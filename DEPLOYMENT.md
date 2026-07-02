@@ -1,5 +1,13 @@
 # MBUTOMS Deployment
 
+Live URLs:
+
+| App | URL |
+|-----|-----|
+| Frontend | https://mbutoms.vercel.app |
+| API | https://mbutoms-api.vercel.app |
+| Health | https://mbutoms-api.vercel.app/api/health |
+
 | App | Platform | Directory |
 |-----|----------|-----------|
 | React frontend | **Vercel** | `frontend/` |
@@ -27,7 +35,7 @@
 | `MONGODB_URI` | `mongodb+srv://...` |
 | `JWT_SECRET` | long random string |
 | `JWT_EXPIRES_IN` | `7d` |
-| `CLIENT_URL` | `https://YOUR-FRONTEND.vercel.app` |
+| `CLIENT_URL` | `https://mbutoms.vercel.app,http://localhost:5173` |
 | `VERCEL` | `1` (set automatically on Vercel) |
 | `RUN_STARTUP_SYNC` | `false` (recommended on serverless; run sync locally once) |
 
@@ -59,7 +67,7 @@ Workflow: `.github/workflows/vercel-backend-deploy.yml`
 
 | Variable | Value |
 |----------|-------|
-| `VITE_API_URL` | `https://YOUR-API.vercel.app/api` |
+| `VITE_API_URL` | `https://mbutoms-api.vercel.app/api` |
 
 4. Deploy.
 
