@@ -16,7 +16,6 @@ import classRoutes from './routes/classRoutes.js';
 import studentRoutes from './routes/studentRoutes.js';
  
 dotenv.config();
-connectDB();
 
 const app = express();
 
@@ -35,6 +34,15 @@ app.use(express.urlencoded({ extended: true }));
 
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', message: 'TOMS API is running' });
+});
+
+app.use(async (req, res, next) => {
+  try {
+    await connectDB({ runStartup: !process.env.VERCEL });
+    next();
+  } catch (error) {
+    next(error);
+  }
 });
 
 app.use('/api/auth', authRoutes);

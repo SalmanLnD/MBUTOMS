@@ -1,65 +1,67 @@
 # MBUTOMS Deployment
 
-This project is a split deployment:
-
 | App | Platform | Directory |
 |-----|----------|-----------|
 | React frontend | **Vercel** | `frontend/` |
-| Express API | **Render** (or Railway/Fly) | `backend/` |
+| Express API | **Vercel** (serverless) | `backend/` |
 | Database | **MongoDB Atlas** | external |
 
 ## 1. MongoDB Atlas
 
-1. Create a free cluster at [mongodb.com/atlas](https://www.mongodb.com/atlas).
-2. Copy the connection string into `MONGODB_URI`.
+1. Create a cluster at [mongodb.com/atlas](https://www.mongodb.com/atlas).
+2. Allow network access (`0.0.0.0/0` for Vercel serverless).
+3. Copy the connection string into `MONGODB_URI`.
 
-## 2. Backend (Render)
+## 2. Backend (Vercel)
 
-1. Push this repo to GitHub (`MBUTOMS`).
-2. In Render, create a **Web Service** from the repo.
+### Dashboard setup
+
+1. Go to [vercel.com/new](https://vercel.com/new) and import **SalmanLnD/MBUTOMS**.
+2. Create a **second Vercel project** for the API (or use CLI below).
 3. Set **Root Directory** to `backend`.
-4. Build command: `npm install`
-5. Start command: `npm start`
-6. Environment variables:
-
-| Variable | Example |
-|----------|---------|
-| `MONGODB_URI` | `mongodb+srv://...` |
-| `JWT_SECRET` | long random string |
-| `JWT_EXPIRES_IN` | `7d` |
-| `CLIENT_URL` | `https://mbutoms.vercel.app` |
-| `PORT` | `10000` |
-
-Or import `render.yaml` as a Render Blueprint.
-
-Note: add a health route if missing — Render uses `/api/health`.
-
-## 3. Frontend (Vercel)
-
-### Option A — Vercel dashboard (recommended)
-
-1. Import the GitHub repo at [vercel.com/new](https://vercel.com/new).
-2. Set **Root Directory** to `frontend`.
-3. Framework preset: **Vite** (auto-detected).
-4. Environment variable:
+4. Framework preset: **Other** (uses `backend/vercel.json`).
+5. Add environment variables:
 
 | Variable | Value |
 |----------|-------|
-| `VITE_API_URL` | `https://YOUR-RENDER-API.onrender.com/api` |
+| `MONGODB_URI` | `mongodb+srv://...` |
+| `JWT_SECRET` | long random string |
+| `JWT_EXPIRES_IN` | `7d` |
+| `CLIENT_URL` | `https://YOUR-FRONTEND.vercel.app` |
+| `VERCEL` | `1` (set automatically on Vercel) |
+| `RUN_STARTUP_SYNC` | `false` (recommended on serverless; run sync locally once) |
 
-5. Deploy.
+6. Deploy. Health check: `https://YOUR-API.vercel.app/api/health`
 
-`frontend/vercel.json` handles SPA routing.
+### CLI deploy
 
-### Option B — GitHub Actions
+```bash
+cd backend
+npm install -g vercel
+vercel login
+vercel link
+vercel env add MONGODB_URI
+vercel env add JWT_SECRET
+vercel env add CLIENT_URL
+vercel --prod
+```
 
-Add these repository secrets:
+### GitHub Actions (optional)
 
-- `VERCEL_TOKEN`
-- `VERCEL_ORG_ID`
-- `VERCEL_PROJECT_ID`
+Add secret `VERCEL_BACKEND_PROJECT_ID` (separate from frontend project).  
+Workflow: `.github/workflows/vercel-backend-deploy.yml`
 
-Pushes to `main` run `.github/workflows/vercel-deploy.yml`.
+## 3. Frontend (Vercel)
+
+1. Import repo at [vercel.com/new](https://vercel.com/new).
+2. Set **Root Directory** to `frontend`.
+3. Environment variable:
+
+| Variable | Value |
+|----------|-------|
+| `VITE_API_URL` | `https://YOUR-API.vercel.app/api` |
+
+4. Deploy.
 
 ## 4. Local development
 
@@ -77,8 +79,12 @@ npm install
 npm run dev
 ```
 
-Frontend proxies `/api` to `http://localhost:5000` in dev (`vite.config.js`).
-
 ## 5. CORS
 
-Set `CLIENT_URL` on the backend to your Vercel URL (comma-separated for multiple origins).
+Set `CLIENT_URL` on the backend to your frontend Vercel URL (comma-separated for multiple origins).
+
+## Notes
+
+- Vercel uses a cached MongoDB connection per serverless instance (`backend/config/db.js`).
+- Heavy startup sync (IDSA/PEDH seed) is skipped on Vercel by default. Run locally against Atlas once if needed: `npm run dev` with `RUN_STARTUP_SYNC` unset.
+- Render deployment (`render.yaml`) remains available as an alternative for a always-on Node server.
