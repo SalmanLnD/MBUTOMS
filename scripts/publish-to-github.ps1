@@ -21,7 +21,7 @@ $owner = (gh api user -q .login)
 
 Write-Host "Publishing to https://github.com/$owner/$repo"
 
-$exists = gh repo view "$owner/$repo" 2>$null
+$view = gh repo view "$owner/$repo" 2>&1
 if ($LASTEXITCODE -ne 0) {
   gh repo create $repo --public --source=. --remote=origin --description "MBU Training Operations Management System (TOMS)"
 } else {
@@ -29,6 +29,7 @@ if ($LASTEXITCODE -ne 0) {
   git remote add origin "https://github.com/$owner/$repo.git"
 }
 
+gh auth setup-git
 git push -u origin main
 
 Write-Host "Done: https://github.com/$owner/$repo" -ForegroundColor Green
