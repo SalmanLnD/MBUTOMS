@@ -1,0 +1,81 @@
+.toms-modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1050;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  background-color: rgba(0, 0, 0, 0.5);
+  overflow-y: auto;
+}
+
+.toms-modal-dialog {
+  width: 100%;
+  max-width: 500px;
+  max-height: calc(100vh - 2rem);
+  margin: auto;
+}
+
+.toms-modal-dialog.toms-modal-lg {
+  max-width: 800px;
+}
+
+.toms-modal-scrollable .toms-modal-content {
+  max-height: calc(100vh - 2rem);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.toms-modal-scrollable form {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  flex: 1;
+}
+
+.toms-modal-scrollable .toms-modal-body {
+  overflow-y: auto;
+  flex: 1;
+  min-height: 0;
+}
+
+.toms-modal-scrollable .toms-modal-footer {
+  flex-shrink: 0;
+}
+
+.toms-modal-content {
+  background: #fff;
+  border-radius: 12px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.25);
+}
+
+.toms-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1rem 1.25rem;
+  border-bottom: 1px solid #e9ecef;
+  flex-shrink: 0;
+}
+
+.toms-modal-title {
+  margin: 0;
+  font-size: 1.1rem;
+  font-weight: 600;
+}
+
+.toms-modal-body {
+  padding: 1.25rem;
+}
+
+.toms-modal-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  padding: 1rem 1.25rem;
+  border-top: 1px solid #e9ecef;
+  flex-shrink: 0;
+  background: #fff;
+}

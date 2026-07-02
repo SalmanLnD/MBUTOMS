@@ -1,0 +1,1604 @@
+[
+  {
+    "trainerCode": "IDSA-T1",
+    "day": "Monday",
+    "startTime": "09:00",
+    "endTime": "10:50",
+    "department": "CSE",
+    "section": "A1",
+    "semester": "III"
+  },
+  {
+    "trainerCode": "IDSA-T1",
+    "day": "Tuesday",
+    "startTime": "09:00",
+    "endTime": "10:50",
+    "department": "CSE",
+    "section": "A1",
+    "semester": "III"
+  },
+  {
+    "trainerCode": "IDSA-T1",
+    "day": "Wednesday",
+    "startTime": "09:00",
+    "endTime": "10:50",
+    "department": "CSE",
+    "section": "A1",
+    "semester": "III"
+  },
+  {
+    "trainerCode": "IDSA-T1",
+    "day": "Thursday",
+    "startTime": "09:00",
+    "endTime": "10:50",
+    "department": "CSE",
+    "section": "A2",
+    "semester": "III"
+  },
+  {
+    "trainerCode": "IDSA-T1",
+    "day": "Friday",
+    "startTime": "09:00",
+    "endTime": "10:50",
+    "department": "CSE",
+    "section": "A2",
+    "semester": "III"
+  },
+  {
+    "trainerCode": "IDSA-T1",
+    "day": "Monday",
+    "startTime": "11:10",
+    "endTime": "13:00",
+    "department": "CSE",
+    "section": "A4",
+    "semester": "III"
+  },
+  {
+    "trainerCode": "IDSA-T1",
+    "day": "Tuesday",
+    "startTime": "11:10",
+    "endTime": "13:00",
+    "department": "CSE",
+    "section": "A3",
+    "semester": "III"
+  },
+  {
+    "trainerCode": "IDSA-T1",
+    "day": "Wednesday",
+    "startTime": "11:10",
+    "endTime": "13:00",
+    "department": "CSE",
+    "section": "A3",
+    "semester": "III"
+  },
+  {
+    "trainerCode": "IDSA-T1",
+    "day": "Friday",
+    "startTime": "11:10",
+    "endTime": "13:00",
+    "department": "CSE",
+    "section": "A4",
+    "semester": "III"
+  },
+  {
+    "trainerCode": "IDSA-T1",
+    "day": "Monday",
+    "startTime": "14:15",
+    "endTime": "16:05",
+    "department": "CSE",
+    "section": "A2",
+    "semester": "III"
+  },
+  {
+    "trainerCode": "IDSA-T1",
+    "day": "Thursday",
+    "startTime": "14:15",
+    "endTime": "16:05",
+    "department": "CSE",
+    "section": "A4",
+    "semester": "III"
+  },
+  {
+    "trainerCode": "IDSA-T1",
+    "day": "Friday",
+    "startTime": "14:15",
+    "endTime": "16:05",
+    "department": "CSE",
+    "section": "A3",
+    "semester": "III"
+  },
+  {
+    "trainerCode": "IDSA-T2",
+    "day": "Monday",
+    "startTime": "09:00",
+    "endTime": "10:50",
+    "department": "CSE",
+    "section": "A5",
+    "semester": "III"
+  },
+  {
+    "trainerCode": "IDSA-T2",
+    "day": "Tuesday",
+    "startTime": "09:00",
+    "endTime": "10:50",
+    "department": "CSE",
+    "section": "A5",
+    "semester": "III"
+  },
+  {
+    "trainerCode": "IDSA-T2",
+    "day": "Wednesday",
+    "startTime": "09:00",
+    "endTime": "10:50",
+    "department": "AIML",
+    "section": "B1",
+    "semester": "III"
+  },
+  {
+    "trainerCode": "IDSA-T2",
+    "day": "Friday",
+    "startTime": "09:00",
+    "endTime": "10:50",
+    "department": "AIML",
+    "section": "B1",
+    "semester": "III"
+  },
+  {
+    "trainerCode": "IDSA-T2",
+    "day": "Monday",
+    "startTime": "11:10",
+    "endTime": "13:00",
+    "department": "CSE",
+    "section": "A7'-CC",
+    "semester": "III"
+  },
+  {
+    "trainerCode": "IDSA-T2",
+    "day": "Tuesday",
+    "startTime": "11:10",
+    "endTime": "13:00",
+    "department": "CSE",
+    "section": "A7'-CC",
+    "semester": "III"
+  },
+  {
+    "trainerCode": "IDSA-T2",
+    "day": "Wednesday",
+    "startTime": "11:10",
+    "endTime": "13:00",
+    "department": "CSE",
+    "section": "A5",
+    "semester": "III"
+  },
+  {
+    "trainerCode": "IDSA-T2",
+    "day": "Thursday",
+    "startTime": "11:10",
+    "endTime": "13:00",
+    "department": "CSE",
+    "section": "A6-Devops",
+    "semester": "III"
+  },
+  {
+    "trainerCode": "IDSA-T2",
+    "day": "Friday",
+    "startTime": "11:10",
+    "endTime": "13:00",
+    "department": "CSE",
+    "section": "A7'-CC",
+    "semester": "III"
+  },
+  {
+    "trainerCode": "IDSA-T2",
+    "day": "Monday",
+    "startTime": "14:15",
+    "endTime": "16:05",
+    "department": "AIML",
+    "section": "B1",
+    "semester": "III"
+  },
+  {
+    "trainerCode": "IDSA-T2",
+    "day": "Tuesday",
+    "startTime": "14:15",
+    "endTime": "16:05",
+    "department": "CSE",
+    "section": "A6-Devops",
+    "semester": "III"
+  },
+  {
+    "trainerCode": "IDSA-T2",
+    "day": "Wednesday",
+    "startTime": "14:15",
+    "endTime": "16:05",
+    "department": "CSE",
+    "section": "A6-Devops",
+    "semester": "III"
+  },
+  {
+    "trainerCode": "IDSA-T3",
+    "day": "Monday",
+    "startTime": "09:00",
+    "endTime": "10:50",
+    "department": "AIML",
+    "section": "B2",
+    "semester": "III"
+  },
+  {
+    "trainerCode": "IDSA-T3",
+    "day": "Wednesday",
+    "startTime": "09:00",
+    "endTime": "10:50",
+    "department": "AIML",
+    "section": "B5",
+    "semester": "III"
+  },
+  {
+    "trainerCode": "IDSA-T3",
+    "day": "Thursday",
+    "startTime": "09:00",
+    "endTime": "10:50",
+    "department": "AIML",
+    "section": "B4",
+    "semester": "III"
+  },
+  {
+    "trainerCode": "IDSA-T3",
+    "day": "Friday",
+    "startTime": "09:00",
+    "endTime": "10:50",
+    "department": "AIML",
+    "section": "B5",
+    "semester": "III"
+  },
+  {
+    "trainerCode": "IDSA-T3",
+    "day": "Monday",
+    "startTime": "11:10",
+    "endTime": "13:00",
+    "department": "AIML",
+    "section": "B4",
+    "semester": "III"
+  },
+  {
+    "trainerCode": "IDSA-T3",
+    "day": "Tuesday",
+    "startTime": "11:10",
+    "endTime": "13:00",
+    "department": "AIML",
+    "section": "B2",
+    "semester": "III"
+  },
+  {
+    "trainerCode": "IDSA-T3",
+    "day": "Wednesday",
+    "startTime": "11:10",
+    "endTime": "13:00",
+    "department": "AIML",
+    "section": "B2",
+    "semester": "III"
+  },
+  {
+    "trainerCode": "IDSA-T3",
+    "day": "Thursday",
+    "startTime": "11:10",
+    "endTime": "13:00",
+    "department": "AIML",
+    "section": "B3",
+    "semester": "III"
+  },
+  {
+    "trainerCode": "IDSA-T3",
+    "day": "Friday",
+    "startTime": "11:10",
+    "endTime": "13:00",
+    "department": "AIML",
+    "section": "B3",
+    "semester": "III"
+  },
+  {
+    "trainerCode": "IDSA-T3",
+    "day": "Monday",
+    "startTime": "14:15",
+    "endTime": "16:05",
+    "department": "AIML",
+    "section": "B3",
+    "semester": "III"
+  },
+  {
+    "trainerCode": "IDSA-T3",
+    "day": "Tuesday",
+    "startTime": "14:15",
+    "endTime": "16:05",
+    "department": "AIML",
+    "section": "B4",
+    "semester": "III"
+  },
+  {
+    "trainerCode": "IDSA-T3",
+    "day": "Thursday",
+    "startTime": "14:15",
+    "endTime": "16:05",
+    "department": "AIML",
+    "section": "B5",
+    "semester": "III"
+  },
+  {
+    "trainerCode": "IDSA-T4",
+    "day": "Monday",
+    "startTime": "09:00",
+    "endTime": "10:50",
+    "department": "AIML",
+    "section": "B6",
+    "semester": "III"
+  },
+  {
+    "trainerCode": "IDSA-T4",
+    "day": "Tuesday",
+    "startTime": "09:00",
+    "endTime": "10:50",
+    "department": "AIML",
+    "section": "B9",
+    "semester": "III"
+  },
+  {
+    "trainerCode": "IDSA-T4",
+    "day": "Wednesday",
+    "startTime": "09:00",
+    "endTime": "10:50",
+    "department": "AIML",
+    "section": "B8",
+    "semester": "III"
+  },
+  {
+    "trainerCode": "IDSA-T4",
+    "day": "Thursday",
+    "startTime": "09:00",
+    "endTime": "10:50",
+    "department": "AIML",
+    "section": "B7",
+    "semester": "III"
+  },
+  {
+    "trainerCode": "IDSA-T4",
+    "day": "Monday",
+    "startTime": "11:10",
+    "endTime": "13:00",
+    "department": "AIML",
+    "section": "B9",
+    "semester": "III"
+  },
+  {
+    "trainerCode": "IDSA-T4",
+    "day": "Tuesday",
+    "startTime": "11:10",
+    "endTime": "13:00",
+    "department": "AIML",
+    "section": "B6",
+    "semester": "III"
+  },
+  {
+    "trainerCode": "IDSA-T4",
+    "day": "Wednesday",
+    "startTime": "11:10",
+    "endTime": "13:00",
+    "department": "AIML",
+    "section": "B6",
+    "semester": "III"
+  },
+  {
+    "trainerCode": "IDSA-T4",
+    "day": "Thursday",
+    "startTime": "11:10",
+    "endTime": "13:00",
+    "department": "AIML",
+    "section": "B8",
+    "semester": "III"
+  },
+  {
+    "trainerCode": "IDSA-T4",
+    "day": "Friday",
+    "startTime": "11:10",
+    "endTime": "13:00",
+    "department": "AIML",
+    "section": "B7",
+    "semester": "III"
+  },
+  {
+    "trainerCode": "IDSA-T4",
+    "day": "Monday",
+    "startTime": "14:15",
+    "endTime": "16:05",
+    "department": "AIML",
+    "section": "B7",
+    "semester": "III"
+  },
+  {
+    "trainerCode": "IDSA-T4",
+    "day": "Thursday",
+    "startTime": "14:15",
+    "endTime": "16:05",
+    "department": "AIML",
+    "section": "B9",
+    "semester": "III"
+  },
+  {
+    "trainerCode": "IDSA-T4",
+    "day": "Friday",
+    "startTime": "14:15",
+    "endTime": "16:05",
+    "department": "AIML",
+    "section": "B8",
+    "semester": "III"
+  },
+  {
+    "trainerCode": "IDSA-T5",
+    "day": "Monday",
+    "startTime": "09:00",
+    "endTime": "10:50",
+    "department": "AIML",
+    "section": "B10",
+    "semester": "III"
+  },
+  {
+    "trainerCode": "IDSA-T5",
+    "day": "Thursday",
+    "startTime": "09:00",
+    "endTime": "10:50",
+    "department": "DS",
+    "section": "+ECM DS1",
+    "semester": "III"
+  },
+  {
+    "trainerCode": "IDSA-T5",
+    "day": "Friday",
+    "startTime": "09:00",
+    "endTime": "10:50",
+    "department": "DS",
+    "section": "+ECM DS1",
+    "semester": "III"
+  },
+  {
+    "trainerCode": "IDSA-T5",
+    "day": "Monday",
+    "startTime": "11:10",
+    "endTime": "13:00",
+    "department": "DS",
+    "section": "+ECM DS2 + ECM",
+    "semester": "III"
+  },
+  {
+    "trainerCode": "IDSA-T5",
+    "day": "Tuesday",
+    "startTime": "11:10",
+    "endTime": "13:00",
+    "department": "AIML",
+    "section": "B10",
+    "semester": "III"
+  },
+  {
+    "trainerCode": "IDSA-T5",
+    "day": "Wednesday",
+    "startTime": "11:10",
+    "endTime": "13:00",
+    "department": "DS",
+    "section": "+ECM DS1",
+    "semester": "III"
+  },
+  {
+    "trainerCode": "IDSA-T5",
+    "day": "Friday",
+    "startTime": "11:10",
+    "endTime": "13:00",
+    "department": "AIML",
+    "section": "B10",
+    "semester": "III"
+  },
+  {
+    "trainerCode": "IDSA-T5",
+    "day": "Monday",
+    "startTime": "14:15",
+    "endTime": "16:05",
+    "department": "AIML",
+    "section": "B11",
+    "semester": "III"
+  },
+  {
+    "trainerCode": "IDSA-T5",
+    "day": "Tuesday",
+    "startTime": "14:15",
+    "endTime": "16:05",
+    "department": "AIML",
+    "section": "B11",
+    "semester": "III"
+  },
+  {
+    "trainerCode": "IDSA-T5",
+    "day": "Wednesday",
+    "startTime": "14:15",
+    "endTime": "16:05",
+    "department": "DS",
+    "section": "+ECM DS2 + ECM",
+    "semester": "III"
+  },
+  {
+    "trainerCode": "IDSA-T5",
+    "day": "Thursday",
+    "startTime": "14:15",
+    "endTime": "16:05",
+    "department": "AIML",
+    "section": "B11",
+    "semester": "III"
+  },
+  {
+    "trainerCode": "IDSA-T5",
+    "day": "Friday",
+    "startTime": "14:15",
+    "endTime": "16:05",
+    "department": "DS",
+    "section": "+ECM DS2 + ECM",
+    "semester": "III"
+  },
+  {
+    "trainerCode": "IDSA-T6",
+    "day": "Monday",
+    "startTime": "09:00",
+    "endTime": "10:50",
+    "department": "IT",
+    "section": "IT",
+    "semester": "III"
+  },
+  {
+    "trainerCode": "IDSA-T6",
+    "day": "Wednesday",
+    "startTime": "09:00",
+    "endTime": "10:50",
+    "department": "CS",
+    "section": "CS2",
+    "semester": "III"
+  },
+  {
+    "trainerCode": "IDSA-T6",
+    "day": "Thursday",
+    "startTime": "09:00",
+    "endTime": "10:50",
+    "department": "AI&DS",
+    "section": "AI&DS-1",
+    "semester": "III"
+  },
+  {
+    "trainerCode": "IDSA-T6",
+    "day": "Friday",
+    "startTime": "09:00",
+    "endTime": "10:50",
+    "department": "AI&DS",
+    "section": "AI&DS-1",
+    "semester": "III"
+  },
+  {
+    "trainerCode": "IDSA-T6",
+    "day": "Monday",
+    "startTime": "11:10",
+    "endTime": "13:00",
+    "department": "CS",
+    "section": "CS1",
+    "semester": "III"
+  },
+  {
+    "trainerCode": "IDSA-T6",
+    "day": "Tuesday",
+    "startTime": "11:10",
+    "endTime": "13:00",
+    "department": "CS",
+    "section": "CS1",
+    "semester": "III"
+  },
+  {
+    "trainerCode": "IDSA-T6",
+    "day": "Wednesday",
+    "startTime": "11:10",
+    "endTime": "13:00",
+    "department": "CS",
+    "section": "CS1",
+    "semester": "III"
+  },
+  {
+    "trainerCode": "IDSA-T6",
+    "day": "Thursday",
+    "startTime": "11:10",
+    "endTime": "13:00",
+    "department": "CS",
+    "section": "CS2",
+    "semester": "III"
+  },
+  {
+    "trainerCode": "IDSA-T6",
+    "day": "Monday",
+    "startTime": "14:15",
+    "endTime": "16:05",
+    "department": "CS",
+    "section": "CS2",
+    "semester": "III"
+  },
+  {
+    "trainerCode": "IDSA-T6",
+    "day": "Tuesday",
+    "startTime": "14:15",
+    "endTime": "16:05",
+    "department": "IT",
+    "section": "IT",
+    "semester": "III"
+  },
+  {
+    "trainerCode": "IDSA-T6",
+    "day": "Wednesday",
+    "startTime": "14:15",
+    "endTime": "16:05",
+    "department": "AI&DS",
+    "section": "AI&DS-1",
+    "semester": "III"
+  },
+  {
+    "trainerCode": "IDSA-T6",
+    "day": "Friday",
+    "startTime": "14:15",
+    "endTime": "16:05",
+    "department": "IT",
+    "section": "IT",
+    "semester": "III"
+  },
+  {
+    "trainerCode": "IDSA-T7",
+    "day": "Tuesday",
+    "startTime": "09:00",
+    "endTime": "10:50",
+    "department": "AI&DS",
+    "section": "AI&DS-3",
+    "semester": "III"
+  },
+  {
+    "trainerCode": "IDSA-T7",
+    "day": "Monday",
+    "startTime": "11:10",
+    "endTime": "13:00",
+    "department": "AI&DS",
+    "section": "AI&DS-2",
+    "semester": "III"
+  },
+  {
+    "trainerCode": "IDSA-T7",
+    "day": "Tuesday",
+    "startTime": "11:10",
+    "endTime": "13:00",
+    "department": "AI&DS",
+    "section": "AI&DS-2",
+    "semester": "III"
+  },
+  {
+    "trainerCode": "IDSA-T7",
+    "day": "Wednesday",
+    "startTime": "11:10",
+    "endTime": "13:00",
+    "department": "AI&DS",
+    "section": "AI&DS-3",
+    "semester": "III"
+  },
+  {
+    "trainerCode": "IDSA-T7",
+    "day": "Thursday",
+    "startTime": "11:10",
+    "endTime": "13:00",
+    "department": "AI&DS",
+    "section": "AI&DS-3",
+    "semester": "III"
+  },
+  {
+    "trainerCode": "IDSA-T7",
+    "day": "Friday",
+    "startTime": "14:15",
+    "endTime": "16:05",
+    "department": "AI&DS",
+    "section": "AI&DS-2",
+    "semester": "III"
+  },
+  {
+    "trainerCode": "PEDH- T01",
+    "day": "Monday",
+    "startTime": "09:00",
+    "endTime": "10:50",
+    "department": "CSE",
+    "section": "A2",
+    "semester": "III"
+  },
+  {
+    "trainerCode": "PEDH- T01",
+    "day": "Wednesday",
+    "startTime": "09:00",
+    "endTime": "10:50",
+    "department": "CSE",
+    "section": "A4",
+    "semester": "III"
+  },
+  {
+    "trainerCode": "PEDH- T01",
+    "day": "Thursday",
+    "startTime": "09:00",
+    "endTime": "10:50",
+    "department": "CSE",
+    "section": "A3",
+    "semester": "III"
+  },
+  {
+    "trainerCode": "PEDH- T01",
+    "day": "Friday",
+    "startTime": "09:00",
+    "endTime": "10:50",
+    "department": "CSE",
+    "section": "A3",
+    "semester": "III"
+  },
+  {
+    "trainerCode": "PEDH- T01",
+    "day": "Monday",
+    "startTime": "11:10",
+    "endTime": "13:00",
+    "department": "CSE",
+    "section": "A1",
+    "semester": "III"
+  },
+  {
+    "trainerCode": "PEDH- T01",
+    "day": "Tuesday",
+    "startTime": "11:10",
+    "endTime": "13:00",
+    "department": "CSE",
+    "section": "A2",
+    "semester": "III"
+  },
+  {
+    "trainerCode": "PEDH- T01",
+    "day": "Thursday",
+    "startTime": "11:10",
+    "endTime": "13:00",
+    "department": "CSE",
+    "section": "A4",
+    "semester": "III"
+  },
+  {
+    "trainerCode": "PEDH- T01",
+    "day": "Monday",
+    "startTime": "14:15",
+    "endTime": "16:05",
+    "department": "CSE",
+    "section": "A3",
+    "semester": "III"
+  },
+  {
+    "trainerCode": "PEDH- T01",
+    "day": "Tuesday",
+    "startTime": "14:15",
+    "endTime": "16:05",
+    "department": "CSE",
+    "section": "A1",
+    "semester": "III"
+  },
+  {
+    "trainerCode": "PEDH- T01",
+    "day": "Wednesday",
+    "startTime": "14:15",
+    "endTime": "16:05",
+    "department": "CSE",
+    "section": "A2",
+    "semester": "III"
+  },
+  {
+    "trainerCode": "PEDH- T01",
+    "day": "Thursday",
+    "startTime": "14:15",
+    "endTime": "16:05",
+    "department": "CSE",
+    "section": "A1",
+    "semester": "III"
+  },
+  {
+    "trainerCode": "PEDH- T01",
+    "day": "Friday",
+    "startTime": "14:15",
+    "endTime": "16:05",
+    "department": "CSE",
+    "section": "A4",
+    "semester": "III"
+  },
+  {
+    "trainerCode": "PEDH- T02",
+    "day": "Monday",
+    "startTime": "09:00",
+    "endTime": "10:50",
+    "department": "CSE",
+    "section": "A7'-CC",
+    "semester": "III"
+  },
+  {
+    "trainerCode": "PEDH- T02",
+    "day": "Tuesday",
+    "startTime": "09:00",
+    "endTime": "10:50",
+    "department": "AIML",
+    "section": "B1",
+    "semester": "III"
+  },
+  {
+    "trainerCode": "PEDH- T02",
+    "day": "Wednesday",
+    "startTime": "09:00",
+    "endTime": "10:50",
+    "department": "CSE",
+    "section": "A7'-CC",
+    "semester": "III"
+  },
+  {
+    "trainerCode": "PEDH- T02",
+    "day": "Thursday",
+    "startTime": "09:00",
+    "endTime": "10:50",
+    "department": "CSE",
+    "section": "A5",
+    "semester": "III"
+  },
+  {
+    "trainerCode": "PEDH- T02",
+    "day": "Friday",
+    "startTime": "09:00",
+    "endTime": "10:50",
+    "department": "CSE",
+    "section": "A7'-CC",
+    "semester": "III"
+  },
+  {
+    "trainerCode": "PEDH- T02",
+    "day": "Monday",
+    "startTime": "11:10",
+    "endTime": "13:00",
+    "department": "CSE",
+    "section": "A5",
+    "semester": "III"
+  },
+  {
+    "trainerCode": "PEDH- T02",
+    "day": "Tuesday",
+    "startTime": "11:10",
+    "endTime": "13:00",
+    "department": "CSE",
+    "section": "A5",
+    "semester": "III"
+  },
+  {
+    "trainerCode": "PEDH- T02",
+    "day": "Thursday",
+    "startTime": "11:10",
+    "endTime": "13:00",
+    "department": "AIML",
+    "section": "B1",
+    "semester": "III"
+  },
+  {
+    "trainerCode": "PEDH- T02",
+    "day": "Monday",
+    "startTime": "14:15",
+    "endTime": "16:05",
+    "department": "CSE",
+    "section": "A6-Devops",
+    "semester": "III"
+  },
+  {
+    "trainerCode": "PEDH- T02",
+    "day": "Tuesday",
+    "startTime": "14:15",
+    "endTime": "16:05",
+    "department": "AIML",
+    "section": "B1",
+    "semester": "III"
+  },
+  {
+    "trainerCode": "PEDH- T02",
+    "day": "Thursday",
+    "startTime": "14:15",
+    "endTime": "16:05",
+    "department": "CSE",
+    "section": "A6-Devops",
+    "semester": "III"
+  },
+  {
+    "trainerCode": "PEDH- T02",
+    "day": "Friday",
+    "startTime": "14:15",
+    "endTime": "16:05",
+    "department": "CSE",
+    "section": "A6-Devops",
+    "semester": "III"
+  },
+  {
+    "trainerCode": "PEDH- T03",
+    "day": "Monday",
+    "startTime": "09:00",
+    "endTime": "10:50",
+    "department": "AIML",
+    "section": "B3",
+    "semester": "III"
+  },
+  {
+    "trainerCode": "PEDH- T03",
+    "day": "Tuesday",
+    "startTime": "09:00",
+    "endTime": "10:50",
+    "department": "AIML",
+    "section": "B4",
+    "semester": "III"
+  },
+  {
+    "trainerCode": "PEDH- T03",
+    "day": "Wednesday",
+    "startTime": "09:00",
+    "endTime": "10:50",
+    "department": "AIML",
+    "section": "B4",
+    "semester": "III"
+  },
+  {
+    "trainerCode": "PEDH- T03",
+    "day": "Friday",
+    "startTime": "09:00",
+    "endTime": "10:50",
+    "department": "AIML",
+    "section": "B3",
+    "semester": "III"
+  },
+  {
+    "trainerCode": "PEDH- T03",
+    "day": "Monday",
+    "startTime": "11:10",
+    "endTime": "13:00",
+    "department": "AIML",
+    "section": "B2",
+    "semester": "III"
+  },
+  {
+    "trainerCode": "PEDH- T03",
+    "day": "Wednesday",
+    "startTime": "11:10",
+    "endTime": "13:00",
+    "department": "AIML",
+    "section": "B5",
+    "semester": "III"
+  },
+  {
+    "trainerCode": "PEDH- T03",
+    "day": "Thursday",
+    "startTime": "11:10",
+    "endTime": "13:00",
+    "department": "AIML",
+    "section": "B5",
+    "semester": "III"
+  },
+  {
+    "trainerCode": "PEDH- T03",
+    "day": "Monday",
+    "startTime": "14:15",
+    "endTime": "16:05",
+    "department": "AIML",
+    "section": "B5",
+    "semester": "III"
+  },
+  {
+    "trainerCode": "PEDH- T03",
+    "day": "Tuesday",
+    "startTime": "14:15",
+    "endTime": "16:05",
+    "department": "AIML",
+    "section": "B2",
+    "semester": "III"
+  },
+  {
+    "trainerCode": "PEDH- T03",
+    "day": "Wednesday",
+    "startTime": "14:15",
+    "endTime": "16:05",
+    "department": "AIML",
+    "section": "B3",
+    "semester": "III"
+  },
+  {
+    "trainerCode": "PEDH- T03",
+    "day": "Thursday",
+    "startTime": "14:15",
+    "endTime": "16:05",
+    "department": "AIML",
+    "section": "B2",
+    "semester": "III"
+  },
+  {
+    "trainerCode": "PEDH- T03",
+    "day": "Friday",
+    "startTime": "14:15",
+    "endTime": "16:05",
+    "department": "AIML",
+    "section": "B4",
+    "semester": "III"
+  },
+  {
+    "trainerCode": "PEDH- T04",
+    "day": "Monday",
+    "startTime": "09:00",
+    "endTime": "10:50",
+    "department": "AIML",
+    "section": "B7",
+    "semester": "III"
+  },
+  {
+    "trainerCode": "PEDH- T04",
+    "day": "Tuesday",
+    "startTime": "09:00",
+    "endTime": "10:50",
+    "department": "AIML",
+    "section": "B8",
+    "semester": "III"
+  },
+  {
+    "trainerCode": "PEDH- T04",
+    "day": "Thursday",
+    "startTime": "09:00",
+    "endTime": "10:50",
+    "department": "AIML",
+    "section": "B6",
+    "semester": "III"
+  },
+  {
+    "trainerCode": "PEDH- T04",
+    "day": "Friday",
+    "startTime": "09:00",
+    "endTime": "10:50",
+    "department": "AIML",
+    "section": "B6",
+    "semester": "III"
+  },
+  {
+    "trainerCode": "PEDH- T04",
+    "day": "Monday",
+    "startTime": "11:10",
+    "endTime": "13:00",
+    "department": "AIML",
+    "section": "B6",
+    "semester": "III"
+  },
+  {
+    "trainerCode": "PEDH- T04",
+    "day": "Tuesday",
+    "startTime": "11:10",
+    "endTime": "13:00",
+    "department": "AIML",
+    "section": "B7",
+    "semester": "III"
+  },
+  {
+    "trainerCode": "PEDH- T04",
+    "day": "Wednesday",
+    "startTime": "11:10",
+    "endTime": "13:00",
+    "department": "AIML",
+    "section": "B8",
+    "semester": "III"
+  },
+  {
+    "trainerCode": "PEDH- T04",
+    "day": "Thursday",
+    "startTime": "11:10",
+    "endTime": "13:00",
+    "department": "AIML",
+    "section": "B9",
+    "semester": "III"
+  },
+  {
+    "trainerCode": "PEDH- T04",
+    "day": "Friday",
+    "startTime": "11:10",
+    "endTime": "13:00",
+    "department": "AIML",
+    "section": "B8",
+    "semester": "III"
+  },
+  {
+    "trainerCode": "PEDH- T04",
+    "day": "Wednesday",
+    "startTime": "14:15",
+    "endTime": "16:05",
+    "department": "AIML",
+    "section": "B9",
+    "semester": "III"
+  },
+  {
+    "trainerCode": "PEDH- T04",
+    "day": "Thursday",
+    "startTime": "14:15",
+    "endTime": "16:05",
+    "department": "AIML",
+    "section": "B7",
+    "semester": "III"
+  },
+  {
+    "trainerCode": "PEDH- T04",
+    "day": "Friday",
+    "startTime": "14:15",
+    "endTime": "16:05",
+    "department": "AIML",
+    "section": "B9",
+    "semester": "III"
+  },
+  {
+    "trainerCode": "PEDH- T05",
+    "day": "Monday",
+    "startTime": "09:00",
+    "endTime": "10:50",
+    "department": "AIML",
+    "section": "B11",
+    "semester": "III"
+  },
+  {
+    "trainerCode": "PEDH- T05",
+    "day": "Wednesday",
+    "startTime": "09:00",
+    "endTime": "10:50",
+    "department": "DS",
+    "section": "+ECM DS2 + ECM",
+    "semester": "III"
+  },
+  {
+    "trainerCode": "PEDH- T05",
+    "day": "Thursday",
+    "startTime": "09:00",
+    "endTime": "10:50",
+    "department": "DS",
+    "section": "+ECM DS2 + ECM",
+    "semester": "III"
+  },
+  {
+    "trainerCode": "PEDH- T05",
+    "day": "Friday",
+    "startTime": "09:00",
+    "endTime": "10:50",
+    "department": "AIML",
+    "section": "B11",
+    "semester": "III"
+  },
+  {
+    "trainerCode": "PEDH- T05",
+    "day": "Monday",
+    "startTime": "11:10",
+    "endTime": "13:00",
+    "department": "DS",
+    "section": "+ECM DS1",
+    "semester": "III"
+  },
+  {
+    "trainerCode": "PEDH- T05",
+    "day": "Tuesday",
+    "startTime": "11:10",
+    "endTime": "13:00",
+    "department": "DS",
+    "section": "+ECM DS1",
+    "semester": "III"
+  },
+  {
+    "trainerCode": "PEDH- T05",
+    "day": "Thursday",
+    "startTime": "11:10",
+    "endTime": "13:00",
+    "department": "AIML",
+    "section": "B10",
+    "semester": "III"
+  },
+  {
+    "trainerCode": "PEDH- T05",
+    "day": "Monday",
+    "startTime": "14:15",
+    "endTime": "16:05",
+    "department": "DS",
+    "section": "+ECM DS2 + ECM",
+    "semester": "III"
+  },
+  {
+    "trainerCode": "PEDH- T05",
+    "day": "Wednesday",
+    "startTime": "14:15",
+    "endTime": "16:05",
+    "department": "AIML",
+    "section": "B11",
+    "semester": "III"
+  },
+  {
+    "trainerCode": "PEDH- T05",
+    "day": "Thursday",
+    "startTime": "14:15",
+    "endTime": "16:05",
+    "department": "DS",
+    "section": "+ECM DS1",
+    "semester": "III"
+  },
+  {
+    "trainerCode": "PEDH- T05",
+    "day": "Friday",
+    "startTime": "14:15",
+    "endTime": "16:05",
+    "department": "AIML",
+    "section": "B10",
+    "semester": "III"
+  },
+  {
+    "trainerCode": "PEDH- T06",
+    "day": "Monday",
+    "startTime": "09:00",
+    "endTime": "10:50",
+    "department": "CS",
+    "section": "CS1",
+    "semester": "III"
+  },
+  {
+    "trainerCode": "PEDH- T06",
+    "day": "Wednesday",
+    "startTime": "09:00",
+    "endTime": "10:50",
+    "department": "IT",
+    "section": "IT",
+    "semester": "III"
+  },
+  {
+    "trainerCode": "PEDH- T06",
+    "day": "Thursday",
+    "startTime": "09:00",
+    "endTime": "10:50",
+    "department": "IT",
+    "section": "IT",
+    "semester": "III"
+  },
+  {
+    "trainerCode": "PEDH- T06",
+    "day": "Friday",
+    "startTime": "09:00",
+    "endTime": "10:50",
+    "department": "CS",
+    "section": "CS2",
+    "semester": "III"
+  },
+  {
+    "trainerCode": "PEDH- T06",
+    "day": "Monday",
+    "startTime": "11:10",
+    "endTime": "13:00",
+    "department": "AI&DS",
+    "section": "AI&DS-1",
+    "semester": "III"
+  },
+  {
+    "trainerCode": "PEDH- T06",
+    "day": "Tuesday",
+    "startTime": "11:10",
+    "endTime": "13:00",
+    "department": "AI&DS",
+    "section": "AI&DS-1",
+    "semester": "III"
+  },
+  {
+    "trainerCode": "PEDH- T06",
+    "day": "Wednesday",
+    "startTime": "11:10",
+    "endTime": "13:00",
+    "department": "CS",
+    "section": "CS2",
+    "semester": "III"
+  },
+  {
+    "trainerCode": "PEDH- T06",
+    "day": "Thursday",
+    "startTime": "11:10",
+    "endTime": "13:00",
+    "department": "AI&DS",
+    "section": "AI&DS-1",
+    "semester": "III"
+  },
+  {
+    "trainerCode": "PEDH- T06",
+    "day": "Tuesday",
+    "startTime": "14:15",
+    "endTime": "16:05",
+    "department": "CS",
+    "section": "CS1",
+    "semester": "III"
+  },
+  {
+    "trainerCode": "PEDH- T06",
+    "day": "Thursday",
+    "startTime": "14:15",
+    "endTime": "16:05",
+    "department": "IT",
+    "section": "IT",
+    "semester": "III"
+  },
+  {
+    "trainerCode": "PEDH- T06",
+    "day": "Friday",
+    "startTime": "14:15",
+    "endTime": "16:05",
+    "department": "CS",
+    "section": "CS1",
+    "semester": "III"
+  },
+  {
+    "trainerCode": "PEDH- T07",
+    "day": "Tuesday",
+    "startTime": "09:00",
+    "endTime": "10:50",
+    "department": "AI&DS",
+    "section": "AI&DS-2",
+    "semester": "III"
+  },
+  {
+    "trainerCode": "PEDH- T07",
+    "day": "Wednesday",
+    "startTime": "09:00",
+    "endTime": "10:50",
+    "department": "AI&DS",
+    "section": "AI&DS-2",
+    "semester": "III"
+  },
+  {
+    "trainerCode": "PEDH- T07",
+    "day": "Thursday",
+    "startTime": "09:00",
+    "endTime": "10:50",
+    "department": "AI&DS",
+    "section": "AI&DS-3",
+    "semester": "III"
+  },
+  {
+    "trainerCode": "PEDH- T07",
+    "day": "Friday",
+    "startTime": "11:10",
+    "endTime": "13:00",
+    "department": "AI&DS",
+    "section": "AI&DS-2",
+    "semester": "III"
+  },
+  {
+    "trainerCode": "PEDH- T07",
+    "day": "Wednesday",
+    "startTime": "14:15",
+    "endTime": "16:05",
+    "department": "AI&DS",
+    "section": "AI&DS-3",
+    "semester": "III"
+  },
+  {
+    "trainerCode": "PEDH- T07",
+    "day": "Thursday",
+    "startTime": "14:15",
+    "endTime": "16:05",
+    "department": "AI&DS",
+    "section": "AI&DS-3",
+    "semester": "III"
+  },
+  {
+    "trainerCode": "PSTP-T8",
+    "day": "Monday",
+    "startTime": "09:00",
+    "endTime": "10:50",
+    "department": "ECE",
+    "section": "& EIE ECE1",
+    "semester": "III"
+  },
+  {
+    "trainerCode": "PSTP-T8",
+    "day": "Tuesday",
+    "startTime": "09:00",
+    "endTime": "10:50",
+    "department": "ECE",
+    "section": "& EIE ECE4",
+    "semester": "III"
+  },
+  {
+    "trainerCode": "PSTP-T8",
+    "day": "Wednesday",
+    "startTime": "09:00",
+    "endTime": "10:50",
+    "department": "ECE",
+    "section": "& EIE ECE3",
+    "semester": "III"
+  },
+  {
+    "trainerCode": "PSTP-T8",
+    "day": "Thursday",
+    "startTime": "09:00",
+    "endTime": "10:50",
+    "department": "ECE",
+    "section": "& EIE ECE1",
+    "semester": "III"
+  },
+  {
+    "trainerCode": "PSTP-T8",
+    "day": "Monday",
+    "startTime": "11:10",
+    "endTime": "13:00",
+    "department": "ECE",
+    "section": "& EIE ECE4",
+    "semester": "III"
+  },
+  {
+    "trainerCode": "PSTP-T8",
+    "day": "Tuesday",
+    "startTime": "11:10",
+    "endTime": "13:00",
+    "department": "ECE",
+    "section": "& EIE ECE1",
+    "semester": "III"
+  },
+  {
+    "trainerCode": "PSTP-T8",
+    "day": "Wednesday",
+    "startTime": "11:10",
+    "endTime": "13:00",
+    "department": "ECE",
+    "section": "& EIE ECE2",
+    "semester": "III"
+  },
+  {
+    "trainerCode": "PSTP-T8",
+    "day": "Friday",
+    "startTime": "11:10",
+    "endTime": "13:00",
+    "department": "ECE",
+    "section": "& EIE ECE3",
+    "semester": "III"
+  },
+  {
+    "trainerCode": "PSTP-T8",
+    "day": "Monday",
+    "startTime": "14:15",
+    "endTime": "16:05",
+    "department": "ECE",
+    "section": "& EIE ECE2",
+    "semester": "III"
+  },
+  {
+    "trainerCode": "PSTP-T8",
+    "day": "Tuesday",
+    "startTime": "14:15",
+    "endTime": "16:05",
+    "department": "ECE",
+    "section": "& EIE ECE2",
+    "semester": "III"
+  },
+  {
+    "trainerCode": "PSTP-T8",
+    "day": "Thursday",
+    "startTime": "14:15",
+    "endTime": "16:05",
+    "department": "ECE",
+    "section": "& EIE ECE3",
+    "semester": "III"
+  },
+  {
+    "trainerCode": "PSTP-T8",
+    "day": "Friday",
+    "startTime": "14:15",
+    "endTime": "16:05",
+    "department": "ECE",
+    "section": "& EIE ECE4",
+    "semester": "III"
+  },
+  {
+    "trainerCode": "PSTP-T9",
+    "day": "Monday",
+    "startTime": "09:00",
+    "endTime": "10:50",
+    "department": "EEE",
+    "section": "EEE1",
+    "semester": "III"
+  },
+  {
+    "trainerCode": "PSTP-T9",
+    "day": "Tuesday",
+    "startTime": "09:00",
+    "endTime": "10:50",
+    "department": "EEE",
+    "section": "EEE1",
+    "semester": "III"
+  },
+  {
+    "trainerCode": "PSTP-T9",
+    "day": "Wednesday",
+    "startTime": "09:00",
+    "endTime": "10:50",
+    "department": "EEE",
+    "section": "EEE2",
+    "semester": "III"
+  },
+  {
+    "trainerCode": "PSTP-T9",
+    "day": "Thursday",
+    "startTime": "09:00",
+    "endTime": "10:50",
+    "department": "EEE",
+    "section": "EEE1",
+    "semester": "III"
+  },
+  {
+    "trainerCode": "PSTP-T9",
+    "day": "Friday",
+    "startTime": "09:00",
+    "endTime": "10:50",
+    "department": "EEE",
+    "section": "EEE2",
+    "semester": "III"
+  },
+  {
+    "trainerCode": "PSTP-T9",
+    "day": "Thursday",
+    "startTime": "11:10",
+    "endTime": "13:00",
+    "department": "ECE",
+    "section": "& EIE EIE",
+    "semester": "III"
+  },
+  {
+    "trainerCode": "PSTP-T9",
+    "day": "Friday",
+    "startTime": "11:10",
+    "endTime": "13:00",
+    "department": "EEE",
+    "section": "EEE2",
+    "semester": "III"
+  },
+  {
+    "trainerCode": "PSTP-T9",
+    "day": "Monday",
+    "startTime": "14:15",
+    "endTime": "16:05",
+    "department": "ECE",
+    "section": "& EIE EIE",
+    "semester": "III"
+  },
+  {
+    "trainerCode": "PSTP-T9",
+    "day": "Tuesday",
+    "startTime": "14:15",
+    "endTime": "16:05",
+    "department": "CE",
+    "section": "& ME CE-ME",
+    "semester": "III"
+  },
+  {
+    "trainerCode": "PSTP-T9",
+    "day": "Wednesday",
+    "startTime": "14:15",
+    "endTime": "16:05",
+    "department": "CE",
+    "section": "& ME CE-ME",
+    "semester": "III"
+  },
+  {
+    "trainerCode": "PSTP-T9",
+    "day": "Thursday",
+    "startTime": "14:15",
+    "endTime": "16:05",
+    "department": "CE",
+    "section": "& ME CE-ME",
+    "semester": "III"
+  },
+  {
+    "trainerCode": "PSTP-T9",
+    "day": "Friday",
+    "startTime": "14:15",
+    "endTime": "16:05",
+    "department": "ECE",
+    "section": "& EIE EIE",
+    "semester": "III"
+  }
+]

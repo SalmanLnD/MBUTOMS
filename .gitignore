@@ -1,0 +1,35 @@
+# Dependencies
+node_modules/
+
+# Environment and secrets
+.env
+.env.*
+!.env.example
+!**/.env.example
+
+# Build output
+dist/
+build/
+frontend/dist/
+
+# Logs and OS
+*.log
+npm-debug.log*
+.DS_Store
+Thumbs.db
+
+# IDE / editor
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Uploads (keep folder, ignore files)
+backend/uploads/*
+!backend/uploads/.gitkeep
+
+# Test / coverage
+coverage/
+
+# Vercel local
+.vercel/

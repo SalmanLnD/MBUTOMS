@@ -1,0 +1,32 @@
+export const formatDate = (date) => {
+  if (!date) return '-';
+  return new Date(date).toLocaleDateString('en-IN', {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+  });
+};
+
+export const formatRole = (role) => {
+  const roles = {
+    admin: 'Admin',
+    campus_manager: 'Campus Manager',
+    trainer: 'Trainer',
+  };
+  return roles[role] || role;
+};
+
+export const formatStatus = (status) =>
+  status?.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()) || '-';
+
+export const getErrorMessage = (error) =>
+  error.response?.data?.message || error.message || 'Something went wrong';
+
+export const toInputDate = (date) => {
+  if (!date) return '';
+  const d = new Date(date);
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+};

@@ -1,0 +1,36 @@
+.schedule-calendar {
+  background: #fff;
+  border-radius: 12px;
+  padding: 1rem;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+}
+
+.schedule-calendar .fc {
+  font-family: inherit;
+}
+
+.schedule-calendar .fc-toolbar-title {
+  font-size: 1.1rem;
+  font-weight: 600;
+}
+
+.schedule-calendar .fc-button-primary {
+  background-color: var(--primary-color);
+  border-color: var(--primary-color);
+}
+
+.schedule-calendar .fc-button-primary:not(:disabled).fc-button-active,
+.schedule-calendar .fc-button-primary:not(:disabled):active {
+  background-color: #0b5ed7;
+  border-color: #0b5ed7;
+}
+
+.schedule-calendar .fc-event {
+  cursor: pointer;
+  font-size: 0.8rem;
+  border-radius: 4px;
+}
+
+.schedule-calendar .fc-timegrid-slot {
+  height: 2.5em;
+}

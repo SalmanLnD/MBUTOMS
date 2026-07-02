@@ -1,0 +1,24 @@
+# Optional: deploy the Express API on Render (frontend stays on Vercel).
+# Import this blueprint at https://dashboard.render.com/blueprints
+
+services:
+  - type: web
+    name: mbutoms-api
+    runtime: node
+    rootDir: backend
+    buildCommand: npm install
+    startCommand: npm start
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_VERSION
+        value: 20
+      - key: PORT
+        value: 10000
+      - key: MONGODB_URI
+        sync: false
+      - key: JWT_SECRET
+        sync: false
+      - key: JWT_EXPIRES_IN
+        value: 7d
+      - key: CLIENT_URL
+        sync: false
