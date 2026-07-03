@@ -12,6 +12,8 @@ import {
 } from './trainerMappings.js';
 import { DEFAULT_SLOT_TIMINGS } from './timetableSlots.js';
 
+import { DEFAULT_SUBJECT_START_DATE } from './subjectStartDate.js';
+
 const LEGACY_IDSA_CODE = 'IDSA';
 
 const mergeTrainerIds = (...lists) => [
@@ -72,7 +74,12 @@ export const syncIdsaTrainersAndSubject = async () => {
     Object.assign(subject, subjectPayload);
     await subject.save();
   } else if (socSchool && semesterIII && trainers.length) {
-    subject = await Subject.create(subjectPayload);
+    subject = await Subject.create({
+      ...subjectPayload,
+      oifNumber: IDSA_SUBJECT.code,
+      dealNumber: IDSA_SUBJECT.code,
+      startDate: DEFAULT_SUBJECT_START_DATE,
+    });
   }
 
   if (subject) {

@@ -3,7 +3,7 @@ import { Link, useSearchParams } from 'react-router-dom';
 import Topbar from '../components/Topbar.jsx';
 import LoadingSpinner from '../components/LoadingSpinner.jsx';
 import Pagination from '../components/Pagination.jsx';
-import AlertMessage from '../components/AlertMessage.jsx';
+import { showError, showSuccess } from '../utils/toast.js';
 import TrainerFormModal from '../components/TrainerFormModal.jsx';
 import TrainerAttendanceTab from '../components/TrainerAttendanceTab.jsx';
 import ConfirmModal from '../components/ConfirmModal.jsx';
@@ -21,8 +21,6 @@ const Trainers = () => {
   const [trainers, setTrainers] = useState([]);
   const [pagination, setPagination] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
-  const [success, setSuccess] = useState('');
   const [search, setSearch] = useState('');
   const [sortBy, setSortBy] = useState('employeeId');
   const [sortOrder, setSortOrder] = useState('asc');
@@ -46,7 +44,7 @@ const Trainers = () => {
       setTrainers(data.trainers);
       setPagination(data.pagination);
     } catch (err) {
-      setError(getErrorMessage(err));
+      showError(getErrorMessage(err));
     } finally {
       setLoading(false);
     }
@@ -75,11 +73,11 @@ const Trainers = () => {
     if (!pendingDelete) return;
     try {
       await deleteTrainer(pendingDelete.id);
-      setSuccess('Trainer deleted successfully');
+      showSuccess('Trainer deleted successfully');
       setPendingDelete(null);
       fetchTrainers();
     } catch (err) {
-      setError(getErrorMessage(err));
+      showError(getErrorMessage(err));
     }
   };
 
@@ -97,7 +95,7 @@ const Trainers = () => {
     setShowModal(false);
     setEditingTrainer(null);
     if (saved) {
-      setSuccess(saved === true ? 'Trainer saved successfully' : saved);
+      showSuccess(saved === true ? 'Trainer saved successfully' : saved);
       fetchTrainers();
     }
   };
@@ -115,8 +113,6 @@ const Trainers = () => {
   return (
     <>
       <Topbar title="Trainer Management" />
-      <AlertMessage message={error} onClose={() => setError('')} />
-      <AlertMessage type="success" message={success} onClose={() => setSuccess('')} />
 
       <ul className="nav nav-tabs mb-3">
         <li className="nav-item">

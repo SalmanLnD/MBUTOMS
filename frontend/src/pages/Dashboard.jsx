@@ -13,7 +13,7 @@ import { Bar, Doughnut } from 'react-chartjs-2';
 import Topbar from '../components/Topbar.jsx';
 import StatCard from '../components/StatCard.jsx';
 import LoadingSpinner from '../components/LoadingSpinner.jsx';
-import AlertMessage from '../components/AlertMessage.jsx';
+import { showError } from '../utils/toast.js';
 import {
   TrainerIcon,
   StudentIcon,
@@ -31,7 +31,6 @@ ChartJS.register(CategoryScale, LinearScale, BarElement, ArcElement, Title, Tool
 const Dashboard = () => {
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
 
   useEffect(() => {
     const fetchStats = async () => {
@@ -39,7 +38,7 @@ const Dashboard = () => {
         const data = await getDashboardStats();
         setStats(data);
       } catch (err) {
-        setError(getErrorMessage(err));
+        showError(getErrorMessage(err));
       } finally {
         setLoading(false);
       }
@@ -63,7 +62,7 @@ const Dashboard = () => {
           attendanceSummary?.od || 0,
           attendanceSummary?.holiday || 0,
         ],
-        backgroundColor: ['#198754', '#dc3545', '#fd7e14', '#0dcaf0', '#6f42c1', '#6c757d'],
+        backgroundColor: ['#10b981', '#f43f5e', '#f59e0b', '#06b6d4', '#8b5cf6', '#64748b'],
       },
     ],
   };
@@ -74,8 +73,10 @@ const Dashboard = () => {
       {
         label: 'Performance Score',
         data: trainerPerformance?.map((t) => t.performanceScore) || [],
-        backgroundColor: '#0d6efd',
-        borderRadius: 6,
+        backgroundColor: 'rgba(20, 184, 166, 0.85)',
+        hoverBackgroundColor: 'rgba(6, 182, 212, 0.95)',
+        borderRadius: 8,
+        borderSkipped: false,
       },
     ],
   };
@@ -83,26 +84,25 @@ const Dashboard = () => {
   return (
     <>
       <Topbar title="Dashboard" />
-      <AlertMessage message={error} onClose={() => setError('')} />
 
       <div className="row g-3 mb-4">
         <div className="col-sm-6 col-xl-4">
-          <StatCard title="Total Trainers" value={cards?.totalTrainers} icon={<TrainerIcon size={24} />} />
+          <StatCard title="Total Trainers" value={cards?.totalTrainers} icon={<TrainerIcon size={24} />} accent="teal" />
         </div>
         <div className="col-sm-6 col-xl-4">
-          <StatCard title="Total Students" value={cards?.totalStudents} icon={<StudentIcon size={24} />} />
+          <StatCard title="Total Students" value={cards?.totalStudents} icon={<StudentIcon size={24} />} accent="violet" />
         </div>
         <div className="col-sm-6 col-xl-4">
-          <StatCard title="Today's Classes" value={cards?.todaysClasses} icon={<CalendarIcon size={24} />} />
+          <StatCard title="Today's Classes" value={cards?.todaysClasses} icon={<CalendarIcon size={24} />} accent="amber" />
         </div>
         <div className="col-sm-6 col-xl-4">
-          <StatCard title="Today's Leaves" value={cards?.todaysLeaves} icon={<LeaveIcon size={24} />} />
+          <StatCard title="Today's Leaves" value={cards?.todaysLeaves} icon={<LeaveIcon size={24} />} accent="rose" />
         </div>
         <div className="col-sm-6 col-xl-4">
-          <StatCard title="Active Venues" value={cards?.activeVenues} icon={<VenueIcon size={24} />} />
+          <StatCard title="Active Venues" value={cards?.activeVenues} icon={<VenueIcon size={24} />} accent="cyan" />
         </div>
         <div className="col-sm-6 col-xl-4">
-          <StatCard title="Pending Replacements" value={cards?.pendingReplacements} icon={<ReplacementIcon size={24} />} />
+          <StatCard title="Pending Replacements" value={cards?.pendingReplacements} icon={<ReplacementIcon size={24} />} accent="gold" />
         </div>
       </div>
 

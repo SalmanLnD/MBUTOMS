@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import Topbar from '../components/Topbar.jsx';
 import LoadingSpinner from '../components/LoadingSpinner.jsx';
 import Pagination from '../components/Pagination.jsx';
-import AlertMessage from '../components/AlertMessage.jsx';
+import { showError, showSuccess } from '../utils/toast.js';
 import VenueFormModal from '../components/VenueFormModal.jsx';
 import ConfirmModal from '../components/ConfirmModal.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
@@ -25,8 +25,6 @@ const Venues = () => {
   const [venues, setVenues] = useState([]);
   const [pagination, setPagination] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
-  const [success, setSuccess] = useState('');
   const [search, setSearch] = useState('');
   const [typeFilter, setTypeFilter] = useState('');
   const [page, setPage] = useState(1);
@@ -43,7 +41,7 @@ const Venues = () => {
       setVenues(data.venues);
       setPagination(data.pagination);
     } catch (err) {
-      setError(getErrorMessage(err));
+      showError(getErrorMessage(err));
     } finally {
       setLoading(false);
     }
@@ -61,19 +59,17 @@ const Venues = () => {
     if (!pendingDelete) return;
     try {
       await deleteVenue(pendingDelete.id);
-      setSuccess('Venue deleted successfully');
+      showSuccess('Venue deleted successfully');
       setPendingDelete(null);
       fetchVenues();
     } catch (err) {
-      setError(getErrorMessage(err));
+      showError(getErrorMessage(err));
     }
   };
 
   return (
     <>
       <Topbar title="Venue Management" />
-      <AlertMessage message={error} onClose={() => setError('')} />
-      <AlertMessage type="success" message={success} onClose={() => setSuccess('')} />
 
       <div className="card table-card">
         <div className="card-body">
@@ -173,7 +169,7 @@ const Venues = () => {
           onClose={(saved) => {
             setShowModal(false);
             setEditingVenue(null);
-            if (saved) { setSuccess('Venue saved successfully'); fetchVenues(); }
+            if (saved) { showSuccess('Venue saved successfully'); fetchVenues(); }
           }}
         />
       )}

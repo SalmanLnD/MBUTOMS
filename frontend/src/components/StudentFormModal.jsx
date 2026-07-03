@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { createStudent, updateStudent } from '../services/studentService.js';
+import { getClasses } from '../services/classService.js';
 import { getErrorMessage } from '../utils/helpers.js';
 import Modal from './Modal.jsx';
 
@@ -7,6 +8,7 @@ const emptyForm = {
   rollNumber: '',
   name: '',
   email: '',
+  classId: '',
   branch: '',
   sectionLabel: '',
   status: 'active',
@@ -14,16 +16,29 @@ const emptyForm = {
 
 const StudentFormModal = ({ show, student, defaultClass, onClose, onSaved }) => {
   const [form, setForm] = useState(emptyForm);
+  const [classOptions, setClassOptions] = useState([]);
+  const [classesLoading, setClassesLoading] = useState(true);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const isEdit = Boolean(student);
 
   useEffect(() => {
+    setClassesLoading(true);
+    getClasses()
+      .then((data) => setClassOptions(data || []))
+      .finally(() => setClassesLoading(false));
+  }, []);
+
+  useEffect(() => {
     if (student) {
+      const matched = classOptions.find(
+        (item) => item.department === student.branch && item.section === student.sectionLabel
+      );
       setForm({
         rollNumber: student.rollNumber || '',
         name: student.name || '',
         email: student.email || '',
+        classId: matched?._id || '',
         branch: student.branch || '',
         sectionLabel: student.sectionLabel || student.section?.name || '',
         status: student.status || 'active',
@@ -31,16 +46,27 @@ const StudentFormModal = ({ show, student, defaultClass, onClose, onSaved }) => 
     } else if (defaultClass) {
       setForm({
         ...emptyForm,
+        classId: defaultClass._id || '',
         branch: defaultClass.department || '',
         sectionLabel: defaultClass.section || '',
       });
     } else {
       setForm(emptyForm);
     }
-  }, [student, defaultClass]);
+  }, [student, defaultClass, classOptions]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
+    if (name === 'classId') {
+      const cls = classOptions.find((item) => item._id === value);
+      setForm((prev) => ({
+        ...prev,
+        classId: value,
+        branch: cls?.department || '',
+        sectionLabel: cls?.section || '',
+      }));
+      return;
+    }
     setForm((prev) => ({ ...prev, [name]: value }));
   };
 
@@ -97,25 +123,26 @@ const StudentFormModal = ({ show, student, defaultClass, onClose, onSaved }) => 
               onChange={handleChange}
             />
           </div>
-          <div className="row">
-            <div className="col-md-6 mb-3">
-              <label className="form-label">Branch / Department</label>
-              <input
-                className="form-control"
-                name="branch"
-                value={form.branch}
+          <div className="mb-3">
+            <label className="form-label">Class</label>
+            {classesLoading ? (
+              <div className="text-muted small">Loading classes...</div>
+            ) : (
+              <select
+                className="form-select"
+                name="classId"
+                value={form.classId}
                 onChange={handleChange}
-              />
-            </div>
-            <div className="col-md-6 mb-3">
-              <label className="form-label">Section</label>
-              <input
-                className="form-control"
-                name="sectionLabel"
-                value={form.sectionLabel}
-                onChange={handleChange}
-              />
-            </div>
+                required
+              >
+                <option value="">Select class</option>
+                {classOptions.map((cls) => (
+                  <option key={cls._id} value={cls._id}>
+                    {cls.department} {cls.section} · PY {cls.py} · Sem {cls.currentSemester}
+                  </option>
+                ))}
+              </select>
+            )}
           </div>
           <div className="mb-3">
             <label className="form-label">Status</label>

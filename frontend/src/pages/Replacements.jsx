@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import Topbar from '../components/Topbar.jsx';
 import LoadingSpinner from '../components/LoadingSpinner.jsx';
-import AlertMessage from '../components/AlertMessage.jsx';
+import { showError, showSuccess } from '../utils/toast.js';
 import {
   getPendingReplacements,
   getReplacementSuggestions,
@@ -15,8 +15,6 @@ import { EditIcon } from '../components/icons.jsx';
 const Replacements = () => {
   const [pending, setPending] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
-  const [success, setSuccess] = useState('');
   const [selectedSchedule, setSelectedSchedule] = useState(null);
   const [changingReplacement, setChangingReplacement] = useState(false);
   const [suggestions, setSuggestions] = useState([]);
@@ -28,7 +26,7 @@ const Replacements = () => {
       const data = await getPendingReplacements();
       setPending(data.pending || []);
     } catch (err) {
-      setError(getErrorMessage(err));
+      showError(getErrorMessage(err));
     } finally {
       setLoading(false);
     }
@@ -51,7 +49,7 @@ const Replacements = () => {
       const data = await getReplacementSuggestions(schedule._id);
       setSuggestions(data.suggestions || []);
     } catch (err) {
-      setError(getErrorMessage(err));
+      showError(getErrorMessage(err));
     } finally {
       setLoadingSuggestions(false);
     }
@@ -60,19 +58,17 @@ const Replacements = () => {
   const handleAssign = async (trainerId) => {
     try {
       await assignReplacement(selectedSchedule._id, trainerId);
-      setSuccess(changingReplacement ? 'Replacement trainer updated' : 'Replacement trainer assigned');
+      showSuccess(changingReplacement ? 'Replacement trainer updated' : 'Replacement trainer assigned');
       closeSuggestionsModal();
       fetchPending();
     } catch (err) {
-      setError(getErrorMessage(err));
+      showError(getErrorMessage(err));
     }
   };
 
   return (
     <>
       <Topbar title="Replacement Suggestions" />
-      <AlertMessage message={error} onClose={() => setError('')} />
-      <AlertMessage type="success" message={success} onClose={() => setSuccess('')} />
 
       {loading ? <LoadingSpinner /> : (
         <div className="card table-card">

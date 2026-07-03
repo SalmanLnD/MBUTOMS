@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import Topbar from '../components/Topbar.jsx';
 import ScheduleCalendar from '../components/ScheduleCalendar.jsx';
 import LoadingSpinner from '../components/LoadingSpinner.jsx';
-import AlertMessage from '../components/AlertMessage.jsx';
+import { showError } from '../utils/toast.js';
 import { getVenues } from '../services/venueService.js';
 import { getVenueSchedule } from '../services/scheduleService.js';
 import { formatDate, getErrorMessage } from '../utils/helpers.js';
@@ -14,7 +14,6 @@ const VenueSchedule = () => {
   const [selectedVenue, setSelectedVenue] = useState('');
   const [schedules, setSchedules] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
   const [view, setView] = useState('calendar');
 
   useEffect(() => {
@@ -24,7 +23,7 @@ const VenueSchedule = () => {
         setVenues(data.venues);
         if (data.venues.length > 0) setSelectedVenue(data.venues[0]._id);
       } catch (err) {
-        setError(getErrorMessage(err));
+        showError(getErrorMessage(err));
       } finally {
         setLoading(false);
       }
@@ -39,7 +38,7 @@ const VenueSchedule = () => {
       const data = await getVenueSchedule(selectedVenue, start && end ? { start, end } : undefined);
       setSchedules(data.schedules);
     } catch (err) {
-      setError(getErrorMessage(err));
+      showError(getErrorMessage(err));
     } finally {
       setLoading(false);
     }
@@ -58,7 +57,6 @@ const VenueSchedule = () => {
   return (
     <>
       <Topbar title="Venue Schedule" />
-      <AlertMessage message={error} onClose={() => setError('')} />
 
       <div className="row g-3 mb-4 align-items-end">
         <div className="col-md-6">

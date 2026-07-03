@@ -11,6 +11,9 @@
     "seed:reference": "node utils/seedReference.js",
     "seed:idsa": "node utils/runIdsaSync.js",
     "seed:pedh": "node utils/runPedhSync.js",
+    "seed:pstp": "node utils/runPstpSync.js",
+    "seed:classes": "node utils/runClassMigration.js",
+    "seed:lrre-v": "node scripts/verify-lrre-v-semester-timetable.js",
     "seed:legacy": "node utils/seed.js",
     "parse:workbook": "node utils/parseWorkbook.js"
   },

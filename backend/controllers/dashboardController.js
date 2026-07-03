@@ -4,12 +4,11 @@ import Student from '../models/Student.js';
 
 import Venue from '../models/Venue.js';
 
-import Schedule from '../models/Schedule.js';
-
 import Leave from '../models/Leave.js';
 
 import Attendance from '../models/Attendance.js';
 import { enrichSchedulesWithReplacementFor } from '../utils/scheduleReplacement.js';
+import { getActiveSchedulesForDay } from '../utils/activeSchedulesForDate.js';
 
 
 
@@ -39,11 +38,11 @@ export const getDashboardStats = async (req, res) => {
 
     activeVenues,
 
-    todaysClasses,
-
     todaysLeaves,
 
-    pendingReplacements,
+    replacementLeaves,
+
+    activeToday,
 
   ] = await Promise.all([
 
@@ -52,8 +51,6 @@ export const getDashboardStats = async (req, res) => {
     Student.countDocuments({ status: 'active' }),
 
     Venue.countDocuments({ isActive: true }),
-
-    Schedule.countDocuments({ day: todayName }),
 
     Leave.countDocuments({
 
@@ -65,17 +62,35 @@ export const getDashboardStats = async (req, res) => {
 
     }),
 
-    Leave.countDocuments({
+    Leave.find({
 
       status: 'approved',
 
       replacementNeeded: true,
 
+      endDate: { $gte: today },
+
       affectedSchedules: { $exists: true, $not: { $size: 0 } },
 
-    }),
+    }).select('affectedSchedules replacements'),
+
+    getActiveSchedulesForDay(todayName, today),
 
   ]);
+
+  const todaysClasses = activeToday.count;
+
+  const pendingReplacements = replacementLeaves.reduce((count, leave) => {
+    const assignedScheduleIds = new Set(
+      (leave.replacements || [])
+        .map((entry) => entry.schedule?.toString())
+        .filter(Boolean)
+    );
+    const unassigned = (leave.affectedSchedules || []).filter(
+      (scheduleId) => !assignedScheduleIds.has(scheduleId.toString())
+    );
+    return count + unassigned.length;
+  }, 0);
 
 
 
@@ -114,9 +129,9 @@ export const getDashboardStats = async (req, res) => {
 
 
   const upcomingClasses = await enrichSchedulesWithReplacementFor(
-    await Schedule.find({ day: todayName })
-      .sort({ startTime: 1 })
-      .limit(5),
+    [...activeToday.schedules]
+      .sort((a, b) => a.startTime.localeCompare(b.startTime))
+      .slice(0, 5),
     new Date()
   );
 

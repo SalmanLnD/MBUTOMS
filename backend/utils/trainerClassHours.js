@@ -1,4 +1,5 @@
 import { buildTrainerSchedulesForDate } from './trainerScheduleView.js';
+import { isScheduleActiveOnDate } from './subjectStartDate.js';
 
 const WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
@@ -20,9 +21,18 @@ export const computeClassHandlingHours = async (trainerId, referenceDate, semest
   });
 
   const dayName = WEEKDAYS[new Date(referenceDate).getDay()];
-  const hours = schedules
-    .filter((schedule) => schedule.day === dayName)
-    .reduce((sum, schedule) => sum + computeHours(schedule.startTime, schedule.endTime), 0);
+  const activeSchedules = [];
+
+  for (const schedule of schedules) {
+    if (schedule.day !== dayName) continue;
+    const active = await isScheduleActiveOnDate(schedule, referenceDate);
+    if (active) activeSchedules.push(schedule);
+  }
+
+  const hours = activeSchedules.reduce(
+    (sum, schedule) => sum + computeHours(schedule.startTime, schedule.endTime),
+    0
+  );
 
   return Math.round(hours * 10) / 10;
 };

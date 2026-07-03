@@ -1,4 +1,4 @@
-import { buildTimetableGrid, WEEKDAYS } from '../utils/timetableGrid.js';
+import { buildTimetableGrid, WEEKDAYS, formatDayShort } from '../utils/timetableGrid.js';
 import { formatTimeRange, formatScheduleClassLabel } from '../utils/scheduleUtils.js';
 import { getEffectiveSubjectCode } from '../utils/scheduleSubject.js';
 
@@ -66,16 +66,18 @@ const TrainerTimetableGrid = ({
     );
   }
 
+  const showHeaderLabel = subjectLabel && subjectLabel !== 'All subjects';
+
   return (
-    <div className="card table-card">
-      {subjectLabel && (
-        <div className="card-header bg-white border-bottom py-2">
+    <div className="card table-card timetable-card">
+      {showHeaderLabel && (
+        <div className="card-header bg-white border-bottom py-2 timetable-card-header">
           <small className="text-success fw-semibold">{subjectLabel}</small>
         </div>
       )}
       <div className="card-body p-0">
-        <div className="table-responsive">
-          <table className="table table-bordered timetable-grid mb-0">
+        <div className={`timetable-grid-wrap${showHeaderLabel ? '' : ' timetable-grid-wrap--full'}`}>
+          <table className="table timetable-grid mb-0">
             <thead className="table-light">
               <tr>
                 <th className="timetable-day-col">Day</th>
@@ -100,8 +102,8 @@ const TrainerTimetableGrid = ({
             <tbody>
               {days.map((day) => (
                 <tr key={day}>
-                  <th scope="row" className="table-light timetable-day-col">
-                    {day}
+                  <th scope="row" className="table-light timetable-day-col" title={day}>
+                    {formatDayShort(day)}
                   </th>
                   {timeSlots.map((slot) => {
                     const columnKey = periodOnly ? slot.key : `${slot.startTime}|${slot.endTime}`;

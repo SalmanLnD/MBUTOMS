@@ -36,6 +36,9 @@ const subjectSchema = new mongoose.Schema(
         default: () => ({ ...DEFAULT_SLOT_TIMINGS.s3 }),
       },
     },
+    oifNumber: { type: String, required: true, trim: true },
+    dealNumber: { type: String, required: true, trim: true },
+    startDate: { type: Date, required: true },
   },
   { timestamps: true }
 );

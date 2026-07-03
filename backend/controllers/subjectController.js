@@ -4,6 +4,8 @@ import Department from '../models/Department.js';
 import School from '../models/School.js';
 import Trainer from '../models/Trainer.js';
 import { normalizeSlotTimings, DEFAULT_SLOT_TIMINGS } from '../utils/timetableSlots.js';
+import { normalizeDate } from '../utils/scheduleHelpers.js';
+import { clearSubjectStartDateCache } from '../utils/subjectStartDate.js';
 import {
   applySubjectTrainerEligibleChange,
 } from '../utils/syncTrainerSubjectLinks.js';
@@ -38,6 +40,10 @@ const normalizeSubjectPayload = (body) => {
 
   if (payload.slotTimings !== undefined) {
     payload.slotTimings = normalizeSlotTimings(payload.slotTimings);
+  }
+
+  if (payload.startDate) {
+    payload.startDate = normalizeDate(payload.startDate);
   }
 
   return payload;
@@ -152,6 +158,7 @@ export const createSubject = async (req, res) => {
 
   const subject = await Subject.create(normalizeSubjectPayload(req.body));
   await applySubjectTrainerEligibleChange(subject._id, [], subject.trainerEligible);
+  clearSubjectStartDateCache();
   const populated = await populateSubject(Subject.findById(subject._id));
 
   res.status(201).json(populated);
@@ -181,6 +188,7 @@ export const updateSubject = async (req, res) => {
     previousEligible,
     subject.trainerEligible
   );
+  clearSubjectStartDateCache();
 
   const updated = await populateSubject(Subject.findById(subject._id));
   res.json(updated);

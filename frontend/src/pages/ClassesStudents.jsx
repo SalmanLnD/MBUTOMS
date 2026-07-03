@@ -1,14 +1,15 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import Topbar from '../components/Topbar.jsx';
 import LoadingSpinner from '../components/LoadingSpinner.jsx';
 import Pagination from '../components/Pagination.jsx';
-import AlertMessage from '../components/AlertMessage.jsx';
+import { showError, showSuccess } from '../utils/toast.js';
 import ConfirmModal from '../components/ConfirmModal.jsx';
 import StudentFormModal from '../components/StudentFormModal.jsx';
 import Modal from '../components/Modal.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
 import { useDebounce } from '../hooks/useDebounce.js';
-import { getClasses } from '../services/classService.js';
+import ClassFormModal from '../components/ClassFormModal.jsx';
+import { getClasses, deleteClass } from '../services/classService.js';
 import {
   getStudents,
   deleteStudent,
@@ -17,6 +18,8 @@ import { getAttendance, markAttendance } from '../services/attendanceService.js'
 import { formatDate, formatStatus, getErrorMessage, toInputDate } from '../utils/helpers.js';
 
 const statusOptions = ['present', 'absent', 'late', 'leave', 'od', 'holiday'];
+const SEMESTER_ORDER = { I: 1, II: 2, III: 3, IV: 4, V: 5, VI: 6, VII: 7, VIII: 8 };
+const semesterSortKey = (sem) => SEMESTER_ORDER[String(sem || '').trim()] ?? 99;
 const tabs = [
   { id: 'classes', label: 'Classes' },
   { id: 'students', label: 'Students' },
@@ -28,12 +31,95 @@ const ClassesStudents = () => {
   const canManage = hasRole('admin', 'campus_manager');
 
   const [activeTab, setActiveTab] = useState('classes');
-  const [error, setError] = useState('');
-  const [success, setSuccess] = useState('');
 
   const [classes, setClasses] = useState([]);
   const [classesLoading, setClassesLoading] = useState(true);
+  const [showClassForm, setShowClassForm] = useState(false);
+  const [editingClass, setEditingClass] = useState(null);
+  const [pendingClassDelete, setPendingClassDelete] = useState(null);
   const [classFilter, setClassFilter] = useState(null);
+  const [classPyFilter, setClassPyFilter] = useState('');
+  const [classDeptFilter, setClassDeptFilter] = useState('');
+  const [classSectionFilter, setClassSectionFilter] = useState('');
+  const [classSemFilter, setClassSemFilter] = useState('');
+  const [classSortBy, setClassSortBy] = useState('department');
+  const [classSortOrder, setClassSortOrder] = useState('asc');
+
+  const classLabel = (cls) => cls.label || `${cls.department} ${cls.section}`;
+
+  const classFilterOptions = useMemo(() => {
+    const pys = [...new Set(classes.map((c) => c.py).filter(Boolean))].sort((a, b) => a - b);
+    const depts = [...new Set(classes.map((c) => c.department).filter(Boolean))].sort();
+    const sections = [...new Set(
+      classes
+        .filter((c) => !classDeptFilter || c.department === classDeptFilter)
+        .map((c) => c.section)
+        .filter(Boolean)
+    )].sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
+    const semesters = [...new Set(classes.map((c) => c.currentSemester).filter(Boolean))]
+      .sort((a, b) => semesterSortKey(a) - semesterSortKey(b));
+    return { pys, depts, sections, semesters };
+  }, [classes, classDeptFilter]);
+
+  const filteredClasses = useMemo(() => {
+    const filtered = classes.filter((cls) => {
+      if (classPyFilter && cls.py !== Number(classPyFilter)) return false;
+      if (classDeptFilter && cls.department !== classDeptFilter) return false;
+      if (classSectionFilter && cls.section !== classSectionFilter) return false;
+      if (classSemFilter && cls.currentSemester !== classSemFilter) return false;
+      return true;
+    });
+
+    const dir = classSortOrder === 'asc' ? 1 : -1;
+    return [...filtered].sort((a, b) => {
+      let cmp = 0;
+      switch (classSortBy) {
+        case 'py':
+          cmp = (a.py ?? 0) - (b.py ?? 0);
+          break;
+        case 'department':
+          cmp = String(a.department || '').localeCompare(String(b.department || ''));
+          break;
+        case 'section':
+          cmp = String(a.section || '').localeCompare(String(b.section || ''), undefined, { numeric: true });
+          break;
+        case 'currentSemester':
+          cmp = semesterSortKey(a.currentSemester) - semesterSortKey(b.currentSemester);
+          break;
+        default:
+          cmp = String(a.department || '').localeCompare(String(b.department || ''));
+      }
+      return cmp * dir;
+    });
+  }, [
+    classes,
+    classPyFilter,
+    classDeptFilter,
+    classSectionFilter,
+    classSemFilter,
+    classSortBy,
+    classSortOrder,
+  ]);
+
+  const hasClassFilters = Boolean(classPyFilter || classDeptFilter || classSectionFilter || classSemFilter);
+
+  const handleClassSort = (field) => {
+    if (classSortBy === field) {
+      setClassSortOrder(classSortOrder === 'asc' ? 'desc' : 'asc');
+    } else {
+      setClassSortBy(field);
+      setClassSortOrder('asc');
+    }
+  };
+
+  const classSortIcon = (field) => (classSortBy === field ? (classSortOrder === 'asc' ? ' ↑' : ' ↓') : '');
+
+  const clearClassTableFilters = () => {
+    setClassPyFilter('');
+    setClassDeptFilter('');
+    setClassSectionFilter('');
+    setClassSemFilter('');
+  };
 
   const [students, setStudents] = useState([]);
   const [studentPagination, setStudentPagination] = useState(null);
@@ -69,7 +155,7 @@ const ClassesStudents = () => {
       const data = await getClasses();
       setClasses(data);
     } catch (err) {
-      setError(getErrorMessage(err));
+      showError(getErrorMessage(err));
     } finally {
       setClassesLoading(false);
     }
@@ -89,7 +175,7 @@ const ClassesStudents = () => {
       setStudents(data.students);
       setStudentPagination(data.pagination);
     } catch (err) {
-      setError(getErrorMessage(err));
+      showError(getErrorMessage(err));
     } finally {
       setStudentsLoading(false);
     }
@@ -108,7 +194,7 @@ const ClassesStudents = () => {
       setAttendanceRecords(data.records);
       setAttendancePagination(data.pagination);
     } catch (err) {
-      setError(getErrorMessage(err));
+      showError(getErrorMessage(err));
     } finally {
       setAttendanceLoading(false);
     }
@@ -141,10 +227,29 @@ const ClassesStudents = () => {
     setStudentPage(1);
   };
 
+  const handleClassSaved = () => {
+    setShowClassForm(false);
+    setEditingClass(null);
+    showSuccess('Class saved successfully');
+    fetchClasses();
+  };
+
+  const handleConfirmClassDelete = async () => {
+    if (!pendingClassDelete) return;
+    try {
+      await deleteClass(pendingClassDelete.id);
+      showSuccess('Class removed');
+      setPendingClassDelete(null);
+      fetchClasses();
+    } catch (err) {
+      showError(getErrorMessage(err));
+    }
+  };
+
   const handleStudentSaved = () => {
     setShowStudentForm(false);
     setEditingStudent(null);
-    setSuccess('Student saved successfully');
+    showSuccess('Student saved successfully');
     fetchStudents();
     fetchClasses();
   };
@@ -153,12 +258,12 @@ const ClassesStudents = () => {
     if (!pendingDelete) return;
     try {
       await deleteStudent(pendingDelete.id);
-      setSuccess('Student removed');
+      showSuccess('Student removed');
       setPendingDelete(null);
       fetchStudents();
       fetchClasses();
     } catch (err) {
-      setError(getErrorMessage(err));
+      showError(getErrorMessage(err));
     }
   };
 
@@ -166,19 +271,17 @@ const ClassesStudents = () => {
     e.preventDefault();
     try {
       await markAttendance({ ...attendanceForm, type: 'student' });
-      setSuccess('Student attendance marked');
+      showSuccess('Student attendance marked');
       setShowAttendanceForm(false);
       fetchAttendance();
     } catch (err) {
-      setError(getErrorMessage(err));
+      showError(getErrorMessage(err));
     }
   };
 
   return (
     <>
       <Topbar title="Classes & Students" />
-      <AlertMessage message={error} onClose={() => setError('')} />
-      <AlertMessage type="success" message={success} onClose={() => setSuccess('')} />
 
       <ul className="nav nav-tabs mb-3">
         {tabs.map((tab) => (
@@ -196,47 +299,161 @@ const ClassesStudents = () => {
 
       {activeTab === 'classes' && (
         <>
+          <div className="row g-2 mb-3 align-items-center">
+            <div className="col-md-2">
+              <select
+                className="form-select"
+                value={classPyFilter}
+                onChange={(e) => setClassPyFilter(e.target.value)}
+                aria-label="Filter by PY"
+              >
+                <option value="">All PY</option>
+                {classFilterOptions.pys.map((py) => (
+                  <option key={py} value={py}>{py}</option>
+                ))}
+              </select>
+            </div>
+            <div className="col-md-2">
+              <select
+                className="form-select"
+                value={classDeptFilter}
+                onChange={(e) => {
+                  setClassDeptFilter(e.target.value);
+                  setClassSectionFilter('');
+                }}
+                aria-label="Filter by department"
+              >
+                <option value="">All Departments</option>
+                {classFilterOptions.depts.map((dept) => (
+                  <option key={dept} value={dept}>{dept}</option>
+                ))}
+              </select>
+            </div>
+            <div className="col-md-2">
+              <select
+                className="form-select"
+                value={classSectionFilter}
+                onChange={(e) => setClassSectionFilter(e.target.value)}
+                aria-label="Filter by section"
+              >
+                <option value="">All Sections</option>
+                {classFilterOptions.sections.map((section) => (
+                  <option key={section} value={section}>{section}</option>
+                ))}
+              </select>
+            </div>
+            <div className="col-md-2">
+              <select
+                className="form-select"
+                value={classSemFilter}
+                onChange={(e) => setClassSemFilter(e.target.value)}
+                aria-label="Filter by semester"
+              >
+                <option value="">All Semesters</option>
+                {classFilterOptions.semesters.map((sem) => (
+                  <option key={sem} value={sem}>{sem}</option>
+                ))}
+              </select>
+            </div>
+            <div className="col-md-2">
+              {hasClassFilters && (
+                <button type="button" className="btn btn-sm btn-outline-secondary" onClick={clearClassTableFilters}>
+                  Clear filters
+                </button>
+              )}
+            </div>
+            <div className="col-md-2 text-md-end">
+              {canManage && (
+                <button
+                  type="button"
+                  className="btn btn-primary"
+                  onClick={() => {
+                    setEditingClass(null);
+                    setShowClassForm(true);
+                  }}
+                >
+                  Add Class
+                </button>
+              )}
+            </div>
+          </div>
+
           {classesLoading ? (
             <LoadingSpinner />
           ) : (
             <div className="card table-card">
               <div className="card-body table-responsive">
+                {hasClassFilters && (
+                  <div className="text-muted small mb-2">
+                    Showing {filteredClasses.length} of {classes.length} classes
+                  </div>
+                )}
                 <table className="table table-hover align-middle">
                   <thead className="table-light">
                     <tr>
-                      <th>Class</th>
-                      <th>Department</th>
-                      <th>Section</th>
+                      <th role="button" onClick={() => handleClassSort('py')}>
+                        PY{classSortIcon('py')}
+                      </th>
+                      <th role="button" onClick={() => handleClassSort('department')}>
+                        Department{classSortIcon('department')}
+                      </th>
+                      <th role="button" onClick={() => handleClassSort('section')}>
+                        Section{classSortIcon('section')}
+                      </th>
+                      <th role="button" onClick={() => handleClassSort('currentSemester')}>
+                        Current Semester{classSortIcon('currentSemester')}
+                      </th>
                       <th>Students</th>
-                      <th>Timetable Slots</th>
-                      <th>Source</th>
                       <th />
                     </tr>
                   </thead>
                   <tbody>
-                    {classes.length === 0 ? (
+                    {filteredClasses.length === 0 ? (
                       <tr>
-                        <td colSpan="7" className="text-center text-muted py-4">
-                          No classes found
+                        <td colSpan="6" className="text-center text-muted py-4">
+                          {hasClassFilters ? 'No classes match the selected filters' : 'No classes found'}
                         </td>
                       </tr>
                     ) : (
-                      classes.map((cls) => (
-                        <tr key={cls.id}>
-                          <td>{cls.label}</td>
+                      filteredClasses.map((cls) => (
+                        <tr key={cls._id}>
+                          <td>{cls.py}</td>
                           <td>{cls.department || '-'}</td>
                           <td>{cls.section || '-'}</td>
+                          <td>{cls.currentSemester || '-'}</td>
                           <td>{cls.studentCount}</td>
-                          <td>{cls.slotCount}</td>
-                          <td className="text-capitalize">{cls.source}</td>
                           <td className="text-end">
                             <button
                               type="button"
-                              className="btn btn-sm btn-outline-primary"
+                              className="btn btn-sm btn-outline-primary me-1"
                               onClick={() => handleViewClassStudents(cls)}
                             >
                               View Students
                             </button>
+                            {canManage && (
+                              <>
+                                <button
+                                  type="button"
+                                  className="btn btn-sm btn-outline-secondary me-1"
+                                  onClick={() => {
+                                    setEditingClass(cls);
+                                    setShowClassForm(true);
+                                  }}
+                                >
+                                  Edit
+                                </button>
+                                <button
+                                  type="button"
+                                  className="btn btn-sm btn-outline-danger"
+                                  onClick={() => setPendingClassDelete({
+                                    id: cls._id,
+                                    name: classLabel(cls),
+                                  })}
+                                >
+                                  Delete
+                                </button>
+                              </>
+                            )}
                           </td>
                         </tr>
                       ))
@@ -283,7 +500,7 @@ const ClassesStudents = () => {
               {classFilter && (
                 <div className="d-flex align-items-center gap-2">
                   <span className="badge bg-primary">
-                    {classFilter.label}
+                    {classLabel(classFilter)}
                   </span>
                   <button type="button" className="btn btn-sm btn-link" onClick={clearClassFilter}>
                     Clear filter
@@ -450,6 +667,30 @@ const ClassesStudents = () => {
             </div>
           )}
         </>
+      )}
+
+      {showClassForm && (
+        <ClassFormModal
+          show
+          classItem={editingClass}
+          onClose={() => {
+            setShowClassForm(false);
+            setEditingClass(null);
+          }}
+          onSaved={handleClassSaved}
+        />
+      )}
+
+      {pendingClassDelete && (
+        <ConfirmModal
+          show
+          title="Delete Class"
+          message={`Delete class "${pendingClassDelete.name}"?`}
+          confirmLabel="Delete"
+          confirmVariant="danger"
+          onConfirm={handleConfirmClassDelete}
+          onClose={() => setPendingClassDelete(null)}
+        />
       )}
 
       {showStudentForm && (

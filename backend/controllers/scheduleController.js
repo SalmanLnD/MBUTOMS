@@ -4,6 +4,8 @@ import Trainer from '../models/Trainer.js';
 import { timesOverlap } from '../utils/timetableSlots.js';
 import { buildTrainerSchedulesForDate } from '../utils/trainerScheduleView.js';
 import { resolveTrainerScheduleCodes } from '../utils/trainerMappings.js';
+import { assertClassRegistered } from '../utils/classRegistry.js';
+import ClassGroup from '../models/ClassGroup.js';
 
 const DAY_ORDER = {
   Monday: 1,
@@ -91,6 +93,25 @@ const enrichSchedulePayload = async (body) => {
     if (subject) {
       payload.subject = subject._id;
     }
+  }
+
+  if (payload.classId) {
+    const cls = await ClassGroup.findById(payload.classId);
+    if (!cls || cls.status !== 'active') {
+      const error = new Error('Selected class is not registered or is inactive.');
+      error.statusCode = 400;
+      throw error;
+    }
+    payload.department = cls.department;
+    payload.section = cls.section;
+    payload.semester = cls.currentSemester;
+    delete payload.classId;
+  } else {
+    await assertClassRegistered({
+      department: payload.department,
+      section: payload.section,
+      semester: payload.semester,
+    });
   }
 
   return payload;
@@ -210,17 +231,21 @@ export const deleteSchedule = async (req, res) => {
 };
 
 export const getBatches = async (req, res) => {
-  const batches = await Schedule.aggregate([
-    { $group: { _id: { department: '$department', section: '$section' } } },
-    { $sort: { '_id.department': 1, '_id.section': 1 } },
-    {
-      $project: {
-        _id: 0,
-        name: { $concat: ['$_id.department', ' ', '$_id.section'] },
-        department: '$_id.department',
-        section: '$_id.section',
-      },
-    },
-  ]);
-  res.json(batches);
+  const filter = { status: 'active' };
+  if (req.query.semester) filter.currentSemester = req.query.semester;
+
+  const classes = await ClassGroup.find(filter)
+    .sort({ department: 1, section: 1 })
+    .lean();
+
+  res.json(
+    classes.map((cls) => ({
+      _id: cls._id,
+      name: `${cls.department} ${cls.section}`,
+      department: cls.department,
+      section: cls.section,
+      py: cls.py,
+      currentSemester: cls.currentSemester,
+    }))
+  );
 };

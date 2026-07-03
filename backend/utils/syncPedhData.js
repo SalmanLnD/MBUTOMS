@@ -15,6 +15,8 @@ import {
 } from './trainerMappings.js';
 import { DEFAULT_SLOT_TIMINGS } from './timetableSlots.js';
 
+import { DEFAULT_SUBJECT_START_DATE } from './subjectStartDate.js';
+
 export const syncSaiPriyaScheduleSubjects = async () => {
   const trainer = await Trainer.findOne({ employeeId: SAI_PRIYA_TRAINER_CODE });
   if (!trainer) {
@@ -119,7 +121,12 @@ export const syncPedhTrainersAndSubject = async () => {
     });
     await subject.save();
   } else if (socSchool && semesterIII && trainers.length) {
-    subject = await Subject.create(subjectPayload);
+    subject = await Subject.create({
+      ...subjectPayload,
+      oifNumber: PEDH_SUBJECT.code,
+      dealNumber: PEDH_SUBJECT.code,
+      startDate: DEFAULT_SUBJECT_START_DATE,
+    });
   }
 
   if (subject) {

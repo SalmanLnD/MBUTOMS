@@ -3,6 +3,7 @@ import { useParams, Link } from 'react-router-dom';
 import Topbar from '../components/Topbar.jsx';
 import LoadingSpinner from '../components/LoadingSpinner.jsx';
 import AlertMessage from '../components/AlertMessage.jsx';
+import { showSuccess } from '../utils/toast.js';
 import TrainerFormModal from '../components/TrainerFormModal.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
 import { getTrainerById } from '../services/trainerService.js';
@@ -14,8 +15,7 @@ const TrainerProfile = () => {
   const canEdit = hasRole('admin', 'campus_manager');
   const [trainer, setTrainer] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
-  const [success, setSuccess] = useState('');
+  const [loadError, setLoadError] = useState('');
   const [showEditModal, setShowEditModal] = useState(false);
 
   const fetchTrainer = useCallback(async () => {
@@ -24,7 +24,7 @@ const TrainerProfile = () => {
       const data = await getTrainerById(id);
       setTrainer(data);
     } catch (err) {
-      setError(getErrorMessage(err));
+      setLoadError(getErrorMessage(err));
     } finally {
       setLoading(false);
     }
@@ -37,20 +37,18 @@ const TrainerProfile = () => {
   const handleEditClose = (saved) => {
     setShowEditModal(false);
     if (saved) {
-      setSuccess('Trainer updated successfully');
+      showSuccess('Trainer updated successfully');
       fetchTrainer();
     }
   };
 
   if (loading) return <LoadingSpinner message="Loading trainer profile..." />;
-  if (error && !trainer) return <AlertMessage message={error} />;
+  if (loadError && !trainer) return <AlertMessage message={loadError} />;
   if (!trainer) return <AlertMessage message="Trainer not found" />;
 
   return (
     <>
       <Topbar title="Trainer Profile" />
-      <AlertMessage message={error} onClose={() => setError('')} />
-      <AlertMessage type="success" message={success} onClose={() => setSuccess('')} />
 
       <div className="mb-3 d-flex justify-content-between align-items-center flex-wrap gap-2">
         <Link to="/trainers" className="btn btn-link text-decoration-none ps-0">

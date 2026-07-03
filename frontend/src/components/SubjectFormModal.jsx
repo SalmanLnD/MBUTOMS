@@ -8,13 +8,16 @@ import {
   getSubjects,
 } from '../services/subjectService.js';
 import { getTrainers } from '../services/trainerService.js';
-import { getErrorMessage } from '../utils/helpers.js';
+import { getErrorMessage, toInputDate } from '../utils/helpers.js';
 import Modal from './Modal.jsx';
 import { DEFAULT_SLOT_TIMINGS, groupSubjectsBySlotTimings, findSubjectsWithSimilarTimings, formatSlotTimingsSummary, normalizeSlotTimings, areSlotTimingsEqual } from '../utils/timetableSlots.js';
 
 const emptyForm = {
   name: '',
   code: '',
+  oifNumber: '',
+  dealNumber: '',
+  startDate: '',
   schools: [],
   semester: '',
   departments: [],
@@ -103,6 +106,9 @@ const SubjectFormModal = ({ subject, onClose }) => {
     setForm({
       name: subject.name || '',
       code: subject.code || '',
+      oifNumber: subject.oifNumber || '',
+      dealNumber: subject.dealNumber || '',
+      startDate: subject.startDate ? toInputDate(subject.startDate) : '',
       schools: schoolIds,
       semester: toId(subject.semester),
       departments: departmentIds,
@@ -211,6 +217,9 @@ const SubjectFormModal = ({ subject, onClose }) => {
     const payload = {
       name: form.name,
       code: form.code,
+      oifNumber: form.oifNumber,
+      dealNumber: form.dealNumber,
+      startDate: form.startDate,
       schools: form.schools,
       semester: form.semester || undefined,
       departments: form.allDepartments ? [] : form.departments,
@@ -258,6 +267,18 @@ const SubjectFormModal = ({ subject, onClose }) => {
               <div className="col-md-6">
                 <label className="form-label">Subject Code *</label>
                 <input name="code" className="form-control" value={form.code} onChange={handleChange} required />
+              </div>
+              <div className="col-md-4">
+                <label className="form-label">OIF Number *</label>
+                <input name="oifNumber" className="form-control" value={form.oifNumber} onChange={handleChange} required />
+              </div>
+              <div className="col-md-4">
+                <label className="form-label">Deal Number *</label>
+                <input name="dealNumber" className="form-control" value={form.dealNumber} onChange={handleChange} required />
+              </div>
+              <div className="col-md-4">
+                <label className="form-label">Start Date *</label>
+                <input type="date" name="startDate" className="form-control" value={form.startDate} onChange={handleChange} required />
               </div>
               <div className="col-md-6">
                 <label className="form-label">Schools</label>

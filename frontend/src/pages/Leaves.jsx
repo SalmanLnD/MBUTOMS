@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import Topbar from '../components/Topbar.jsx';
 import LoadingSpinner from '../components/LoadingSpinner.jsx';
 import Pagination from '../components/Pagination.jsx';
-import AlertMessage from '../components/AlertMessage.jsx';
+import { showError, showSuccess } from '../utils/toast.js';
 import { useAuth } from '../context/AuthContext.jsx';
 import { getLeaves, createLeave, updateLeave, deleteLeave, previewAffectedSchedules } from '../services/leaveService.js';
 import { getTrainers } from '../services/trainerService.js';
@@ -18,8 +18,6 @@ const Leaves = () => {
   const [leaves, setLeaves] = useState([]);
   const [pagination, setPagination] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
-  const [success, setSuccess] = useState('');
   const [page, setPage] = useState(1);
   const [statusFilter, setStatusFilter] = useState('');
   const [showForm, setShowForm] = useState(false);
@@ -40,7 +38,7 @@ const Leaves = () => {
       setLeaves(data.leaves);
       setPagination(data.pagination);
     } catch (err) {
-      setError(getErrorMessage(err));
+      showError(getErrorMessage(err));
     } finally {
       setLoading(false);
     }
@@ -95,21 +93,21 @@ const Leaves = () => {
     e.preventDefault();
     try {
       await createLeave(form);
-      setSuccess('Leave application submitted');
+      showSuccess('Leave application submitted');
       closeLeaveForm();
       fetchLeaves();
     } catch (err) {
-      setError(getErrorMessage(err));
+      showError(getErrorMessage(err));
     }
   };
 
   const handleApprove = async (id, status) => {
     try {
       await updateLeave(id, { status });
-      setSuccess(`Leave ${status}`);
+      showSuccess(`Leave ${status}`);
       fetchLeaves();
     } catch (err) {
-      setError(getErrorMessage(err));
+      showError(getErrorMessage(err));
     }
   };
 
@@ -121,19 +119,17 @@ const Leaves = () => {
     if (!pendingCancel) return;
     try {
       await deleteLeave(pendingCancel);
-      setSuccess('Leave cancelled');
+      showSuccess('Leave cancelled');
       setPendingCancel(null);
       fetchLeaves();
     } catch (err) {
-      setError(getErrorMessage(err));
+      showError(getErrorMessage(err));
     }
   };
 
   return (
     <>
       <Topbar title="Leave Management" />
-      <AlertMessage message={error} onClose={() => setError('')} />
-      <AlertMessage type="success" message={success} onClose={() => setSuccess('')} />
 
       <div className="d-flex justify-content-between align-items-center mb-3">
         <select className="form-select w-auto" value={statusFilter} onChange={(e) => { setStatusFilter(e.target.value); setPage(1); }}>

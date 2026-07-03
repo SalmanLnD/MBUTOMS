@@ -39,6 +39,18 @@ export const DSAP_SUBJECT = {
   name: 'Data Structures and Algorithms with Python',
 };
 
+export const PSTP_TRAINER_NAMES = {
+  'PSTP-T8': 'PSTP-T8',
+  'PSTP-T9': 'PSTP-T9',
+};
+
+export const PSTP_SUBJECT = {
+  code: '22CS102034',
+  name: 'Problem Solving Through Python',
+};
+
+export const PSTP_DEPARTMENT_CODES = ['ECE', 'EIE', 'EEE', 'CE'];
+
 export const resolveSaiPriyaSubjectCode = ({ department, section }) => {
   const dept = String(department || '').trim();
   const sect = String(section || '').trim();
@@ -53,7 +65,10 @@ export const resolveSaiPriyaSubjectCode = ({ department, section }) => {
 };
 
 export const getTrainerDisplayName = (employeeId) =>
-  IDSA_TRAINER_NAMES[employeeId] || PEDH_TRAINER_NAMES[employeeId] || employeeId;
+  IDSA_TRAINER_NAMES[employeeId]
+  || PEDH_TRAINER_NAMES[employeeId]
+  || PSTP_TRAINER_NAMES[employeeId]
+  || employeeId;
 
 const normalizeName = (value) =>
   String(value || '').toLowerCase().replace(/[^a-z0-9]/g, '');
@@ -117,7 +132,7 @@ export const resolveTrainerScheduleCodes = (trainer) => {
 
   if (trainer.employeeId) codes.add(trainer.employeeId);
 
-  const allLegacyMaps = [IDSA_TRAINER_NAMES, PEDH_TRAINER_NAMES];
+  const allLegacyMaps = [IDSA_TRAINER_NAMES, PEDH_TRAINER_NAMES, PSTP_TRAINER_NAMES];
 
   allLegacyMaps.forEach((legacyMap) => {
     Object.entries(legacyMap).forEach(([code, legacyName]) => {

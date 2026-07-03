@@ -2,11 +2,13 @@ import { useState, useEffect } from 'react';
 import Modal from './Modal.jsx';
 import ConfirmModal from './ConfirmModal.jsx';
 import { createSchedule, updateSchedule, deleteSchedule } from '../services/scheduleService.js';
+import { getClasses } from '../services/classService.js';
 import { getSlotTimesForSubject } from '../utils/timetableSlots.js';
 import { getErrorMessage } from '../utils/helpers.js';
 
 const emptyForm = {
   subjectId: '',
+  classId: '',
   slot: 'S1',
   day: 'Monday',
   department: '',
@@ -23,6 +25,7 @@ const TimetableSlotModal = ({
   slot,
   subject,
   subjects,
+  semester = 'III',
   onClose,
 }) => {
   const isEdit = Boolean(schedule);
@@ -30,26 +33,44 @@ const TimetableSlotModal = ({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [pendingDelete, setPendingDelete] = useState(false);
+  const [classOptions, setClassOptions] = useState([]);
+  const [classesLoading, setClassesLoading] = useState(true);
 
   const selectedSubject = subjects.find((item) => item._id === form.subjectId) || subject;
+  const selectedClass = classOptions.find((item) => item._id === form.classId);
+
+  useEffect(() => {
+    setClassesLoading(true);
+    getClasses({ semester })
+      .then((data) => setClassOptions(data || []))
+      .catch(() => setClassOptions([]))
+      .finally(() => setClassesLoading(false));
+  }, [semester]);
 
   useEffect(() => {
     const initialSubjectId = schedule?.subject || subject?._id || '';
     const initialSlot = schedule?.slot || slot || 'S1';
     const subjectForTimes = subjects.find((item) => item._id === initialSubjectId) || subject;
     const times = getSlotTimesForSubject(subjectForTimes, initialSlot);
+    const matchedClass = classOptions.find(
+      (item) =>
+        item.department === schedule?.department
+        && item.section === schedule?.section
+        && item.currentSemester === (schedule?.semester || semester)
+    );
 
     setForm({
       subjectId: initialSubjectId,
+      classId: matchedClass?._id || '',
       slot: initialSlot,
       day: schedule?.day || day || 'Monday',
-      department: schedule?.department || '',
-      section: schedule?.section || '',
+      department: schedule?.department || matchedClass?.department || '',
+      section: schedule?.section || matchedClass?.section || '',
       startTime: schedule?.startTime || times.startTime,
       endTime: schedule?.endTime || times.endTime,
-      semester: schedule?.semester || 'III',
+      semester: schedule?.semester || matchedClass?.currentSemester || semester,
     });
-  }, [schedule, trainerCode, day, slot, subject, subjects]);
+  }, [schedule, trainerCode, day, slot, subject, subjects, semester, classOptions]);
 
   const applySlotTimes = (subjectId, slotKey) => {
     const subjectItem = subjects.find((item) => item._id === subjectId) || subject;
@@ -73,6 +94,17 @@ const TimetableSlotModal = ({
       applySlotTimes(form.subjectId, value);
       return;
     }
+    if (name === 'classId') {
+      const cls = classOptions.find((item) => item._id === value);
+      setForm((prev) => ({
+        ...prev,
+        classId: value,
+        department: cls?.department || '',
+        section: cls?.section || '',
+        semester: cls?.currentSemester || prev.semester,
+      }));
+      return;
+    }
     setForm((prev) => ({ ...prev, [name]: value }));
   };
 
@@ -89,6 +121,7 @@ const TimetableSlotModal = ({
       endTime: form.endTime,
       department: form.department.trim(),
       section: form.section.trim(),
+      classId: form.classId || undefined,
       subjectCode: selectedSubject?.code || '',
       subject: form.subjectId || undefined,
       semester: form.semester,
@@ -192,29 +225,32 @@ const TimetableSlotModal = ({
                 <label className="form-label">End time</label>
                 <input className="form-control" value={form.endTime} readOnly />
               </div>
-              <div className="col-md-6">
-                <label className="form-label" htmlFor="slot-department">Department *</label>
-                <input
-                  id="slot-department"
-                  name="department"
-                  className="form-control"
-                  value={form.department}
-                  onChange={handleChange}
-                  required
-                  placeholder="e.g. CS"
-                />
-              </div>
-              <div className="col-md-6">
-                <label className="form-label" htmlFor="slot-section">Section *</label>
-                <input
-                  id="slot-section"
-                  name="section"
-                  className="form-control"
-                  value={form.section}
-                  onChange={handleChange}
-                  required
-                  placeholder="e.g. A"
-                />
+              <div className="col-12">
+                <label className="form-label" htmlFor="slot-class">Class *</label>
+                {classesLoading ? (
+                  <div className="text-muted small">Loading registered classes...</div>
+                ) : (
+                  <select
+                    id="slot-class"
+                    name="classId"
+                    className="form-select"
+                    value={form.classId}
+                    onChange={handleChange}
+                    required
+                  >
+                    <option value="">Select a registered class</option>
+                    {classOptions.map((item) => (
+                      <option key={item._id} value={item._id}>
+                        {item.department} {item.section} · PY {item.py} · Sem {item.currentSemester}
+                      </option>
+                    ))}
+                  </select>
+                )}
+                {!classesLoading && classOptions.length === 0 && (
+                  <small className="text-muted d-block mt-1">
+                    No classes registered for semester {semester}. Add classes under Classes &amp; Students first.
+                  </small>
+                )}
               </div>
             </div>
           </div>

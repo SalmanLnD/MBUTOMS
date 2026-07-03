@@ -8,6 +8,16 @@ import {
 
 export const WEEKDAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
 
+const DAY_SHORT_LABELS = {
+  Monday: 'Mon',
+  Tuesday: 'Tue',
+  Wednesday: 'Wed',
+  Thursday: 'Thu',
+  Friday: 'Fri',
+};
+
+export const formatDayShort = (day) => DAY_SHORT_LABELS[day] || day;
+
 const slotKey = (startTime, endTime) => `${startTime}|${endTime}`;
 
 const getColumnKey = (slot, periodOnly) =>

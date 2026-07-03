@@ -30,6 +30,9 @@ export const venueValidation = [
 export const subjectValidation = [
   body('name').trim().notEmpty().withMessage('Subject name is required'),
   body('code').trim().notEmpty().withMessage('Subject code is required'),
+  body('oifNumber').trim().notEmpty().withMessage('OIF number is required'),
+  body('dealNumber').trim().notEmpty().withMessage('Deal number is required'),
+  body('startDate').notEmpty().withMessage('Start date is required'),
   body('hours').optional().isInt({ min: 0 }).withMessage('Hours must be a positive number'),
 ];
 
@@ -44,6 +47,15 @@ export const scheduleValidation = [
   body('subjectCode').optional().trim(),
   body('slot').optional().isIn(['S1', 'S2', 'S3', '']).withMessage('Invalid slot'),
   body('subject').optional().isMongoId().withMessage('Invalid subject'),
+  body('classId').optional().isMongoId().withMessage('Invalid class'),
+];
+
+export const classValidation = [
+  body('department').trim().notEmpty().withMessage('Department is required'),
+  body('section').trim().notEmpty().withMessage('Section is required'),
+  body('py').isInt({ min: 2000, max: 2100 }).withMessage('PY must be a valid year'),
+  body('currentSemester').trim().notEmpty().withMessage('Current semester is required'),
+  body('status').optional().isIn(['active', 'inactive']).withMessage('Invalid status'),
 ];
 
 export const leaveValidation = [

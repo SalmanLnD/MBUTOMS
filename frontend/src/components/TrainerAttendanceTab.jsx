@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, Fragment } from 'react';
 import LoadingSpinner from '../components/LoadingSpinner.jsx';
-import AlertMessage from '../components/AlertMessage.jsx';
+import { showError, showSuccess } from '../utils/toast.js';
 import { useAuth } from '../context/AuthContext.jsx';
 import {
   getTrainerAttendanceGrid,
@@ -21,8 +21,6 @@ const TrainerAttendanceTab = () => {
   const [weekRef, setWeekRef] = useState(new Date());
   const [grid, setGrid] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
-  const [success, setSuccess] = useState('');
   const [savingKey, setSavingKey] = useState('');
 
   const fetchGrid = useCallback(async () => {
@@ -36,7 +34,7 @@ const TrainerAttendanceTab = () => {
       });
       setGrid(data);
     } catch (err) {
-      setError(getErrorMessage(err));
+      showError(getErrorMessage(err));
     } finally {
       setLoading(false);
     }
@@ -78,7 +76,6 @@ const TrainerAttendanceTab = () => {
 
     const saveKey = `${trainerId}|${dateKey}`;
     setSavingKey(saveKey);
-    setError('');
 
     try {
       const saved = await upsertTrainerDailyAttendance({
@@ -108,9 +105,9 @@ const TrainerAttendanceTab = () => {
           }),
         };
       });
-      setSuccess('Attendance saved');
+      showSuccess('Attendance saved');
     } catch (err) {
-      setError(getErrorMessage(err));
+      showError(getErrorMessage(err));
       fetchGrid();
     } finally {
       setSavingKey('');
@@ -122,9 +119,6 @@ const TrainerAttendanceTab = () => {
 
   return (
     <>
-      <AlertMessage message={error} onClose={() => setError('')} />
-      <AlertMessage type="success" message={success} onClose={() => setSuccess('')} />
-
       <div className="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
         <div>
           <h5 className="mb-1">Trainer Attendance</h5>

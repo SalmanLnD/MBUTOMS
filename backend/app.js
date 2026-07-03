@@ -14,9 +14,9 @@ import attendanceRoutes from './routes/attendanceRoutes.js';
 import replacementRoutes from './routes/replacementRoutes.js';
 import classRoutes from './routes/classRoutes.js';
 import studentRoutes from './routes/studentRoutes.js';
- 
-dotenv.config();
+import sheetsRoutes from './routes/sheetsRoutes.js';
 
+dotenv.config();
 const app = express();
 
 const allowedOrigins = (process.env.CLIENT_URL || 'http://localhost:5173')
@@ -56,6 +56,7 @@ app.use('/api/attendance', attendanceRoutes);
 app.use('/api/replacements', replacementRoutes);
 app.use('/api/classes', classRoutes);
 app.use('/api/students', studentRoutes);
+app.use('/api/sheets', sheetsRoutes);
 
 app.use(notFound);
 app.use(errorHandler);

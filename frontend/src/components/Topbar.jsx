@@ -15,7 +15,7 @@ const Topbar = ({ title }) => {
     <header className="topbar d-flex justify-content-between align-items-center mb-4">
       <h1 className="h4 mb-0 fw-semibold">{title}</h1>
       <div className="d-flex align-items-center gap-3">
-        <span className="text-muted small d-none d-md-inline">
+        <span className="topbar-user small d-none d-md-inline">
           {user?.name} · {formatRole(user?.role)}
         </span>
         <button className="btn btn-outline-danger btn-sm" onClick={handleLogout}>

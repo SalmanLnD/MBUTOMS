@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import Topbar from '../components/Topbar.jsx';
 import LoadingSpinner from '../components/LoadingSpinner.jsx';
 import Pagination from '../components/Pagination.jsx';
-import AlertMessage from '../components/AlertMessage.jsx';
+import { showError, showSuccess } from '../utils/toast.js';
 import SubjectFormModal from '../components/SubjectFormModal.jsx';
 import ConfirmModal from '../components/ConfirmModal.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
@@ -34,8 +34,6 @@ const Subjects = () => {
   const [subjects, setSubjects] = useState([]);
   const [pagination, setPagination] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
-  const [success, setSuccess] = useState('');
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(1);
   const [showModal, setShowModal] = useState(false);
@@ -51,7 +49,7 @@ const Subjects = () => {
       setSubjects(data.subjects);
       setPagination(data.pagination);
     } catch (err) {
-      setError(getErrorMessage(err));
+      showError(getErrorMessage(err));
     } finally {
       setLoading(false);
     }
@@ -69,19 +67,17 @@ const Subjects = () => {
     if (!pendingDelete) return;
     try {
       await deleteSubject(pendingDelete.id);
-      setSuccess('Subject deleted successfully');
+      showSuccess('Subject deleted successfully');
       setPendingDelete(null);
       fetchSubjects();
     } catch (err) {
-      setError(getErrorMessage(err));
+      showError(getErrorMessage(err));
     }
   };
 
   return (
     <>
       <Topbar title="Subject Management" />
-      <AlertMessage message={error} onClose={() => setError('')} />
-      <AlertMessage type="success" message={success} onClose={() => setSuccess('')} />
 
       <div className="card table-card">
         <div className="card-body">
@@ -165,7 +161,7 @@ const Subjects = () => {
           onClose={(saved) => {
             setShowModal(false);
             setEditingSubject(null);
-            if (saved) { setSuccess('Subject saved successfully'); fetchSubjects(); }
+            if (saved) { showSuccess('Subject saved successfully'); fetchSubjects(); }
           }}
         />
       )}

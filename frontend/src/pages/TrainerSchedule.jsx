@@ -3,7 +3,7 @@ import { useParams, Link } from 'react-router-dom';
 import Topbar from '../components/Topbar.jsx';
 import TrainerTimetableGrid from '../components/TrainerTimetableGrid.jsx';
 import LoadingSpinner from '../components/LoadingSpinner.jsx';
-import AlertMessage from '../components/AlertMessage.jsx';
+import { showError } from '../utils/toast.js';
 import { getTrainerById } from '../services/trainerService.js';
 import { getTrainerSchedule } from '../services/scheduleService.js';
 import { getErrorMessage, toInputDate } from '../utils/helpers.js';
@@ -15,7 +15,6 @@ const TrainerSchedule = () => {
   const [schedules, setSchedules] = useState([]);
   const [totalHours, setTotalHours] = useState(0);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
   const [view, setView] = useState('grid');
 
   const fetchData = useCallback(async () => {
@@ -29,7 +28,7 @@ const TrainerSchedule = () => {
       setSchedules(scheduleData.schedules);
       setTotalHours(scheduleData.totalHours);
     } catch (err) {
-      setError(getErrorMessage(err));
+      showError(getErrorMessage(err));
     } finally {
       setLoading(false);
     }
@@ -44,7 +43,6 @@ const TrainerSchedule = () => {
   return (
     <>
       <Topbar title="Trainer Schedule" />
-      <AlertMessage message={error} onClose={() => setError('')} />
 
       <div className="mb-3">
         <Link to={`/trainers/${id}`} className="btn btn-link text-decoration-none ps-0">

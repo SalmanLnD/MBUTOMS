@@ -1,26 +1,24 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.jsx';
-import AlertMessage from '../components/AlertMessage.jsx';
+import { showError } from '../utils/toast.js';
 import { getErrorMessage } from '../utils/helpers.js';
 
 const Login = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const { login } = useAuth();
   const navigate = useNavigate();
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setError('');
     setLoading(true);
     try {
       await login(email, password);
       navigate('/dashboard');
     } catch (err) {
-      setError(getErrorMessage(err));
+      showError(getErrorMessage(err));
     } finally {
       setLoading(false);
     }
@@ -31,17 +29,10 @@ const Login = () => {
       <div className="card login-card">
         <div className="card-body p-4 p-md-5">
           <div className="text-center mb-4">
-            <div
-              className="rounded-circle bg-primary text-white d-inline-flex align-items-center justify-content-center mb-3"
-              style={{ width: 56, height: 56, fontSize: '1.5rem', fontWeight: 700 }}
-            >
-              T
-            </div>
+            <div className="login-brand-icon mb-3">T</div>
             <h2 className="fw-bold">TOMS</h2>
             <p className="text-muted">Training Operations Management System</p>
           </div>
-
-          <AlertMessage message={error} onClose={() => setError('')} />
 
           <form onSubmit={handleSubmit}>
             <div className="mb-3">
@@ -74,7 +65,7 @@ const Login = () => {
             </button>
           </form>
 
-          <div className="mt-4 p-3 bg-light rounded small text-muted">
+          <div className="mt-4 p-3 login-demo-box small text-muted">
             <strong>Demo accounts:</strong>
             <ul className="mb-0 mt-1">
               <li>admin@toms.edu / admin123</li>

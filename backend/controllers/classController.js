@@ -1,97 +1,148 @@
-import Schedule from '../models/Schedule.js';
-import Batch from '../models/Batch.js';
+import ClassGroup from '../models/ClassGroup.js';
 import Student from '../models/Student.js';
+import Schedule from '../models/Schedule.js';
 
-const classKey = (department, section) => `${department}::${section}`;
-
-export const getClasses = async (req, res) => {
-  const [scheduleGroups, batches, students] = await Promise.all([
-    Schedule.aggregate([
-      ...(req.query.semester ? [{ $match: { semester: req.query.semester } }] : []),
-      {
-        $group: {
-          _id: { department: '$department', section: '$section' },
-          slotCount: { $sum: 1 },
-        },
+const attachStudentCounts = async (classes) => {
+  const counts = await Student.aggregate([
+    { $match: { status: 'active' } },
+    {
+      $group: {
+        _id: { department: '$branch', section: '$sectionLabel' },
+        studentCount: { $sum: 1 },
       },
-      { $sort: { '_id.department': 1, '_id.section': 1 } },
-    ]),
-    Batch.find()
-      .populate({ path: 'section', populate: { path: 'department', select: 'name code' } })
-      .populate('semester', 'name number')
-      .sort({ name: 1 }),
-    Student.find({ status: 'active' }).select('branch sectionLabel batch'),
+    },
   ]);
 
-  const classMap = new Map();
-
-  scheduleGroups.forEach((group) => {
-    const department = group._id.department;
-    const section = group._id.section;
-    const key = classKey(department, section);
-    classMap.set(key, {
-      id: key,
-      department,
-      section,
-      label: `${department} ${section}`,
-      source: 'timetable',
-      slotCount: group.slotCount,
-      studentCount: 0,
-      batchId: null,
-    });
-  });
-
-  batches.forEach((batch) => {
-    const department = batch.section?.department?.code || batch.section?.department?.name || '';
-    const section = batch.section?.name || batch.name;
-    const key = classKey(department, section);
-    const existing = classMap.get(key);
-    if (existing) {
-      existing.batchId = batch._id;
-      existing.studentCount = batch.studentCount || existing.studentCount;
-      existing.batchName = batch.name;
-      existing.semester = batch.semester?.name;
-    } else {
-      classMap.set(key, {
-        id: key,
-        department,
-        section,
-        label: batch.name,
-        source: 'batch',
-        slotCount: 0,
-        studentCount: batch.studentCount || 0,
-        batchId: batch._id,
-        batchName: batch.name,
-        semester: batch.semester?.name,
-      });
-    }
-  });
-
-  students.forEach((student) => {
-    const department = student.branch || '';
-    const section = student.sectionLabel || '';
-    if (!department || !section) return;
-    const key = classKey(department, section);
-    const entry = classMap.get(key);
-    if (entry) {
-      entry.studentCount += 1;
-    } else {
-      classMap.set(key, {
-        id: key,
-        department,
-        section,
-        label: `${department} ${section}`,
-        source: 'students',
-        slotCount: 0,
-        studentCount: 1,
-        batchId: student.batch || null,
-      });
-    }
-  });
-
-  const classes = [...classMap.values()].sort((a, b) =>
-    a.label.localeCompare(b.label, undefined, { numeric: true, sensitivity: 'base' })
+  const countMap = new Map(
+    counts.map((row) => [
+      `${row._id.department}::${row._id.section}`,
+      row.studentCount,
+    ])
   );
 
-  res.json(classes);
+  return classes.map((cls) => {
+    const key = `${cls.department}::${cls.section}`;
+    return {
+      ...cls,
+      studentCount: countMap.get(key) || 0,
+      label: `${cls.department} ${cls.section}`,
+    };
+  });
+};
+
+export const getClasses = async (req, res) => {
+  const filter = {};
+  if (req.query.status) filter.status = req.query.status;
+  if (req.query.semester) filter.currentSemester = req.query.semester;
+
+  const classes = await ClassGroup.find(filter)
+    .sort({ department: 1, section: 1, py: 1 })
+    .lean();
+
+  res.json(await attachStudentCounts(classes));
+};
+
+export const getClassById = async (req, res) => {
+  const cls = await ClassGroup.findById(req.params.id).lean();
+  if (!cls) return res.status(404).json({ message: 'Class not found' });
+  const [withCount] = await attachStudentCounts([cls]);
+  res.json(withCount);
+};
+
+export const createClass = async (req, res) => {
+  const payload = {
+    department: String(req.body.department || '').trim(),
+    section: String(req.body.section || '').trim(),
+    py: Number(req.body.py),
+    currentSemester: String(req.body.currentSemester || '').trim(),
+    status: req.body.status || 'active',
+  };
+
+  const duplicate = await ClassGroup.findOne({
+    department: payload.department,
+    section: payload.section,
+    currentSemester: payload.currentSemester,
+  });
+  if (duplicate) {
+    return res.status(409).json({
+      message: `Class ${payload.department} ${payload.section} (Sem ${payload.currentSemester}) already exists.`,
+    });
+  }
+
+  const cls = await ClassGroup.create(payload);
+  const [withCount] = await attachStudentCounts([cls.toObject()]);
+  res.status(201).json(withCount);
+};
+
+export const updateClass = async (req, res) => {
+  const cls = await ClassGroup.findById(req.params.id);
+  if (!cls) return res.status(404).json({ message: 'Class not found' });
+
+  const nextDepartment = String(req.body.department ?? cls.department).trim();
+  const nextSection = String(req.body.section ?? cls.section).trim();
+  const nextPy = Number(req.body.py ?? cls.py);
+  const nextSemester = String(req.body.currentSemester ?? cls.currentSemester).trim();
+
+  const duplicate = await ClassGroup.findOne({
+    _id: { $ne: cls._id },
+    department: nextDepartment,
+    section: nextSection,
+    currentSemester: nextSemester,
+  });
+  if (duplicate) {
+    return res.status(409).json({
+      message: `Class ${nextDepartment} ${nextSection} (Sem ${nextSemester}) already exists.`,
+    });
+  }
+
+  const oldDepartment = cls.department;
+  const oldSection = cls.section;
+  const oldSemester = cls.currentSemester;
+
+  cls.department = nextDepartment;
+  cls.section = nextSection;
+  cls.py = nextPy;
+  cls.currentSemester = nextSemester;
+  if (req.body.status) cls.status = req.body.status;
+
+  await cls.save();
+
+  if (
+    oldDepartment !== nextDepartment
+    || oldSection !== nextSection
+    || oldSemester !== nextSemester
+  ) {
+    await Schedule.updateMany(
+      { department: oldDepartment, section: oldSection, semester: oldSemester },
+      {
+        $set: {
+          department: nextDepartment,
+          section: nextSection,
+          semester: nextSemester,
+        },
+      }
+    );
+  }
+
+  const [withCount] = await attachStudentCounts([cls.toObject()]);
+  res.json(withCount);
+};
+
+export const deleteClass = async (req, res) => {
+  const cls = await ClassGroup.findById(req.params.id);
+  if (!cls) return res.status(404).json({ message: 'Class not found' });
+
+  const scheduleCount = await Schedule.countDocuments({
+    department: cls.department,
+    section: cls.section,
+    semester: cls.currentSemester,
+  });
+  if (scheduleCount > 0) {
+    return res.status(409).json({
+      message: `Cannot delete class while ${scheduleCount} timetable slot(s) still reference it.`,
+    });
+  }
+
+  await cls.deleteOne();
+  res.json({ message: 'Class removed' });
 };
