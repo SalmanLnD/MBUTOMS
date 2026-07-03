@@ -36,6 +36,7 @@ Live URLs:
 | `JWT_SECRET` | long random string |
 | `JWT_EXPIRES_IN` | `7d` |
 | `CLIENT_URL` | `https://mbutoms.vercel.app,http://localhost:5173` |
+| `API_PUBLIC_URL` | `https://mbutoms-api.vercel.app` |
 | `VERCEL` | `1` (set automatically on Vercel) |
 | `RUN_STARTUP_SYNC` | `false` (recommended on serverless; run sync locally once) |
 
