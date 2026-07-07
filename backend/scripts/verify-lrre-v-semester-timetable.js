@@ -110,7 +110,11 @@ const hariniSchedules = await Schedule.countDocuments({
   semester: LRRE_V_SEMESTER,
   subjectCode: LRRE_SUBJECT_CODE,
 });
-check('Harinisree has no LRRE V schedules', hariniSchedules === 0, `found ${hariniSchedules}`);
+check(
+  'Harinisree LRRE V schedule count',
+  hariniSchedules === LRRE_V_TRAINER_ALLOCATIONS['801406'].slots.length,
+  `expected ${LRRE_V_TRAINER_ALLOCATIONS['801406'].slots.length}, found ${hariniSchedules}`
+);
 
 await mongoose.disconnect();
 

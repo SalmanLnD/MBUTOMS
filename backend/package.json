@@ -14,6 +14,9 @@
     "seed:pstp": "node utils/runPstpSync.js",
     "seed:classes": "node utils/runClassMigration.js",
     "seed:lrre-v": "node scripts/verify-lrre-v-semester-timetable.js",
+    "test": "node --test tests/unit/**/*.test.js",
+    "verify:timetable": "node scripts/verify-timetable-integrity.js",
+    "verify:display": "node scripts/verify-subject-timetable-display.js",
     "seed:legacy": "node utils/seed.js",
     "parse:workbook": "node utils/parseWorkbook.js"
   },

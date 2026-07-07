@@ -67,3 +67,35 @@ export const getUniqueTrainerCodes = (schedules) =>
 
 export const buildFixedSlotsForSubject = (subject) =>
   subject ? getSubjectSlotDefinitions(subject) : getDefaultSlotDefinitions();
+
+/**
+ * Pick grid columns for a trainer row on the timetable board.
+ * Uses the subject filter when set; otherwise derives columns from the trainer's
+ * scheduled subject(s). Falls back to period-only mode when timings differ.
+ */
+export const resolveTrainerGridSlots = ({
+  selectedSubject,
+  trainerSubjects,
+  visibleSchedules,
+  showTimingsInCells,
+}) => {
+  if (showTimingsInCells) return null;
+
+  if (selectedSubject) {
+    return buildFixedSlotsForSubject(selectedSubject);
+  }
+
+  if (trainerSubjects.length === 1) {
+    return buildFixedSlotsForSubject(trainerSubjects[0]);
+  }
+
+  if (trainerSubjects.length > 1) {
+    return null;
+  }
+
+  if (!visibleSchedules.length) {
+    return getDefaultSlotDefinitions();
+  }
+
+  return null;
+};

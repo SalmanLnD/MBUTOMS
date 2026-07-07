@@ -72,7 +72,7 @@ export const getTrainers = async (req, res) => {
   const [trainers, total] = await Promise.all([
     Trainer.find(filter)
       .populate('department', 'name code')
-      .populate('subjects', 'name code')
+      .populate('subjects', 'name code slotCount slotTimings')
       .sort(sort)
       .skip(skip)
       .limit(limit),

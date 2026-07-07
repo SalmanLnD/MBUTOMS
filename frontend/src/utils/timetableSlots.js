@@ -1,5 +1,5 @@
 import { formatTimeRange } from './scheduleUtils.js';
-import { SOC_FOUR_SLOT_TIMINGS, getSubjectSlotCount } from './subjectSlotTimings.js';
+import { SOC_FOUR_SLOT_TIMINGS, getSubjectSlotCount, getSubjectSlotProfile } from './subjectSlotTimings.js';
 
 export const DEFAULT_SLOT_TIMINGS = SOC_FOUR_SLOT_TIMINGS;
 
@@ -12,10 +12,14 @@ export const slotKeyToField = (key) => key.toLowerCase();
 export const getActiveSlotKeys = (subject) =>
   SLOT_KEYS.slice(0, getSubjectSlotCount(subject));
 
-export const getSubjectSlotDefinitions = (subject) =>
-  getActiveSlotKeys(subject).map((key) => {
+export const getSubjectSlotDefinitions = (subject) => {
+  const profile = getSubjectSlotProfile(subject?.code);
+  return getActiveSlotKeys(subject).map((key) => {
     const field = slotKeyToField(key);
-    const timing = subject?.slotTimings?.[field] || DEFAULT_SLOT_TIMINGS[field];
+    const timing =
+      profile?.timings?.[field] ||
+      subject?.slotTimings?.[field] ||
+      DEFAULT_SLOT_TIMINGS[field];
     return {
       key,
       startTime: timing.startTime,
@@ -23,6 +27,7 @@ export const getSubjectSlotDefinitions = (subject) =>
       label: formatTimeRange(timing.startTime, timing.endTime),
     };
   });
+};
 
 export const getDefaultSlotDefinitions = () => getSubjectSlotDefinitions(null);
 
@@ -66,13 +71,21 @@ export const matchScheduleToSlot = (schedule, slotDefinitions) => {
   );
   if (byTime) return byTime;
 
+  if (schedule.slot && SLOT_KEYS.includes(schedule.slot)) {
+    return slotDefinitions.find((slot) => slot.key === schedule.slot);
+  }
+
   const period = inferSchedulePeriod(schedule);
   return slotDefinitions.find((slot) => slot.key === period);
 };
 
 export const getSlotTimesForSubject = (subject, slotKey) => {
   const field = slotKeyToField(slotKey);
-  const timing = subject?.slotTimings?.[field] || DEFAULT_SLOT_TIMINGS[field];
+  const profile = getSubjectSlotProfile(subject?.code);
+  const timing =
+    profile?.timings?.[field] ||
+    subject?.slotTimings?.[field] ||
+    DEFAULT_SLOT_TIMINGS[field];
   return {
     startTime: timing.startTime,
     endTime: timing.endTime,

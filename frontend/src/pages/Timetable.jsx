@@ -15,8 +15,9 @@ import {
 import TimetableSheetSetupModal from '../components/TimetableSheetSetupModal.jsx';
 import { SheetIcon, ExternalLinkIcon } from '../components/icons.jsx';
 import { getErrorMessage, toInputDate } from '../utils/helpers.js';
-import { buildFixedSlotsForSubject } from '../utils/timetableGrid.js';
-import { shouldShowTimingsInCells, getDefaultSlotDefinitions } from '../utils/timetableSlots.js';
+import { buildFixedSlotsForSubject, resolveTrainerGridSlots } from '../utils/timetableGrid.js';
+import { shouldShowTimingsInCells } from '../utils/timetableSlots.js';
+import { getSubjectSlotProfile } from '../utils/subjectSlotTimings.js';
 import { getEffectiveSubjectCode, scheduleMatchesSubject } from '../utils/scheduleSubject.js';
 
 const inferSemesterForTrainer = (trainerCode, schedules, subject) => {
@@ -36,11 +37,12 @@ const buildSubjectLabel = (visibleSchedules, trainerSubjects, selectedSubject, t
   }
 
   const codes = [
-    ...new Set(
-      visibleSchedules
+    ...new Set([
+      ...visibleSchedules
         .map((schedule) => getEffectiveSubjectCode(schedule, trainerCode))
-        .filter(Boolean)
-    ),
+        .filter(Boolean),
+      ...trainerSubjects.map((subject) => subject.code).filter(Boolean),
+    ]),
   ];
 
   if (codes.length > 1) return 'All subjects';
@@ -168,15 +170,33 @@ const Timetable = () => {
     return subjects;
   };
 
-  const getTrainerSubjectsForDisplay = (trainerCode, visibleSchedules) => {
+  const getTrainerSubjectsForDisplay = (trainer, visibleSchedules) => {
     const codes = [
-      ...new Set(
-        visibleSchedules
-          .map((schedule) => getEffectiveSubjectCode(schedule, trainerCode))
-          .filter(Boolean)
-      ),
+      ...new Set([
+        ...visibleSchedules
+          .map((schedule) => getEffectiveSubjectCode(schedule, trainer.employeeId))
+          .filter(Boolean),
+        ...(trainer.subjects || []).map((subject) => subject.code).filter(Boolean),
+      ]),
     ];
-    return allSubjects.filter((subject) => codes.includes(subject.code));
+
+    return codes.map((code) => {
+      const matched = allSubjects.find((subject) => subject.code === code);
+      if (matched) return matched;
+
+      const assigned = (trainer.subjects || []).find((subject) => subject.code === code);
+      if (assigned?.slotTimings) return assigned;
+
+      const profile = getSubjectSlotProfile(code);
+      if (!profile) return null;
+      return {
+        _id: code,
+        code,
+        name: assigned?.name || code,
+        slotCount: profile.slotCount,
+        slotTimings: profile.timings,
+      };
+    }).filter(Boolean);
   };
 
   const handleCellClick = async ({ trainerCode, schedule, day, slot }) => {
@@ -349,20 +369,19 @@ const Timetable = () => {
         >
           {visibleTrainerEntries.map(({ trainer, visibleSchedules }) => {
             const trainerSubjectsForDisplay = getTrainerSubjectsForDisplay(
-              trainer.employeeId,
+              trainer,
               visibleSchedules
             );
             const showTimingsInCells = shouldShowTimingsInCells(
               trainerSubjectsForDisplay,
               selectedSubject
             );
-            const fixedSlots = !showTimingsInCells
-              ? (selectedSubject
-                ? buildFixedSlotsForSubject(selectedSubject)
-                : visibleSchedules.length === 0
-                  ? getDefaultSlotDefinitions()
-                  : null)
-              : null;
+            const fixedSlots = resolveTrainerGridSlots({
+              selectedSubject,
+              trainerSubjects: trainerSubjectsForDisplay,
+              visibleSchedules,
+              showTimingsInCells,
+            });
             const subjectLabel = buildSubjectLabel(
               visibleSchedules,
               trainerSubjectsForDisplay,

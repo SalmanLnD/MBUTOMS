@@ -28,6 +28,12 @@ export const syncLrreVSemesterTimetable = async () => {
     const allocation = LRRE_V_TRAINER_ALLOCATIONS[employeeId];
     if (!allocation?.slots?.length) continue;
 
+    await Schedule.deleteMany({
+      trainerCode: employeeId,
+      semester: LRRE_V_SEMESTER,
+      subjectCode: LRRE_SUBJECT_CODE,
+    });
+
     for (const entry of allocation.slots) {
       const record = buildExpectedScheduleRecord(employeeId, entry, subject._id);
       const existing = await Schedule.findOne({

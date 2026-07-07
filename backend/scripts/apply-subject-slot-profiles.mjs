@@ -16,6 +16,7 @@ const subjects = await Subject.find({
       '22CS102034',
       '25CA202009',
       '22CA102006',
+      '22LG101702',
       '22LG101703',
     ],
   },
