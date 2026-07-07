@@ -1,10 +1,12 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import Modal from './Modal.jsx';
 import ConfirmModal from './ConfirmModal.jsx';
 import { createSchedule, updateSchedule, deleteSchedule } from '../services/scheduleService.js';
 import { getClasses } from '../services/classService.js';
 import { getSlotTimesForSubject, getActiveSlotKeys } from '../utils/timetableSlots.js';
 import { getErrorMessage } from '../utils/helpers.js';
+import { subjectHasClassRestrictions } from '../utils/subjectClassEligibility.js';
+import { getSubjectSemesterRoman } from '../utils/classPy.js';
 
 const emptyForm = {
   subjectId: '',
@@ -37,15 +39,46 @@ const TimetableSlotModal = ({
   const [classesLoading, setClassesLoading] = useState(true);
 
   const selectedSubject = subjects.find((item) => item._id === form.subjectId) || subject;
-  const selectedClass = classOptions.find((item) => item._id === form.classId);
+  const subjectIdForClasses = selectedSubject?._id || '';
+  const subjectSemesterRoman = getSubjectSemesterRoman(selectedSubject) || semester;
 
   useEffect(() => {
     setClassesLoading(true);
-    getClasses({ semester })
+    const params = { semester: subjectSemesterRoman };
+    if (subjectIdForClasses) {
+      params.subjectId = subjectIdForClasses;
+    }
+    getClasses(params)
       .then((data) => setClassOptions(data || []))
       .catch(() => setClassOptions([]))
       .finally(() => setClassesLoading(false));
-  }, [semester]);
+  }, [subjectSemesterRoman, subjectIdForClasses]);
+
+  const visibleClassOptions = useMemo(() => {
+    if (!isEdit || !schedule?.department || !schedule?.section) {
+      return classOptions;
+    }
+
+    const alreadyListed = classOptions.some(
+      (item) =>
+        item.department === schedule.department
+        && item.section === schedule.section
+        && item.currentSemester === (schedule.semester || subjectSemesterRoman)
+    );
+    if (alreadyListed) return classOptions;
+
+    return [
+      {
+        _id: '',
+        department: schedule.department,
+        section: schedule.section,
+        currentSemester: schedule.semester || subjectSemesterRoman,
+        py: '—',
+        __legacy: true,
+      },
+      ...classOptions,
+    ];
+  }, [classOptions, isEdit, schedule, subjectSemesterRoman]);
 
   useEffect(() => {
     const initialSubjectId = schedule?.subject || subject?._id || '';
@@ -56,7 +89,7 @@ const TimetableSlotModal = ({
       (item) =>
         item.department === schedule?.department
         && item.section === schedule?.section
-        && item.currentSemester === (schedule?.semester || semester)
+        && item.currentSemester === (schedule?.semester || subjectSemesterRoman)
     );
 
     setForm({
@@ -68,9 +101,9 @@ const TimetableSlotModal = ({
       section: schedule?.section || matchedClass?.section || '',
       startTime: schedule?.startTime || times.startTime,
       endTime: schedule?.endTime || times.endTime,
-      semester: schedule?.semester || matchedClass?.currentSemester || semester,
+      semester: schedule?.semester || matchedClass?.currentSemester || subjectSemesterRoman,
     });
-  }, [schedule, trainerCode, day, slot, subject, subjects, semester, classOptions]);
+  }, [schedule, trainerCode, day, slot, subject, subjects, subjectSemesterRoman, classOptions]);
 
   const applySlotTimes = (subjectId, slotKey) => {
     const subjectItem = subjects.find((item) => item._id === subjectId) || subject;
@@ -87,7 +120,18 @@ const TimetableSlotModal = ({
   const handleChange = (e) => {
     const { name, value } = e.target;
     if (name === 'subjectId') {
-      applySlotTimes(value, form.slot);
+      const subjectItem = subjects.find((item) => item._id === value) || subject;
+      const times = getSlotTimesForSubject(subjectItem, form.slot);
+      setForm((prev) => ({
+        ...prev,
+        subjectId: value,
+        slot: form.slot,
+        startTime: times.startTime,
+        endTime: times.endTime,
+        classId: '',
+        department: '',
+        section: '',
+      }));
       return;
     }
     if (name === 'slot') {
@@ -95,7 +139,7 @@ const TimetableSlotModal = ({
       return;
     }
     if (name === 'classId') {
-      const cls = classOptions.find((item) => item._id === value);
+      const cls = visibleClassOptions.find((item) => item._id === value);
       setForm((prev) => ({
         ...prev,
         classId: value,
@@ -244,16 +288,19 @@ const TimetableSlotModal = ({
                     required
                   >
                     <option value="">Select a registered class</option>
-                    {classOptions.map((item) => (
-                      <option key={item._id} value={item._id}>
+                    {visibleClassOptions.map((item) => (
+                      <option key={item._id || `${item.department}-${item.section}`} value={item._id}>
                         {item.department} {item.section} · PY {item.py} · Sem {item.currentSemester}
+                        {item.__legacy ? ' (current assignment)' : ''}
                       </option>
                     ))}
                   </select>
                 )}
-                {!classesLoading && classOptions.length === 0 && (
+                {!classesLoading && visibleClassOptions.length === 0 && (
                   <small className="text-muted d-block mt-1">
-                    No classes registered for semester {semester}. Add classes under Classes &amp; Students first.
+                    {subjectHasClassRestrictions(selectedSubject)
+                      ? `No classes registered for this subject${subjectSemesterRoman ? ` in semester ${subjectSemesterRoman}` : ''}. Add matching classes under Classes & Students first.`
+                      : `No classes registered for semester ${subjectSemesterRoman}. Add classes under Classes & Students first.`}
                   </small>
                 )}
               </div>

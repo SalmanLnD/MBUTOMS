@@ -5,6 +5,7 @@ import { timesOverlap } from '../utils/timetableSlots.js';
 import { buildTrainerSchedulesForDate } from '../utils/trainerScheduleView.js';
 import { resolveTrainerScheduleCodes } from '../utils/trainerMappings.js';
 import { assertClassRegistered } from '../utils/classRegistry.js';
+import { assertClassAllowedForSubject } from '../utils/subjectClassEligibility.js';
 import ClassGroup from '../models/ClassGroup.js';
 
 import { buildTimetableBoardForDate } from '../utils/timetableBoard.js';
@@ -85,15 +86,20 @@ const enrichSchedulePayload = async (body) => {
     throw error;
   }
 
+  let subjectDoc = null;
   if (payload.subject) {
-    const subject = await Subject.findById(payload.subject);
-    if (subject) {
-      payload.subjectCode = subject.code;
+    subjectDoc = await Subject.findById(payload.subject)
+      .populate('departments', 'code')
+      .populate('schools', 'code');
+    if (subjectDoc) {
+      payload.subjectCode = subjectDoc.code;
     }
   } else if (payload.subjectCode) {
-    const subject = await Subject.findOne({ code: payload.subjectCode });
-    if (subject) {
-      payload.subject = subject._id;
+    subjectDoc = await Subject.findOne({ code: payload.subjectCode })
+      .populate('departments', 'code')
+      .populate('schools', 'code');
+    if (subjectDoc) {
+      payload.subject = subjectDoc._id;
     }
   }
 
@@ -114,6 +120,10 @@ const enrichSchedulePayload = async (body) => {
       section: payload.section,
       semester: payload.semester,
     });
+  }
+
+  if (subjectDoc) {
+    await assertClassAllowedForSubject(subjectDoc, payload.department);
   }
 
   return payload;

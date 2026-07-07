@@ -19,11 +19,11 @@ import { buildFixedSlotsForSubject, resolveTrainerGridSlots } from '../utils/tim
 import { shouldShowTimingsInCells } from '../utils/timetableSlots.js';
 import { getSubjectSlotProfile } from '../utils/subjectSlotTimings.js';
 import { getEffectiveSubjectCode, scheduleMatchesSubject } from '../utils/scheduleSubject.js';
+import { getSubjectSemesterRoman } from '../utils/classPy.js';
 
 const inferSemesterForTrainer = (trainerCode, schedules, subject) => {
-  if (subject?.semester?.name?.includes('V') || subject?.semester?.number === 5) {
-    return 'V';
-  }
+  const fromSubject = getSubjectSemesterRoman(subject);
+  if (fromSubject) return fromSubject;
   const trainerSchedules = schedules.filter((schedule) => schedule.trainerCode === trainerCode);
   if (trainerSchedules.length) {
     return trainerSchedules[0].semester || 'III';

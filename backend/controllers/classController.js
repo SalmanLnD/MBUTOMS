@@ -1,6 +1,8 @@
 import ClassGroup from '../models/ClassGroup.js';
 import Student from '../models/Student.js';
 import Schedule from '../models/Schedule.js';
+import Subject from '../models/Subject.js';
+import { getAllowedDepartmentCodesForSubject } from '../utils/subjectClassEligibility.js';
 
 const attachStudentCounts = async (classes) => {
   const counts = await Student.aggregate([
@@ -34,6 +36,18 @@ export const getClasses = async (req, res) => {
   const filter = {};
   if (req.query.status) filter.status = req.query.status;
   if (req.query.semester) filter.currentSemester = req.query.semester;
+
+  if (req.query.subjectId) {
+    const subject = await Subject.findById(req.query.subjectId)
+      .populate('departments', 'code')
+      .populate('schools', 'code');
+    if (subject) {
+      const allowedDepartments = await getAllowedDepartmentCodesForSubject(subject);
+      if (allowedDepartments?.length) {
+        filter.department = { $in: allowedDepartments };
+      }
+    }
+  }
 
   const classes = await ClassGroup.find(filter)
     .sort({ department: 1, section: 1, py: 1 })
