@@ -1,7 +1,7 @@
 /* TOMS — Midnight Academy theme: deep navy, teal glow, amber accents */
 
 :root {
-  --sidebar-width: 260px;
+  /* Sidebar sizing — animated in global.css */
   --sidebar-width-collapsed: 72px;
 
   /* Core palette */

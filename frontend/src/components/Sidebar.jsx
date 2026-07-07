@@ -26,7 +26,7 @@ const navItems = [
   { path: '/replacements', label: 'Replacements', Icon: ReplacementIcon, roles: ['admin', 'campus_manager'] },
 ];
 
-const Sidebar = ({ collapsed = false, onToggle }) => {
+const Sidebar = ({ collapsed = false, labelsVisible = true, onToggle }) => {
   const { user, hasRole } = useAuth();
 
   const visibleItems = navItems.filter((item) =>
@@ -34,7 +34,13 @@ const Sidebar = ({ collapsed = false, onToggle }) => {
   );
 
   return (
-    <aside className={`sidebar ${collapsed ? 'sidebar--collapsed' : ''}`}>
+    <aside
+      className={[
+        'sidebar',
+        collapsed ? 'sidebar--collapsed' : '',
+        labelsVisible ? 'sidebar--labels-visible' : 'sidebar--labels-hidden',
+      ].filter(Boolean).join(' ')}
+    >
       <div className="sidebar-brand">
         <span className="brand-icon" aria-hidden="true">T</span>
         <div className="sidebar-brand-text">
