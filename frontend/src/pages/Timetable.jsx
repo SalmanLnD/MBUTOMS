@@ -171,14 +171,16 @@ const Timetable = () => {
   };
 
   const getTrainerSubjectsForDisplay = (trainer, visibleSchedules) => {
-    const codes = [
-      ...new Set([
-        ...visibleSchedules
+    const scheduledCodes = [
+      ...new Set(
+        visibleSchedules
           .map((schedule) => getEffectiveSubjectCode(schedule, trainer.employeeId))
-          .filter(Boolean),
-        ...(trainer.subjects || []).map((subject) => subject.code).filter(Boolean),
-      ]),
+          .filter(Boolean)
+      ),
     ];
+    const codes = scheduledCodes.length
+      ? scheduledCodes
+      : [...new Set((trainer.subjects || []).map((subject) => subject.code).filter(Boolean))];
 
     return codes.map((code) => {
       const matched = allSubjects.find((subject) => subject.code === code);

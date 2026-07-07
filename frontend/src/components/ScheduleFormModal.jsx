@@ -6,6 +6,7 @@ import { getVenues } from '../services/venueService.js';
 import { getBatches } from '../services/scheduleService.js';
 import { getErrorMessage, toInputDate } from '../utils/helpers.js';
 import Modal from './Modal.jsx';
+import StyledSelect from './StyledSelect.jsx';
 
 const emptyForm = {
   date: toInputDate(new Date()),
@@ -131,57 +132,102 @@ const ScheduleFormModal = ({ schedule, defaultDate, onClose }) => {
                 </div>
                 <div className="col-md-6">
                   <label className="form-label">Subject *</label>
-                  <select name="subject" className="form-select" value={form.subject} onChange={handleChange} required>
-                    <option value="">Select subject</option>
-                    {subjects.map((s) => (
-                      <option key={s._id} value={s._id}>{s.name} ({s.code})</option>
-                    ))}
-                  </select>
+                  <StyledSelect
+                    name="subject"
+                    value={form.subject}
+                    onChange={handleChange}
+                    required
+                    placeholder="Select subject"
+                    options={[
+                      { value: '', label: 'Select subject' },
+                      ...subjects.map((s) => ({
+                        value: s._id,
+                        label: `${s.name} (${s.code})`,
+                      })),
+                    ]}
+                  />
                 </div>
                 <div className="col-md-6">
                   <label className="form-label">Trainer *</label>
-                  <select name="trainer" className="form-select" value={form.trainer} onChange={handleChange} required>
-                    <option value="">Select trainer</option>
-                    {trainers.map((t) => (
-                      <option key={t._id} value={t._id}>{t.name} ({t.employeeId})</option>
-                    ))}
-                  </select>
+                  <StyledSelect
+                    name="trainer"
+                    value={form.trainer}
+                    onChange={handleChange}
+                    required
+                    placeholder="Select trainer"
+                    options={[
+                      { value: '', label: 'Select trainer' },
+                      ...trainers.map((t) => ({
+                        value: t._id,
+                        label: `${t.name} (${t.employeeId})`,
+                      })),
+                    ]}
+                  />
                 </div>
                 <div className="col-md-6">
                   <label className="form-label">Venue *</label>
-                  <select name="venue" className="form-select" value={form.venue} onChange={handleChange} required>
-                    <option value="">Select venue</option>
-                    {venues.map((v) => (
-                      <option key={v._id} value={v._id}>{v.name} — {v.building}</option>
-                    ))}
-                  </select>
+                  <StyledSelect
+                    name="venue"
+                    value={form.venue}
+                    onChange={handleChange}
+                    required
+                    placeholder="Select venue"
+                    options={[
+                      { value: '', label: 'Select venue' },
+                      ...venues.map((v) => ({
+                        value: v._id,
+                        label: `${v.name} — ${v.building}`,
+                      })),
+                    ]}
+                  />
                 </div>
                 <div className="col-md-6">
                   <label className="form-label">Batch *</label>
-                  <select name="batch" className="form-select" value={form.batch} onChange={handleChange} required>
-                    <option value="">Select batch</option>
-                    {batches.map((b) => (
-                      <option key={b._id} value={b._id}>{b.name}</option>
-                    ))}
-                  </select>
+                  <StyledSelect
+                    name="batch"
+                    value={form.batch}
+                    onChange={handleChange}
+                    required
+                    placeholder="Select batch"
+                    options={[
+                      { value: '', label: 'Select batch' },
+                      ...batches.map((b) => ({
+                        value: b._id,
+                        label: b.name,
+                      })),
+                    ]}
+                  />
                 </div>
                 <div className="col-md-6">
                   <label className="form-label">Semester *</label>
-                  <select name="semester" className="form-select" value={form.semester} onChange={handleChange} required>
-                    <option value="">Select semester</option>
-                    {semesters.map((s) => (
-                      <option key={s._id} value={s._id}>{s.name}</option>
-                    ))}
-                  </select>
+                  <StyledSelect
+                    name="semester"
+                    value={form.semester}
+                    onChange={handleChange}
+                    required
+                    placeholder="Select semester"
+                    options={[
+                      { value: '', label: 'Select semester' },
+                      ...semesters.map((s) => ({
+                        value: s._id,
+                        label: s.name,
+                      })),
+                    ]}
+                  />
                 </div>
                 {isEdit && (
                   <div className="col-md-6">
                     <label className="form-label">Status</label>
-                    <select name="status" className="form-select" value={form.status} onChange={handleChange}>
-                      <option value="scheduled">Scheduled</option>
-                      <option value="cancelled">Cancelled</option>
-                      <option value="completed">Completed</option>
-                    </select>
+                    <StyledSelect
+                      name="status"
+                      value={form.status}
+                      onChange={handleChange}
+                      options={[
+                        { value: 'scheduled', label: 'Scheduled' },
+                        { value: 'cancelled', label: 'Cancelled' },
+                        { value: 'completed', label: 'Completed' },
+                      ]}
+                    />
                   </div>
                 )}
                 <div className="col-12">

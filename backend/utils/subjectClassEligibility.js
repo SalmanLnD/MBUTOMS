@@ -2,6 +2,25 @@ import Department from '../models/Department.js';
 
 const toId = (value) => value?._id || value || null;
 
+/** Registered class groups that use a combined label distinct from subject department codes. */
+const COMBINED_CLASS_DEPARTMENTS = [
+  { classDepartment: 'ECE & EIE', subjectCodes: ['ECE', 'EIE'] },
+  { classDepartment: 'CE & ME', subjectCodes: ['CE-ME'] },
+];
+
+export const expandAllowedClassDepartments = (departmentCodes) => {
+  const codes = departmentCodes || [];
+  const expanded = new Set(codes);
+
+  for (const { classDepartment, subjectCodes } of COMBINED_CLASS_DEPARTMENTS) {
+    if (subjectCodes.some((code) => codes.includes(code))) {
+      expanded.add(classDepartment);
+    }
+  }
+
+  return [...expanded];
+};
+
 export const getAllowedDepartmentCodesForSubject = async (subject) => {
   if (!subject) return null;
 
@@ -31,8 +50,14 @@ export const getAllowedDepartmentCodesForSubject = async (subject) => {
   return codes.length ? codes : null;
 };
 
+export const getAllowedClassDepartmentsForSubject = async (subject) => {
+  const codes = await getAllowedDepartmentCodesForSubject(subject);
+  if (!codes) return null;
+  return expandAllowedClassDepartments(codes);
+};
+
 export const assertClassAllowedForSubject = async (subject, departmentCode) => {
-  const allowed = await getAllowedDepartmentCodesForSubject(subject);
+  const allowed = await getAllowedClassDepartmentsForSubject(subject);
   if (!allowed) return;
 
   const dept = String(departmentCode || '').trim();

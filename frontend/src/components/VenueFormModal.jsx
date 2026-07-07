@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { createVenue, updateVenue } from '../services/venueService.js';
 import { getErrorMessage } from '../utils/helpers.js';
 import Modal from './Modal.jsx';
+import StyledSelect from './StyledSelect.jsx';
 
 const emptyForm = {
   name: '',
@@ -84,13 +85,18 @@ const VenueFormModal = ({ venue, onClose }) => {
                 </div>
                 <div className="col-md-6">
                   <label className="form-label">Type</label>
-                  <select name="type" className="form-select" value={form.type} onChange={handleChange}>
-                    <option value="classroom">Classroom</option>
-                    <option value="lab">Lab</option>
-                    <option value="auditorium">Auditorium</option>
-                    <option value="seminar_hall">Seminar Hall</option>
-                    <option value="other">Other</option>
-                  </select>
+                  <StyledSelect
+                    name="type"
+                    value={form.type}
+                    onChange={handleChange}
+                    options={[
+                      { value: 'classroom', label: 'Classroom' },
+                      { value: 'lab', label: 'Lab' },
+                      { value: 'auditorium', label: 'Auditorium' },
+                      { value: 'seminar_hall', label: 'Seminar Hall' },
+                      { value: 'other', label: 'Other' },
+                    ]}
+                  />
                 </div>
                 <div className="col-md-6 d-flex align-items-end">
                   <div className="form-check">

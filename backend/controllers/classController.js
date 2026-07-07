@@ -2,7 +2,7 @@ import ClassGroup from '../models/ClassGroup.js';
 import Student from '../models/Student.js';
 import Schedule from '../models/Schedule.js';
 import Subject from '../models/Subject.js';
-import { getAllowedDepartmentCodesForSubject } from '../utils/subjectClassEligibility.js';
+import { getAllowedClassDepartmentsForSubject } from '../utils/subjectClassEligibility.js';
 
 const attachStudentCounts = async (classes) => {
   const counts = await Student.aggregate([
@@ -42,7 +42,7 @@ export const getClasses = async (req, res) => {
       .populate('departments', 'code')
       .populate('schools', 'code');
     if (subject) {
-      const allowedDepartments = await getAllowedDepartmentCodesForSubject(subject);
+      const allowedDepartments = await getAllowedClassDepartmentsForSubject(subject);
       if (allowedDepartments?.length) {
         filter.department = { $in: allowedDepartments };
       }

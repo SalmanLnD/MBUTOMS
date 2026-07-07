@@ -6,7 +6,8 @@
   align-items: center;
   justify-content: center;
   padding: 1rem;
-  background-color: rgba(0, 0, 0, 0.5);
+  background-color: rgba(10, 14, 26, 0.65);
+  backdrop-filter: blur(4px);
   overflow-y: auto;
 }
 
@@ -21,11 +22,38 @@
   max-width: 800px;
 }
 
-.toms-modal-scrollable .toms-modal-content {
-  max-height: calc(100vh - 2rem);
-  overflow: hidden;
+.toms-modal-content {
   display: flex;
   flex-direction: column;
+  overflow: hidden;
+  background: var(--surface-glass-strong, #fff);
+  backdrop-filter: blur(20px);
+  border: 1px solid var(--border-glass, rgba(148, 163, 184, 0.25));
+  border-radius: var(--radius-lg, 16px);
+  box-shadow: 0 24px 80px rgba(10, 14, 26, 0.35);
+  animation: toms-modal-in 0.35s var(--transition-smooth, ease) both;
+}
+
+@keyframes toms-modal-in {
+  from {
+    opacity: 0;
+    transform: scale(0.96) translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+.toms-modal-content > form {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  min-height: 0;
+}
+
+.toms-modal-scrollable .toms-modal-content {
+  max-height: calc(100vh - 2rem);
 }
 
 .toms-modal-scrollable form {
@@ -45,37 +73,293 @@
   flex-shrink: 0;
 }
 
-.toms-modal-content {
-  background: #fff;
-  border-radius: 12px;
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.25);
-}
-
 .toms-modal-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 1rem 1.25rem;
-  border-bottom: 1px solid #e9ecef;
+  padding: 1rem 1.35rem;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.2);
+  background: linear-gradient(135deg, rgba(20, 184, 166, 0.08) 0%, transparent 100%);
   flex-shrink: 0;
 }
 
 .toms-modal-title {
   margin: 0;
-  font-size: 1.1rem;
-  font-weight: 600;
+  font-size: 1.12rem;
+  font-weight: 700;
+  background: linear-gradient(135deg, var(--toms-navy-900, #0f1729) 0%, var(--toms-navy-700, #1e2d47) 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
 }
 
 .toms-modal-body {
-  padding: 1.25rem;
+  padding: 1.35rem;
+  background: #fff;
 }
 
 .toms-modal-footer {
   display: flex;
   justify-content: flex-end;
-  gap: 0.5rem;
-  padding: 1rem 1.25rem;
-  border-top: 1px solid #e9ecef;
+  align-items: center;
+  gap: 0.65rem;
+  padding: 1rem 1.35rem;
+  border-top: 1px solid rgba(148, 163, 184, 0.2);
+  background: linear-gradient(180deg, rgba(248, 250, 252, 0.95) 0%, rgba(241, 245, 249, 0.98) 100%);
   flex-shrink: 0;
+}
+
+/* Modal form fields — polished selects and inputs */
+.toms-modal-body .form-label {
+  font-weight: 600;
+  font-size: 0.82rem;
+  color: var(--toms-navy-700, #1e2d47);
+  letter-spacing: 0.02em;
+  margin-bottom: 0.4rem;
+}
+
+.toms-modal-body .form-control,
+.toms-modal-body .form-select {
+  min-height: 2.75rem;
+  padding: 0.6rem 0.95rem;
+  font-size: 0.95rem;
+  font-weight: 500;
+  color: var(--toms-navy-900, #0f1729);
+  background-color: #fff;
+  border: 1px solid rgba(148, 163, 184, 0.45);
+  border-radius: var(--radius-md, 12px);
+  box-shadow:
+    inset 0 1px 2px rgba(15, 23, 42, 0.04),
+    0 1px 2px rgba(15, 23, 42, 0.03);
+  transition:
+    border-color 0.2s ease,
+    box-shadow 0.2s ease,
+    background-color 0.2s ease;
+}
+
+.toms-modal-body .form-control::placeholder {
+  color: #94a3b8;
+  font-weight: 400;
+}
+
+.toms-modal-body .form-control:hover,
+.toms-modal-body .form-select:hover {
+  border-color: rgba(20, 184, 166, 0.55);
+  background-color: #fff;
+}
+
+.toms-modal-body .form-control:focus,
+.toms-modal-body .form-select:focus {
+  border-color: var(--toms-teal, #14b8a6);
+  background-color: #fff;
+  box-shadow:
+    0 0 0 3px rgba(20, 184, 166, 0.18),
+    0 4px 14px rgba(20, 184, 166, 0.12),
+    inset 0 1px 2px rgba(15, 23, 42, 0.04);
+  outline: none;
+}
+
+.toms-modal-body .form-select {
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  padding-right: 2.75rem;
+  cursor: pointer;
+  background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none'%3e%3cpath d='M5 7.5 10 12.5 15 7.5' stroke='%2314b8a6' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3e%3c/svg%3e");
+  background-repeat: no-repeat;
+  background-position: right 0.85rem center;
+  background-size: 1.1rem;
+}
+
+.toms-modal-body .form-select:disabled {
+  cursor: not-allowed;
+  opacity: 0.7;
+  background-color: #f8fafc;
+}
+
+.toms-modal-body textarea.form-control {
+  min-height: 6rem;
+  resize: vertical;
+}
+
+.toms-modal-body .alert {
+  border-radius: var(--radius-md, 12px);
+  border: none;
+}
+
+.toms-modal-footer .btn {
+  min-width: 5.5rem;
+  padding: 0.55rem 1.15rem;
+  border-radius: var(--radius-sm, 8px);
+  font-weight: 600;
+}
+
+/* Custom styled select — replaces native option popup in modals */
+.toms-styled-select {
+  position: relative;
+  width: 100%;
+}
+
+.toms-styled-select__validator {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+  height: 0;
+  width: 0;
+  border: 0;
+  padding: 0;
+}
+
+.toms-styled-select__trigger {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  width: 100%;
+  text-align: left;
+  background-image: none !important;
+  padding-right: 0.95rem !important;
+}
+
+.toms-styled-select__trigger:focus {
+  outline: none;
+}
+
+.toms-styled-select.is-open .toms-styled-select__trigger {
+  border-color: var(--toms-teal, #14b8a6);
+  box-shadow:
+    0 0 0 3px rgba(20, 184, 166, 0.18),
+    0 4px 14px rgba(20, 184, 166, 0.12),
+    inset 0 1px 2px rgba(15, 23, 42, 0.04);
+}
+
+.toms-styled-select__value {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.toms-styled-select__value.is-placeholder {
+  color: #94a3b8;
+  font-weight: 400;
+}
+
+.toms-styled-select__chevron {
+  display: inline-flex;
+  flex-shrink: 0;
+  color: var(--toms-teal, #14b8a6);
+  transition: transform 0.2s ease;
+}
+
+.toms-styled-select.is-open .toms-styled-select__chevron {
+  transform: rotate(180deg);
+}
+
+.toms-styled-select__menu {
+  overflow: hidden;
+  border-radius: var(--radius-md, 12px);
+  border: 1px solid rgba(148, 163, 184, 0.45);
   background: #fff;
+  box-shadow:
+    0 18px 48px rgba(10, 14, 26, 0.18),
+    0 4px 16px rgba(15, 23, 42, 0.08);
+  animation: toms-select-menu-in 0.18s ease both;
+}
+
+@keyframes toms-select-menu-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.toms-styled-select__menu-inner {
+  max-height: inherit;
+  overflow-y: auto;
+  padding: 0.35rem;
+}
+
+.toms-styled-select__group + .toms-styled-select__group,
+.toms-styled-select__option + .toms-styled-select__group {
+  margin-top: 0.35rem;
+  padding-top: 0.35rem;
+  border-top: 1px solid rgba(148, 163, 184, 0.2);
+}
+
+.toms-styled-select__group-label {
+  padding: 0.35rem 0.65rem 0.25rem;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #64748b;
+}
+
+.toms-styled-select__option {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  width: 100%;
+  min-height: 2.5rem;
+  padding: 0.55rem 0.75rem;
+  border: 0;
+  border-radius: calc(var(--radius-md, 12px) - 4px);
+  background: transparent;
+  color: var(--toms-navy-900, #0f1729);
+  font-size: 0.92rem;
+  font-weight: 500;
+  text-align: left;
+  cursor: pointer;
+  transition:
+    background-color 0.15s ease,
+    color 0.15s ease;
+}
+
+.toms-styled-select__option:hover,
+.toms-styled-select__option.is-highlighted {
+  background: rgba(20, 184, 166, 0.1);
+  color: var(--toms-navy-900, #0f1729);
+}
+
+.toms-styled-select__option.is-selected {
+  background: rgba(20, 184, 166, 0.14);
+  color: #0f766e;
+  font-weight: 600;
+}
+
+.toms-styled-select__option:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.toms-styled-select__option-label {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.toms-styled-select__option-check {
+  display: inline-flex;
+  flex-shrink: 0;
+  color: var(--toms-teal, #14b8a6);
+}
+
+.toms-styled-select__menu-inner::-webkit-scrollbar {
+  width: 8px;
+}
+
+.toms-styled-select__menu-inner::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.55);
+  border-radius: 999px;
+}
+
+.toms-styled-select__menu-inner::-webkit-scrollbar-track {
+  background: transparent;
 }

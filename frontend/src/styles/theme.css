@@ -437,48 +437,7 @@ body {
   border-radius: var(--radius-md);
 }
 
-/* Modal theme */
-.toms-modal-overlay {
-  background-color: rgba(10, 14, 26, 0.65);
-  backdrop-filter: blur(4px);
-}
-
-.toms-modal-content {
-  background: var(--surface-glass-strong);
-  backdrop-filter: blur(20px);
-  border: 1px solid var(--border-glass);
-  border-radius: var(--radius-lg);
-  box-shadow: 0 24px 80px rgba(10, 14, 26, 0.35);
-  animation: toms-modal-in 0.35s var(--transition-smooth) both;
-}
-
-@keyframes toms-modal-in {
-  from {
-    opacity: 0;
-    transform: scale(0.92) translateY(12px);
-  }
-  to {
-    opacity: 1;
-    transform: scale(1) translateY(0);
-  }
-}
-
-.toms-modal-header {
-  background: linear-gradient(135deg, rgba(20, 184, 166, 0.08) 0%, transparent 100%);
-  border-bottom-color: rgba(148, 163, 184, 0.2);
-}
-
-.toms-modal-title {
-  background: linear-gradient(135deg, var(--toms-navy-900) 0%, var(--toms-navy-700) 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
-}
-
-.toms-modal-footer {
-  background: rgba(248, 250, 252, 0.8);
-  border-top-color: rgba(148, 163, 184, 0.2);
-}
+/* Modal theme — see styles/modal.css for full modal + form field styling */
 
 /* Timetable page — compact, polished grid */
 .timetable-controls {

@@ -2,7 +2,6 @@ import { useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { lockBodyScroll, unlockBodyScroll } from '../utils/modalManager.js';
 import { cleanupBootstrapArtifacts } from '../utils/modalCleanup.js';
-import '../styles/modal.css';
 
 const Modal = ({
   show,

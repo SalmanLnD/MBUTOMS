@@ -9,6 +9,7 @@ import { AuthProvider } from './context/AuthContext.jsx';
 import { resetAllModalArtifacts } from './utils/modalCleanup.js';
 import './styles/global.css';
 import './styles/theme.css';
+import './styles/modal.css';
 
 resetAllModalArtifacts();
 

@@ -26,21 +26,29 @@ const pstj = (slotKey) => {
   };
 };
 
+/** PSTJ afternoon block — 14:45–16:45 displayed in S4 on the 4-period grid. */
+const pstjAfternoon = () => ({
+  startTime: SOLAS_THREE_SLOT_TIMINGS.s3.startTime,
+  endTime: SOLAS_THREE_SLOT_TIMINGS.s3.endTime,
+  slot: 'S4',
+  subjectCode: PSTJ_SUBJECT_CODE,
+});
+
 /** Weekly III Semester timetable for Navya Mallidi (IDSA-T2). */
 export const NAVYA_WEEKLY_SLOTS = [
   { day: 'Monday', department: 'AI&DS', section: 'AI&DS-2', ...idsa('S1') },
   { day: 'Monday', department: 'AI&DS', section: 'AI&DS-2', ...idsa('S2') },
-  { day: 'Monday', department: 'B.COM(CA)', section: '1', ...pstj('S3') },
+  { day: 'Monday', department: 'B.COM(CA)', section: '1', ...pstjAfternoon() },
 
   { day: 'Tuesday', department: 'AI&DS', section: 'AI&DS-3', ...idsa('S1') },
   { day: 'Tuesday', department: 'AI&DS', section: 'AI&DS-2', ...idsa('S2') },
-  { day: 'Tuesday', department: 'B.COM(CA)', section: '1', ...pstj('S3') },
+  { day: 'Tuesday', department: 'B.COM(CA)', section: '1', ...pstjAfternoon() },
 
   { day: 'Wednesday', department: 'AI&DS', section: 'AI&DS-2', ...idsa('S1') },
 
   { day: 'Thursday', department: 'AI&DS', section: 'AI&DS-3', ...idsa('S1') },
   { day: 'Thursday', department: 'AI&DS', section: 'AI&DS-3', ...idsa('S2') },
-  { day: 'Thursday', department: 'B.COM(CA)', section: '1', ...pstj('S3') },
+  { day: 'Thursday', department: 'B.COM(CA)', section: '1', ...pstjAfternoon() },
 
   { day: 'Friday', department: 'B.COM(CA)', section: '1', ...pstj('S1') },
   { day: 'Friday', department: 'AI&DS', section: 'AI&DS-3', ...idsa('S3') },

@@ -13,7 +13,11 @@ dotenv.config();
 await mongoose.connect(process.env.MONGODB_URI);
 
 const navya = await Trainer.findOne({
-  $or: [{ employeeId: 'IDSA-T2' }, { scheduleTrainerCodes: NAVYA_TRAINER_CODE }],
+  $or: [
+    { employeeId: 'IDSA-T2' },
+    { employeeId: '135301' },
+    { scheduleTrainerCodes: NAVYA_TRAINER_CODE },
+  ],
 });
 if (!navya) {
   throw new Error('Navya trainer record not found');

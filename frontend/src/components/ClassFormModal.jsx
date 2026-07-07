@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import Modal from './Modal.jsx';
+import StyledSelect from './StyledSelect.jsx';
 import { createClass, updateClass } from '../services/classService.js';
 import { getErrorMessage } from '../utils/helpers.js';
 import { defaultPyForSemester } from '../utils/classPy.js';
@@ -114,32 +115,31 @@ const ClassFormModal = ({ show, classItem, onClose, onSaved }) => {
             </div>
             <div className="col-md-6">
               <label className="form-label" htmlFor="class-semester">Current Semester</label>
-              <select
+              <StyledSelect
                 id="class-semester"
                 name="currentSemester"
-                className="form-select"
                 value={form.currentSemester}
                 onChange={handleChange}
                 required
-              >
-                {SEMESTER_OPTIONS.map((sem) => (
-                  <option key={sem} value={sem}>{sem}</option>
-                ))}
-              </select>
+                options={SEMESTER_OPTIONS.map((sem) => ({
+                  value: sem,
+                  label: sem,
+                }))}
+              />
             </div>
             {isEdit && (
               <div className="col-md-6">
                 <label className="form-label" htmlFor="class-status">Status</label>
-                <select
+                <StyledSelect
                   id="class-status"
                   name="status"
-                  className="form-select"
                   value={form.status}
                   onChange={handleChange}
-                >
-                  <option value="active">Active</option>
-                  <option value="inactive">Inactive</option>
-                </select>
+                  options={[
+                    { value: 'active', label: 'Active' },
+                    { value: 'inactive', label: 'Inactive' },
+                  ]}
+                />
               </div>
             )}
           </div>

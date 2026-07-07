@@ -7,6 +7,7 @@ import {
 import { getSubjects } from '../services/subjectService.js';
 import { getErrorMessage, toInputDate } from '../utils/helpers.js';
 import Modal from './Modal.jsx';
+import StyledSelect from './StyledSelect.jsx';
 
 const toSubjectId = (subject) => {
   if (!subject) return '';
@@ -142,19 +143,31 @@ const TrainerFormModal = ({ trainer, onClose }) => {
                 </div>
                 <div className="col-md-6">
                   <label className="form-label">Department</label>
-                  <select name="department" className="form-select" value={form.department} onChange={handleChange}>
-                    <option value="">Select department</option>
-                    {departments.map((d) => (
-                      <option key={d._id} value={d._id}>{d.name} ({d.code})</option>
-                    ))}
-                  </select>
+                  <StyledSelect
+                    name="department"
+                    value={form.department}
+                    onChange={handleChange}
+                    placeholder="Select department"
+                    options={[
+                      { value: '', label: 'Select department' },
+                      ...departments.map((d) => ({
+                        value: d._id,
+                        label: `${d.name} (${d.code})`,
+                      })),
+                    ]}
+                  />
                 </div>
                 <div className="col-md-6">
                   <label className="form-label">Availability</label>
-                  <select name="status" className="form-select" value={form.status} onChange={handleChange}>
-                    <option value="active">Available</option>
-                    <option value="unavailable">Unavailable</option>
-                  </select>
+                  <StyledSelect
+                    name="status"
+                    value={form.status}
+                    onChange={handleChange}
+                    options={[
+                      { value: 'active', label: 'Available' },
+                      { value: 'unavailable', label: 'Unavailable' },
+                    ]}
+                  />
                 </div>
                 <div className="col-md-6">
                   <label className="form-label">Experience (years)</label>

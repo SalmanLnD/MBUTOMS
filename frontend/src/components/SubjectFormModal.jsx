@@ -10,6 +10,7 @@ import {
 import { getTrainers } from '../services/trainerService.js';
 import { getErrorMessage, toInputDate } from '../utils/helpers.js';
 import Modal from './Modal.jsx';
+import StyledSelect from './StyledSelect.jsx';
 import { SLOT_FIELD_KEYS, groupSubjectsBySlotTimings, findSubjectsWithSimilarTimings, formatSlotTimingsSummary, normalizeSlotTimings, areSlotTimingsEqual } from '../utils/timetableSlots.js';
 import { getSubjectSlotProfile } from '../utils/subjectSlotTimings.js';
 
@@ -293,12 +294,19 @@ const SubjectFormModal = ({ subject, onClose }) => {
               </div>
               <div className="col-md-6">
                 <label className="form-label">Semester</label>
-                <select name="semester" className="form-select" value={form.semester} onChange={handleChange}>
-                  <option value="">Select semester</option>
-                  {semesters.map((s) => (
-                    <option key={s._id} value={s._id}>{s.name}</option>
-                  ))}
-                </select>
+                <StyledSelect
+                  name="semester"
+                  value={form.semester}
+                  onChange={handleChange}
+                  placeholder="Select semester"
+                  options={[
+                    { value: '', label: 'Select semester' },
+                    ...semesters.map((s) => ({
+                      value: s._id,
+                      label: s.name,
+                    })),
+                  ]}
+                />
               </div>
               <div className="col-12">
                 <label className="form-label">Departments</label>
@@ -356,16 +364,16 @@ const SubjectFormModal = ({ subject, onClose }) => {
               </div>
               <div className="col-12">
                 <label className="form-label" htmlFor="slot-count">Number of periods</label>
-                <select
+                <StyledSelect
                   id="slot-count"
                   name="slotCount"
-                  className="form-select"
-                  value={form.slotCount}
+                  value={String(form.slotCount)}
                   onChange={handleChange}
-                >
-                  <option value={3}>3 periods (S1–S3)</option>
-                  <option value={4}>4 periods (S1–S4)</option>
-                </select>
+                  options={[
+                    { value: '3', label: '3 periods (S1–S3)' },
+                    { value: '4', label: '4 periods (S1–S4)' },
+                  ]}
+                />
               </div>
               <div className="col-12">
                 <label className="form-label">Period Timings (S1–S{form.slotCount})</label>
@@ -392,26 +400,20 @@ const SubjectFormModal = ({ subject, onClose }) => {
                       <label className="form-label small" htmlFor="timing-source-subject">
                         Copy timings from subject
                       </label>
-                      <select
+                      <StyledSelect
                         id="timing-source-subject"
-                        className="form-select"
                         value={timingSourceSubjectId}
                         onChange={handleTimingSourceChange}
-                      >
-                        <option value="">Enter timings manually</option>
-                        {timingGroups.map((group) => (
-                          <optgroup
-                            key={group.key}
-                            label={`${group.summary} (${group.subjects.length} subject${group.subjects.length === 1 ? '' : 's'})`}
-                          >
-                            {group.subjects.map((item) => (
-                              <option key={item._id} value={item._id}>
-                                {item.name} ({item.code})
-                              </option>
-                            ))}
-                          </optgroup>
-                        ))}
-                      </select>
+                        placeholder="Enter timings manually"
+                        options={[{ value: '', label: 'Enter timings manually' }]}
+                        groups={timingGroups.map((group) => ({
+                          label: `${group.summary} (${group.subjects.length} subject${group.subjects.length === 1 ? '' : 's'})`,
+                          options: group.subjects.map((item) => ({
+                            value: item._id,
+                            label: `${item.name} (${item.code})`,
+                          })),
+                        }))}
+                      />
                       <small className="text-muted d-block mt-2">
                         Subjects are grouped by matching S1–S4 timings. Select one to copy its slots.
                       </small>

@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import {
   getAllowedDepartmentCodesForSubject,
+  expandAllowedClassDepartments,
 } from '../../utils/subjectClassEligibility.js';
 
 describe('getAllowedDepartmentCodesForSubject', () => {
@@ -26,5 +27,25 @@ describe('getAllowedDepartmentCodesForSubject', () => {
   it('returns null when subject is missing', async () => {
     const codes = await getAllowedDepartmentCodesForSubject(null);
     assert.equal(codes, null);
+  });
+});
+
+describe('expandAllowedClassDepartments', () => {
+  it('adds ECE & EIE when ECE or EIE is allowed', () => {
+    assert.deepEqual(
+      expandAllowedClassDepartments(['EEE', 'ECE', 'EIE']).sort(),
+      ['ECE', 'ECE & EIE', 'EEE', 'EIE'].sort()
+    );
+  });
+
+  it('adds CE & ME when CE-ME is allowed', () => {
+    assert.deepEqual(
+      expandAllowedClassDepartments(['CE-ME']).sort(),
+      ['CE & ME', 'CE-ME'].sort()
+    );
+  });
+
+  it('leaves unrelated codes unchanged', () => {
+    assert.deepEqual(expandAllowedClassDepartments(['CSE', 'AIML']), ['CSE', 'AIML']);
   });
 });

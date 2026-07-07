@@ -3,6 +3,7 @@ import { createStudent, updateStudent } from '../services/studentService.js';
 import { getClasses } from '../services/classService.js';
 import { getErrorMessage } from '../utils/helpers.js';
 import Modal from './Modal.jsx';
+import StyledSelect from './StyledSelect.jsx';
 
 const emptyForm = {
   rollNumber: '',
@@ -128,29 +129,34 @@ const StudentFormModal = ({ show, student, defaultClass, onClose, onSaved }) => 
             {classesLoading ? (
               <div className="text-muted small">Loading classes...</div>
             ) : (
-              <select
-                className="form-select"
+              <StyledSelect
                 name="classId"
                 value={form.classId}
                 onChange={handleChange}
                 required
-              >
-                <option value="">Select class</option>
-                {classOptions.map((cls) => (
-                  <option key={cls._id} value={cls._id}>
-                    {cls.department} {cls.section} · PY {cls.py} · Sem {cls.currentSemester}
-                  </option>
-                ))}
-              </select>
+                placeholder="Select class"
+                options={[
+                  { value: '', label: 'Select class' },
+                  ...classOptions.map((cls) => ({
+                    value: cls._id,
+                    label: `${cls.department} ${cls.section} · PY ${cls.py} · Sem ${cls.currentSemester}`,
+                  })),
+                ]}
+              />
             )}
           </div>
           <div className="mb-3">
             <label className="form-label">Status</label>
-            <select className="form-select" name="status" value={form.status} onChange={handleChange}>
-              <option value="active">Active</option>
-              <option value="inactive">Inactive</option>
-              <option value="graduated">Graduated</option>
-            </select>
+            <StyledSelect
+              name="status"
+              value={form.status}
+              onChange={handleChange}
+              options={[
+                { value: 'active', label: 'Active' },
+                { value: 'inactive', label: 'Inactive' },
+                { value: 'graduated', label: 'Graduated' },
+              ]}
+            />
           </div>
         </div>
         <div className="toms-modal-footer">

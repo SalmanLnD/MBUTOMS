@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import Modal from './Modal.jsx';
 import ConfirmModal from './ConfirmModal.jsx';
+import StyledSelect from './StyledSelect.jsx';
 import { createSchedule, updateSchedule, deleteSchedule } from '../services/scheduleService.js';
 import { getClasses } from '../services/classService.js';
 import { getSlotTimesForSubject, getActiveSlotKeys } from '../utils/timetableSlots.js';
@@ -214,57 +215,53 @@ const TimetableSlotModal = ({
             <div className="row g-3">
               <div className="col-md-6">
                 <label className="form-label" htmlFor="slot-subject">Subject *</label>
-                <select
+                <StyledSelect
                   id="slot-subject"
                   name="subjectId"
-                  className="form-select"
                   value={form.subjectId}
                   onChange={handleChange}
                   required
                   disabled={Boolean(subject) && !isEdit}
-                >
-                  <option value="">Select subject</option>
-                  {subjects.map((item) => (
-                    <option key={item._id} value={item._id}>
-                      {item.name} ({item.code})
-                    </option>
-                  ))}
-                </select>
+                  placeholder="Select subject"
+                  options={[
+                    { value: '', label: 'Select subject' },
+                    ...subjects.map((item) => ({
+                      value: item._id,
+                      label: `${item.name} (${item.code})`,
+                    })),
+                  ]}
+                />
               </div>
               <div className="col-md-6">
                 <label className="form-label" htmlFor="slot-period">Period *</label>
-                <select
+                <StyledSelect
                   id="slot-period"
                   name="slot"
-                  className="form-select"
                   value={form.slot}
                   onChange={handleChange}
                   required
-                >
-                  {getActiveSlotKeys(selectedSubject).map((slotKey) => {
+                  options={getActiveSlotKeys(selectedSubject).map((slotKey) => {
                     const times = getSlotTimesForSubject(selectedSubject, slotKey);
-                    return (
-                      <option key={slotKey} value={slotKey}>
-                        {slotKey} ({times.startTime} – {times.endTime})
-                      </option>
-                    );
+                    return {
+                      value: slotKey,
+                      label: `${slotKey} (${times.startTime} – ${times.endTime})`,
+                    };
                   })}
-                </select>
+                />
               </div>
               <div className="col-md-4">
                 <label className="form-label" htmlFor="slot-day">Day *</label>
-                <select
+                <StyledSelect
                   id="slot-day"
                   name="day"
-                  className="form-select"
                   value={form.day}
                   onChange={handleChange}
                   required
-                >
-                  {['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'].map((weekday) => (
-                    <option key={weekday} value={weekday}>{weekday}</option>
-                  ))}
-                </select>
+                  options={['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'].map((weekday) => ({
+                    value: weekday,
+                    label: weekday,
+                  }))}
+                />
               </div>
               <div className="col-md-4">
                 <label className="form-label">Start time</label>
@@ -279,22 +276,21 @@ const TimetableSlotModal = ({
                 {classesLoading ? (
                   <div className="text-muted small">Loading registered classes...</div>
                 ) : (
-                  <select
+                  <StyledSelect
                     id="slot-class"
                     name="classId"
-                    className="form-select"
                     value={form.classId}
                     onChange={handleChange}
                     required
-                  >
-                    <option value="">Select a registered class</option>
-                    {visibleClassOptions.map((item) => (
-                      <option key={item._id || `${item.department}-${item.section}`} value={item._id}>
-                        {item.department} {item.section} · PY {item.py} · Sem {item.currentSemester}
-                        {item.__legacy ? ' (current assignment)' : ''}
-                      </option>
-                    ))}
-                  </select>
+                    placeholder="Select a registered class"
+                    options={[
+                      { value: '', label: 'Select a registered class' },
+                      ...visibleClassOptions.map((item) => ({
+                        value: item._id,
+                        label: `${item.department} ${item.section} · PY ${item.py} · Sem ${item.currentSemester}${item.__legacy ? ' (current assignment)' : ''}`,
+                      })),
+                    ]}
+                  />
                 )}
                 {!classesLoading && visibleClassOptions.length === 0 && (
                   <small className="text-muted d-block mt-1">
