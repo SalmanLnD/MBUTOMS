@@ -10,7 +10,7 @@ import {
   IDSA_SUBJECT,
   IDSA_DEPARTMENT_CODES,
 } from './trainerMappings.js';
-import { DEFAULT_SLOT_TIMINGS } from './timetableSlots.js';
+import { SOC_FOUR_SLOT_TIMINGS } from './subjectSlotTimings.js';
 
 import { DEFAULT_SUBJECT_START_DATE } from './subjectStartDate.js';
 
@@ -61,17 +61,19 @@ export const syncIdsaTrainersAndSubject = async () => {
     departments: departments.map((d) => d._id),
     semester: semesterIII?._id,
     allDepartments: false,
-    hours: 0,
+    hours: 6,
     trainerEligible: mergeTrainerIds(
       subject?.trainerEligible,
       legacySubject?.trainerEligible,
       trainers.map((t) => t._id)
     ),
-    slotTimings: DEFAULT_SLOT_TIMINGS,
+    slotTimings: SOC_FOUR_SLOT_TIMINGS,
+    slotCount: 4,
   };
 
   if (subject) {
-    Object.assign(subject, subjectPayload);
+    const { hours, ...syncFields } = subjectPayload;
+    Object.assign(subject, syncFields);
     await subject.save();
   } else if (socSchool && semesterIII && trainers.length) {
     subject = await Subject.create({

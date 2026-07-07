@@ -1,6 +1,7 @@
 import express from 'express';
 import {
   getSchedules,
+  getTimetableBoard,
   getScheduleById,
   getTrainerSchedule,
   getTrainerScheduleByCode,
@@ -18,6 +19,7 @@ const router = express.Router();
 
 router.use(protect);
 
+router.get('/timetable-board', asyncHandler(getTimetableBoard));
 router.get('/batches/list', asyncHandler(getBatches));
 router.get('/trainer/:id', asyncHandler(getTrainerSchedule));
 router.get('/trainer-code/:code', asyncHandler(getTrainerScheduleByCode));

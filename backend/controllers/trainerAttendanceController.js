@@ -1,8 +1,19 @@
 import Trainer from '../models/Trainer.js';
 import TrainerDailyAttendance from '../models/TrainerDailyAttendance.js';
 import { normalizeDate } from '../utils/scheduleHelpers.js';
-import { getWeekdayDates, getWeekRange, toDateKey } from '../utils/dateRange.js';
+import {
+  clampMonthToTrackingStart,
+  formatMonthKey,
+  getCalendarDates,
+  getMonthRange,
+  groupDatesByWeek,
+  isWeekendDate,
+  parseMonthParam,
+  toDateKey,
+} from '../utils/dateRange.js';
+import { TRAINER_ATTENDANCE_TRACKING_START } from '../utils/attendanceTracking.js';
 import { computeClassHandlingHours } from '../utils/trainerClassHours.js';
+import { computeClassHandlingHoursBatch } from '../utils/trainerClassHoursBatch.js';
 
 const buildLogMap = (logs) => {
   const map = new Map();
@@ -12,13 +23,40 @@ const buildLogMap = (logs) => {
   return map;
 };
 
-export const getTrainerAttendanceGrid = async (req, res) => {
-  const weekRange = req.query.startDate && req.query.endDate
-    ? { startDate: normalizeDate(req.query.startDate), endDate: normalizeDate(req.query.endDate) }
-    : getWeekRange(req.query.referenceDate || new Date());
+const buildRowTotals = (days, dateKeys) => {
+  let mockPrepHours = 0;
+  let classHandlingHours = 0;
+  let oifDays = 0;
 
-  const { startDate, endDate } = weekRange;
-  const dates = getWeekdayDates(startDate, endDate);
+  dateKeys.forEach((dateKey) => {
+    const cell = days[dateKey];
+    if (!cell) return;
+    mockPrepHours += Number(cell.mockPrepHours || 0);
+    classHandlingHours += Number(cell.classHandlingHours || 0);
+    if (String(cell.oifNumber || '').trim()) oifDays += 1;
+  });
+
+  return {
+    mockPrepHours,
+    classHandlingHours,
+    oifDays,
+    workingDays: dateKeys.length,
+  };
+};
+
+export const getTrainerAttendanceGrid = async (req, res) => {
+  const today = normalizeDate(new Date());
+  let { year, month } = parseMonthParam(req.query.month, req.query.referenceDate || new Date());
+  ({ year, month } = clampMonthToTrackingStart({ year, month }, TRAINER_ATTENDANCE_TRACKING_START));
+
+  const { startDate: monthStart, endDate: monthEnd } = getMonthRange(year, month);
+  const rangeStart = monthStart < TRAINER_ATTENDANCE_TRACKING_START
+    ? TRAINER_ATTENDANCE_TRACKING_START
+    : monthStart;
+  const rangeEnd = monthEnd;
+
+  const dates = getCalendarDates(rangeStart, rangeEnd);
+  const editableDays = dates.filter((date) => date <= today).length;
   const semester = req.query.semester || 'III';
 
   const trainerFilter = {};
@@ -33,55 +71,63 @@ export const getTrainerAttendanceGrid = async (req, res) => {
 
   const logs = await TrainerDailyAttendance.find({
     trainer: { $in: trainers.map((trainer) => trainer._id) },
-    date: { $gte: startDate, $lte: endDate },
+    date: { $gte: rangeStart, $lte: monthEnd },
   });
 
   const logMap = buildLogMap(logs);
-  const classHoursCache = new Map();
-
-  const rows = await Promise.all(
-    trainers.map(async (trainer) => {
-      const days = {};
-
-      await Promise.all(
-        dates.map(async (date) => {
-          const dateKey = toDateKey(date);
-          const cacheKey = `${trainer._id}|${dateKey}`;
-          let classHandlingHours = classHoursCache.get(cacheKey);
-          if (classHandlingHours === undefined) {
-            classHandlingHours = await computeClassHandlingHours(trainer._id, date, semester);
-            classHoursCache.set(cacheKey, classHandlingHours);
-          }
-
-          const log = logMap.get(cacheKey);
-          days[dateKey] = {
-            id: log?._id || null,
-            oifNumber: log?.oifNumber || '',
-            mockPrepHours: log?.mockPrepHours ?? 0,
-            classHandlingHours,
-          };
-        })
-      );
-
-      return {
-        trainer: {
-          _id: trainer._id,
-          name: trainer.name,
-          employeeId: trainer.employeeId,
-          department: trainer.department,
-        },
-        days,
-      };
-    })
+  const classHoursCache = await computeClassHandlingHoursBatch(
+    trainers.map((trainer) => trainer._id),
+    dates,
+    semester
   );
+  const dateKeys = dates.map(toDateKey);
+
+  const rows = trainers.map((trainer) => {
+    const days = {};
+
+    dates.forEach((date) => {
+      const dateKey = toDateKey(date);
+      const cacheKey = `${trainer._id}|${dateKey}`;
+      const log = logMap.get(cacheKey);
+      days[dateKey] = {
+        id: log?._id || null,
+        oifNumber: log?.oifNumber || '',
+        mockPrepHours: log?.mockPrepHours ?? 0,
+        classHandlingHours: classHoursCache.get(cacheKey) ?? 0,
+        isFuture: date > today,
+      };
+    });
+
+    return {
+      trainer: {
+        _id: trainer._id,
+        name: trainer.name,
+        employeeId: trainer.employeeId,
+        department: trainer.department,
+      },
+      days,
+      totals: buildRowTotals(days, dateKeys),
+    };
+  });
 
   res.json({
-    startDate,
-    endDate,
+    month: formatMonthKey(year, month),
+    monthLabel: new Date(year, month - 1, 1).toLocaleDateString('en-IN', {
+      month: 'long',
+      year: 'numeric',
+    }),
+    trackingStart: toDateKey(TRAINER_ATTENDANCE_TRACKING_START),
+    startDate: rangeStart,
+    endDate: rangeEnd,
+    workingDays: dates.length,
+    editableDays,
     dates: dates.map((date) => ({
       key: toDateKey(date),
-      label: date.toLocaleDateString('en-IN', { weekday: 'short', day: '2-digit', month: 'short' }),
+      label: date.toLocaleDateString('en-IN', { weekday: 'short', day: '2-digit' }),
+      isFuture: date > today,
+      isWeekend: isWeekendDate(date),
     })),
+    weeks: groupDatesByWeek(dates),
     rows,
   });
 };
@@ -103,6 +149,18 @@ export const upsertTrainerDailyAttendance = async (req, res) => {
   }
 
   const day = normalizeDate(date);
+  const today = normalizeDate(new Date());
+
+  if (day < TRAINER_ATTENDANCE_TRACKING_START) {
+    return res.status(400).json({
+      message: 'Attendance tracking starts from 1 July 2026.',
+    });
+  }
+
+  if (day > today) {
+    return res.status(400).json({ message: 'Future dates cannot be marked.' });
+  }
+
   const parsedMockHours = mockPrepHours === '' || mockPrepHours === null || mockPrepHours === undefined
     ? 0
     : Number(mockPrepHours);

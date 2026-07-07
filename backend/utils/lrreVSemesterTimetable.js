@@ -4,7 +4,7 @@ export const LRRE_V_SEMESTER = 'V';
 export const LRRE_V_SLOT_TIMINGS = {
   S1: { startTime: '09:00', endTime: '10:50', slot: 'S1' },
   S2: { startTime: '11:10', endTime: '13:00', slot: 'S2' },
-  S3: { startTime: '14:15', endTime: '16:05', slot: 'S3' },
+  S3: { startTime: '14:45', endTime: '16:45', slot: 'S3' },
 };
 
 /** employeeId -> weekly LRRE V Semester allocation (source of truth for sync + tests) */

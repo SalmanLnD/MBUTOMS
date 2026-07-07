@@ -10,7 +10,8 @@ import {
 import { getTrainers } from '../services/trainerService.js';
 import { getErrorMessage, toInputDate } from '../utils/helpers.js';
 import Modal from './Modal.jsx';
-import { DEFAULT_SLOT_TIMINGS, groupSubjectsBySlotTimings, findSubjectsWithSimilarTimings, formatSlotTimingsSummary, normalizeSlotTimings, areSlotTimingsEqual } from '../utils/timetableSlots.js';
+import { SLOT_FIELD_KEYS, groupSubjectsBySlotTimings, findSubjectsWithSimilarTimings, formatSlotTimingsSummary, normalizeSlotTimings, areSlotTimingsEqual } from '../utils/timetableSlots.js';
+import { getSubjectSlotProfile } from '../utils/subjectSlotTimings.js';
 
 const emptyForm = {
   name: '',
@@ -24,11 +25,8 @@ const emptyForm = {
   allDepartments: false,
   hours: 0,
   trainerEligible: [],
-  slotTimings: {
-    s1: { startTime: '09:00', endTime: '10:50' },
-    s2: { startTime: '11:10', endTime: '13:00' },
-    s3: { startTime: '14:15', endTime: '16:05' },
-  },
+  slotCount: 4,
+  slotTimings: normalizeSlotTimings(),
 };
 
 const toId = (value) => value?._id || value || '';
@@ -115,11 +113,8 @@ const SubjectFormModal = ({ subject, onClose }) => {
       allDepartments: Boolean(subject.allDepartments),
       hours: subject.hours || 0,
       trainerEligible: subject.trainerEligible?.map((t) => toId(t)) || [],
-      slotTimings: {
-        s1: { ...DEFAULT_SLOT_TIMINGS.s1, ...subject.slotTimings?.s1 },
-        s2: { ...DEFAULT_SLOT_TIMINGS.s2, ...subject.slotTimings?.s2 },
-        s3: { ...DEFAULT_SLOT_TIMINGS.s3, ...subject.slotTimings?.s3 },
-      },
+      slotCount: subject.slotCount || getSubjectSlotProfile(subject.code)?.slotCount || 4,
+      slotTimings: normalizeSlotTimings(subject.slotTimings),
     });
 
     if (schoolIds.length) {
@@ -133,8 +128,8 @@ const SubjectFormModal = ({ subject, onClose }) => {
   );
 
   const similarSubjects = useMemo(
-    () => findSubjectsWithSimilarTimings(allSubjects, form.slotTimings, subject?._id),
-    [allSubjects, form.slotTimings, subject?._id]
+    () => findSubjectsWithSimilarTimings(allSubjects, form.slotTimings, subject?._id, form.slotCount),
+    [allSubjects, form.slotTimings, form.slotCount, subject?._id]
   );
 
   const handleTimingSourceChange = (e) => {
@@ -226,6 +221,7 @@ const SubjectFormModal = ({ subject, onClose }) => {
       allDepartments: form.allDepartments,
       hours: Number(form.hours),
       trainerEligible: form.trainerEligible,
+      slotCount: Number(form.slotCount) || 4,
       slotTimings: form.slotTimings,
     };
 
@@ -359,7 +355,20 @@ const SubjectFormModal = ({ subject, onClose }) => {
                 <small className="text-muted">Hold Ctrl/Cmd to select multiple</small>
               </div>
               <div className="col-12">
-                <label className="form-label">Period Timings (S1, S2, S3)</label>
+                <label className="form-label" htmlFor="slot-count">Number of periods</label>
+                <select
+                  id="slot-count"
+                  name="slotCount"
+                  className="form-select"
+                  value={form.slotCount}
+                  onChange={handleChange}
+                >
+                  <option value={3}>3 periods (S1–S3)</option>
+                  <option value={4}>4 periods (S1–S4)</option>
+                </select>
+              </div>
+              <div className="col-12">
+                <label className="form-label">Period Timings (S1–S{form.slotCount})</label>
                 <div className="border rounded p-3 mb-3 bg-light">
                   <div className="form-check mb-3">
                     <input
@@ -404,7 +413,7 @@ const SubjectFormModal = ({ subject, onClose }) => {
                         ))}
                       </select>
                       <small className="text-muted d-block mt-2">
-                        Subjects are grouped by matching S1, S2, and S3 timings. Select one to copy its slots.
+                        Subjects are grouped by matching S1–S4 timings. Select one to copy its slots.
                       </small>
                     </div>
                   ) : (
@@ -414,8 +423,8 @@ const SubjectFormModal = ({ subject, onClose }) => {
                   )}
                 </div>
                 <div className="row g-3">
-                  {['s1', 's2', 's3'].map((slotKey) => (
-                    <div className="col-md-4" key={slotKey}>
+                  {SLOT_FIELD_KEYS.slice(0, form.slotCount).map((slotKey) => (
+                    <div className="col-md-6 col-lg-3" key={slotKey}>
                       <div className="border rounded p-3 h-100">
                         <div className="fw-semibold text-uppercase mb-2">{slotKey}</div>
                         <label className="form-label small mb-1" htmlFor={`${slotKey}-start`}>Start</label>
@@ -448,7 +457,7 @@ const SubjectFormModal = ({ subject, onClose }) => {
                   </small>
                 )}
                 <small className="text-muted d-block mt-2">
-                  Current timings: {formatSlotTimingsSummary(form.slotTimings)}. These are used when adding this subject to a trainer timetable.
+                  Current timings: {formatSlotTimingsSummary(form.slotTimings, form.slotCount)}. These are used when adding this subject to a trainer timetable.
                 </small>
               </div>
             </div>

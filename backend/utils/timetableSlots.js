@@ -1,10 +1,10 @@
-export const DEFAULT_SLOT_TIMINGS = {
-  s1: { startTime: '09:00', endTime: '10:50' },
-  s2: { startTime: '11:10', endTime: '13:00' },
-  s3: { startTime: '14:15', endTime: '16:05' },
-};
+import { SOC_FOUR_SLOT_TIMINGS } from './subjectSlotTimings.js';
 
-export const SLOT_KEYS = ['S1', 'S2', 'S3'];
+export const DEFAULT_SLOT_TIMINGS = SOC_FOUR_SLOT_TIMINGS;
+
+export const SLOT_KEYS = ['S1', 'S2', 'S3', 'S4'];
+export const SLOT_FIELD_KEYS = ['s1', 's2', 's3', 's4'];
+export const MAX_SLOT_COUNT = 4;
 
 export const slotKeyToField = (key) => key.toLowerCase();
 
@@ -29,6 +29,10 @@ export const normalizeSlotTimings = (input = {}) => ({
   s3: {
     startTime: input.s3?.startTime || DEFAULT_SLOT_TIMINGS.s3.startTime,
     endTime: input.s3?.endTime || DEFAULT_SLOT_TIMINGS.s3.endTime,
+  },
+  s4: {
+    startTime: input.s4?.startTime || DEFAULT_SLOT_TIMINGS.s4.startTime,
+    endTime: input.s4?.endTime || DEFAULT_SLOT_TIMINGS.s4.endTime,
   },
 });
 

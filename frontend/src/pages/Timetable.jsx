@@ -6,7 +6,7 @@ import LoadingSpinner from '../components/LoadingSpinner.jsx';
 import { showError, showSuccess } from '../utils/toast.js';
 import { useAuth } from '../context/AuthContext.jsx';
 import { useDebounce } from '../hooks/useDebounce.js';
-import { getSchedules } from '../services/scheduleService.js';
+import { getTimetableBoard } from '../services/scheduleService.js';
 import { getTrainers } from '../services/trainerService.js';
 import { getSubjects } from '../services/subjectService.js';
 import {
@@ -73,25 +73,15 @@ const Timetable = () => {
   const loadData = useCallback(async () => {
     setLoading(true);
     try {
-      const [trainerData, subjectData] = await Promise.all([
+      const [trainerData, subjectData, boardData] = await Promise.all([
         getTrainers({ limit: 200, sortBy: 'employeeId', sortOrder: 'asc' }),
         getSubjects({ limit: 100 }),
+        getTimetableBoard({ referenceDate: toInputDate(new Date()) }),
       ]);
       const trainerList = trainerData.trainers || [];
-      const referenceDate = toInputDate(new Date());
-
-      const scheduleEntries = await Promise.all(
-        trainerList.map(async (trainer) => {
-          const schedules = await getSchedules({
-            trainer: trainer._id,
-            referenceDate,
-          });
-          return [trainer.employeeId, schedules || []];
-        })
-      );
 
       setTrainers(trainerList);
-      setSchedulesByTrainer(Object.fromEntries(scheduleEntries));
+      setSchedulesByTrainer(boardData.schedulesByTrainer || {});
       setAllSubjects(subjectData.subjects || []);
     } catch (err) {
       showError(getErrorMessage(err));

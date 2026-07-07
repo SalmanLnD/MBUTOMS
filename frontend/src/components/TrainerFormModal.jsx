@@ -8,6 +8,13 @@ import { getSubjects } from '../services/subjectService.js';
 import { getErrorMessage, toInputDate } from '../utils/helpers.js';
 import Modal from './Modal.jsx';
 
+const toSubjectId = (subject) => {
+  if (!subject) return '';
+  if (typeof subject === 'string') return subject;
+  const id = subject._id ?? subject;
+  return typeof id === 'string' ? id : id?.toString?.() || '';
+};
+
 const emptyForm = {
   employeeId: '',
   name: '',
@@ -51,7 +58,7 @@ const TrainerFormModal = ({ trainer, onClose }) => {
         email: trainer.email || '',
         phone: trainer.phone || '',
         department: trainer.department?._id || trainer.department || '',
-        subjects: trainer.subjects?.map((s) => s._id || s) || [],
+        subjects: trainer.subjects?.map(toSubjectId).filter(Boolean) || [],
         skills: trainer.skills?.join(', ') || '',
         experience: trainer.experience || 0,
         joiningDate: trainer.joiningDate
@@ -88,6 +95,7 @@ const TrainerFormModal = ({ trainer, onClose }) => {
       weeklyWorkloadHours: Number(form.weeklyWorkloadHours),
       performanceScore: Number(form.performanceScore),
       department: form.department || undefined,
+      subjects: form.subjects.map(toSubjectId).filter(Boolean),
     };
 
     try {

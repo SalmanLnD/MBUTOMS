@@ -11,6 +11,12 @@
   z-index: 1000;
   border-right: 1px solid rgba(20, 184, 166, 0.15);
   box-shadow: 4px 0 24px rgba(10, 14, 26, 0.3);
+  transition: width 0.38s cubic-bezier(0.4, 0, 0.2, 1);
+  overflow: hidden;
+}
+
+.sidebar--collapsed {
+  width: var(--sidebar-width-collapsed);
 }
 
 .sidebar::after {
@@ -30,6 +36,9 @@
   align-items: center;
   gap: 0.75rem;
   border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  transition: padding 0.38s cubic-bezier(0.4, 0, 0.2, 1),
+    gap 0.38s cubic-bezier(0.4, 0, 0.2, 1),
+    justify-content 0.38s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .brand-icon {
@@ -67,7 +76,13 @@
   text-decoration: none;
   border-radius: var(--radius-sm);
   margin-bottom: 0.25rem;
-  transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+  transition:
+    padding 0.38s cubic-bezier(0.4, 0, 0.2, 1),
+    gap 0.38s cubic-bezier(0.4, 0, 0.2, 1),
+    background 0.25s ease,
+    color 0.25s ease,
+    transform 0.25s ease,
+    box-shadow 0.25s ease;
   position: relative;
   overflow: hidden;
 }
@@ -109,7 +124,8 @@
 .nav-icon {
   display: flex;
   align-items: center;
-  transition: transform 0.3s;
+  flex-shrink: 0;
+  transition: transform 0.25s ease;
 }
 
 .sidebar-link:hover .nav-icon,
@@ -121,12 +137,15 @@
   padding: 1rem 1.25rem;
   border-top: 1px solid rgba(255, 255, 255, 0.08);
   background: rgba(0, 0, 0, 0.15);
+  transition: padding 0.38s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .user-info {
   display: flex;
   align-items: center;
   gap: 0.75rem;
+  transition: gap 0.38s cubic-bezier(0.4, 0, 0.2, 1),
+    justify-content 0.38s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .user-avatar {
@@ -146,6 +165,113 @@
 .user-name {
   font-size: 0.875rem;
   font-weight: 600;
+}
+
+.sidebar-brand-text {
+  display: block;
+  min-width: 0;
+  max-width: 180px;
+  opacity: 1;
+  overflow: hidden;
+  transition:
+    max-width 0.38s cubic-bezier(0.4, 0, 0.2, 1) 0.1s,
+    opacity 0.28s ease 0.12s,
+    margin 0.38s cubic-bezier(0.4, 0, 0.2, 1) 0.1s;
+}
+
+.sidebar-link-label,
+.sidebar-user-text,
+.sidebar-toggle-label {
+  display: block;
+  white-space: nowrap;
+  overflow: hidden;
+  max-width: 200px;
+  opacity: 1;
+  transition:
+    max-width 0.38s cubic-bezier(0.4, 0, 0.2, 1) 0.1s,
+    opacity 0.28s ease 0.12s,
+    margin 0.38s cubic-bezier(0.4, 0, 0.2, 1) 0.1s;
+}
+
+.sidebar-toggle {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  width: 100%;
+  margin-bottom: 0.85rem;
+  padding: 0.55rem 0.75rem;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: var(--radius-sm);
+  background: rgba(255, 255, 255, 0.04);
+  color: #cbd5e1;
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition:
+    padding 0.38s cubic-bezier(0.4, 0, 0.2, 1),
+    gap 0.38s cubic-bezier(0.4, 0, 0.2, 1),
+    background 0.2s ease,
+    color 0.2s ease,
+    justify-content 0.38s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.sidebar-toggle svg {
+  flex-shrink: 0;
+  transition: transform 0.38s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.sidebar-toggle:hover {
+  background: var(--sidebar-hover);
+  color: #fff;
+}
+
+.sidebar--collapsed .sidebar-brand {
+  justify-content: center;
+  padding-inline: 0.75rem;
+  gap: 0;
+}
+
+.sidebar--collapsed .sidebar-brand-text,
+.sidebar--collapsed .sidebar-link-label,
+.sidebar--collapsed .sidebar-user-text,
+.sidebar--collapsed .sidebar-toggle-label {
+  max-width: 0;
+  opacity: 0;
+  margin-inline: 0;
+  pointer-events: none;
+  transition:
+    opacity 0.18s ease,
+    max-width 0.32s cubic-bezier(0.4, 0, 0.2, 1) 0.04s,
+    margin 0.32s cubic-bezier(0.4, 0, 0.2, 1) 0.04s;
+}
+
+.sidebar--collapsed .sidebar-link {
+  justify-content: center;
+  padding-inline: 0.65rem;
+  gap: 0;
+}
+
+.sidebar--collapsed .sidebar-link:hover {
+  transform: none;
+}
+
+.sidebar--collapsed .sidebar-toggle {
+  justify-content: center;
+  padding-inline: 0.5rem;
+  gap: 0;
+}
+
+.sidebar--collapsed .sidebar-toggle svg {
+  transform: rotate(180deg);
+}
+
+.sidebar--collapsed .user-info {
+  justify-content: center;
+  gap: 0;
+}
+
+.sidebar--collapsed .sidebar-footer {
+  padding-inline: 0.65rem;
 }
 
 @media (max-width: 768px) {

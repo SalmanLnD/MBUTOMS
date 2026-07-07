@@ -1,6 +1,6 @@
 import mongoose from 'mongoose';
 import { ensureReferenceData } from '../utils/seedReferenceData.js';
-import { migrateSubjectSchoolsAndDepartments, migrateSubjectSlotTimings } from '../controllers/subjectController.js';
+import { migrateSubjectSchoolsAndDepartments, migrateSubjectSlotTimings, migrateSubjectSlotProfiles } from '../controllers/subjectController.js';
 import { syncIdsaTrainersAndSubject } from '../utils/syncIdsaData.js';
 import { syncPedhTrainersAndSubject } from '../utils/syncPedhData.js';
 import { syncPstpTrainersAndSubject } from '../utils/syncPstpData.js';
@@ -14,6 +14,7 @@ import { syncLrreVSemesterTimetable } from '../utils/syncLrreVSemesterTimetable.
 import { repairMisplacedLrreVSemesterSlots } from '../utils/repairMisplacedLrreVSemesterSlots.js';
 import { migrateClassesFromSchedules } from '../utils/migrateClassesFromSchedules.js';
 import { repairClassIndexesAndPy } from '../utils/repairClassIndexesAndPy.js';
+import { repairTrainerScheduleCodeLinks } from '../utils/repairTrainerScheduleCodeLinks.js';
 
 const getCache = () => {
   if (!globalThis._mongooseCache) {
@@ -22,10 +23,19 @@ const getCache = () => {
   return globalThis._mongooseCache;
 };
 
-const runStartupTasks = async () => {
+const runEssentialStartup = async () => {
   const counts = await ensureReferenceData();
+  console.log(
+    `Reference data ready: ${counts.schoolCount} schools, ${counts.semesterCount} semesters, ${counts.departmentCount} departments`
+  );
+  return counts;
+};
+
+const runFullStartupTasks = async () => {
   await migrateSubjectSchoolsAndDepartments();
   await migrateSubjectSlotTimings();
+  const slotProfileMigration = await migrateSubjectSlotProfiles();
+  console.log(`Subject slot profile migration: ${slotProfileMigration.updated} subject(s) updated`);
   const commercialFieldsMigration = await migrateSubjectCommercialFields();
   const idsaSync = await syncIdsaTrainersAndSubject();
   const pedhSync = await syncPedhTrainersAndSubject();
@@ -39,8 +49,8 @@ const runStartupTasks = async () => {
   const lrreSemesterRepair = await repairMisplacedLrreVSemesterSlots();
   const classMigration = await migrateClassesFromSchedules();
   const classPyRepair = await repairClassIndexesAndPy();
+  const scheduleCodeRepair = await repairTrainerScheduleCodeLinks();
 
-  console.log(`Reference data ready: ${counts.schoolCount} schools, ${counts.semesterCount} semesters, ${counts.departmentCount} departments`);
   console.log(`Subject commercial fields migration: ${commercialFieldsMigration.updatedCount} subject(s) backfilled (start date ${commercialFieldsMigration.defaultStartDate})`);
   console.log(`IDSA sync: ${idsaSync.trainersUpdated} trainers, subject ${idsaSync.subjectCode}, ${idsaSync.schedulesTagged} schedule slots tagged`);
   console.log(`PEDH sync: ${pedhSync.trainersUpdated} trainers, subject ${pedhSync.subjectCode}, ${pedhSync.schedulesTagged} schedule slots tagged, Sai Priya ${pedhSync.saiPriya?.pedhSlots || 0} PEDH / ${pedhSync.saiPriya?.dsapSlots || 0} DSAP`);
@@ -54,6 +64,14 @@ const runStartupTasks = async () => {
   console.log(`LRRE misplaced semester repair: ${lrreSemesterRepair.repairedCount} slot(s) moved from III to V`);
   console.log(`Class migration: ${classMigration.created} created, ${classMigration.updated} updated, ${classMigration.skipped} unchanged (${classMigration.total} distinct from timetables), PY sync ${classMigration.pySync?.updated || 0} updated`);
   console.log(`Class PY repair: ${classPyRepair.updated} updated, ${classPyRepair.skipped} unchanged`);
+  console.log(`Trainer schedule code repair: ${scheduleCodeRepair.updated} trainer record(s) linked to legacy timetable codes`);
+};
+
+const runStartupTasks = async () => {
+  await runEssentialStartup();
+  if (process.env.RUN_STARTUP_SYNC === 'true') {
+    await runFullStartupTasks();
+  }
 };
 
 export const connectDB = async ({ runStartup = false } = {}) => {
@@ -77,8 +95,7 @@ export const connectDB = async ({ runStartup = false } = {}) => {
     throw error;
   }
 
-  const shouldRunStartup =
-    runStartup && !cache.startupDone && process.env.RUN_STARTUP_SYNC !== 'false';
+  const shouldRunStartup = runStartup && !cache.startupDone;
 
   if (shouldRunStartup) {
     await runStartupTasks();

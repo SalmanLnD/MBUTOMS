@@ -16,11 +16,11 @@ export const IDSA_SUBJECT = {
 export const IDSA_DEPARTMENT_CODES = ['CSE', 'AIML', 'DS', 'IT', 'CS', 'AI&DS'];
 
 export const PEDH_TRAINER_NAMES = {
-  'PEDH- T01': 'PEDH- T01',
-  'PEDH- T02': 'PEDH- T02',
-  'PEDH- T03': 'PEDH- T03',
-  'PEDH- T04': 'PEDH- T04',
-  'PEDH- T05': 'PEDH- T05',
+  'PEDH- T01': 'Megha Sree S',
+  'PEDH- T02': 'Sumit Kumar Gupta',
+  'PEDH- T03': 'Mahendra Urumu',
+  'PEDH- T04': 'Viswateja Jana',
+  'PEDH- T05': 'Rahmathullah Shaik',
   'PEDH- T06': 'PEDH- T06',
   'PEDH- T07': 'Sai Priya',
 };
@@ -40,7 +40,7 @@ export const DSAP_SUBJECT = {
 };
 
 export const PSTP_TRAINER_NAMES = {
-  'PSTP-T8': 'PSTP-T8',
+  'PSTP-T8': 'Ashwini',
   'PSTP-T9': 'PSTP-T9',
 };
 
@@ -86,7 +86,7 @@ const stemsMatch = (left, right) => {
 
 const MIN_NAME_PART_LENGTH = 3;
 
-const isPlaceholderLegacyName = (code, legacyName) =>
+export const isPlaceholderLegacyName = (code, legacyName) =>
   String(legacyName || '').trim() === String(code || '').trim();
 
 const getNameParts = (name) =>
@@ -99,13 +99,10 @@ const getNameParts = (name) =>
 const partMatchesLegacyToken = (trainerPart, legacyPart) => {
   if (!trainerPart || !legacyPart) return false;
   if (trainerPart === legacyPart) return true;
-  if (trainerPart.includes(legacyPart) || legacyPart.includes(trainerPart)) {
-    return legacyPart.length >= MIN_NAME_PART_LENGTH && trainerPart.length >= MIN_NAME_PART_LENGTH;
-  }
   return stemsMatch(nameStem(trainerPart), nameStem(legacyPart));
 };
 
-const trainerNameMatchesLegacy = (trainerName, legacyName) => {
+export const trainerNameMatchesLegacy = (trainerName, legacyName) => {
   const trainer = normalizeName(trainerName);
   const legacy = normalizeName(legacyName);
   if (!trainer || !legacy) return false;
@@ -119,11 +116,9 @@ const trainerNameMatchesLegacy = (trainerName, legacyName) => {
     );
   }
 
-  if (trainer.length >= MIN_NAME_PART_LENGTH && legacy.length >= MIN_NAME_PART_LENGTH) {
-    if (trainer.includes(legacy) || legacy.includes(trainer)) return true;
-  }
-
-  return trainerParts.some((part) => partMatchesLegacyToken(part, legacy));
+  return legacyParts.some((legacyPart) =>
+    trainerParts.some((trainerPart) => partMatchesLegacyToken(trainerPart, legacyPart))
+  );
 };
 
 export const resolveTrainerScheduleCodes = (trainer) => {
@@ -131,6 +126,10 @@ export const resolveTrainerScheduleCodes = (trainer) => {
   if (!trainer) return [];
 
   if (trainer.employeeId) codes.add(trainer.employeeId);
+
+  (trainer.scheduleTrainerCodes || []).forEach((code) => {
+    if (code) codes.add(String(code).trim());
+  });
 
   const allLegacyMaps = [IDSA_TRAINER_NAMES, PEDH_TRAINER_NAMES, PSTP_TRAINER_NAMES];
 
@@ -147,4 +146,18 @@ export const resolveTrainerScheduleCodes = (trainer) => {
   });
 
   return [...codes];
+};
+
+export const findTrainerByScheduleCode = async (TrainerModel, scheduleCode) => {
+  if (!scheduleCode) return null;
+
+  const direct = await TrainerModel.findOne({
+    $or: [{ employeeId: scheduleCode }, { scheduleTrainerCodes: scheduleCode }],
+  });
+  if (direct) return direct;
+
+  const trainers = await TrainerModel.find();
+  return trainers.find((trainer) =>
+    resolveTrainerScheduleCodes(trainer).includes(scheduleCode)
+  ) || null;
 };

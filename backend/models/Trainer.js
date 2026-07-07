@@ -21,9 +21,14 @@ const trainerSchema = new mongoose.Schema(
     },
     weeklyWorkloadHours: { type: Number, default: 0 },
     performanceScore: { type: Number, default: 0, min: 0, max: 100 },
+    scheduleTrainerCodes: [{ type: String, trim: true }],
   },
   { timestamps: true }
 );
+
+trainerSchema.index({ department: 1, name: 1 });
+trainerSchema.index({ subjects: 1 });
+trainerSchema.index({ scheduleTrainerCodes: 1 });
 
 const Trainer = mongoose.model('Trainer', trainerSchema);
 export default Trainer;

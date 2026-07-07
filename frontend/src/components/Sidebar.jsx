@@ -10,6 +10,7 @@ import {
   ClassesIcon,
   LeaveNavIcon,
   ReplacementIcon,
+  ChevronLeftIcon,
 } from './icons.jsx';
 import '../styles/sidebar.css';
 
@@ -25,7 +26,7 @@ const navItems = [
   { path: '/replacements', label: 'Replacements', Icon: ReplacementIcon, roles: ['admin', 'campus_manager'] },
 ];
 
-const Sidebar = () => {
+const Sidebar = ({ collapsed = false, onToggle }) => {
   const { user, hasRole } = useAuth();
 
   const visibleItems = navItems.filter((item) =>
@@ -33,34 +34,51 @@ const Sidebar = () => {
   );
 
   return (
-    <aside className="sidebar">
+    <aside className={`sidebar ${collapsed ? 'sidebar--collapsed' : ''}`}>
       <div className="sidebar-brand">
-        <span className="brand-icon">T</span>
-        <div>
+        <span className="brand-icon" aria-hidden="true">T</span>
+        <div className="sidebar-brand-text">
           <strong>TOMS</strong>
           <small className="d-block text-white-50">Training Operations</small>
         </div>
       </div>
 
-      <nav className="sidebar-nav">
+      <nav className="sidebar-nav" aria-label="Main navigation">
         {visibleItems.map(({ path, label, Icon }) => (
           <NavLink
             key={path}
             to={path}
+            title={collapsed ? label : undefined}
+            aria-label={label}
             className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`}
           >
             <span className="nav-icon">
               <Icon size={18} />
             </span>
-            {label}
+            <span className="sidebar-link-label">{label}</span>
           </NavLink>
         ))}
       </nav>
 
       <div className="sidebar-footer">
+        <button
+          type="button"
+          className="sidebar-toggle"
+          onClick={onToggle}
+          aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+          title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+        >
+          <ChevronLeftIcon size={18} />
+          <span className="sidebar-toggle-label">
+            {collapsed ? 'Expand' : 'Collapse'}
+          </span>
+        </button>
+
         <div className="user-info">
-          <div className="user-avatar">{user?.name?.charAt(0) || 'U'}</div>
-          <div>
+          <div className="user-avatar" title={user?.name || 'User'}>
+            {user?.name?.charAt(0) || 'U'}
+          </div>
+          <div className="sidebar-user-text">
             <div className="user-name">{user?.name}</div>
             <small className="text-white-50">{user?.role?.replace('_', ' ')}</small>
           </div>

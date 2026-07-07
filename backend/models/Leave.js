@@ -32,5 +32,10 @@ const leaveSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
+leaveSchema.index({ status: 1, startDate: 1, endDate: 1 });
+leaveSchema.index({ trainer: 1, status: 1, startDate: 1, endDate: 1 });
+leaveSchema.index({ affectedSchedules: 1 });
+leaveSchema.index({ 'replacements.replacementTrainer': 1, status: 1, startDate: 1, endDate: 1 });
+
 const Leave = mongoose.model('Leave', leaveSchema);
 export default Leave;

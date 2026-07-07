@@ -1,8 +1,38 @@
 import Trainer from '../models/Trainer.js';
 import Subject from '../models/Subject.js';
 
-const toIdStrings = (ids) =>
-  [...new Set((ids || []).map((id) => id?.toString?.() || String(id)).filter(Boolean))];
+const OBJECT_ID_PATTERN = /^[a-f\d]{24}$/i;
+
+export const toObjectIdString = (value) => {
+  if (value == null || value === '') return null;
+
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    return OBJECT_ID_PATTERN.test(trimmed) ? trimmed : null;
+  }
+
+  if (typeof value === 'object') {
+    // Must run before reading _id — Mongoose ObjectId._id getter recurses into itself.
+    if (typeof value.toHexString === 'function') {
+      const hex = value.toHexString();
+      return OBJECT_ID_PATTERN.test(hex) ? hex : null;
+    }
+
+    if (value._id != null && value._id !== value) {
+      return toObjectIdString(value._id);
+    }
+
+    if (typeof value.toString === 'function') {
+      const asString = value.toString();
+      if (OBJECT_ID_PATTERN.test(asString)) return asString;
+    }
+  }
+
+  return null;
+};
+
+export const toIdStrings = (ids) =>
+  [...new Set((ids || []).map(toObjectIdString).filter(Boolean))];
 
 export const applySubjectTrainerEligibleChange = async (subjectId, previousIds, nextIds) => {
   const previous = new Set(toIdStrings(previousIds));

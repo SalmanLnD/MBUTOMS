@@ -8,7 +8,7 @@ let subjectStartDateCache = null;
 let subjectStartDateCacheAt = 0;
 const CACHE_TTL_MS = 60_000;
 
-const buildSubjectStartDateMap = async () => {
+export const buildSubjectStartDateMap = async () => {
   const now = Date.now();
   if (subjectStartDateCache && now - subjectStartDateCacheAt < CACHE_TTL_MS) {
     return subjectStartDateCache;

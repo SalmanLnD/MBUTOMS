@@ -1,17 +1,19 @@
 import { formatTimeRange } from './scheduleUtils.js';
+import { SOC_FOUR_SLOT_TIMINGS, getSubjectSlotCount } from './subjectSlotTimings.js';
 
-export const DEFAULT_SLOT_TIMINGS = {
-  s1: { startTime: '09:00', endTime: '10:50' },
-  s2: { startTime: '11:10', endTime: '13:00' },
-  s3: { startTime: '14:15', endTime: '16:05' },
-};
+export const DEFAULT_SLOT_TIMINGS = SOC_FOUR_SLOT_TIMINGS;
 
-export const SLOT_KEYS = ['S1', 'S2', 'S3'];
+export const SLOT_KEYS = ['S1', 'S2', 'S3', 'S4'];
+export const SLOT_FIELD_KEYS = ['s1', 's2', 's3', 's4'];
+export const MAX_SLOT_COUNT = 4;
 
 export const slotKeyToField = (key) => key.toLowerCase();
 
+export const getActiveSlotKeys = (subject) =>
+  SLOT_KEYS.slice(0, getSubjectSlotCount(subject));
+
 export const getSubjectSlotDefinitions = (subject) =>
-  SLOT_KEYS.map((key) => {
+  getActiveSlotKeys(subject).map((key) => {
     const field = slotKeyToField(key);
     const timing = subject?.slotTimings?.[field] || DEFAULT_SLOT_TIMINGS[field];
     return {
@@ -35,9 +37,10 @@ export const inferSchedulePeriod = (schedule) => {
   }
 
   const start = parseTimeToMinutes(schedule.startTime);
-  if (start < 11 * 60) return 'S1';
-  if (start < 14 * 60) return 'S2';
-  return 'S3';
+  if (start < 10 * 60 + 30) return 'S1';
+  if (start < 13 * 60 + 45) return 'S2';
+  if (start < 15 * 60 + 45) return 'S3';
+  return 'S4';
 };
 
 export const getPeriodOnlySlotDefinitions = () =>
@@ -76,28 +79,29 @@ export const getSlotTimesForSubject = (subject, slotKey) => {
   };
 };
 
-const SLOT_FIELDS = ['s1', 's2', 's3'];
+const SLOT_FIELDS = SLOT_FIELD_KEYS;
 
 export const normalizeSlotTimings = (slotTimings) => ({
   s1: { ...DEFAULT_SLOT_TIMINGS.s1, ...slotTimings?.s1 },
   s2: { ...DEFAULT_SLOT_TIMINGS.s2, ...slotTimings?.s2 },
   s3: { ...DEFAULT_SLOT_TIMINGS.s3, ...slotTimings?.s3 },
+  s4: { ...DEFAULT_SLOT_TIMINGS.s4, ...slotTimings?.s4 },
 });
 
-export const serializeSlotTimings = (slotTimings) => {
+export const serializeSlotTimings = (slotTimings, slotCount = MAX_SLOT_COUNT) => {
   const normalized = normalizeSlotTimings(slotTimings);
-  return SLOT_FIELDS.map((key) => {
+  return `${slotCount}|${SLOT_FIELDS.slice(0, slotCount).map((key) => {
     const slot = normalized[key];
     return `${key}:${slot.startTime}-${slot.endTime}`;
-  }).join('|');
+  }).join('|')}`;
 };
 
-export const areSlotTimingsEqual = (left, right) =>
-  serializeSlotTimings(left) === serializeSlotTimings(right);
+export const areSlotTimingsEqual = (left, right, slotCount = MAX_SLOT_COUNT) =>
+  serializeSlotTimings(left, slotCount) === serializeSlotTimings(right, slotCount);
 
-export const formatSlotTimingsSummary = (slotTimings) => {
+export const formatSlotTimingsSummary = (slotTimings, slotCount = MAX_SLOT_COUNT) => {
   const normalized = normalizeSlotTimings(slotTimings);
-  return SLOT_FIELDS.map((key) => {
+  return SLOT_FIELDS.slice(0, slotCount).map((key) => {
     const slot = normalized[key];
     return `${key.toUpperCase()} ${slot.startTime}–${slot.endTime}`;
   }).join(', ');
@@ -109,12 +113,13 @@ export const groupSubjectsBySlotTimings = (subjects, excludeSubjectId = '') => {
   subjects.forEach((subject) => {
     if (excludeSubjectId && subject._id === excludeSubjectId) return;
 
-    const key = serializeSlotTimings(subject.slotTimings);
+    const key = serializeSlotTimings(subject.slotTimings, subject.slotCount || MAX_SLOT_COUNT);
     if (!groups.has(key)) {
       groups.set(key, {
         key,
         slotTimings: normalizeSlotTimings(subject.slotTimings),
-        summary: formatSlotTimingsSummary(subject.slotTimings),
+        slotCount: subject.slotCount || MAX_SLOT_COUNT,
+        summary: formatSlotTimingsSummary(subject.slotTimings, subject.slotCount || MAX_SLOT_COUNT),
         subjects: [],
       });
     }
@@ -124,15 +129,19 @@ export const groupSubjectsBySlotTimings = (subjects, excludeSubjectId = '') => {
   return [...groups.values()].sort((a, b) => a.summary.localeCompare(b.summary));
 };
 
-export const findSubjectsWithSimilarTimings = (subjects, slotTimings, excludeSubjectId = '') =>
+export const findSubjectsWithSimilarTimings = (subjects, slotTimings, excludeSubjectId = '', slotCount = MAX_SLOT_COUNT) =>
   subjects.filter(
     (subject) =>
-      subject._id !== excludeSubjectId && areSlotTimingsEqual(subject.slotTimings, slotTimings)
+      subject._id !== excludeSubjectId
+      && (subject.slotCount || MAX_SLOT_COUNT) === slotCount
+      && areSlotTimingsEqual(subject.slotTimings, slotTimings, slotCount)
   );
 
 export const hasMultipleSubjectTimings = (subjects) => {
   if (subjects.length <= 1) return false;
-  const keys = new Set(subjects.map((subject) => serializeSlotTimings(subject.slotTimings)));
+  const keys = new Set(
+    subjects.map((subject) => serializeSlotTimings(subject.slotTimings, subject.slotCount || MAX_SLOT_COUNT))
+  );
   return keys.size > 1;
 };
 

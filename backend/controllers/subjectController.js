@@ -4,6 +4,7 @@ import Department from '../models/Department.js';
 import School from '../models/School.js';
 import Trainer from '../models/Trainer.js';
 import { normalizeSlotTimings, DEFAULT_SLOT_TIMINGS } from '../utils/timetableSlots.js';
+import { SUBJECT_SLOT_PROFILES } from '../utils/subjectSlotTimings.js';
 import { normalizeDate } from '../utils/scheduleHelpers.js';
 import { clearSubjectStartDateCache } from '../utils/subjectStartDate.js';
 import {
@@ -42,6 +43,13 @@ const normalizeSubjectPayload = (body) => {
     payload.slotTimings = normalizeSlotTimings(payload.slotTimings);
   }
 
+  if (payload.slotCount !== undefined) {
+    const parsed = Number(payload.slotCount);
+    payload.slotCount = Number.isFinite(parsed)
+      ? Math.min(4, Math.max(1, Math.round(parsed)))
+      : 4;
+  }
+
   if (payload.startDate) {
     payload.startDate = normalizeDate(payload.startDate);
   }
@@ -56,14 +64,41 @@ export const migrateSubjectSlotTimings = async () => {
         { 'slotTimings.s1': { $exists: false } },
         { 'slotTimings.s2': { $exists: false } },
         { 'slotTimings.s3': { $exists: false } },
+        { 'slotTimings.s4': { $exists: false } },
       ],
     },
-    {
-      $set: {
-        slotTimings: DEFAULT_SLOT_TIMINGS,
+    [
+      {
+        $set: {
+          slotTimings: {
+            s1: { $ifNull: ['$slotTimings.s1', DEFAULT_SLOT_TIMINGS.s1] },
+            s2: { $ifNull: ['$slotTimings.s2', DEFAULT_SLOT_TIMINGS.s2] },
+            s3: { $ifNull: ['$slotTimings.s3', DEFAULT_SLOT_TIMINGS.s3] },
+            s4: { $ifNull: ['$slotTimings.s4', DEFAULT_SLOT_TIMINGS.s4] },
+          },
+        },
       },
-    }
+    ]
   );
+};
+
+export const migrateSubjectSlotProfiles = async () => {
+  let updated = 0;
+
+  for (const [code, profile] of Object.entries(SUBJECT_SLOT_PROFILES)) {
+    const result = await Subject.updateOne(
+      { code },
+      {
+        $set: {
+          slotTimings: profile.timings,
+          slotCount: profile.slotCount,
+        },
+      }
+    );
+    if (result.matchedCount) updated += 1;
+  }
+
+  return { updated };
 };
 
 export const migrateSubjectSchoolsAndDepartments = async () => {
@@ -121,7 +156,7 @@ const buildSubjectQuery = async (query) => {
 
 export const getSubjects = async (req, res) => {
   const page = Math.max(1, parseInt(req.query.page, 10) || 1);
-  const limit = Math.min(50, Math.max(1, parseInt(req.query.limit, 10) || 10));
+  const limit = Math.min(200, Math.max(1, parseInt(req.query.limit, 10) || 10));
   const skip = (page - 1) * limit;
 
   const filter = await buildSubjectQuery(req.query);

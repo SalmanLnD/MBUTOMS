@@ -142,3 +142,15 @@ export const ExternalLinkIcon = (props) => (
     <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
   </IconBase>
 );
+
+export const ChevronLeftIcon = (props) => (
+  <IconBase {...props}>
+    <path d="m15 18-6-6 6-6" />
+  </IconBase>
+);
+
+export const ChevronRightIcon = (props) => (
+  <IconBase {...props}>
+    <path d="m9 18 6-6-6-6" />
+  </IconBase>
+);

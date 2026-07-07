@@ -22,6 +22,7 @@ const Trainers = () => {
   const [pagination, setPagination] = useState(null);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
+  const [subjectSearch, setSubjectSearch] = useState('');
   const [sortBy, setSortBy] = useState('employeeId');
   const [sortOrder, setSortOrder] = useState('asc');
   const [page, setPage] = useState(1);
@@ -30,6 +31,7 @@ const Trainers = () => {
   const [pendingDelete, setPendingDelete] = useState(null);
 
   const debouncedSearch = useDebounce(search);
+  const debouncedSubjectSearch = useDebounce(subjectSearch);
 
   const fetchTrainers = async () => {
     setLoading(true);
@@ -38,6 +40,7 @@ const Trainers = () => {
         page,
         limit: 10,
         search: debouncedSearch,
+        subject: debouncedSubjectSearch,
         sortBy,
         sortOrder,
       });
@@ -54,7 +57,7 @@ const Trainers = () => {
     if (activeTab === 'directory') {
       fetchTrainers();
     }
-  }, [activeTab, page, debouncedSearch, sortBy, sortOrder]);
+  }, [activeTab, page, debouncedSearch, debouncedSubjectSearch, sortBy, sortOrder]);
 
   const handleSort = (field) => {
     if (sortBy === field) {
@@ -145,17 +148,28 @@ const Trainers = () => {
         <div className="card table-card">
           <div className="card-body">
             <div className="row g-2 mb-3 align-items-center">
-              <div className="col-md-6">
+              <div className="col-md-4">
                 <input
                   type="search"
                   className="form-control"
                   placeholder="Search trainers..."
                   value={search}
                   onChange={(e) => { setSearch(e.target.value); setPage(1); }}
+                  aria-label="Search trainers"
+                />
+              </div>
+              <div className="col-md-4">
+                <input
+                  type="search"
+                  className="form-control"
+                  placeholder="Filter by subject name or code..."
+                  value={subjectSearch}
+                  onChange={(e) => { setSubjectSearch(e.target.value); setPage(1); }}
+                  aria-label="Filter trainers by subject"
                 />
               </div>
               {canManage && (
-                <div className="col-md-6 text-md-end">
+                <div className="col-md-4 text-md-end">
                   <button type="button" className="btn btn-primary" onClick={handleAdd}>
                     + Add Trainer
                   </button>

@@ -3,7 +3,7 @@ import Modal from './Modal.jsx';
 import ConfirmModal from './ConfirmModal.jsx';
 import { createSchedule, updateSchedule, deleteSchedule } from '../services/scheduleService.js';
 import { getClasses } from '../services/classService.js';
-import { getSlotTimesForSubject } from '../utils/timetableSlots.js';
+import { getSlotTimesForSubject, getActiveSlotKeys } from '../utils/timetableSlots.js';
 import { getErrorMessage } from '../utils/helpers.js';
 
 const emptyForm = {
@@ -197,9 +197,14 @@ const TimetableSlotModal = ({
                   onChange={handleChange}
                   required
                 >
-                  <option value="S1">S1 ({getSlotTimesForSubject(selectedSubject, 'S1').startTime} – {getSlotTimesForSubject(selectedSubject, 'S1').endTime})</option>
-                  <option value="S2">S2 ({getSlotTimesForSubject(selectedSubject, 'S2').startTime} – {getSlotTimesForSubject(selectedSubject, 'S2').endTime})</option>
-                  <option value="S3">S3 ({getSlotTimesForSubject(selectedSubject, 'S3').startTime} – {getSlotTimesForSubject(selectedSubject, 'S3').endTime})</option>
+                  {getActiveSlotKeys(selectedSubject).map((slotKey) => {
+                    const times = getSlotTimesForSubject(selectedSubject, slotKey);
+                    return (
+                      <option key={slotKey} value={slotKey}>
+                        {slotKey} ({times.startTime} – {times.endTime})
+                      </option>
+                    );
+                  })}
                 </select>
               </div>
               <div className="col-md-4">

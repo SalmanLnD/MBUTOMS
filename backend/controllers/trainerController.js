@@ -1,21 +1,57 @@
 import Trainer from '../models/Trainer.js';
 import Department from '../models/Department.js';
 import Subject from '../models/Subject.js';
-import { applyTrainerSubjectsChange } from '../utils/syncTrainerSubjectLinks.js';
+import Schedule from '../models/Schedule.js';
+import { applyTrainerSubjectsChange, toIdStrings } from '../utils/syncTrainerSubjectLinks.js';
 
-const buildTrainerQuery = (query) => {
-  const filter = {};
-  if (query.department) filter.department = query.department;
-  if (query.search) {
-    const searchRegex = { $regex: query.search, $options: 'i' };
-    filter.$or = [
-      { name: searchRegex },
-      { email: searchRegex },
-      { employeeId: searchRegex },
-      { phone: searchRegex },
-    ];
+const buildTrainerQuery = async (query) => {
+  const clauses = [];
+
+  if (query.department) {
+    clauses.push({ department: query.department });
   }
-  return filter;
+
+  if (query.search?.trim()) {
+    const searchRegex = { $regex: query.search.trim(), $options: 'i' };
+    clauses.push({
+      $or: [
+        { name: searchRegex },
+        { email: searchRegex },
+        { employeeId: searchRegex },
+        { phone: searchRegex },
+      ],
+    });
+  }
+
+  if (query.subject?.trim()) {
+    const subjectRegex = { $regex: query.subject.trim(), $options: 'i' };
+    const matchingSubjects = await Subject.find({
+      $or: [{ name: subjectRegex }, { code: subjectRegex }],
+    }).select('_id trainerEligible');
+
+    if (!matchingSubjects.length) {
+      clauses.push({ _id: { $in: [] } });
+    } else {
+      const subjectIds = matchingSubjects.map((subject) => subject._id);
+      const eligibleTrainerIds = [
+        ...new Set(
+          matchingSubjects.flatMap((subject) =>
+            (subject.trainerEligible || []).map((trainerId) => trainerId.toString())
+          )
+        ),
+      ];
+
+      const subjectClauses = [{ subjects: { $in: subjectIds } }];
+      if (eligibleTrainerIds.length) {
+        subjectClauses.push({ _id: { $in: eligibleTrainerIds } });
+      }
+      clauses.push({ $or: subjectClauses });
+    }
+  }
+
+  if (!clauses.length) return {};
+  if (clauses.length === 1) return clauses[0];
+  return { $and: clauses };
 };
 
 const getSortOption = (sortBy, sortOrder) => {
@@ -27,10 +63,10 @@ const getSortOption = (sortBy, sortOrder) => {
 
 export const getTrainers = async (req, res) => {
   const page = Math.max(1, parseInt(req.query.page, 10) || 1);
-  const limit = Math.min(50, Math.max(1, parseInt(req.query.limit, 10) || 10));
+  const limit = Math.min(200, Math.max(1, parseInt(req.query.limit, 10) || 10));
   const skip = (page - 1) * limit;
 
-  const filter = buildTrainerQuery(req.query);
+  const filter = await buildTrainerQuery(req.query);
   const sort = getSortOption(req.query.sortBy, req.query.sortOrder);
 
   const [trainers, total] = await Promise.all([
@@ -94,6 +130,9 @@ const sanitizeTrainerBody = (body) => {
   } else {
     payload.phone = payload.phone.trim();
   }
+  if (payload.subjects !== undefined) {
+    payload.subjects = toIdStrings(payload.subjects);
+  }
   return payload;
 };
 
@@ -148,6 +187,7 @@ export const updateTrainer = async (req, res) => {
   }
 
   const previousSubjects = [...(trainer.subjects || [])];
+  const previousEmployeeId = trainer.employeeId;
 
   const updateDoc = { $set: { ...payload } };
   if (!req.body.email?.trim()) {
@@ -163,7 +203,20 @@ export const updateTrainer = async (req, res) => {
     .populate('subjects', 'name code');
 
   if (payload.subjects !== undefined) {
-    await applyTrainerSubjectsChange(req.params.id, previousSubjects, updated.subjects);
+    await applyTrainerSubjectsChange(req.params.id, previousSubjects, payload.subjects);
+  }
+
+  if (payload.employeeId && payload.employeeId !== previousEmployeeId) {
+    const legacyCodes = [];
+    const hasOldSchedules = await Schedule.exists({ trainerCode: previousEmployeeId });
+    if (hasOldSchedules) legacyCodes.push(previousEmployeeId);
+
+    if (legacyCodes.length) {
+      await Trainer.updateOne(
+        { _id: req.params.id },
+        { $addToSet: { scheduleTrainerCodes: { $each: legacyCodes } } }
+      );
+    }
   }
 
   const refreshed = await Trainer.findById(req.params.id)

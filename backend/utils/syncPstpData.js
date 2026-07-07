@@ -11,6 +11,7 @@ import {
   PSTP_DEPARTMENT_CODES,
 } from './trainerMappings.js';
 import { DEFAULT_SLOT_TIMINGS } from './timetableSlots.js';
+import { SOC_FOUR_SLOT_TIMINGS } from './subjectSlotTimings.js';
 import { DEFAULT_SUBJECT_START_DATE } from './subjectStartDate.js';
 
 export const syncPstpTrainersAndSubject = async () => {
@@ -18,15 +19,17 @@ export const syncPstpTrainersAndSubject = async () => {
   const trainers = [];
 
   for (const [employeeId, name] of Object.entries(PSTP_TRAINER_NAMES)) {
-    const trainer = await Trainer.findOneAndUpdate(
-      { employeeId },
-      { name },
-      { new: true }
-    );
-    if (trainer) {
-      trainers.push(trainer);
+    const trainer = await Trainer.findOne({
+      $or: [{ employeeId }, { scheduleTrainerCodes: employeeId }],
+    });
+    if (!trainer) continue;
+
+    if (trainer.employeeId === employeeId && trainer.name !== name) {
+      await Trainer.updateOne({ _id: trainer._id }, { name });
       await User.updateOne({ trainer: trainer._id }, { name });
     }
+
+    trainers.push(trainer);
   }
 
   const socSchool = await School.findOne({ code: 'SOC' });
@@ -44,10 +47,12 @@ export const syncPstpTrainersAndSubject = async () => {
     allDepartments: false,
     hours: 6,
     trainerEligible: trainers.map((t) => t._id),
-    slotTimings: DEFAULT_SLOT_TIMINGS,
+    slotTimings: SOC_FOUR_SLOT_TIMINGS,
+    slotCount: 4,
   };
 
   if (subject) {
+    const { hours, ...syncFields } = subjectPayload;
     const mergedTrainerIds = [
       ...new Set([
         ...(subject.trainerEligible || []).map((id) => String(id)),
@@ -55,7 +60,7 @@ export const syncPstpTrainersAndSubject = async () => {
       ]),
     ];
     Object.assign(subject, {
-      ...subjectPayload,
+      ...syncFields,
       trainerEligible: mergedTrainerIds,
     });
     await subject.save();
@@ -70,7 +75,12 @@ export const syncPstpTrainersAndSubject = async () => {
 
   if (subject) {
     await Trainer.updateMany(
-      { employeeId: { $in: pstpTrainerCodes } },
+      {
+        $or: [
+          { employeeId: { $in: pstpTrainerCodes } },
+          { scheduleTrainerCodes: { $in: pstpTrainerCodes } },
+        ],
+      },
       { $addToSet: { subjects: subject._id } }
     );
 

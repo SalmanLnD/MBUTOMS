@@ -7,6 +7,8 @@ import { resolveTrainerScheduleCodes } from '../utils/trainerMappings.js';
 import { assertClassRegistered } from '../utils/classRegistry.js';
 import ClassGroup from '../models/ClassGroup.js';
 
+import { buildTimetableBoardForDate } from '../utils/timetableBoard.js';
+
 const DAY_ORDER = {
   Monday: 1,
   Tuesday: 2,
@@ -115,6 +117,19 @@ const enrichSchedulePayload = async (body) => {
   }
 
   return payload;
+};
+
+export const getTimetableBoard = async (req, res) => {
+  const referenceDate = req.query.referenceDate || new Date();
+  const { schedulesByTrainer } = await buildTimetableBoardForDate({
+    referenceDate,
+    semester: req.query.semester,
+  });
+
+  res.json({
+    referenceDate,
+    schedulesByTrainer,
+  });
 };
 
 export const getSchedules = async (req, res) => {

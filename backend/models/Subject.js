@@ -22,6 +22,7 @@ const subjectSchema = new mongoose.Schema(
     allDepartments: { type: Boolean, default: false },
     hours: { type: Number, default: 0, min: 0 },
     trainerEligible: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Trainer' }],
+    slotCount: { type: Number, default: 4, min: 1, max: 4 },
     slotTimings: {
       s1: {
         type: periodTimingSchema,
@@ -35,6 +36,10 @@ const subjectSchema = new mongoose.Schema(
         type: periodTimingSchema,
         default: () => ({ ...DEFAULT_SLOT_TIMINGS.s3 }),
       },
+      s4: {
+        type: periodTimingSchema,
+        default: () => ({ ...DEFAULT_SLOT_TIMINGS.s4 }),
+      },
     },
     oifNumber: { type: String, required: true, trim: true },
     dealNumber: { type: String, required: true, trim: true },
@@ -42,6 +47,8 @@ const subjectSchema = new mongoose.Schema(
   },
   { timestamps: true }
 );
+
+subjectSchema.index({ trainerEligible: 1 });
 
 const Subject = mongoose.model('Subject', subjectSchema);
 export default Subject;

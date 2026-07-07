@@ -16,6 +16,7 @@ import classRoutes from './routes/classRoutes.js';
 import studentRoutes from './routes/studentRoutes.js';
 import sheetsRoutes from './routes/sheetsRoutes.js';
 
+
 dotenv.config();
 const app = express();
 
@@ -38,7 +39,7 @@ app.get('/api/health', (req, res) => {
 
 app.use(async (req, res, next) => {
   try {
-    await connectDB({ runStartup: !process.env.VERCEL });
+    await connectDB({ runStartup: false });
     next();
   } catch (error) {
     next(error);
