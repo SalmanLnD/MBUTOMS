@@ -16,7 +16,6 @@ import classRoutes from './routes/classRoutes.js';
 import studentRoutes from './routes/studentRoutes.js';
 import sheetsRoutes from './routes/sheetsRoutes.js';
 
-
 dotenv.config();
 const app = express();
 
