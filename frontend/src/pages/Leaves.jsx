@@ -10,6 +10,7 @@ import { formatDate, formatStatus, getErrorMessage, toInputDate } from '../utils
 import { formatTimeRange } from '../utils/scheduleUtils.js';
 import Modal from '../components/Modal.jsx';
 import ConfirmModal from '../components/ConfirmModal.jsx';
+import { TrashIcon } from '../components/icons.jsx';
 
 const Leaves = () => {
   const { hasRole } = useAuth();
@@ -111,20 +112,29 @@ const Leaves = () => {
     }
   };
 
-  const handleDelete = async (id) => {
-    setPendingCancel(id);
+  const handleDelete = (leave) => {
+    setPendingCancel(leave);
   };
 
   const handleConfirmDelete = async () => {
     if (!pendingCancel) return;
     try {
-      await deleteLeave(pendingCancel);
+      await deleteLeave(pendingCancel._id);
       showSuccess('Leave cancelled');
       setPendingCancel(null);
       fetchLeaves();
     } catch (err) {
       showError(getErrorMessage(err));
     }
+  };
+
+  const canCancelLeave = (leave) => !['rejected', 'cancelled'].includes(leave.status);
+
+  const getLeaveStatusBadgeClass = (status) => {
+    if (status === 'approved') return 'success';
+    if (status === 'rejected') return 'danger';
+    if (status === 'cancelled') return 'secondary';
+    return 'warning';
   };
 
   return (
@@ -137,6 +147,7 @@ const Leaves = () => {
           <option value="pending">Pending</option>
           <option value="approved">Approved</option>
           <option value="rejected">Rejected</option>
+          <option value="cancelled">Cancelled</option>
         </select>
         <button type="button" className="btn btn-primary" onClick={openLeaveForm}>Apply Leave</button>
       </div>
@@ -166,17 +177,26 @@ const Leaves = () => {
                     <td>{formatDate(leave.endDate)}</td>
                     <td>{leave.reason}</td>
                     <td>{leave.affectedSchedules?.length || 0}</td>
-                    <td><span className={`badge bg-${leave.status === 'approved' ? 'success' : leave.status === 'rejected' ? 'danger' : 'warning'}`}>{formatStatus(leave.status)}</span></td>
+                    <td><span className={`badge bg-${getLeaveStatusBadgeClass(leave.status)}`}>{formatStatus(leave.status)}</span></td>
                     <td>
-                      <div className="btn-group btn-group-sm">
+                      <div className="d-flex align-items-center gap-2">
                         {canApprove && leave.status === 'pending' && (
-                          <>
-                            <button className="btn btn-outline-success" onClick={() => handleApprove(leave._id, 'approved')}>Approve</button>
-                            <button className="btn btn-outline-danger" onClick={() => handleApprove(leave._id, 'rejected')}>Reject</button>
-                          </>
+                          <div className="btn-group btn-group-sm">
+                            <button type="button" className="btn btn-outline-success" onClick={() => handleApprove(leave._id, 'approved')}>Approve</button>
+                            <button type="button" className="btn btn-outline-danger" onClick={() => handleApprove(leave._id, 'rejected')}>Reject</button>
+                          </div>
                         )}
-                        {leave.status === 'pending' && (
-                          <button className="btn btn-outline-secondary" onClick={() => handleDelete(leave._id)}>Cancel</button>
+                        {canCancelLeave(leave) && (
+                          <button
+                            type="button"
+                            className="btn btn-sm btn-outline-danger d-inline-flex align-items-center justify-content-center"
+                            style={{ width: '2rem', height: '2rem', padding: 0 }}
+                            aria-label={`Cancel leave for ${leave.trainer?.name}`}
+                            title="Cancel leave"
+                            onClick={() => handleDelete(leave)}
+                          >
+                            <TrashIcon size={16} />
+                          </button>
                         )}
                       </div>
                     </td>
@@ -245,8 +265,12 @@ const Leaves = () => {
       {pendingCancel && (
         <ConfirmModal
           show
-          title="Cancel Leave Request"
-          message="Cancel this leave request? This action cannot be undone."
+          title="Cancel Leave"
+          message={
+            pendingCancel.status === 'approved'
+              ? `Cancel the approved leave for ${pendingCancel.trainer?.name}? Any replacement trainers assigned for this leave will be revoked and the original trainer will continue their classes.`
+              : `Cancel the leave request for ${pendingCancel.trainer?.name}? This action cannot be undone.`
+          }
           confirmLabel="Cancel Leave"
           confirmVariant="danger"
           onConfirm={handleConfirmDelete}

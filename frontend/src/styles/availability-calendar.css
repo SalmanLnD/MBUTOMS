@@ -1,0 +1,64 @@
+.trainer-availability-panel .availability-calendar {
+  background: #fff;
+  border-radius: 12px;
+  padding: 1rem;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+}
+
+.trainer-availability-panel .availability-calendar .fc {
+  font-family: inherit;
+}
+
+.trainer-availability-panel .availability-calendar .fc-timegrid-slot {
+  height: 2.5em;
+}
+
+.trainer-availability-panel .availability-event {
+  border-radius: 4px;
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.trainer-availability-panel .availability-calendar-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(255, 255, 255, 0.72);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2;
+  border-radius: 12px;
+}
+
+.trainer-availability-panel .availability-week-toolbar {
+  background: #fff;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  border-radius: 12px;
+  padding: 0.75rem 1rem;
+}
+
+.trainer-availability-panel .availability-overview-table th,
+.trainer-availability-panel .availability-overview-table td {
+  vertical-align: top;
+}
+
+.trainer-availability-panel .availability-trainer-col {
+  min-width: 10rem;
+  white-space: nowrap;
+}
+
+.trainer-availability-panel .availability-slot-cell {
+  min-width: 7rem;
+}
+
+.trainer-availability-panel .availability-pill {
+  display: block;
+  background: #d1e7dd;
+  color: #0f5132;
+  border: 1px solid #badbcc;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 0.2rem 0.35rem;
+  margin-bottom: 0.25rem;
+}

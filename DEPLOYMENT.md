@@ -55,10 +55,23 @@ vercel env add CLIENT_URL
 vercel --prod
 ```
 
-### GitHub Actions (optional)
+### GitHub Actions (auto-deploy on push to `main`)
 
-Add secret `VERCEL_BACKEND_PROJECT_ID` (separate from frontend project).  
-Workflow: `.github/workflows/vercel-backend-deploy.yml`
+Every push to `main` runs `.github/workflows/vercel-production.yml` and deploys **both** the frontend and API.
+
+Add this repository secret in GitHub (**Settings → Secrets and variables → Actions**):
+
+| Secret | How to get it |
+|--------|----------------|
+| `VERCEL_TOKEN` | [vercel.com/account/tokens](https://vercel.com/account/tokens) → Create Token |
+
+`VERCEL_ORG_ID` and both project IDs are already set in the workflow file. You do **not** need `VERCEL_PROJECT_ID` or `VERCEL_BACKEND_PROJECT_ID` secrets anymore.
+
+If deploys still fail with authentication errors, regenerate `VERCEL_TOKEN` and update the GitHub secret.
+
+### Optional: Vercel Git integration
+
+You can also connect each Vercel project to `SalmanLnD/MBUTOMS` in the Vercel dashboard (**Project → Settings → Git**) with root directories `frontend` and `backend`. GitHub Actions remains the source of truth for production deploys in this repo.
 
 ## 3. Frontend (Vercel)
 

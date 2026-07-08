@@ -1,9 +1,16 @@
 import Schedule from '../models/Schedule.js';
 import Leave from '../models/Leave.js';
 import Trainer from '../models/Trainer.js';
+import Subject from '../models/Subject.js';
 import { normalizeDate } from '../utils/scheduleHelpers.js';
 import { resolveTrainerScheduleCodes } from '../utils/trainerMappings.js';
 import { isTrainerAvailableForReplacement } from '../utils/leaveStatus.js';
+import { buildTrainerAvailabilityForRange } from '../utils/trainerAvailability.js';
+
+const timeToMinutes = (time) => {
+  const [h, m] = time.split(':').map(Number);
+  return h * 60 + m;
+};
 
 const parseTimeToMinutes = (time) => {
   const [h, m] = time.split(':').map(Number);
@@ -13,6 +20,8 @@ const parseTimeToMinutes = (time) => {
 const timesOverlap = (startA, endA, startB, endB) =>
   parseTimeToMinutes(startA) < parseTimeToMinutes(endB) &&
   parseTimeToMinutes(endA) > parseTimeToMinutes(startB);
+
+const WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
 const getScheduleId = (value) => value?._id?.toString() || value?.toString();
 
@@ -44,12 +53,24 @@ export const getReplacementSuggestions = async (req, res) => {
     return res.status(400).json({ message: 'No approved leave found for this schedule' });
   }
 
+  let subject = null;
+  if (schedule.subject) {
+    subject = await Subject.findById(schedule.subject).select('trainerEligible name code');
+  } else if (schedule.subjectCode) {
+    subject = await Subject.findOne({ code: schedule.subjectCode }).select('trainerEligible name code');
+  }
+
+  const eligibleTrainerIds = new Set(
+    (subject?.trainerEligible || []).map((trainerId) => trainerId.toString())
+  );
+
   const trainers = await Trainer.find({
     _id: { $ne: leave.trainer },
     status: 'active',
   });
 
-  const suggestions = [];
+  const eligibleSuggestions = [];
+  const otherSuggestions = [];
 
   for (const trainer of trainers) {
     const available = await isTrainerAvailableForReplacement({
@@ -72,19 +93,13 @@ export const getReplacementSuggestions = async (req, res) => {
     );
     if (hasConflict) continue;
 
-    const teachesDept = await Schedule.findOne({
-      trainerCode: { $in: scheduleCodes },
-      department: schedule.department,
-    });
-    if (!teachesDept) continue;
-
     const weekSchedules = await Schedule.find({ trainerCode: { $in: scheduleCodes } });
     const weeklyHours = weekSchedules.reduce((sum, s) => {
       const diff = parseTimeToMinutes(s.endTime) - parseTimeToMinutes(s.startTime);
       return sum + diff / 60;
     }, 0);
 
-    suggestions.push({
+    const suggestion = {
       trainer: {
         _id: trainer._id,
         name: trainer.name,
@@ -95,17 +110,29 @@ export const getReplacementSuggestions = async (req, res) => {
       },
       weeklyHours,
       performanceScore: trainer.performanceScore,
-    });
+      eligible: eligibleTrainerIds.has(trainer._id.toString()),
+    };
+
+    if (suggestion.eligible) {
+      eligibleSuggestions.push(suggestion);
+    } else {
+      otherSuggestions.push(suggestion);
+    }
   }
 
-  suggestions.sort((a, b) => {
+  const sortSuggestions = (a, b) => {
     if (a.weeklyHours !== b.weeklyHours) return a.weeklyHours - b.weeklyHours;
     return b.performanceScore - a.performanceScore;
-  });
+  };
+
+  eligibleSuggestions.sort(sortSuggestions);
+  otherSuggestions.sort(sortSuggestions);
 
   res.json({
     schedule,
-    suggestions: suggestions.slice(0, 5),
+    subject: subject ? { name: subject.name, code: subject.code } : null,
+    suggestions: eligibleSuggestions.slice(0, 5),
+    otherSuggestions: otherSuggestions.slice(0, 5),
   });
 };
 
@@ -149,9 +176,13 @@ export const getPendingReplacements = async (req, res) => {
           trainer: leave.trainer,
           startDate: leave.startDate,
           endDate: leave.endDate,
+          reason: leave.reason,
         },
         schedule,
         replacement,
+        replacementDate: leave.startDate,
+        isSlotReplacement:
+          normalizeDate(leave.startDate).getTime() === normalizeDate(leave.endDate).getTime(),
       });
     }
   }
@@ -221,5 +252,136 @@ export const assignReplacement = async (req, res) => {
       name: trainer.name,
       employeeId: trainer.employeeId,
     },
+  });
+};
+
+export const getTrainerAvailability = async (req, res) => {
+  const { start, end, trainerId, subjectId, slotStart, slotEnd } = req.query;
+
+  if (!start || !end) {
+    return res.status(400).json({ message: 'Start and end dates are required' });
+  }
+
+  const startDate = normalizeDate(start);
+  const endDate = normalizeDate(end);
+  if (endDate < startDate) {
+    return res.status(400).json({ message: 'End date must be on or after start date' });
+  }
+
+  if (slotStart && slotEnd && timeToMinutes(slotEnd) <= timeToMinutes(slotStart)) {
+    return res.status(400).json({ message: 'End time must be after start time' });
+  }
+
+  const trainerIds = trainerId ? [trainerId] : null;
+  const data = await buildTrainerAvailabilityForRange({
+    startDate,
+    endDate,
+    trainerIds,
+    subjectId: subjectId || null,
+    slotStart: slotStart || null,
+    slotEnd: slotEnd || null,
+  });
+
+  res.json(data);
+};
+
+export const getTrainerSlotsForReplacement = async (req, res) => {
+  const { trainerId, date } = req.query;
+
+  if (!trainerId || !date) {
+    return res.status(400).json({ message: 'Trainer and date are required' });
+  }
+
+  const trainer = await Trainer.findById(trainerId);
+  if (!trainer) {
+    return res.status(404).json({ message: 'Trainer not found' });
+  }
+
+  const slotDate = normalizeDate(date);
+  const dayName = WEEKDAYS[slotDate.getDay()];
+
+  const schedules = await Schedule.find({
+    trainerCode: { $in: resolveTrainerScheduleCodes(trainer) },
+    day: dayName,
+  }).sort({ startTime: 1, department: 1, section: 1 });
+
+  res.json({
+    trainer: {
+      _id: trainer._id,
+      name: trainer.name,
+      employeeId: trainer.employeeId,
+    },
+    date: slotDate,
+    day: dayName,
+    schedules,
+  });
+};
+
+export const createSlotReplacementRequest = async (req, res) => {
+  const { trainerId, scheduleId, date, reason } = req.body;
+
+  if (!trainerId || !scheduleId || !date) {
+    return res.status(400).json({ message: 'Trainer, schedule slot, and date are required' });
+  }
+
+  const trainer = await Trainer.findById(trainerId);
+  if (!trainer || trainer.status !== 'active') {
+    return res.status(400).json({ message: 'Trainer not found or inactive' });
+  }
+
+  const schedule = await Schedule.findById(scheduleId);
+  if (!schedule) {
+    return res.status(404).json({ message: 'Schedule slot not found' });
+  }
+
+  const scheduleCodes = resolveTrainerScheduleCodes(trainer);
+  if (!scheduleCodes.includes(schedule.trainerCode)) {
+    return res.status(400).json({ message: 'Selected slot does not belong to this trainer' });
+  }
+
+  const slotDate = normalizeDate(date);
+  const today = normalizeDate(new Date());
+  if (slotDate < today) {
+    return res.status(400).json({ message: 'Replacement date cannot be in the past' });
+  }
+
+  const dayName = WEEKDAYS[slotDate.getDay()];
+  if (schedule.day !== dayName) {
+    return res.status(400).json({ message: 'Selected slot does not occur on the chosen date' });
+  }
+
+  const existing = await Leave.findOne({
+    trainer: trainerId,
+    status: 'approved',
+    replacementNeeded: true,
+    affectedSchedules: scheduleId,
+    startDate: { $lte: slotDate },
+    endDate: { $gte: slotDate },
+  });
+  if (existing) {
+    return res.status(400).json({
+      message: 'A replacement request already exists for this trainer and slot on the selected date',
+    });
+  }
+
+  const leave = await Leave.create({
+    trainer: trainerId,
+    startDate: slotDate,
+    endDate: slotDate,
+    reason: reason?.trim() || 'Ad-hoc slot replacement',
+    status: 'approved',
+    affectedSchedules: [scheduleId],
+    replacementNeeded: true,
+    approvedBy: req.user._id,
+    approvedAt: new Date(),
+  });
+
+  const populated = await Leave.findById(leave._id)
+    .populate('trainer', 'name employeeId')
+    .populate('affectedSchedules');
+
+  res.status(201).json({
+    leave: populated,
+    schedule,
   });
 };

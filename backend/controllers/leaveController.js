@@ -104,6 +104,10 @@ export const updateLeave = async (req, res) => {
     return res.status(403).json({ message: 'Only managers can approve or reject leaves' });
   }
 
+  if (leave.status === 'cancelled') {
+    return res.status(400).json({ message: 'Cancelled leaves cannot be updated' });
+  }
+
   const { status, rejectionReason } = req.body;
   if (!['approved', 'rejected'].includes(status)) {
     return res.status(400).json({ message: 'Status must be approved or rejected' });
@@ -121,21 +125,67 @@ export const updateLeave = async (req, res) => {
   res.json(updated);
 };
 
+const restoreSchedulesForCancelledLeave = async (leave, originalTrainerCode) => {
+  if (!originalTrainerCode) return;
+
+  const scheduleIds = (leave.affectedSchedules || []).map((schedule) =>
+    schedule._id ? schedule._id : schedule
+  );
+  if (!scheduleIds.length) return;
+
+  const schedules = await Schedule.find({ _id: { $in: scheduleIds } });
+  await Promise.all(
+    schedules.map(async (schedule) => {
+      if (
+        schedule.trainerCode === originalTrainerCode &&
+        !schedule.replacementFor?.trainerName &&
+        !schedule.replacementFor?.trainerCode
+      ) {
+        return;
+      }
+
+      schedule.trainerCode = originalTrainerCode;
+      schedule.replacementFor = { trainerCode: '', trainerName: '' };
+      await schedule.save();
+    })
+  );
+};
+
 export const deleteLeave = async (req, res) => {
-  const leave = await Leave.findById(req.params.id);
+  const leave = await Leave.findById(req.params.id)
+    .populate('trainer', 'employeeId')
+    .populate('affectedSchedules');
+
   if (!leave) return res.status(404).json({ message: 'Leave not found' });
 
-  if (req.user.role === 'trainer') {
-    if (leave.trainer.toString() !== req.user.trainer?.toString()) {
-      return res.status(403).json({ message: 'Not authorized' });
-    }
-    if (leave.status !== 'pending') {
-      return res.status(400).json({ message: 'Only pending leaves can be cancelled' });
-    }
+  if (['rejected', 'cancelled'].includes(leave.status)) {
+    return res.status(400).json({ message: 'This leave cannot be cancelled' });
   }
 
-  await leave.deleteOne();
-  res.json({ message: 'Leave removed' });
+  if (req.user.role === 'trainer') {
+    if (leave.trainer._id.toString() !== req.user.trainer?.toString()) {
+      return res.status(403).json({ message: 'Not authorized' });
+    }
+  } else if (!['admin', 'campus_manager'].includes(req.user.role)) {
+    return res.status(403).json({ message: 'Not authorized' });
+  }
+
+  const hadReplacements = Array.isArray(leave.replacements) && leave.replacements.length > 0;
+  await restoreSchedulesForCancelledLeave(leave, leave.trainer?.employeeId);
+
+  leave.replacements = [];
+  leave.replacementNeeded = false;
+  leave.status = 'cancelled';
+  leave.markModified('replacements');
+  await leave.save();
+
+  const updated = await Leave.findById(leave._id).populate(populateLeave);
+  res.json({
+    message: hadReplacements
+      ? 'Leave cancelled and replacement assignments revoked'
+      : 'Leave cancelled',
+    leave: updated,
+  });
 };
 
 export const previewAffectedSchedules = async (req, res) => {

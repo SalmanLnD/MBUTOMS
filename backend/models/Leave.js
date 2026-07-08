@@ -12,7 +12,7 @@ const leaveSchema = new mongoose.Schema(
     reason: { type: String, required: true, trim: true },
     status: {
       type: String,
-      enum: ['pending', 'approved', 'rejected'],
+      enum: ['pending', 'approved', 'rejected', 'cancelled'],
       default: 'pending',
     },
     affectedSchedules: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Schedule' }],
