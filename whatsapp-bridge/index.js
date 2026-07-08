@@ -1,0 +1,220 @@
+import 'dotenv/config';
+import pkg from 'whatsapp-web.js';
+import qrcode from 'qrcode-terminal';
+import axios from 'axios';
+
+const { Client, LocalAuth } = pkg;
+
+const {
+  WEBHOOK_URL,
+  WEBHOOK_SECRET,
+  GROUP_ID = '',
+  GROUP_NAME = '',
+  OIF_REGEX = '\\bOIF[\\s:_-]*([A-Za-z0-9/-]+)\\b',
+  ENABLE_OCR = 'false',
+} = process.env;
+
+const LIST_GROUPS = process.argv.includes('--list-groups');
+
+if (!LIST_GROUPS && (!WEBHOOK_URL || !WEBHOOK_SECRET)) {
+  console.error('Missing WEBHOOK_URL or WEBHOOK_SECRET in .env');
+  process.exit(1);
+}
+
+const oifPattern = new RegExp(OIF_REGEX, 'i');
+const processedMessageIds = new Set();
+
+const log = (...args) => console.log(new Date().toISOString(), ...args);
+
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+const withRetries = async (label, fn, { attempts = 3, delayMs = 5000 } = {}) => {
+  let lastError;
+  for (let attempt = 1; attempt <= attempts; attempt += 1) {
+    try {
+      return await fn();
+    } catch (error) {
+      lastError = error;
+      if (attempt < attempts) {
+        log(`${label} failed (attempt ${attempt}/${attempts}): ${error.message}. Retrying in ${delayMs / 1000}s...`);
+        await sleep(delayMs);
+      }
+    }
+  }
+  throw lastError;
+};
+
+const client = new Client({
+  authStrategy: new LocalAuth({ dataPath: './.wwebjs_auth' }),
+  puppeteer: {
+    headless: true,
+    protocolTimeout: 180000,
+    args: [
+      '--no-sandbox',
+      '--disable-setuid-sandbox',
+      '--disable-dev-shm-usage',
+    ],
+  },
+});
+
+client.on('qr', (qr) => {
+  console.log('\nScan this QR code with the WhatsApp account that is in the group:\n');
+  qrcode.generate(qr, { small: true });
+});
+
+client.on('authenticated', () => log('WhatsApp authenticated'));
+client.on('auth_failure', (msg) => log('Auth failure:', msg));
+client.on('disconnected', (reason) => log('Disconnected:', reason));
+
+client.on('ready', async () => {
+  log('Bridge is ready');
+
+  if (LIST_GROUPS) {
+    try {
+      // WhatsApp Web may still be loading chat metadata when "ready" fires.
+      log('Fetching groups (this can take up to a minute on first connect)...');
+      await sleep(8000);
+
+      const chats = await withRetries('getChats', () => client.getChats(), {
+        attempts: 3,
+        delayMs: 10000,
+      });
+      const groups = chats.filter((chat) => chat.isGroup);
+      console.log('\nGroups this account can see:\n');
+      if (!groups.length) {
+        console.log('  (no groups found — make sure this WhatsApp account is in the punch-in group)');
+      } else {
+        groups.forEach((group) => {
+          console.log(`  ${group.name}  ->  ${group.id._serialized}`);
+        });
+      }
+      console.log('\nCopy the id of your punch-in group into GROUP_ID in .env, then restart.\n');
+    } catch (error) {
+      console.error('\nFailed to list groups:', error.message);
+      console.error('Try running "npm run list-groups" again after WhatsApp Web finishes loading.');
+      process.exitCode = 1;
+    } finally {
+      try {
+        await client.destroy();
+      } catch {
+        // ignore shutdown errors
+      }
+      process.exit(process.exitCode || 0);
+    }
+    return;
+  }
+
+  if (GROUP_ID) {
+    log(`Listening to group id: ${GROUP_ID}`);
+  } else if (GROUP_NAME) {
+    log(`Listening to group name: ${GROUP_NAME}`);
+  } else {
+    log('WARNING: No GROUP_ID or GROUP_NAME set. Run "npm run list-groups" to find it. Ignoring all messages until set.');
+  }
+
+  const linkedPhone = client.info?.wid?.user;
+  if (linkedPhone) {
+    log(`Linked WhatsApp number: ${linkedPhone}`);
+  }
+});
+
+const isTargetGroup = (chat) => {
+  if (!chat?.isGroup) return false;
+  if (GROUP_ID) return chat.id._serialized === GROUP_ID;
+  if (GROUP_NAME) return chat.name === GROUP_NAME;
+  return false;
+};
+
+const extractOifFromText = (text) => {
+  if (!text) return '';
+  const match = text.match(oifPattern);
+  return match ? (match[1] || match[0]).trim() : '';
+};
+
+/**
+ * In groups, message.from is the group id (@g.us), not the sender.
+ * For your own messages (fromMe), message.author is often empty — use the
+ * linked WhatsApp account number instead.
+ */
+const resolveSenderPhone = (message) => {
+  if (message.fromMe) {
+    const ownNumber = client.info?.wid?.user || client.info?.me?.user;
+    if (ownNumber) return String(ownNumber);
+  }
+
+  const senderId = message.author || '';
+  if (!senderId || senderId.endsWith('@g.us')) return '';
+  return senderId.split('@')[0];
+};
+
+const extractOifWithOcr = async (message) => {
+  if (String(ENABLE_OCR).toLowerCase() !== 'true') return '';
+  try {
+    const { createWorker } = await import('tesseract.js');
+    const media = await message.downloadMedia();
+    if (!media?.data) return '';
+
+    const worker = await createWorker('eng');
+    const {
+      data: { text },
+    } = await worker.recognize(Buffer.from(media.data, 'base64'));
+    await worker.terminate();
+    return extractOifFromText(text);
+  } catch (error) {
+    log('OCR failed:', error.message);
+    return '';
+  }
+};
+
+const handleMessage = async (message) => {
+  try {
+    if (processedMessageIds.has(message.id._serialized)) return;
+
+    const chat = await message.getChat();
+    if (!isTargetGroup(chat)) return;
+    if (!message.hasMedia) return;
+
+    processedMessageIds.add(message.id._serialized);
+
+    const phone = resolveSenderPhone(message);
+    if (!phone) {
+      log('Could not resolve sender phone, skipping');
+      return;
+    }
+
+    let oifNumber = extractOifFromText(message.body);
+    if (!oifNumber) {
+      oifNumber = await extractOifWithOcr(message);
+    }
+
+    if (!oifNumber) {
+      log(`No OIF found in message from ${phone}, skipping`);
+      return;
+    }
+
+    const punchInAt = new Date(message.timestamp * 1000).toISOString();
+
+    const payload = { phone, oifNumber, punchInAt };
+    log(`Forwarding punch-in from ${phone}, OIF ${oifNumber}`);
+
+    const { data } = await axios.post(WEBHOOK_URL, payload, {
+      headers: { 'x-webhook-secret': WEBHOOK_SECRET },
+      timeout: 15000,
+    });
+
+    log(`Recorded: ${data?.trainer?.name || phone} | OIF ${oifNumber} | ${punchInAt}`);
+  } catch (error) {
+    const status = error.response?.status;
+    const detail = error.response?.data?.message || error.message;
+    const phoneHint = error.response?.data?.phone ? ` (normalized phone: ${error.response.data.phone})` : '';
+    log(`Failed to forward punch-in (${status || 'no response'}): ${detail}${phoneHint}`);
+  }
+};
+
+client.on('message', handleMessage);
+client.on('message_create', (message) => {
+  // Also catch messages sent from the bridge account itself.
+  if (message.fromMe) handleMessage(message);
+});
+
+client.initialize();

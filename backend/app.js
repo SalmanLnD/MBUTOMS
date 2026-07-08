@@ -15,6 +15,7 @@ import replacementRoutes from './routes/replacementRoutes.js';
 import classRoutes from './routes/classRoutes.js';
 import studentRoutes from './routes/studentRoutes.js';
 import sheetsRoutes from './routes/sheetsRoutes.js';
+import webhookRoutes from './routes/webhookRoutes.js';
 
 dotenv.config();
 const app = express();
@@ -57,6 +58,7 @@ app.use('/api/replacements', replacementRoutes);
 app.use('/api/classes', classRoutes);
 app.use('/api/students', studentRoutes);
 app.use('/api/sheets', sheetsRoutes);
+app.use('/api/webhooks', webhookRoutes);
 
 app.use(notFound);
 app.use(errorHandler);

@@ -33,3 +33,7 @@ coverage/
 
 # Vercel local
 .vercel/
+
+# WhatsApp bridge session data (local only)
+whatsapp-bridge/.wwebjs_auth/
+whatsapp-bridge/.wwebjs_cache/

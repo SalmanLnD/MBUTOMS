@@ -10,6 +10,14 @@ const trainerDailyAttendanceSchema = new mongoose.Schema(
     date: { type: Date, required: true },
     oifNumber: { type: String, trim: true, default: '' },
     mockPrepHours: { type: Number, min: 0, default: 0 },
+    punchInAt: { type: Date },
+    punchInSource: {
+      type: String,
+      enum: ['manual', 'whatsapp'],
+      default: 'manual',
+    },
+    punchInImageUrl: { type: String, trim: true, default: '' },
+    punchInRawPhone: { type: String, trim: true, default: '' },
     markedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
   },
   { timestamps: true }

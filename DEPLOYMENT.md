@@ -39,8 +39,25 @@ Live URLs:
 | `API_PUBLIC_URL` | `https://mbutoms-api.vercel.app` |
 | `VERCEL` | `1` (set automatically on Vercel) |
 | `RUN_STARTUP_SYNC` | `false` (recommended on serverless; run sync locally once) |
+| `WHATSAPP_WEBHOOK_SECRET` | long random string (only if using the WhatsApp punch-in bridge) |
 
 6. Deploy. Health check: `https://YOUR-API.vercel.app/api/health`
+
+## WhatsApp punch-in automation
+
+Trainers post a punch-in image with an OIF number in a WhatsApp group; the
+attendance is recorded automatically in MBUTOMS.
+
+- **Endpoint:** `POST /api/webhooks/whatsapp-punch`
+- **Auth:** `x-webhook-secret` header must equal `WHATSAPP_WEBHOOK_SECRET`.
+- **Body:** `{ "phone": "919876543210", "oifNumber": "OIF-12345", "punchInAt": "2026-07-08T09:05:00+05:30", "imageUrl": "https://..." }`
+- **Behaviour:** matches a trainer by the last 10 digits of `phone`, then upserts
+  that trainer's `TrainerDailyAttendance` for the day with the OIF and punch-in time.
+
+The group-reading half runs as a separate always-on service in
+[`whatsapp-bridge/`](./whatsapp-bridge/README.md) (it cannot run on Vercel).
+Set the same secret value in both the backend `WHATSAPP_WEBHOOK_SECRET` and the
+bridge `WEBHOOK_SECRET`.
 
 ### CLI deploy
 

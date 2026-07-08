@@ -21,6 +21,8 @@ const emptyForm = {
   name: '',
   email: '',
   phone: '',
+  camuErpId: '',
+  camuPassword: '',
   department: '',
   subjects: [],
   skills: '',
@@ -58,6 +60,8 @@ const TrainerFormModal = ({ trainer, onClose }) => {
         name: trainer.name || '',
         email: trainer.email || '',
         phone: trainer.phone || '',
+        camuErpId: trainer.camuErpId || '',
+        camuPassword: trainer.camuPassword || '',
         department: trainer.department?._id || trainer.department || '',
         subjects: trainer.subjects?.map(toSubjectId).filter(Boolean) || [],
         skills: trainer.skills?.join(', ') || '',
@@ -140,6 +144,14 @@ const TrainerFormModal = ({ trainer, onClose }) => {
                 <div className="col-md-6">
                   <label className="form-label">Phone</label>
                   <input name="phone" className="form-control" value={form.phone} onChange={handleChange} />
+                </div>
+                <div className="col-md-6">
+                  <label className="form-label">CAMU ERP ID</label>
+                  <input name="camuErpId" className="form-control" value={form.camuErpId} onChange={handleChange} placeholder="adjfaculty-90@mbu.asia" />
+                </div>
+                <div className="col-md-6">
+                  <label className="form-label">CAMU Password</label>
+                  <input name="camuPassword" type="text" className="form-control" value={form.camuPassword} onChange={handleChange} autoComplete="off" />
                 </div>
                 <div className="col-md-6">
                   <label className="form-label">Department</label>

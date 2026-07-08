@@ -6,6 +6,8 @@ const trainerSchema = new mongoose.Schema(
     name: { type: String, required: true, trim: true },
     email: { type: String, unique: true, sparse: true, lowercase: true, trim: true },
     phone: { type: String, trim: true, default: '' },
+    camuErpId: { type: String, trim: true, default: '' },
+    camuPassword: { type: String, trim: true, default: '' },
     department: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Department',

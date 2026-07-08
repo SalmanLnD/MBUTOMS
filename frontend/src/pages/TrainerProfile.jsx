@@ -84,12 +84,22 @@ const TrainerProfile = () => {
               <div className="row g-3">
                 <div className="col-sm-6">
                   <label className="text-muted small">Email</label>
-                  <p className="mb-0">{trainer.email}</p>
+                  <p className="mb-0">{trainer.email || '-'}</p>
                 </div>
                 <div className="col-sm-6">
                   <label className="text-muted small">Phone</label>
-                  <p className="mb-0">{trainer.phone}</p>
+                  <p className="mb-0">{trainer.phone || '-'}</p>
                 </div>
+                <div className="col-sm-6">
+                  <label className="text-muted small">CAMU ERP ID</label>
+                  <p className="mb-0">{trainer.camuErpId || '-'}</p>
+                </div>
+                {canEdit && (
+                  <div className="col-sm-6">
+                    <label className="text-muted small">CAMU Password</label>
+                    <p className="mb-0">{trainer.camuPassword || '-'}</p>
+                  </div>
+                )}
                 <div className="col-sm-6">
                   <label className="text-muted small">Department</label>
                   <p className="mb-0">{trainer.department?.name || '-'}</p>

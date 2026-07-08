@@ -130,6 +130,12 @@ const sanitizeTrainerBody = (body) => {
   } else {
     payload.phone = payload.phone.trim();
   }
+  if (payload.camuErpId !== undefined) {
+    payload.camuErpId = payload.camuErpId?.trim() || '';
+  }
+  if (payload.camuPassword !== undefined) {
+    payload.camuPassword = payload.camuPassword?.trim() || '';
+  }
   if (payload.subjects !== undefined) {
     payload.subjects = toIdStrings(payload.subjects);
   }
