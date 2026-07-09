@@ -37,3 +37,7 @@ coverage/
 # WhatsApp bridge session data (local only)
 whatsapp-bridge/.wwebjs_auth/
 whatsapp-bridge/.wwebjs_cache/
+
+# SSM command output artifacts (local only)
+whatsapp-bridge/scripts/ssm-*.txt
+whatsapp-bridge/scripts/ssm-result.json

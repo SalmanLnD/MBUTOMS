@@ -1,0 +1,8 @@
+{
+  "commands": [
+    "grep '^GROUP_ID=' /opt/MBUTOMS/whatsapp-bridge/.env",
+    "grep 'protocolTimeout:' /opt/MBUTOMS/whatsapp-bridge/index.js",
+    "sudo -u ubuntu pm2 jlist | node -e \"let d='';process.stdin.on('data',c=>d+=c);process.stdin.on('end',()=>{const j=JSON.parse(d||'[]');const p=j.find(x=>x.name==='mbutoms-whatsapp-bridge');console.log('PM2_STATUS='+(p?p.pm2_env.status:'missing'));});\"",
+    "tail -10 /home/ubuntu/.pm2/logs/mbutoms-whatsapp-bridge-out.log | tr -cd '\\11\\12\\15\\40-\\176'"
+  ]
+}

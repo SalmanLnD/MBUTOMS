@@ -1,7 +1,0 @@
-{
-  "commands": [
-    "pm2 jlist | node -e \"let d='';process.stdin.on('data',c=>d+=c);process.stdin.on('end',()=>{try{const j=JSON.parse(d||'[]');console.log('PM2_COUNT='+j.length);j.forEach(p=>console.log('PM2_'+p.name+'='+p.pm2_env.status));}catch(e){console.log('PM2_PARSE_ERROR');}});\"",
-    "pgrep -af chrome | tr -cd '\\11\\12\\15\\40-\\176' | head -5 || echo NO_CHROME",
-    "ls -la /opt/MBUTOMS/whatsapp-bridge/.wwebjs_auth/session/Singleton* 2>/dev/null || echo NO_LOCK_FILES"
-  ]
-}
