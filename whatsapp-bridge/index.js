@@ -136,22 +136,57 @@ const digitsOnly = (value) => {
   return String(value).replace(/\D/g, '');
 };
 
+/** Indian mobile: 10 digits, or 12 with leading 91. Rejects WhatsApp @lid ids (15 digits). */
 const isLikelyPhoneUserId = (value) => {
   const digits = digitsOnly(value);
-  return digits.length >= 10 && digits.length <= 15;
+  if (digits.length === 10) return true;
+  if (digits.length === 12 && digits.startsWith('91')) return true;
+  return false;
+};
+
+const resolvePhoneFromLid = async (senderId) => {
+  if (!client.pupPage || !senderId) return '';
+
+  const candidates = senderId.includes('@')
+    ? [senderId]
+    : [`${senderId}@lid`, `${senderId}@c.us`];
+
+  for (const userId of candidates) {
+    try {
+      const phoneUser = await client.pupPage.evaluate(async (uid) => {
+        if (!window.WWebJS?.enforceLidAndPnRetrieval) return null;
+        const { phone } = await window.WWebJS.enforceLidAndPnRetrieval(uid);
+        if (!phone) return null;
+        if (typeof phone === 'object' && phone.user) return phone.user;
+        if (typeof phone === 'string') return phone.split('@')[0];
+        return null;
+      }, userId);
+
+      if (isLikelyPhoneUserId(phoneUser)) {
+        return digitsOnly(phoneUser);
+      }
+    } catch {
+      // try next candidate
+    }
+  }
+
+  return '';
 };
 
 /**
  * In groups, message.from is the group id (@g.us), not the sender.
  * For your own messages (fromMe), message.author is often empty — use the
  * linked WhatsApp account number instead.
- * Other members may appear as @lid privacy ids; resolve via getContact().
+ * Other members may appear as @lid privacy ids; resolve via WhatsApp Web API.
  */
 const resolveSenderPhone = async (message) => {
   if (message.fromMe) {
     const ownNumber = client.info?.wid?.user || client.info?.me?.user;
     if (ownNumber) return digitsOnly(ownNumber);
   }
+
+  const senderId = message.author || message.from || '';
+  if (!senderId || senderId.endsWith('@g.us')) return '';
 
   try {
     const contact = await message.getContact();
@@ -163,12 +198,13 @@ const resolveSenderPhone = async (message) => {
     log('Contact lookup failed:', error.message);
   }
 
-  const senderId = message.author || message.from || '';
-  if (!senderId || senderId.endsWith('@g.us')) return '';
+  const fromLid = await resolvePhoneFromLid(senderId);
+  if (fromLid) {
+    log(`Resolved LID ${senderId} to phone ${fromLid}`);
+    return fromLid;
+  }
 
   const [userPart, server = ''] = senderId.split('@');
-
-  // WhatsApp privacy IDs (@lid) are not phone numbers.
   if (server === 'lid' || !isLikelyPhoneUserId(userPart)) {
     return '';
   }
