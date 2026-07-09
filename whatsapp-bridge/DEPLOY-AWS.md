@@ -114,6 +114,52 @@ Forwarding punch-in from ...
 Recorded: <trainer name> | OIF ...
 ```
 
+## View logs manually
+
+The bridge writes to PM2 log files on the EC2 instance:
+
+| Log | Path on server |
+|-----|----------------|
+| Main output (punch-ins, errors) | `/home/ubuntu/.pm2/logs/mbutoms-whatsapp-bridge-out.log` |
+| Node/Puppeteer errors | `/home/ubuntu/.pm2/logs/mbutoms-whatsapp-bridge-error.log` |
+
+### Option A — AWS Console (recommended if SSH is blocked)
+
+1. Open [AWS EC2 Console](https://ap-south-1.console.aws.amazon.com/ec2/home?region=ap-south-1#Instances:)
+2. Select instance `mbutoms-whatsapp-bridge` (`i-04219aaf606896599`)
+3. Click **Connect** → **Session Manager** → **Connect**
+4. Run:
+
+```bash
+pm2 logs mbutoms-whatsapp-bridge --lines 50
+# or view files directly:
+tail -50 /home/ubuntu/.pm2/logs/mbutoms-whatsapp-bridge-out.log
+```
+
+### Option B — SSH (if your network allows port 22)
+
+```powershell
+ssh -i .aws\mbutoms-whatsapp-bridge.pem ubuntu@43.204.141.175
+pm2 logs mbutoms-whatsapp-bridge
+```
+
+### Option C — AWS CLI from your PC
+
+```powershell
+aws ssm start-session --target i-04219aaf606896599 --region ap-south-1
+# then: pm2 logs mbutoms-whatsapp-bridge
+```
+
+### What to look for
+
+| Log line | Meaning |
+|----------|---------|
+| `Forwarding punch-in from 916306859275, OIF ...` | Bridge detected message and resolved phone |
+| `Recorded: Sumit Kumar Gupta \| OIF ...` | Success — saved to MBUTOMS |
+| `Failed to forward punch-in (404)` | Trainer phone not in MBUTOMS |
+| `Could not resolve sender phone (author=...@lid)` | WhatsApp privacy ID not resolved |
+| `No OIF found in message` | Caption missing OIF text |
+
 ## Useful commands
 
 ```powershell
@@ -146,6 +192,7 @@ Get-Content .aws\instance.json
 | Chrome OOM / crash | Upgrade to `t3.small` (2 GB RAM) or add more swap |
 | Session lost | Re-scan QR; back up `.wwebjs_auth/` |
 | `getChats` hangs | Wait 1–2 min; re-run `npm run list-groups` on server |
+| Code updates not applying | Run deploy with `git reset --hard origin/main` as `ubuntu` user (see `ssm-deploy.json`) |
 
 ## Tear down (stop charges)
 

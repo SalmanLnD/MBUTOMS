@@ -59,6 +59,7 @@ cd "$INSTALL_DIR/whatsapp-bridge"
 npm install
 
 chown -R ubuntu:ubuntu "$INSTALL_DIR" || true
+sudo -u ubuntu git config --global --add safe.directory "$INSTALL_DIR"
 
 echo "=== Bootstrap complete at $(date -Is) ==="
 touch /var/log/mbutoms-bridge-bootstrap.done

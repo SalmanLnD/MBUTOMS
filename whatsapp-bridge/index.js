@@ -147,27 +147,57 @@ const isLikelyPhoneUserId = (value) => {
 const resolvePhoneFromLid = async (senderId) => {
   if (!client.pupPage || !senderId) return '';
 
-  const candidates = senderId.includes('@')
-    ? [senderId]
-    : [`${senderId}@lid`, `${senderId}@c.us`];
+  const contactId = senderId.includes('@') ? senderId : `${senderId}@lid`;
 
-  for (const userId of candidates) {
-    try {
-      const phoneUser = await client.pupPage.evaluate(async (uid) => {
-        if (!window.WWebJS?.enforceLidAndPnRetrieval) return null;
-        const { phone } = await window.WWebJS.enforceLidAndPnRetrieval(uid);
-        if (!phone) return null;
-        if (typeof phone === 'object' && phone.user) return phone.user;
-        if (typeof phone === 'string') return phone.split('@')[0];
+  try {
+    const resolved = await client.pupPage.evaluate(async (uid) => {
+      const tryUser = (widLike) => {
+        if (!widLike) return null;
+        if (typeof widLike === 'object' && widLike.user) return widLike.user;
+        if (typeof widLike === 'string') return widLike.split('@')[0];
         return null;
-      }, userId);
+      };
 
-      if (isLikelyPhoneUserId(phoneUser)) {
-        return digitsOnly(phoneUser);
+      const widFactory = window.require('WAWebWidFactory');
+      const contactStore = window.require('WAWebCollections').Contact;
+      const wid = widFactory.createWid(uid);
+
+      const contact = await contactStore.find(wid);
+      if (contact?.phoneNumber) {
+        const phone = tryUser(contact.phoneNumber);
+        if (phone) return { phone, source: 'contact.phoneNumber' };
       }
-    } catch {
-      // try next candidate
+
+      if (window.WWebJS?.getContact) {
+        const model = await window.WWebJS.getContact(wid._serialized || uid);
+        const phone = model?.userid || tryUser(model?.id);
+        if (phone) return { phone, source: 'WWebJS.getContact' };
+      }
+
+      if (window.WWebJS?.enforceLidAndPnRetrieval) {
+        const { phone } = await window.WWebJS.enforceLidAndPnRetrieval(wid._serialized || uid);
+        const phoneUser = tryUser(phone);
+        if (phoneUser) return { phone: phoneUser, source: 'enforceLidAndPnRetrieval' };
+      }
+
+      const toPn = window.require('WAWebLidMigrationUtils')?.toPn;
+      if (toPn) {
+        const phoneWid = toPn(wid);
+        const phone = tryUser(phoneWid);
+        if (phone) return { phone, source: 'toPn' };
+      }
+
+      return null;
+    }, contactId);
+
+    if (resolved?.phone) {
+      log(`Resolved ${senderId} via ${resolved.source}: ${resolved.phone}`);
+      if (isLikelyPhoneUserId(resolved.phone)) {
+        return digitsOnly(resolved.phone);
+      }
     }
+  } catch (error) {
+    log('LID resolution failed:', error.message);
   }
 
   return '';
@@ -199,10 +229,7 @@ const resolveSenderPhone = async (message) => {
   }
 
   const fromLid = await resolvePhoneFromLid(senderId);
-  if (fromLid) {
-    log(`Resolved LID ${senderId} to phone ${fromLid}`);
-    return fromLid;
-  }
+  if (fromLid) return fromLid;
 
   const [userPart, server = ''] = senderId.split('@');
   if (server === 'lid' || !isLikelyPhoneUserId(userPart)) {
@@ -243,7 +270,7 @@ const handleMessage = async (message) => {
 
     const phone = await resolveSenderPhone(message);
     if (!phone) {
-      log('Could not resolve sender phone, skipping');
+      log(`Could not resolve sender phone (author=${message.author || message.from || 'unknown'}), skipping`);
       return;
     }
 
