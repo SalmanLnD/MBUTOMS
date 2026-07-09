@@ -43,7 +43,7 @@ const Login = () => {
                 className="form-control"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder="admin@toms.edu"
+                placeholder="mbu.campusmanager@faceprep.in"
                 required
                 autoFocus
               />
@@ -65,14 +65,6 @@ const Login = () => {
             </button>
           </form>
 
-          <div className="mt-4 p-3 login-demo-box small text-muted">
-            <strong>Demo accounts:</strong>
-            <ul className="mb-0 mt-1">
-              <li>admin@toms.edu / admin123</li>
-              <li>manager@toms.edu / manager123</li>
-              <li>trainer@toms.edu / trainer123</li>
-            </ul>
-          </div>
         </div>
       </div>
     </div>

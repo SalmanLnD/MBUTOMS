@@ -2,10 +2,12 @@ import { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import LoadingSpinner from './LoadingSpinner.jsx';
 import Pagination from './Pagination.jsx';
-import { showError } from '../utils/toast.js';
+import ConfirmModal from './ConfirmModal.jsx';
+import { TrashIcon } from './icons.jsx';
+import { showError, showSuccess } from '../utils/toast.js';
 import { useAuth } from '../context/AuthContext.jsx';
 import { useDebounce } from '../hooks/useDebounce.js';
-import { getTrainerPunchInLogs } from '../services/attendanceService.js';
+import { deleteTrainerPunchInLog, getTrainerPunchInLogs } from '../services/attendanceService.js';
 import { formatDate, formatDateTime, formatStatus, getErrorMessage } from '../utils/helpers.js';
 
 const SOURCE_BADGE = {
@@ -25,6 +27,8 @@ const TrainerPunchInLogsTab = () => {
   const [sourceFilter, setSourceFilter] = useState('');
   const [fromDate, setFromDate] = useState('');
   const [toDate, setToDate] = useState('');
+  const [pendingDelete, setPendingDelete] = useState(null);
+  const [deleting, setDeleting] = useState(false);
 
   const debouncedSearch = useDebounce(search);
 
@@ -62,6 +66,21 @@ const TrainerPunchInLogsTab = () => {
     setPage(1);
   };
 
+  const handleConfirmDelete = async () => {
+    if (!pendingDelete) return;
+    setDeleting(true);
+    try {
+      await deleteTrainerPunchInLog(pendingDelete.id);
+      showSuccess('Punch-in log and attendance removed');
+      setPendingDelete(null);
+      fetchLogs();
+    } catch (err) {
+      showError(getErrorMessage(err));
+    } finally {
+      setDeleting(false);
+    }
+  };
+
   const formatPhone = (phone) => {
     if (!phone) return '-';
     const digits = String(phone).replace(/\D/g, '');
@@ -73,6 +92,8 @@ const TrainerPunchInLogsTab = () => {
     }
     return phone;
   };
+
+  const columnCount = canManageAll ? 8 : 7;
 
   return (
     <>
@@ -169,13 +190,13 @@ const TrainerPunchInLogsTab = () => {
                   <th>OIF</th>
                   <th>Source</th>
                   <th>Phone</th>
-                  <th>Recorded at</th>
+                  {canManageAll && <th className="text-end">Actions</th>}
                 </tr>
               </thead>
               <tbody>
                 {logs.length === 0 ? (
                   <tr>
-                    <td colSpan={canManageAll ? 8 : 7} className="text-center text-muted py-4">
+                    <td colSpan={columnCount} className="text-center text-muted py-4">
                       No punch-in logs found
                     </td>
                   </tr>
@@ -214,7 +235,20 @@ const TrainerPunchInLogsTab = () => {
                         </span>
                       </td>
                       <td className="text-nowrap">{formatPhone(log.punchInRawPhone)}</td>
-                      <td className="text-nowrap text-muted small">{formatDateTime(log.recordedAt)}</td>
+                      {canManageAll && (
+                        <td className="text-end">
+                          <button
+                            type="button"
+                            className="btn btn-sm btn-outline-danger d-inline-flex align-items-center justify-content-center"
+                            style={{ width: '2rem', height: '2rem', padding: 0 }}
+                            aria-label={`Delete punch-in log for ${log.trainer?.name || 'trainer'}`}
+                            title="Delete log and attendance"
+                            onClick={() => setPendingDelete(log)}
+                          >
+                            <TrashIcon size={16} />
+                          </button>
+                        </td>
+                      )}
                     </tr>
                   ))
                 )}
@@ -223,6 +257,18 @@ const TrainerPunchInLogsTab = () => {
           </div>
           <Pagination pagination={pagination} onPageChange={setPage} />
         </>
+      )}
+
+      {pendingDelete && (
+        <ConfirmModal
+          show
+          title="Delete Punch-In Log"
+          message={`Delete the punch-in for ${pendingDelete.trainer?.name || 'this trainer'} on ${formatDate(pendingDelete.date)}? This will also remove the corresponding attendance record.`}
+          confirmLabel="Delete"
+          confirmVariant="danger"
+          onConfirm={handleConfirmDelete}
+          onClose={() => !deleting && setPendingDelete(null)}
+        />
       )}
     </>
   );

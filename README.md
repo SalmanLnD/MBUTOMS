@@ -49,13 +49,9 @@ npm install
 npm run dev     # Start app on http://localhost:5173
 ```
 
-## Demo Login Credentials
+## Login
 
-| Role           | Email              | Password    |
-|----------------|--------------------|-------------|
-| Admin          | admin@toms.edu     | admin123    |
-| Campus Manager | manager@toms.edu   | manager123  |
-| Trainer        | trainer@toms.edu   | trainer123  |
+Use your assigned MBUTOMS account. The primary admin account is `mbu.campusmanager@faceprep.in`.
 
 ## Phase 1 (Complete)
 

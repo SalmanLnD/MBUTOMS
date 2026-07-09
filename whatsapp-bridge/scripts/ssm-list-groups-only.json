@@ -1,0 +1,14 @@
+{
+  "commands": [
+    "pgrep -af 'wwebjs_auth/session' || echo NO_CHROME_PROCESS",
+    "ls -la /opt/MBUTOMS/whatsapp-bridge/.wwebjs_auth/session/Singleton* 2>/dev/null || echo NO_LOCKS",
+    "rm -f /opt/MBUTOMS/whatsapp-bridge/.wwebjs_auth/session/SingletonLock /opt/MBUTOMS/whatsapp-bridge/.wwebjs_auth/session/SingletonCookie /opt/MBUTOMS/whatsapp-bridge/.wwebjs_auth/session/SingletonSocket 2>/dev/null || true",
+    "pkill -9 -f 'wwebjs_auth/session' 2>/dev/null || true",
+    "sleep 5",
+    "cd /opt/MBUTOMS/whatsapp-bridge",
+    "timeout 180 node index.js --list-groups > /tmp/mbutoms-list-groups.txt 2>&1; echo LIST_EXIT=$?",
+    "python3 - <<'PY'\nimport pathlib\ntarget='120363422235597898@g.us'\ntext=pathlib.Path('/tmp/mbutoms-list-groups.txt').read_text(errors='ignore')\nprint('=== GROUPS ===')\nfound=False\nfor line in text.splitlines():\n    if '->' in line and '@g.us' in line:\n        safe=''.join(ch for ch in line.strip() if ord(ch)<128)\n        print(safe)\n        if target in line: found=True\nprint('')\nprint('VERIFY_RESULT=' + ('CONFIRMED' if found else ('NOT_IN_LIST' if 'Groups this account' in text else 'FAILED')))\nPY",
+    "pm2 start index.js --name mbutoms-whatsapp-bridge",
+    "pm2 save"
+  ]
+}

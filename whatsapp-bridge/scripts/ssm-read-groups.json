@@ -1,0 +1,6 @@
+{
+  "commands": [
+    "python3 - <<'PY'\nimport pathlib\ntarget = '120363422235597898@g.us'\ntext = pathlib.Path('/tmp/mbutoms-list-groups.txt').read_text(errors='ignore') if pathlib.Path('/tmp/mbutoms-list-groups.txt').exists() else ''\nprint('=== GROUPS (name -> id) ===')\nfound = False\nfor line in text.splitlines():\n    if '->' in line and '@g.us' in line:\n        safe = ''.join(ch for ch in line.strip() if ord(ch) < 128)\n        print(safe)\n        if target in line:\n            found = True\nprint('')\nif found:\n    print('VERIFY_RESULT=CONFIRMED')\nelif 'Groups this account can see' in text:\n    print('VERIFY_RESULT=NOT_IN_LIST')\nelse:\n    print('VERIFY_RESULT=FAILED')\n    for line in text.splitlines()[-10:]:\n        safe = ''.join(ch for ch in line.strip() if ord(ch) < 128)\n        if safe: print('LOG: ' + safe)\nPY",
+    "pm2 jlist | node -e \"let d='';process.stdin.on('data',c=>d+=c);process.stdin.on('end',()=>{const j=JSON.parse(d||'[]');const p=j.find(x=>x.name==='mbutoms-whatsapp-bridge');console.log('PM2_STATUS='+(p?p.pm2_env.status:'missing'));});\""
+  ]
+}

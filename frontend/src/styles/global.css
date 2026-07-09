@@ -254,14 +254,47 @@ body {
   -webkit-overflow-scrolling: touch;
   border: 1px solid rgba(148, 163, 184, 0.25);
   border-radius: var(--radius-sm, 0.375rem);
-  scrollbar-gutter: stable;
+}
+
+.table-responsive,
+.trainer-attendance-grid,
+.timetable-grid-wrap {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.table-responsive::-webkit-scrollbar,
+.trainer-attendance-grid::-webkit-scrollbar,
+.timetable-grid-wrap::-webkit-scrollbar {
+  display: none;
+  width: 0;
+  height: 0;
 }
 
 .trainer-attendance-month-table {
   width: max-content;
   min-width: 100%;
   margin-bottom: 0;
-  border-collapse: collapse;
+  border-collapse: separate;
+  border-spacing: 0;
+  table-layout: fixed;
+}
+
+.trainer-attendance-month-table col.trainer-attendance-oif-col {
+  width: 6.5rem;
+}
+
+.trainer-attendance-month-table col.trainer-attendance-mock-col,
+.trainer-attendance-month-table col.trainer-attendance-class-col {
+  width: 3.75rem;
+}
+
+.trainer-attendance-month-table col.trainer-attendance-sticky-col {
+  width: 10.5rem;
+}
+
+.trainer-attendance-month-table col.trainer-attendance-totals-col {
+  width: 7.5rem;
 }
 
 .trainer-attendance-grid .trainer-attendance-month-table thead {
@@ -297,8 +330,9 @@ body {
   position: sticky;
   left: 0;
   z-index: 3;
-  min-width: 150px;
-  max-width: 150px;
+  width: 10.5rem;
+  min-width: 10.5rem;
+  max-width: 10.5rem;
   background: #ffffff;
   box-shadow: 2px 0 6px rgba(15, 23, 42, 0.08);
   overflow: hidden;
@@ -309,16 +343,67 @@ body {
   z-index: 8;
 }
 
-.trainer-attendance-grid td input {
-  width: 100%;
-  min-width: 0;
-  max-width: 64px;
+.trainer-attendance-month-table tbody td,
+.trainer-attendance-month-table tbody th.trainer-attendance-sticky-col {
+  padding: 0.3rem 0.35rem;
+  vertical-align: middle;
 }
 
-.trainer-attendance-month-table tbody td {
-  padding: 0.35rem 0.3rem;
-  width: 64px;
-  max-width: 64px;
+.trainer-attendance-grid th.trainer-attendance-oif-header,
+.trainer-attendance-grid td.trainer-attendance-oif-cell,
+.trainer-attendance-grid th.trainer-attendance-mock-header,
+.trainer-attendance-grid td.trainer-attendance-mock-cell,
+.trainer-attendance-grid th.trainer-attendance-class-header,
+.trainer-attendance-grid td.trainer-attendance-class-cell {
+  padding: 0.3rem 0.35rem;
+  text-align: center;
+  vertical-align: middle;
+}
+
+.trainer-attendance-grid .trainer-attendance-oif-input,
+.trainer-attendance-grid .trainer-attendance-mock-input {
+  display: block;
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  height: 1.85rem;
+  margin: 0 auto;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 0.75rem;
+  line-height: 1.2;
+  text-align: center;
+  padding: 0.2rem 0.35rem;
+  border-radius: 0.3rem;
+}
+
+.trainer-attendance-grid .trainer-attendance-oif-input {
+  text-align: left;
+}
+
+.trainer-attendance-grid .trainer-attendance-mock-input::-webkit-outer-spin-button,
+.trainer-attendance-grid .trainer-attendance-mock-input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.trainer-attendance-grid .trainer-attendance-mock-input {
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+
+.trainer-attendance-grid .trainer-attendance-class-value {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  min-height: 1.85rem;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #334155;
+  background: rgba(148, 163, 184, 0.12);
+  border: 1px solid rgba(148, 163, 184, 0.28);
+  border-radius: 0.3rem;
 }
 
 .trainer-attendance-toolbar {
@@ -397,14 +482,15 @@ body {
 }
 
 .trainer-attendance-month-table .trainer-attendance-day-header {
-  min-width: 96px;
+  min-width: 14.5rem;
   white-space: nowrap;
   font-weight: 700;
 }
 
 .trainer-attendance-month-table .trainer-attendance-subheader {
-  min-width: 32px;
   white-space: nowrap;
+  font-size: 0.7rem;
+  letter-spacing: 0.02em;
 }
 
 .trainer-attendance-future {
@@ -416,8 +502,8 @@ body {
 }
 
 .trainer-attendance-totals-col {
-  min-width: 118px;
-  width: 118px;
+  min-width: 7.5rem;
+  width: 7.5rem;
   background: #ffffff;
   border-left: 2px solid rgba(20, 184, 166, 0.35) !important;
   box-shadow: none;

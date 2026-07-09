@@ -1,0 +1,16 @@
+{
+  "commands": [
+    "set -e",
+    "cd /opt/MBUTOMS/whatsapp-bridge",
+    "pm2 stop mbutoms-whatsapp-bridge 2>/dev/null || true",
+    "pkill -f 'chrome.*wwebjs_auth' 2>/dev/null || true",
+    "pkill -f chromium 2>/dev/null || true",
+    "sleep 6",
+    "timeout 150 node index.js --list-groups > /tmp/groups2.txt 2>&1 || true",
+    "python3 - <<'PY'\nimport pathlib\ntext = pathlib.Path('/tmp/groups2.txt').read_text(errors='ignore')\nfor line in text.splitlines():\n    if '120363422235597898@g.us' in line:\n        print('GROUP_LINE=' + line.strip())\nelse:\n    print('GROUP_LINE=NOT_FOUND')\nPY",
+    "pm2 start index.js --name mbutoms-whatsapp-bridge",
+    "pm2 save",
+    "sleep 8",
+    "tail -5 /home/ubuntu/.pm2/logs/mbutoms-whatsapp-bridge-out.log | tr -cd '\\11\\12\\15\\40-\\176'"
+  ]
+}

@@ -8,7 +8,7 @@ const trainerDailyAttendanceSchema = new mongoose.Schema(
       required: true,
     },
     date: { type: Date, required: true },
-    oifNumber: { type: String, trim: true, default: '' },
+    oifNumber: { type: String, trim: true, maxlength: 12, default: '' },
     mockPrepHours: { type: Number, min: 0, default: 0 },
     punchInAt: { type: Date },
     punchInSource: {
@@ -24,6 +24,8 @@ const trainerDailyAttendanceSchema = new mongoose.Schema(
 );
 
 trainerDailyAttendanceSchema.index({ trainer: 1, date: 1 }, { unique: true });
+trainerDailyAttendanceSchema.index({ date: 1 });
+trainerDailyAttendanceSchema.index({ punchInAt: -1 });
 
 const TrainerDailyAttendance = mongoose.model('TrainerDailyAttendance', trainerDailyAttendanceSchema);
 export default TrainerDailyAttendance;

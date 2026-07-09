@@ -4,6 +4,12 @@ import { normalizeDate } from '../utils/scheduleHelpers.js';
 import { toDateKey } from '../utils/dateRange.js';
 import { normalizePhone, isValidMobileKey } from '../utils/phone.js';
 import { TRAINER_ATTENDANCE_TRACKING_START } from '../utils/attendanceTracking.js';
+import { clearAttendanceGridCache } from '../utils/attendanceGridCache.js';
+import {
+  applyItOifAttendanceRules,
+  isItOif,
+  IT_MOCK_PREP_HOURS,
+} from '../utils/attendanceOifRules.js';
 
 const findTrainerByPhone = async (phone) => {
   const target = normalizePhone(phone);
@@ -40,6 +46,11 @@ export const recordWhatsappPunchIn = async (req, res) => {
     return res.status(400).json({ message: 'oifNumber is required' });
   }
 
+  const trimmedOif = String(oifNumber).trim();
+  if (trimmedOif.length > 12) {
+    return res.status(400).json({ message: 'OIF number must be 12 characters or fewer' });
+  }
+
   const trainer = await findTrainerByPhone(phone);
   if (!trainer) {
     return res.status(404).json({
@@ -63,11 +74,14 @@ export const recordWhatsappPunchIn = async (req, res) => {
   const update = {
     trainer: trainer._id,
     date: day,
-    oifNumber: String(oifNumber).trim(),
+    oifNumber: trimmedOif,
     punchInSource: 'whatsapp',
     punchInRawPhone: String(phone),
   };
   if (imageUrl) update.punchInImageUrl = String(imageUrl);
+  if (isItOif(trimmedOif)) {
+    update.mockPrepHours = IT_MOCK_PREP_HOURS;
+  }
 
   // First punch of the day wins; later messages only backfill a missing time.
   if (!existing?.punchInAt) {
@@ -79,6 +93,8 @@ export const recordWhatsappPunchIn = async (req, res) => {
     { $set: update },
     { upsert: true, new: true, setDefaultsOnInsert: true }
   );
+
+  clearAttendanceGridCache();
 
   return res.status(existing ? 200 : 201).json({
     status: existing ? 'updated' : 'recorded',

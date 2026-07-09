@@ -69,15 +69,17 @@ const seed = async () => {
   await syncIdsaTrainersAndSubject();
   await syncPedhTrainersAndSubject();
 
-  const adminExists = await User.findOne({ email: 'admin@toms.edu' });
+  const adminExists = await User.findOne({ email: 'mbu.campusmanager@faceprep.in' });
   if (!adminExists) {
     await User.create({
-      name: 'System Admin',
-      email: 'admin@toms.edu',
-      password: 'admin123',
+      name: 'MBU Campus Manager',
+      email: 'mbu.campusmanager@faceprep.in',
+      password: 'Mbu#2026',
       role: 'admin',
     });
   }
+
+  await User.deleteOne({ email: 'admin@toms.edu' });
 
   const managerExists = await User.findOne({ email: 'manager@toms.edu' });
   if (!managerExists) {
@@ -102,7 +104,7 @@ const seed = async () => {
   console.log(`Trainers: ${trainers.length}`);
   console.log(`Schedules: ${schedules.length}`);
   console.log('Semester: III');
-  console.log('\nLogin: admin@toms.edu / admin123');
+  console.log('\nLogin: mbu.campusmanager@faceprep.in');
   console.log('       trainer@toms.edu / trainer123 (linked to first trainer)\n');
 
   process.exit(0);

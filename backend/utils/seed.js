@@ -179,9 +179,9 @@ const seed = async () => {
 
     // Create users
     await User.create({
-      name: 'System Admin',
-      email: 'admin@toms.edu',
-      password: 'admin123',
+      name: 'MBU Campus Manager',
+      email: 'mbu.campusmanager@faceprep.in',
+      password: 'Mbu#2026',
       role: 'admin',
     });
 
@@ -234,7 +234,7 @@ const seed = async () => {
       makeSchedule(4, '15:00', '16:30', subjects[2]._id, trainers[2]._id, venues[1]._id, batches[1]._id, semesters[0]._id),
     ]);
 
-    const adminUser = await User.findOne({ email: 'admin@toms.edu' });
+    const adminUser = await User.findOne({ email: 'mbu.campusmanager@faceprep.in' });
     const students = await Student.find();
     const tomorrow = new Date(today);
     tomorrow.setDate(tomorrow.getDate() + 1 + dayOffset);
@@ -259,7 +259,7 @@ const seed = async () => {
 
     console.log('\n--- Seed completed successfully ---\n');
     console.log('Login credentials:');
-    console.log('  Admin:   admin@toms.edu / admin123');
+    console.log('  Admin:   mbu.campusmanager@faceprep.in');
     console.log('  Manager: manager@toms.edu / manager123');
     console.log('  Trainer: trainer@toms.edu / trainer123');
     console.log('');

@@ -1,6 +1,7 @@
-import { useState, useEffect, useCallback, Fragment, useMemo } from 'react';
+import { useState, useEffect, useLayoutEffect, useCallback, Fragment, useMemo, useRef } from 'react';
 import LoadingSpinner from '../components/LoadingSpinner.jsx';
-import { showError, showSuccess } from '../utils/toast.js';
+import TrainerAttendanceRow from '../components/TrainerAttendanceRow.jsx';
+import { showError } from '../utils/toast.js';
 import { useAuth } from '../context/AuthContext.jsx';
 import {
   getTrainerAttendanceGrid,
@@ -16,6 +17,7 @@ import {
   isFutureDateKey,
   parseMonthKey,
   shiftMonth,
+  toInputDate,
   TRAINER_ATTENDANCE_TRACKING_START,
 } from '../utils/monthDates.js';
 
@@ -28,7 +30,12 @@ const TrainerAttendanceTab = () => {
   );
   const [grid, setGrid] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [savingKey, setSavingKey] = useState('');
+  const [trainerSearch, setTrainerSearch] = useState('');
+  const scrollContainerRef = useRef(null);
+  const gridDataRef = useRef(null);
+  const monthCacheRef = useRef(new Map());
 
   const monthKey = formatMonthKey(monthParts.year, monthParts.month);
   const monthOptions = useMemo(() => buildMonthOptions(), []);
@@ -40,18 +47,45 @@ const TrainerAttendanceTab = () => {
   const atLatestMonth =
     monthParts.year === currentMonth.year && monthParts.month === currentMonth.month;
 
-  const fetchGrid = useCallback(async () => {
-    setLoading(true);
+  const filteredRows = useMemo(() => {
+    if (!grid?.rows) return [];
+    const query = trainerSearch.trim().toLowerCase();
+    if (!query || !canManageAll) return grid.rows;
+    return grid.rows.filter((row) => {
+      const name = row.trainer.name?.toLowerCase() || '';
+      const employeeId = row.trainer.employeeId?.toLowerCase() || '';
+      return name.includes(query) || employeeId.includes(query);
+    });
+  }, [grid?.rows, trainerSearch, canManageAll]);
+
+  const fetchGrid = useCallback(async ({ forceRefresh = false } = {}) => {
+    const requestParams = { month: monthKey, semester: 'III' };
+    const cachedMonth = monthCacheRef.current.get(monthKey);
+
+    if (cachedMonth && !forceRefresh) {
+      gridDataRef.current = cachedMonth;
+      setGrid(cachedMonth);
+      setLoading(false);
+      setRefreshing(true);
+    } else if (!cachedMonth) {
+      setLoading(true);
+    } else {
+      setRefreshing(true);
+    }
+
     try {
-      const data = await getTrainerAttendanceGrid({
-        month: monthKey,
-        semester: 'III',
+      const data = await getTrainerAttendanceGrid(requestParams, {
+        preferCache: !forceRefresh,
+        forceRefresh,
       });
+      monthCacheRef.current.set(monthKey, data);
+      gridDataRef.current = data;
       setGrid(data);
     } catch (err) {
       showError(getErrorMessage(err));
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
   }, [monthKey]);
 
@@ -59,13 +93,40 @@ const TrainerAttendanceTab = () => {
     fetchGrid();
   }, [fetchGrid]);
 
-  const canEditTrainer = (trainerId) =>
-    canManageAll || user?.trainer?.toString() === trainerId?.toString();
+  const scrollToTodayColumn = useCallback(() => {
+    const container = scrollContainerRef.current;
+    if (!container || !grid?.dates?.length) return;
 
-  const updateCell = (trainerId, dateKey, field, value) => {
+    const todayKey = toInputDate(new Date());
+    const anchor = container.querySelector(`[data-date-scroll-anchor="${todayKey}"]`);
+    if (!anchor) {
+      container.scrollLeft = 0;
+      return;
+    }
+
+    const stickyCol = container.querySelector('.trainer-attendance-sticky-col');
+    const stickyWidth = stickyCol?.getBoundingClientRect().width ?? 0;
+    const containerLeft = container.getBoundingClientRect().left;
+    const anchorLeft = anchor.getBoundingClientRect().left;
+    container.scrollLeft = Math.max(0, container.scrollLeft + (anchorLeft - containerLeft) - stickyWidth);
+  }, [grid?.dates]);
+
+  const hasVisibleGrid = !loading && Boolean(grid?.dates?.length) && filteredRows.length > 0;
+
+  useLayoutEffect(() => {
+    if (!hasVisibleGrid) return;
+    scrollToTodayColumn();
+  }, [hasVisibleGrid, monthKey, scrollToTodayColumn]);
+
+  const canEditTrainer = useCallback(
+    (trainerId) => canManageAll || user?.trainer?.toString() === trainerId?.toString(),
+    [canManageAll, user?.trainer]
+  );
+
+  const updateCell = useCallback((trainerId, dateKey, field, value) => {
     setGrid((prev) => {
       if (!prev) return prev;
-      return {
+      const next = {
         ...prev,
         rows: prev.rows.map((row) => {
           if (row.trainer._id !== trainerId) return row;
@@ -98,11 +159,15 @@ const TrainerAttendanceTab = () => {
           return { ...row, days: nextDays, totals };
         }),
       };
+      gridDataRef.current = next;
+      monthCacheRef.current.set(prev.month, next);
+      return next;
     });
-  };
+  }, []);
 
-  const handleSave = async (trainerId, dateKey) => {
-    const row = grid?.rows.find((entry) => entry.trainer._id === trainerId);
+  const handleSave = useCallback(async (trainerId, dateKey) => {
+    const currentGrid = gridDataRef.current;
+    const row = currentGrid?.rows.find((entry) => entry.trainer._id === trainerId);
     const cell = row?.days[dateKey];
     if (!cell || cell.isFuture || isFutureDateKey(dateKey)) return;
 
@@ -119,7 +184,7 @@ const TrainerAttendanceTab = () => {
 
       setGrid((prev) => {
         if (!prev) return prev;
-        return {
+        const next = {
           ...prev,
           rows: prev.rows.map((entry) => {
             if (entry.trainer._id !== trainerId) return entry;
@@ -130,21 +195,24 @@ const TrainerAttendanceTab = () => {
                 [dateKey]: {
                   ...entry.days[dateKey],
                   id: saved.id,
+                  mockPrepHours: saved.mockPrepHours,
                   classHandlingHours: saved.classHandlingHours,
                 },
               },
             };
           }),
         };
+        gridDataRef.current = next;
+        monthCacheRef.current.set(next.month, next);
+        return next;
       });
-      showSuccess('Attendance saved');
     } catch (err) {
       showError(getErrorMessage(err));
-      fetchGrid();
+      fetchGrid({ forceRefresh: true });
     } finally {
       setSavingKey('');
     }
-  };
+  }, [fetchGrid]);
 
   const monthLabel = grid?.monthLabel || formatMonthLabel(monthParts.year, monthParts.month);
 
@@ -195,6 +263,9 @@ const TrainerAttendanceTab = () => {
       {!loading && grid && (
         <div className="trainer-attendance-summary mb-3">
           <span className="trainer-attendance-pill">{monthLabel}</span>
+          {refreshing && (
+            <span className="trainer-attendance-pill text-muted">Refreshing...</span>
+          )}
           <span className="trainer-attendance-pill">
             {grid.workingDays} day{grid.workingDays === 1 ? '' : 's'} in month
           </span>
@@ -204,28 +275,60 @@ const TrainerAttendanceTab = () => {
             </span>
           )}
           <span className="trainer-attendance-pill">
-            {grid.rows.length} trainer{grid.rows.length === 1 ? '' : 's'}
+            {filteredRows.length} trainer{filteredRows.length === 1 ? '' : 's'}
+            {trainerSearch.trim() && canManageAll && filteredRows.length !== grid.rows.length
+              ? ` of ${grid.rows.length}`
+              : ''}
           </span>
         </div>
       )}
 
-      {loading ? (
+      {canManageAll && !loading && grid?.rows?.length > 0 && (
+        <div className="row g-2 mb-3">
+          <div className="col-md-4">
+            <input
+              type="search"
+              className="form-control form-control-sm"
+              placeholder="Filter trainers by name or ID..."
+              value={trainerSearch}
+              onChange={(e) => setTrainerSearch(e.target.value)}
+              aria-label="Filter trainers in attendance grid"
+            />
+          </div>
+        </div>
+      )}
+
+      {loading && (!grid || grid.month !== monthKey) ? (
         <LoadingSpinner message="Loading monthly attendance..." />
-      ) : !grid?.rows?.length ? (
-        <div className="text-center text-muted py-5">No trainers found for attendance.</div>
+      ) : !filteredRows.length ? (
+        <div className="text-center text-muted py-5">
+          {trainerSearch.trim() ? 'No trainers match your filter.' : 'No trainers found for attendance.'}
+        </div>
       ) : !grid.dates.length ? (
         <div className="text-center text-muted py-5">
           No working days to show for {monthLabel}.
         </div>
       ) : (
-        <div className="trainer-attendance-grid">
+        <div className="trainer-attendance-grid" ref={scrollContainerRef}>
           <table className="table table-bordered table-sm align-middle mb-0 trainer-attendance-month-table">
+            <colgroup>
+              <col className="trainer-attendance-sticky-col" />
+              {grid.dates.map((date) => (
+                <Fragment key={`col-${date.key}`}>
+                  <col className="trainer-attendance-oif-col" />
+                  <col className="trainer-attendance-mock-col" />
+                  <col className="trainer-attendance-class-col" />
+                </Fragment>
+              ))}
+              <col className="trainer-attendance-totals-col" />
+            </colgroup>
             <thead className="table-light">
               <tr>
                 <th rowSpan="2" className="trainer-attendance-sticky-col">Trainer</th>
                 {grid.dates.map((date) => (
                   <th
                     key={`${date.key}-headers`}
+                    data-date-scroll-anchor={date.key}
                     className={`text-center small trainer-attendance-day-header ${
                       date.isFuture ? 'trainer-attendance-future' : ''
                     } ${date.isWeekend ? 'trainer-attendance-weekend' : ''}`}
@@ -243,21 +346,21 @@ const TrainerAttendanceTab = () => {
                 {grid.dates.map((date) => (
                   <Fragment key={`${date.key}-subheaders`}>
                     <th
-                      className={`text-center small trainer-attendance-subheader ${
+                      className={`text-center small trainer-attendance-subheader trainer-attendance-oif-header ${
                         date.isFuture ? 'trainer-attendance-future' : ''
                       } ${date.isWeekend ? 'trainer-attendance-weekend' : ''}`}
                     >
                       OIF
                     </th>
                     <th
-                      className={`text-center small trainer-attendance-subheader ${
+                      className={`text-center small trainer-attendance-subheader trainer-attendance-mock-header ${
                         date.isFuture ? 'trainer-attendance-future' : ''
                       } ${date.isWeekend ? 'trainer-attendance-weekend' : ''}`}
                     >
                       Mock
                     </th>
                     <th
-                      className={`text-center small trainer-attendance-subheader ${
+                      className={`text-center small trainer-attendance-subheader trainer-attendance-class-header ${
                         date.isFuture ? 'trainer-attendance-future' : ''
                       } ${date.isWeekend ? 'trainer-attendance-weekend' : ''}`}
                     >
@@ -268,75 +371,16 @@ const TrainerAttendanceTab = () => {
               </tr>
             </thead>
             <tbody>
-              {grid.rows.map((row) => (
-                <tr key={row.trainer._id}>
-                  <th scope="row" className="trainer-attendance-sticky-col">
-                    <div className="fw-semibold">{row.trainer.name}</div>
-                    <small className="text-muted">{row.trainer.employeeId}</small>
-                  </th>
-                  {grid.dates.map((date) => {
-                    const cell = row.days[date.key] || {
-                      oifNumber: '',
-                      mockPrepHours: 0,
-                      classHandlingHours: 0,
-                    };
-                    const editable = canEditTrainer(row.trainer._id) && !date.isFuture;
-                    const saveKey = `${row.trainer._id}|${date.key}`;
-                    const isSaving = savingKey === saveKey;
-                    const futureClass = date.isFuture ? 'trainer-attendance-future' : '';
-                    const weekendClass = date.isWeekend ? 'trainer-attendance-weekend' : '';
-                    const cellClass = [futureClass, weekendClass].filter(Boolean).join(' ');
-
-                    return (
-                      <Fragment key={`${row.trainer._id}-${date.key}`}>
-                        <td className={cellClass}>
-                          <input
-                            type="text"
-                            className="form-control form-control-sm"
-                            value={cell.oifNumber}
-                            disabled={!editable || isSaving}
-                            onChange={(e) => updateCell(row.trainer._id, date.key, 'oifNumber', e.target.value)}
-                            onBlur={() => editable && handleSave(row.trainer._id, date.key)}
-                            placeholder="—"
-                          />
-                        </td>
-                        <td className={cellClass}>
-                          <input
-                            type="number"
-                            min="0"
-                            step="0.5"
-                            className="form-control form-control-sm"
-                            value={cell.mockPrepHours}
-                            disabled={!editable || isSaving}
-                            onChange={(e) => updateCell(row.trainer._id, date.key, 'mockPrepHours', e.target.value)}
-                            onBlur={() => editable && handleSave(row.trainer._id, date.key)}
-                          />
-                        </td>
-                        <td className={`text-center ${cellClass}`}>
-                          <span className="badge bg-light text-dark border">
-                            {Number(cell.classHandlingHours || 0).toFixed(1)}
-                          </span>
-                        </td>
-                      </Fragment>
-                    );
-                  })}
-                  <td className="trainer-attendance-totals-col">
-                    <div className="trainer-attendance-totals-cell">
-                      <div>
-                        <span className="text-muted">Mock</span>
-                        <strong>{Number(row.totals?.mockPrepHours || 0).toFixed(1)}</strong>
-                      </div>
-                      <div>
-                        <span className="text-muted">Class</span>
-                        <strong>{Number(row.totals?.classHandlingHours || 0).toFixed(1)}</strong>
-                      </div>
-                      <div>
-                        <span className="text-muted">OIF days</span>
-                        <strong>{row.totals?.oifDays || 0}</strong>
-                      </div>
-                    </div>
-                  </td>
-                </tr>
+              {filteredRows.map((row) => (
+                <TrainerAttendanceRow
+                  key={row.trainer._id}
+                  row={row}
+                  dates={grid.dates}
+                  canEditTrainer={canEditTrainer}
+                  savingKey={savingKey}
+                  onUpdateCell={updateCell}
+                  onSave={handleSave}
+                />
               ))}
             </tbody>
           </table>

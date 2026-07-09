@@ -1,0 +1,10 @@
+{
+  "commands": [
+    "pm2 stop mbutoms-whatsapp-bridge 2>/dev/null || true",
+    "pm2 delete mbutoms-whatsapp-bridge 2>/dev/null || true",
+    "pkill -9 -f 'wwebjs_auth/session' 2>/dev/null || true",
+    "pkill -9 -f 'chrome-linux64/chrome' 2>/dev/null || true",
+    "sleep 12",
+    "pgrep -af 'wwebjs_auth/session' || echo CHROME_STOPPED"
+  ]
+}

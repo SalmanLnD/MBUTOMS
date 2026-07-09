@@ -9,9 +9,11 @@ import {
   buildSubjectStartDateMap,
   DEFAULT_SUBJECT_START_DATE,
 } from './subjectStartDate.js';
-import { isScheduleDayInLeaveRange } from './trainerScheduleView.js';
+import { getWeekdaysInLeaveRange } from './trainerScheduleView.js';
 
 const WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+
+const SCHEDULE_FIELDS = 'day startTime endTime trainerCode semester subject subjectCode';
 
 const resolveStartDate = (schedule, subjectStartMap) => {
   const subjectId = schedule.subject?.toString();
@@ -32,52 +34,83 @@ const isActiveOnDate = (schedule, referenceDate, subjectStartMap) => {
   return ref >= effectiveStart;
 };
 
+const buildTrainerLookup = (trainers) => {
+  const trainerById = new Map();
+  const codeToTrainerId = new Map();
+
+  trainers.forEach((trainer) => {
+    const trainerId = trainer._id.toString();
+    trainerById.set(trainerId, trainer);
+    resolveTrainerScheduleCodes(trainer).forEach((code) => {
+      codeToTrainerId.set(code, trainerId);
+    });
+  });
+
+  return { trainerById, codeToTrainerId, allCodes: [...codeToTrainerId.keys()] };
+};
+
+const indexSchedulesByTrainerDay = (schedules, codeToTrainerId) => {
+  const schedulesByTrainerDay = new Map();
+
+  schedules.forEach((schedule) => {
+    const trainerId = codeToTrainerId.get(schedule.trainerCode);
+    if (!trainerId) return;
+
+    let byDay = schedulesByTrainerDay.get(trainerId);
+    if (!byDay) {
+      byDay = new Map();
+      schedulesByTrainerDay.set(trainerId, byDay);
+    }
+
+    let daySchedules = byDay.get(schedule.day);
+    if (!daySchedules) {
+      daySchedules = [];
+      byDay.set(schedule.day, daySchedules);
+    }
+    daySchedules.push(schedule);
+  });
+
+  return schedulesByTrainerDay;
+};
+
 export const computeClassHandlingHoursBatch = async (
   trainerIds,
   dates,
-  semester = 'III'
+  semester = 'III',
+  trainersInput = null
 ) => {
   const result = new Map();
   if (!trainerIds.length || !dates.length) return result;
 
-  const trainers = await Trainer.find({ _id: { $in: trainerIds } }).lean();
-  const trainerById = new Map(trainers.map((trainer) => [trainer._id.toString(), trainer]));
+  const trainers = trainersInput?.length
+    ? trainersInput
+    : await Trainer.find({ _id: { $in: trainerIds } })
+      .select('name employeeId scheduleTrainerCodes')
+      .lean();
 
-  const codeToTrainerId = new Map();
-  const allCodes = new Set();
-  trainers.forEach((trainer) => {
-    resolveTrainerScheduleCodes(trainer).forEach((code) => {
-      allCodes.add(code);
-      codeToTrainerId.set(code, trainer._id.toString());
-    });
-  });
+  const { trainerById, codeToTrainerId, allCodes } = buildTrainerLookup(trainers);
+  if (!allCodes.length) return result;
 
   const rangeStart = normalizeDate(dates[0]);
   const rangeEnd = normalizeDate(dates[dates.length - 1]);
 
-  const ownedFilter = { trainerCode: { $in: [...allCodes] } };
+  const ownedFilter = { trainerCode: { $in: allCodes } };
   if (semester) ownedFilter.semester = semester;
 
   const [ownedSchedules, subjectStartMap, leaves] = await Promise.all([
-    Schedule.find(ownedFilter).lean(),
+    Schedule.find(ownedFilter).select(SCHEDULE_FIELDS).lean(),
     buildSubjectStartDateMap(),
     Leave.find({
       status: 'approved',
       startDate: { $lte: rangeEnd },
       endDate: { $gte: rangeStart },
-      'replacements.0': { $exists: true },
+      'replacements.replacementTrainer': { $in: trainerIds },
     })
-      .populate('trainer', 'name employeeId')
+      .select('startDate endDate replacements')
       .lean(),
   ]);
 
-  const schedulesByTrainer = new Map();
-  ownedSchedules.forEach((schedule) => {
-    const trainerId = codeToTrainerId.get(schedule.trainerCode);
-    if (!trainerId) return;
-    if (!schedulesByTrainer.has(trainerId)) schedulesByTrainer.set(trainerId, []);
-    schedulesByTrainer.get(trainerId).push(schedule);
-  });
+  const schedulesByTrainerDay = indexSchedulesByTrainerDay(ownedSchedules, codeToTrainerId);
 
   const replacementScheduleIds = [
     ...new Set(
@@ -88,10 +121,18 @@ export const computeClassHandlingHoursBatch = async (
   ];
 
   const replacementSchedules = replacementScheduleIds.length
-    ? await Schedule.find({ _id: { $in: replacementScheduleIds } }).lean()
+    ? await Schedule.find({ _id: { $in: replacementScheduleIds } }).select(SCHEDULE_FIELDS).lean()
     : [];
+
   const scheduleById = new Map(
     replacementSchedules.map((schedule) => [schedule._id.toString(), schedule])
+  );
+
+  const leaveWeekdays = new Map(
+    leaves.map((leave) => [
+      leave._id.toString(),
+      new Set(getWeekdaysInLeaveRange(leave.startDate, leave.endDate)),
+    ])
   );
 
   const replacementByTrainerDate = new Map();
@@ -101,20 +142,25 @@ export const computeClassHandlingHoursBatch = async (
     const dayName = WEEKDAYS[date.getDay()];
 
     leaves.forEach((leave) => {
+      const leaveDays = leaveWeekdays.get(leave._id.toString());
+      if (!leaveDays?.has(dayName)) return;
+
       leave.replacements?.forEach((entry) => {
         const replacementTrainerId = entry.replacementTrainer?.toString();
         if (!replacementTrainerId || !trainerById.has(replacementTrainerId)) return;
 
         const schedule = scheduleById.get(entry.schedule?.toString());
-        if (!schedule) return;
+        if (!schedule || schedule.day !== dayName) return;
         if (semester && schedule.semester !== semester) return;
-        if (schedule.day !== dayName) return;
-        if (!isScheduleDayInLeaveRange(schedule.day, leave)) return;
         if (!isActiveOnDate(schedule, date, subjectStartMap)) return;
 
         const key = `${replacementTrainerId}|${dateKey}`;
-        if (!replacementByTrainerDate.has(key)) replacementByTrainerDate.set(key, []);
-        replacementByTrainerDate.get(key).push(schedule);
+        let entries = replacementByTrainerDate.get(key);
+        if (!entries) {
+          entries = [];
+          replacementByTrainerDate.set(key, entries);
+        }
+        entries.push(schedule);
       });
     });
   });
@@ -125,9 +171,8 @@ export const computeClassHandlingHoursBatch = async (
 
     trainers.forEach((trainer) => {
       const trainerId = trainer._id.toString();
-      const owned = (schedulesByTrainer.get(trainerId) || []).filter(
-        (schedule) =>
-          schedule.day === dayName && isActiveOnDate(schedule, date, subjectStartMap)
+      const owned = (schedulesByTrainerDay.get(trainerId)?.get(dayName) || []).filter((schedule) =>
+        isActiveOnDate(schedule, date, subjectStartMap)
       );
       const replacements = replacementByTrainerDate.get(`${trainerId}|${dateKey}`) || [];
 

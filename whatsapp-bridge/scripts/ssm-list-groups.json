@@ -1,0 +1,17 @@
+{
+  "commands": [
+    "cd /opt/MBUTOMS/whatsapp-bridge",
+    "pm2 stop mbutoms-whatsapp-bridge 2>/dev/null || true",
+    "pm2 delete mbutoms-whatsapp-bridge 2>/dev/null || true",
+    "kill -9 13143 2>/dev/null || true",
+    "pkill -9 -f 'wwebjs_auth/session' 2>/dev/null || true",
+    "sleep 8",
+    "pgrep -af 'wwebjs_auth/session' || echo NO_CHROME",
+    "timeout 180 node index.js --list-groups > /tmp/mbutoms-list-groups.txt 2>&1; echo LIST_EXIT=$?",
+    "python3 - <<'PY'\nimport pathlib\ntarget = '120363422235597898@g.us'\ntext = pathlib.Path('/tmp/mbutoms-list-groups.txt').read_text(errors='ignore')\nprint('=== GROUPS (name -> id) ===')\nfound = False\nfor line in text.splitlines():\n    if '->' in line and '@g.us' in line:\n        safe = ''.join(ch for ch in line.strip() if ord(ch) < 128)\n        print(safe)\n        if target in line:\n            found = True\nprint('')\nif found:\n    print('VERIFY_RESULT=CONFIRMED')\nelif 'Groups this account can see' in text:\n    print('VERIFY_RESULT=NOT_IN_LIST')\nelse:\n    print('VERIFY_RESULT=FAILED')\n    for line in text.splitlines()[-8:]:\n        safe = ''.join(ch for ch in line.strip() if ord(ch) < 128)\n        if safe: print('LOG: ' + safe)\nPY",
+    "pm2 start index.js --name mbutoms-whatsapp-bridge",
+    "pm2 save",
+    "sleep 6",
+    "pm2 jlist | node -e \"let d='';process.stdin.on('data',c=>d+=c);process.stdin.on('end',()=>{const j=JSON.parse(d||'[]');const p=j.find(x=>x.name==='mbutoms-whatsapp-bridge');console.log('PM2_STATUS='+(p?p.pm2_env.status:'missing'));});\""
+  ]
+}

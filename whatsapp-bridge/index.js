@@ -15,6 +15,8 @@ const {
 } = process.env;
 
 const LIST_GROUPS = process.argv.includes('--list-groups');
+const verifyGroupArg = process.argv.find((arg) => arg.startsWith('--verify-group='));
+const VERIFY_GROUP_ID = verifyGroupArg?.split('=').slice(1).join('=') || process.env.VERIFY_GROUP_ID || '';
 
 if (!LIST_GROUPS && (!WEBHOOK_URL || !WEBHOOK_SECRET)) {
   console.error('Missing WEBHOOK_URL or WEBHOOK_SECRET in .env');
@@ -69,28 +71,42 @@ client.on('disconnected', (reason) => log('Disconnected:', reason));
 client.on('ready', async () => {
   log('Bridge is ready');
 
-  if (LIST_GROUPS) {
+  if (LIST_GROUPS || VERIFY_GROUP_ID) {
     try {
       // WhatsApp Web may still be loading chat metadata when "ready" fires.
       log('Fetching groups (this can take up to a minute on first connect)...');
       await sleep(8000);
 
-      const chats = await withRetries('getChats', () => client.getChats(), {
-        attempts: 3,
-        delayMs: 10000,
-      });
-      const groups = chats.filter((chat) => chat.isGroup);
-      console.log('\nGroups this account can see:\n');
-      if (!groups.length) {
-        console.log('  (no groups found — make sure this WhatsApp account is in the punch-in group)');
-      } else {
-        groups.forEach((group) => {
-          console.log(`  ${group.name}  ->  ${group.id._serialized}`);
+      if (VERIFY_GROUP_ID) {
+        const chat = await withRetries('getChatById', () => client.getChatById(VERIFY_GROUP_ID), {
+          attempts: 3,
+          delayMs: 10000,
         });
+        console.log('\nGroup lookup:\n');
+        if (!chat?.isGroup) {
+          console.log(`  ${VERIFY_GROUP_ID} is not a group this account can access.`);
+        } else {
+          console.log(`  ${chat.name}  ->  ${chat.id._serialized}`);
+        }
+        console.log('');
+      } else {
+        const chats = await withRetries('getChats', () => client.getChats(), {
+          attempts: 3,
+          delayMs: 10000,
+        });
+        const groups = chats.filter((chat) => chat.isGroup);
+        console.log('\nGroups this account can see:\n');
+        if (!groups.length) {
+          console.log('  (no groups found — make sure this WhatsApp account is in the punch-in group)');
+        } else {
+          groups.forEach((group) => {
+            console.log(`  ${group.name}  ->  ${group.id._serialized}`);
+          });
+        }
+        console.log('\nCopy the id of your punch-in group into GROUP_ID in .env, then restart.\n');
       }
-      console.log('\nCopy the id of your punch-in group into GROUP_ID in .env, then restart.\n');
     } catch (error) {
-      console.error('\nFailed to list groups:', error.message);
+      console.error(`\nFailed to ${VERIFY_GROUP_ID ? 'verify group' : 'list groups'}:`, error.message);
       console.error('Try running "npm run list-groups" again after WhatsApp Web finishes loading.');
       process.exitCode = 1;
     } finally {

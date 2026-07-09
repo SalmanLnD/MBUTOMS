@@ -6,14 +6,23 @@ import {
   formatMonthKey,
   getCalendarDates,
   getMonthRange,
-  groupDatesByWeek,
   isWeekendDate,
   parseMonthParam,
   toDateKey,
 } from '../utils/dateRange.js';
 import { TRAINER_ATTENDANCE_TRACKING_START } from '../utils/attendanceTracking.js';
-import { computeClassHandlingHours } from '../utils/trainerClassHours.js';
 import { computeClassHandlingHoursBatch } from '../utils/trainerClassHoursBatch.js';
+import {
+  buildAttendanceGridCacheKey,
+  clearAttendanceGridCache,
+  getCachedAttendanceGrid,
+  setCachedAttendanceGrid,
+} from '../utils/attendanceGridCache.js';
+import {
+  applyItOifAttendanceRules,
+  isItOif,
+  resolveMockPrepHoursForOif,
+} from '../utils/attendanceOifRules.js';
 
 const buildLogMap = (logs) => {
   const map = new Map();
@@ -49,6 +58,18 @@ export const getTrainerAttendanceGrid = async (req, res) => {
   let { year, month } = parseMonthParam(req.query.month, req.query.referenceDate || new Date());
   ({ year, month } = clampMonthToTrackingStart({ year, month }, TRAINER_ATTENDANCE_TRACKING_START));
 
+  const monthKey = formatMonthKey(year, month);
+  const semester = req.query.semester || 'III';
+  const cacheKey = buildAttendanceGridCacheKey(monthKey, semester, req.user);
+  const bypassCache = req.query.refresh === '1' || req.query.refresh === 'true';
+
+  if (!bypassCache) {
+    const cached = getCachedAttendanceGrid(cacheKey);
+    if (cached) {
+      return res.json(cached);
+    }
+  }
+
   const { startDate: monthStart, endDate: monthEnd } = getMonthRange(year, month);
   const rangeStart = monthStart < TRAINER_ATTENDANCE_TRACKING_START
     ? TRAINER_ATTENDANCE_TRACKING_START
@@ -57,7 +78,6 @@ export const getTrainerAttendanceGrid = async (req, res) => {
 
   const dates = getCalendarDates(rangeStart, rangeEnd);
   const editableDays = dates.filter((date) => date <= today).length;
-  const semester = req.query.semester || 'III';
 
   const trainerFilter = {};
   if (req.user.role === 'trainer' && req.user.trainer) {
@@ -65,22 +85,24 @@ export const getTrainerAttendanceGrid = async (req, res) => {
   }
 
   const trainers = await Trainer.find(trainerFilter)
-    .select('name employeeId department')
-    .populate('department', 'name code')
-    .sort({ name: 1 });
+    .select('name employeeId scheduleTrainerCodes')
+    .sort({ name: 1 })
+    .lean();
 
-  const logs = await TrainerDailyAttendance.find({
-    trainer: { $in: trainers.map((trainer) => trainer._id) },
-    date: { $gte: rangeStart, $lte: monthEnd },
-  });
+  const trainerIds = trainers.map((trainer) => trainer._id);
+  const dateKeys = dates.map(toDateKey);
+
+  const [logs, classHoursCache] = await Promise.all([
+    trainerIds.length
+      ? TrainerDailyAttendance.find({
+        trainer: { $in: trainerIds },
+        date: { $gte: rangeStart, $lte: monthEnd },
+      }).lean()
+      : [],
+    computeClassHandlingHoursBatch(trainerIds, dates, semester, trainers),
+  ]);
 
   const logMap = buildLogMap(logs);
-  const classHoursCache = await computeClassHandlingHoursBatch(
-    trainers.map((trainer) => trainer._id),
-    dates,
-    semester
-  );
-  const dateKeys = dates.map(toDateKey);
 
   const rows = trainers.map((trainer) => {
     const days = {};
@@ -89,11 +111,17 @@ export const getTrainerAttendanceGrid = async (req, res) => {
       const dateKey = toDateKey(date);
       const cacheKey = `${trainer._id}|${dateKey}`;
       const log = logMap.get(cacheKey);
-      days[dateKey] = {
-        id: log?._id || null,
-        oifNumber: log?.oifNumber || '',
+      const oifNumber = log?.oifNumber || '';
+      const { mockPrepHours, classHandlingHours } = applyItOifAttendanceRules({
+        oifNumber,
         mockPrepHours: log?.mockPrepHours ?? 0,
         classHandlingHours: classHoursCache.get(cacheKey) ?? 0,
+      });
+      days[dateKey] = {
+        id: log?._id || null,
+        oifNumber,
+        mockPrepHours,
+        classHandlingHours,
         isFuture: date > today,
       };
     });
@@ -103,15 +131,14 @@ export const getTrainerAttendanceGrid = async (req, res) => {
         _id: trainer._id,
         name: trainer.name,
         employeeId: trainer.employeeId,
-        department: trainer.department,
       },
       days,
       totals: buildRowTotals(days, dateKeys),
     };
   });
 
-  res.json({
-    month: formatMonthKey(year, month),
+  const payload = {
+    month: monthKey,
     monthLabel: new Date(year, month - 1, 1).toLocaleDateString('en-IN', {
       month: 'long',
       year: 'numeric',
@@ -127,9 +154,11 @@ export const getTrainerAttendanceGrid = async (req, res) => {
       isFuture: date > today,
       isWeekend: isWeekendDate(date),
     })),
-    weeks: groupDatesByWeek(dates),
     rows,
-  });
+  };
+
+  setCachedAttendanceGrid(cacheKey, payload);
+  res.json(payload);
 };
 
 export const upsertTrainerDailyAttendance = async (req, res) => {
@@ -143,7 +172,7 @@ export const upsertTrainerDailyAttendance = async (req, res) => {
     return res.status(403).json({ message: 'Not authorized to update this trainer attendance' });
   }
 
-  const trainerRecord = await Trainer.findById(trainer);
+  const trainerRecord = await Trainer.exists({ _id: trainer });
   if (!trainerRecord) {
     return res.status(404).json({ message: 'Trainer not found' });
   }
@@ -169,27 +198,50 @@ export const upsertTrainerDailyAttendance = async (req, res) => {
     return res.status(400).json({ message: 'Mock or preparation hours must be a valid number' });
   }
 
+  const trimmedOif = oifNumber?.trim() || '';
+  if (trimmedOif.length > 12) {
+    return res.status(400).json({ message: 'OIF number must be 12 characters or fewer' });
+  }
+
+  const finalMockHours = resolveMockPrepHoursForOif(trimmedOif, parsedMockHours);
+
   const record = await TrainerDailyAttendance.findOneAndUpdate(
     { trainer, date: day },
     {
       trainer,
       date: day,
-      oifNumber: oifNumber?.trim() || '',
-      mockPrepHours: parsedMockHours,
+      oifNumber: trimmedOif,
+      mockPrepHours: finalMockHours,
       markedBy: req.user._id,
     },
     { upsert: true, new: true, setDefaultsOnInsert: true }
   );
 
-  const classHandlingHours = await computeClassHandlingHours(trainer, day);
+  let classHandlingHours = 0;
+  if (!isItOif(trimmedOif)) {
+    const classHoursCache = await computeClassHandlingHoursBatch(
+      [trainer],
+      [day],
+      'III'
+    );
+    classHandlingHours = classHoursCache.get(`${trainer.toString()}|${toDateKey(day)}`) ?? 0;
+  }
+
+  clearAttendanceGridCache();
+
+  const resolved = applyItOifAttendanceRules({
+    oifNumber: record.oifNumber,
+    mockPrepHours: record.mockPrepHours,
+    classHandlingHours,
+  });
 
   res.json({
     id: record._id,
     trainer,
     date: toDateKey(day),
     oifNumber: record.oifNumber,
-    mockPrepHours: record.mockPrepHours,
-    classHandlingHours,
+    mockPrepHours: resolved.mockPrepHours,
+    classHandlingHours: resolved.classHandlingHours,
   });
 };
 
@@ -294,4 +346,20 @@ export const getTrainerPunchInLogs = async (req, res) => {
       pages: Math.ceil(total / limit) || 0,
     },
   });
+};
+
+export const deleteTrainerPunchInLog = async (req, res) => {
+  const record = await TrainerDailyAttendance.findById(req.params.id);
+  if (!record) {
+    return res.status(404).json({ message: 'Punch-in log not found' });
+  }
+  if (!record.punchInAt) {
+    return res.status(400).json({ message: 'This attendance entry has no punch-in to remove' });
+  }
+
+  await record.deleteOne();
+
+  clearAttendanceGridCache();
+
+  res.json({ message: 'Punch-in log and attendance removed' });
 };
