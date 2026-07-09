@@ -29,3 +29,8 @@ export const upsertTrainerDailyAttendance = async (payload) => {
   const { data } = await api.put('/attendance/trainer-daily', payload);
   return data;
 };
+
+export const getTrainerPunchInLogs = async (params = {}) => {
+  const { data } = await api.get('/attendance/trainer-punch-logs', { params });
+  return data;
+};

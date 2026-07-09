@@ -19,6 +19,9 @@ MBUTOMS API  ->  match trainer by phone  ->  save TrainerDailyAttendance
 
 > The bridge must run on an **always-on machine** (office PC, mini-PC, or a small
 > VPS). It cannot run on Vercel because it keeps a live WhatsApp session open.
+>
+> **AWS EC2:** see [DEPLOY-AWS.md](./DEPLOY-AWS.md) for automated setup with
+> `scripts/launch-ec2.ps1` and `scripts/deploy-bridge.ps1`.
 
 ## Requirements
 

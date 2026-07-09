@@ -6,6 +6,7 @@ import Pagination from '../components/Pagination.jsx';
 import { showError, showSuccess } from '../utils/toast.js';
 import TrainerFormModal from '../components/TrainerFormModal.jsx';
 import TrainerAttendanceTab from '../components/TrainerAttendanceTab.jsx';
+import TrainerPunchInLogsTab from '../components/TrainerPunchInLogsTab.jsx';
 import ConfirmModal from '../components/ConfirmModal.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
 import { useDebounce } from '../hooks/useDebounce.js';
@@ -16,7 +17,8 @@ const Trainers = () => {
   const { hasRole } = useAuth();
   const canManage = hasRole('admin', 'campus_manager');
   const [searchParams, setSearchParams] = useSearchParams();
-  const activeTab = searchParams.get('tab') === 'attendance' ? 'attendance' : 'directory';
+  const tabParam = searchParams.get('tab');
+  const activeTab = ['attendance', 'logs'].includes(tabParam) ? tabParam : 'directory';
 
   const [trainers, setTrainers] = useState([]);
   const [pagination, setPagination] = useState(null);
@@ -107,7 +109,7 @@ const Trainers = () => {
     if (tab === 'directory') {
       setSearchParams({});
     } else {
-      setSearchParams({ tab: 'attendance' });
+      setSearchParams({ tab });
     }
   };
 
@@ -136,12 +138,27 @@ const Trainers = () => {
             Attendance
           </button>
         </li>
+        <li className="nav-item">
+          <button
+            type="button"
+            className={`nav-link ${activeTab === 'logs' ? 'active' : ''}`}
+            onClick={() => setTab('logs')}
+          >
+            Logs
+          </button>
+        </li>
       </ul>
 
       {activeTab === 'attendance' ? (
         <div className="card table-card">
           <div className="card-body">
             <TrainerAttendanceTab />
+          </div>
+        </div>
+      ) : activeTab === 'logs' ? (
+        <div className="card table-card">
+          <div className="card-body">
+            <TrainerPunchInLogsTab />
           </div>
         </div>
       ) : (

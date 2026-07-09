@@ -192,3 +192,106 @@ export const upsertTrainerDailyAttendance = async (req, res) => {
     classHandlingHours,
   });
 };
+
+export const getTrainerPunchInLogs = async (req, res) => {
+  const page = Math.max(1, parseInt(req.query.page, 10) || 1);
+  const limit = Math.min(50, Math.max(1, parseInt(req.query.limit, 10) || 20));
+  const skip = (page - 1) * limit;
+
+  const filter = {
+    punchInAt: { $exists: true, $ne: null },
+  };
+
+  if (req.user.role === 'trainer' && req.user.trainer) {
+    filter.trainer = req.user.trainer;
+  } else if (req.query.trainer) {
+    filter.trainer = req.query.trainer;
+  }
+
+  if (req.query.source && ['whatsapp', 'manual'].includes(req.query.source)) {
+    filter.punchInSource = req.query.source;
+  }
+
+  if (req.query.from || req.query.to) {
+    filter.punchInAt = { ...filter.punchInAt };
+    if (req.query.from) {
+      filter.punchInAt.$gte = normalizeDate(req.query.from);
+    }
+    if (req.query.to) {
+      const end = normalizeDate(req.query.to);
+      end.setHours(23, 59, 59, 999);
+      filter.punchInAt.$lte = end;
+    }
+  }
+
+  if (req.query.search && req.user.role !== 'trainer') {
+    const search = String(req.query.search).trim();
+    if (search) {
+      const matchingTrainers = await Trainer.find({
+        $or: [
+          { name: { $regex: search, $options: 'i' } },
+          { employeeId: { $regex: search, $options: 'i' } },
+        ],
+      }).select('_id');
+      const trainerIds = matchingTrainers.map((t) => t._id);
+      if (trainerIds.length === 0) {
+        return res.json({
+          logs: [],
+          pagination: { page, limit, total: 0, pages: 0 },
+        });
+      }
+      if (filter.trainer) {
+        const allowed = trainerIds.some((id) => id.toString() === filter.trainer.toString());
+        if (!allowed) {
+          return res.json({
+            logs: [],
+            pagination: { page, limit, total: 0, pages: 0 },
+          });
+        }
+      } else {
+        filter.trainer = { $in: trainerIds };
+      }
+    }
+  }
+
+  const [records, total] = await Promise.all([
+    TrainerDailyAttendance.find(filter)
+      .populate('trainer', 'name employeeId department')
+      .populate('trainer.department', 'name code')
+      .sort({ punchInAt: -1 })
+      .skip(skip)
+      .limit(limit),
+    TrainerDailyAttendance.countDocuments(filter),
+  ]);
+
+  const logs = records.map((record) => ({
+    id: record._id,
+    trainer: record.trainer
+      ? {
+          _id: record.trainer._id,
+          name: record.trainer.name,
+          employeeId: record.trainer.employeeId,
+          department: record.trainer.department,
+        }
+      : null,
+    date: toDateKey(record.date),
+    oifNumber: record.oifNumber || '',
+    punchInAt: record.punchInAt,
+    punchInSource: record.punchInSource || 'manual',
+    punchInRawPhone: record.punchInRawPhone || '',
+    punchInImageUrl: record.punchInImageUrl || '',
+    mockPrepHours: record.mockPrepHours ?? 0,
+    recordedAt: record.createdAt,
+    updatedAt: record.updatedAt,
+  }));
+
+  res.json({
+    logs,
+    pagination: {
+      page,
+      limit,
+      total,
+      pages: Math.ceil(total / limit) || 0,
+    },
+  });
+};

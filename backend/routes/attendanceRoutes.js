@@ -8,6 +8,7 @@ import {
 import {
   getTrainerAttendanceGrid,
   upsertTrainerDailyAttendance,
+  getTrainerPunchInLogs,
 } from '../controllers/trainerAttendanceController.js';
 import { protect, authorize } from '../middleware/auth.js';
 import { validate } from '../middleware/validate.js';
@@ -20,6 +21,7 @@ router.use(protect);
 
 router.get('/summary', asyncHandler(getAttendanceSummary));
 router.get('/trainer-grid', asyncHandler(getTrainerAttendanceGrid));
+router.get('/trainer-punch-logs', asyncHandler(getTrainerPunchInLogs));
 router.put(
   '/trainer-daily',
   authorize('admin', 'campus_manager', 'trainer'),
