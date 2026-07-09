@@ -131,20 +131,49 @@ const extractOifFromText = (text) => {
   return match ? (match[1] || match[0]).trim() : '';
 };
 
+const digitsOnly = (value) => {
+  if (!value) return '';
+  return String(value).replace(/\D/g, '');
+};
+
+const isLikelyPhoneUserId = (value) => {
+  const digits = digitsOnly(value);
+  return digits.length >= 10 && digits.length <= 15;
+};
+
 /**
  * In groups, message.from is the group id (@g.us), not the sender.
  * For your own messages (fromMe), message.author is often empty — use the
  * linked WhatsApp account number instead.
+ * Other members may appear as @lid privacy ids; resolve via getContact().
  */
-const resolveSenderPhone = (message) => {
+const resolveSenderPhone = async (message) => {
   if (message.fromMe) {
     const ownNumber = client.info?.wid?.user || client.info?.me?.user;
-    if (ownNumber) return String(ownNumber);
+    if (ownNumber) return digitsOnly(ownNumber);
   }
 
-  const senderId = message.author || '';
+  try {
+    const contact = await message.getContact();
+    const fromContact = digitsOnly(contact?.number) || digitsOnly(contact?.id?.user);
+    if (isLikelyPhoneUserId(fromContact)) {
+      return fromContact;
+    }
+  } catch (error) {
+    log('Contact lookup failed:', error.message);
+  }
+
+  const senderId = message.author || message.from || '';
   if (!senderId || senderId.endsWith('@g.us')) return '';
-  return senderId.split('@')[0];
+
+  const [userPart, server = ''] = senderId.split('@');
+
+  // WhatsApp privacy IDs (@lid) are not phone numbers.
+  if (server === 'lid' || !isLikelyPhoneUserId(userPart)) {
+    return '';
+  }
+
+  return digitsOnly(userPart);
 };
 
 const extractOifWithOcr = async (message) => {
@@ -176,7 +205,7 @@ const handleMessage = async (message) => {
 
     processedMessageIds.add(message.id._serialized);
 
-    const phone = resolveSenderPhone(message);
+    const phone = await resolveSenderPhone(message);
     if (!phone) {
       log('Could not resolve sender phone, skipping');
       return;
