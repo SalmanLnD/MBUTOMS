@@ -89,7 +89,7 @@ const Leaves = () => {
       }
     };
     loadPreview();
-  }, [form.startDate, form.endDate, form.trainer, showForm, hasRole]);
+  }, [form.startDate, form.endDate, form.trainer, showForm]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
