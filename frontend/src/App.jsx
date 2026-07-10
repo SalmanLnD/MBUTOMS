@@ -15,6 +15,8 @@ import VenueSchedule from './pages/VenueSchedule.jsx';
 import ClassesStudents from './pages/ClassesStudents.jsx';
 import Leaves from './pages/Leaves.jsx';
 import Replacements from './pages/Replacements.jsx';
+import Performance from './pages/Performance.jsx';
+import PublicFeedbackForm from './pages/PublicFeedbackForm.jsx';
  
 const App = () => {
   const { user, loading } = useAuth();
@@ -29,6 +31,7 @@ const App = () => {
         path="/login"
         element={user ? <Navigate to="/dashboard" replace /> : <Login />}
       />
+      <Route path="/f/:slug" element={<PublicFeedbackForm />} />
 
       <Route
         element={
@@ -66,6 +69,14 @@ const App = () => {
           element={
             <ProtectedRoute roles={['admin', 'campus_manager']}>
               <Subjects />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/performance"
+          element={
+            <ProtectedRoute roles={['admin', 'campus_manager']}>
+              <Performance />
             </ProtectedRoute>
           }
         />

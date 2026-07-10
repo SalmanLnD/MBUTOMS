@@ -10,7 +10,8 @@ import TrainerPunchInLogsTab from '../components/TrainerPunchInLogsTab.jsx';
 import ConfirmModal from '../components/ConfirmModal.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
 import { useDebounce } from '../hooks/useDebounce.js';
-import { getTrainers, deleteTrainer } from '../services/trainerService.js';
+import { getTrainers, deleteTrainer, resetTrainerPassword } from '../services/trainerService.js';
+import { KeyIcon } from '../components/icons.jsx';
 import { getErrorMessage } from '../utils/helpers.js';
 
 const Trainers = () => {
@@ -30,6 +31,7 @@ const Trainers = () => {
   const [page, setPage] = useState(1);
   const [showModal, setShowModal] = useState(false);
   const [editingTrainer, setEditingTrainer] = useState(null);
+  const [pendingReset, setPendingReset] = useState(null);
   const [pendingDelete, setPendingDelete] = useState(null);
 
   const debouncedSearch = useDebounce(search);
@@ -67,6 +69,17 @@ const Trainers = () => {
     } else {
       setSortBy(field);
       setSortOrder('asc');
+    }
+  };
+
+  const handleConfirmReset = async () => {
+    if (!pendingReset) return;
+    try {
+      const result = await resetTrainerPassword(pendingReset.id);
+      showSuccess(result.message || 'Trainer password reset');
+      setPendingReset(null);
+    } catch (err) {
+      showError(getErrorMessage(err));
     }
   };
 
@@ -244,13 +257,28 @@ const Trainers = () => {
                                       Edit
                                     </button>
                                     {hasRole('admin') && (
-                                      <button
-                                        type="button"
-                                        className="btn btn-outline-danger"
-                                        onClick={() => handleDelete(trainer._id, trainer.name)}
-                                      >
-                                        Delete
-                                      </button>
+                                      <>
+                                        <button
+                                          type="button"
+                                          className="btn btn-outline-warning"
+                                          title="Reset password to initial OTP"
+                                          aria-label={`Reset password for ${trainer.name}`}
+                                          onClick={() => setPendingReset({
+                                            id: trainer._id,
+                                            name: trainer.name,
+                                            email: trainer.email,
+                                          })}
+                                        >
+                                          <KeyIcon size={16} aria-hidden="true" />
+                                        </button>
+                                        <button
+                                          type="button"
+                                          className="btn btn-outline-danger"
+                                          onClick={() => handleDelete(trainer._id, trainer.name)}
+                                        >
+                                          Delete
+                                        </button>
+                                      </>
                                     )}
                                   </>
                                 )}
@@ -271,6 +299,18 @@ const Trainers = () => {
 
       {showModal && (
         <TrainerFormModal trainer={editingTrainer} onClose={handleModalClose} />
+      )}
+
+      {pendingReset && (
+        <ConfirmModal
+          show
+          title="Reset Trainer Password"
+          message={`Reset login password for "${pendingReset.name}"${pendingReset.email ? ` (${pendingReset.email})` : ''} to the initial OTP?`}
+          confirmLabel="Reset password"
+          confirmVariant="warning"
+          onConfirm={handleConfirmReset}
+          onClose={() => setPendingReset(null)}
+        />
       )}
 
       {pendingDelete && (

@@ -6,6 +6,7 @@ import {
   updateTrainer,
   deleteTrainer,
   getDepartments,
+  resetTrainerPassword,
 } from '../controllers/trainerController.js';
 import { protect, authorize } from '../middleware/auth.js';
 import { validate } from '../middleware/validate.js';
@@ -27,5 +28,11 @@ router
   .get(asyncHandler(getTrainerById))
   .put(authorize('admin', 'campus_manager'), trainerValidation, validate, asyncHandler(updateTrainer))
   .delete(authorize('admin'), asyncHandler(deleteTrainer));
+
+router.post(
+  '/:id/reset-password',
+  authorize('admin'),
+  asyncHandler(resetTrainerPassword)
+);
 
 export default router;

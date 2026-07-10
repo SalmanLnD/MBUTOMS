@@ -526,13 +526,53 @@ body {
 }
 
 @media (max-width: 768px) {
+  html {
+    font-size: 85%;
+  }
+
   .main-content {
     margin-left: 0;
-    padding: 1rem;
+    padding: 0.85rem 0.75rem;
+    /* Keep content clear of the floating bubble launcher */
+    padding-bottom: 5.5rem;
+  }
+
+  .page-header h1 {
+    font-size: 1.3rem;
+  }
+
+  .topbar {
+    padding: 0.65rem 0.85rem;
+  }
+
+  .topbar h1 {
+    font-size: 1.15rem;
   }
 
   .trainer-attendance-month-controls {
     flex-wrap: wrap;
     width: 100%;
+  }
+
+  .trainer-attendance-grid {
+    max-height: calc(100dvh - 220px);
+  }
+
+  .stat-card:hover {
+    transform: none;
+  }
+
+  .table-responsive {
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* Cards and toolbars stack cleanly on narrow screens */
+  .trainer-attendance-toolbar {
+    gap: 0.6rem;
+  }
+
+  .login-card {
+    max-width: 100%;
+    margin-inline: 1rem;
   }
 }

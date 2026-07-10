@@ -12,6 +12,7 @@ const {
   GROUP_NAME = '',
   OIF_REGEX = '\\bOIF[\\s:_-]*([A-Za-z0-9/-]+)\\b',
   ENABLE_OCR = 'false',
+  CHROME_BIN = '',
 } = process.env;
 
 const LIST_GROUPS = process.argv.includes('--list-groups');
@@ -50,6 +51,7 @@ const client = new Client({
   authStrategy: new LocalAuth({ dataPath: './.wwebjs_auth' }),
   puppeteer: {
     headless: true,
+    ...(CHROME_BIN ? { executablePath: CHROME_BIN } : {}),
     protocolTimeout: 300000,
     args: [
       '--no-sandbox',
@@ -280,7 +282,12 @@ const handleMessage = async (message) => {
 
     const chat = await message.getChat();
     if (!isTargetGroup(chat)) return;
-    if (!message.hasMedia) return;
+
+    const phonePreview = message.author || message.from || 'unknown';
+    if (!message.hasMedia) {
+      log(`Ignored non-media message in punch group from ${phonePreview}`);
+      return;
+    }
 
     processedMessageIds.add(message.id._serialized);
 

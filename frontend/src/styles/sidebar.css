@@ -253,17 +253,13 @@
   padding-inline: 0.65rem;
 }
 
+/* On mobile the sidebar is replaced by the floating bubble nav. */
 @media (max-width: 768px) {
   .app-layout {
     grid-template-columns: minmax(0, 1fr);
   }
 
   .sidebar {
-    position: fixed;
-    left: 0;
-    top: 0;
-    width: var(--sidebar-width-expanded);
-    transform: translateX(-100%);
-    z-index: 1000;
+    display: none;
   }
 }

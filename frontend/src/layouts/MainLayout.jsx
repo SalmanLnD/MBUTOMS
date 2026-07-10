@@ -1,6 +1,9 @@
 import { memo, useCallback, useEffect, useState } from 'react';
-import { Outlet, useLocation } from 'react-router-dom';
+import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 import Sidebar from '../components/Sidebar.jsx';
+import MobileBubbleNav from '../components/MobileBubbleNav.jsx';
+import ResetPasswordModal from '../components/ResetPasswordModal.jsx';
+import { useAuth } from '../context/AuthContext.jsx';
 import { resetAllModalArtifacts } from '../utils/modalCleanup.js';
 import '../styles/layout.css';
 
@@ -41,20 +44,32 @@ const AppShell = ({ children }) => {
         onToggle={toggleSidebar}
       />
       <MainContent>{children}</MainContent>
+      <MobileBubbleNav />
     </div>
   );
 };
 
 const MainLayout = () => {
   const location = useLocation();
+  const navigate = useNavigate();
+  const { user, completePasswordReset } = useAuth();
+  const needsReset = Boolean(user?.mustResetPassword || user?.requiresPasswordReset);
 
   useEffect(() => {
     resetAllModalArtifacts();
   }, [location.pathname]);
 
+  const handlePasswordResetComplete = (data) => {
+    completePasswordReset(data);
+    navigate('/dashboard');
+  };
+
   return (
     <AppShell>
       <Outlet />
+      {needsReset && (
+        <ResetPasswordModal show onComplete={handlePasswordResetComplete} />
+      )}
     </AppShell>
   );
 };

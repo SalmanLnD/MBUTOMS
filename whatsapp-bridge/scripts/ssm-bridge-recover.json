@@ -1,0 +1,18 @@
+{
+  "commands": [
+    "sudo pkill -9 -f '/opt/MBUTOMS/whatsapp-bridge/index.js' || true",
+    "sudo pkill -9 -f 'wwebjs_auth' || true",
+    "sudo pkill -9 -f 'chrome' || true",
+    "sleep 4",
+    "rm -f /opt/MBUTOMS/whatsapp-bridge/.wwebjs_auth/session/SingletonLock",
+    "rm -f /opt/MBUTOMS/whatsapp-bridge/.wwebjs_auth/session/DevToolsActivePort",
+    "rm -f /opt/MBUTOMS/whatsapp-bridge/.bridge-instance.lock",
+    "sudo -u ubuntu bash -lc 'pm2 delete all 2>/dev/null || true'",
+    "sleep 2",
+    "sudo -u ubuntu bash -lc 'cd /opt/MBUTOMS/whatsapp-bridge && pm2 start index.js --name mbutoms-whatsapp-bridge && pm2 save'",
+    "sleep 45",
+    "pgrep -af 'node /opt/MBUTOMS/whatsapp-bridge/index.js' | wc -l",
+    "python3 - <<'PY'\nfrom pathlib import Path\np = Path('/home/ubuntu/.pm2/logs/mbutoms-whatsapp-bridge-out.log')\nif p.exists():\n    for line in p.read_text(errors='ignore').splitlines()[-15:]:\n        clean = line.encode('ascii', 'ignore').decode().strip()\n        if clean:\n            print(clean)\nPY",
+    "python3 - <<'PY'\nfrom pathlib import Path\np = Path('/home/ubuntu/.pm2/logs/mbutoms-whatsapp-bridge-error.log')\nif p.exists():\n    for line in p.read_text(errors='ignore').splitlines()[-5:]:\n        print(line.encode('ascii', 'ignore').decode())\nPY"
+  ]
+}

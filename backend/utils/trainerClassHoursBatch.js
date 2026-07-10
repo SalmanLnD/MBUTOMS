@@ -1,8 +1,8 @@
 import Schedule from '../models/Schedule.js';
 import Leave from '../models/Leave.js';
 import Trainer from '../models/Trainer.js';
-import { normalizeDate } from './scheduleHelpers.js';
-import { toDateKey } from './dateRange.js';
+import { normalizeAttendanceDate, toAttendanceDateKey } from './attendanceTracking.js';
+import { getAttendanceWeekdayName } from './attendanceDates.js';
 import { resolveTrainerScheduleCodes } from './trainerMappings.js';
 import { computeHours } from './trainerClassHours.js';
 import {
@@ -10,8 +10,6 @@ import {
   DEFAULT_SUBJECT_START_DATE,
 } from './subjectStartDate.js';
 import { getWeekdaysInLeaveRange } from './trainerScheduleView.js';
-
-const WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
 const SCHEDULE_FIELDS = 'day startTime endTime trainerCode semester subject subjectCode';
 
@@ -28,7 +26,7 @@ const resolveStartDate = (schedule, subjectStartMap) => {
 };
 
 const isActiveOnDate = (schedule, referenceDate, subjectStartMap) => {
-  const ref = normalizeDate(referenceDate);
+  const ref = normalizeAttendanceDate(referenceDate);
   const startDate = resolveStartDate(schedule, subjectStartMap);
   const effectiveStart = startDate ?? DEFAULT_SUBJECT_START_DATE;
   return ref >= effectiveStart;
@@ -91,8 +89,8 @@ export const computeClassHandlingHoursBatch = async (
   const { trainerById, codeToTrainerId, allCodes } = buildTrainerLookup(trainers);
   if (!allCodes.length) return result;
 
-  const rangeStart = normalizeDate(dates[0]);
-  const rangeEnd = normalizeDate(dates[dates.length - 1]);
+  const rangeStart = normalizeAttendanceDate(dates[0]);
+  const rangeEnd = normalizeAttendanceDate(dates[dates.length - 1]);
 
   const ownedFilter = { trainerCode: { $in: allCodes } };
   if (semester) ownedFilter.semester = semester;
@@ -138,8 +136,8 @@ export const computeClassHandlingHoursBatch = async (
   const replacementByTrainerDate = new Map();
 
   dates.forEach((date) => {
-    const dateKey = toDateKey(date);
-    const dayName = WEEKDAYS[date.getDay()];
+    const dateKey = toAttendanceDateKey(date);
+    const dayName = getAttendanceWeekdayName(date);
 
     leaves.forEach((leave) => {
       const leaveDays = leaveWeekdays.get(leave._id.toString());
@@ -166,8 +164,8 @@ export const computeClassHandlingHoursBatch = async (
   });
 
   dates.forEach((date) => {
-    const dateKey = toDateKey(date);
-    const dayName = WEEKDAYS[date.getDay()];
+    const dateKey = toAttendanceDateKey(date);
+    const dayName = getAttendanceWeekdayName(date);
 
     trainers.forEach((trainer) => {
       const trainerId = trainer._id.toString();

@@ -1,0 +1,17 @@
+{
+  "commands": [
+    "sudo pkill -9 -f '/opt/MBUTOMS/whatsapp-bridge/index.js' || true",
+    "sudo pkill -9 -f 'wwebjs_auth' || true",
+    "sudo pkill -9 -f chrome || true",
+    "sleep 4",
+    "sudo su - ubuntu -c 'pm2 delete all 2>/dev/null || true'",
+    "sleep 2",
+    "pgrep -af 'node.*index.js' || echo 'no node bridge'",
+    "sudo su - ubuntu -c 'cd /opt/MBUTOMS/whatsapp-bridge && pm2 start index.js --name mbutoms-whatsapp-bridge'",
+    "sleep 50",
+    "pgrep -af 'node.*index.js' | tr -cd '\\11\\12\\15\\40-\\176'",
+    "date -u",
+    "tail -10 /home/ubuntu/.pm2/logs/mbutoms-whatsapp-bridge-out.log | tr -cd '\\11\\12\\15\\40-\\176'",
+    "tail -8 /home/ubuntu/.pm2/logs/mbutoms-whatsapp-bridge-error.log | tr -cd '\\11\\12\\15\\40-\\176'"
+  ]
+}

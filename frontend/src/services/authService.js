@@ -14,3 +14,8 @@ export const logout = async () => {
   const { data } = await api.post('/auth/logout');
   return data;
 };
+
+export const resetPassword = async (payload) => {
+  const { data } = await api.post('/auth/reset-password', payload);
+  return data;
+};

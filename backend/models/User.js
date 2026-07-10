@@ -19,6 +19,7 @@ const userSchema = new mongoose.Schema(
     },
     trainer: { type: mongoose.Schema.Types.ObjectId, ref: 'Trainer' },
     isActive: { type: Boolean, default: true },
+    mustResetPassword: { type: Boolean, default: false },
   },
   { timestamps: true }
 );

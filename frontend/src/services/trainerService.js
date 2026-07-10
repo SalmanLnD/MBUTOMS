@@ -29,3 +29,8 @@ export const getDepartments = async () => {
   const { data } = await api.get('/trainers/departments/list');
   return data;
 };
+
+export const resetTrainerPassword = async (id) => {
+  const { data } = await api.post(`/trainers/${id}/reset-password`);
+  return data;
+};

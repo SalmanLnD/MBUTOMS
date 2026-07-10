@@ -1,0 +1,13 @@
+{
+  "commands": [
+    "grep -E '^GROUP_ID=|^WEBHOOK_URL=' /opt/MBUTOMS/whatsapp-bridge/.env",
+    "grep 'protocolTimeout' /opt/MBUTOMS/whatsapp-bridge/index.js | head -1",
+    "sudo pkill -9 -f 'wwebjs_auth/session' || true",
+    "sleep 3",
+    "sudo su - ubuntu -c 'pm2 delete mbutoms-whatsapp-bridge 2>/dev/null; cd /opt/MBUTOMS/whatsapp-bridge && pm2 start index.js --name mbutoms-whatsapp-bridge && pm2 save'",
+    "sleep 25",
+    "sudo su - ubuntu -c 'pm2 jlist' | node -e \"let d='';process.stdin.on('data',c=>d+=c);process.stdin.on('end',()=>{const j=JSON.parse(d||'[]');const p=j.find(x=>x.name==='mbutoms-whatsapp-bridge');console.log('PM2 status:',p?.pm2_env?.status);});\"",
+    "tail -15 /home/ubuntu/.pm2/logs/mbutoms-whatsapp-bridge-out.log | tr -cd '\\11\\12\\15\\40-\\176'",
+    "tail -5 /home/ubuntu/.pm2/logs/mbutoms-whatsapp-bridge-error.log | tr -cd '\\11\\12\\15\\40-\\176'"
+  ]
+}

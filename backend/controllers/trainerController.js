@@ -3,6 +3,8 @@ import Department from '../models/Department.js';
 import Subject from '../models/Subject.js';
 import Schedule from '../models/Schedule.js';
 import { applyTrainerSubjectsChange, toIdStrings } from '../utils/syncTrainerSubjectLinks.js';
+import { syncTrainerUser, removeTrainerUser } from '../utils/trainerUserSync.js';
+import { INITIAL_TRAINER_PASSWORD } from '../constants/trainerAuth.js';
 
 const buildTrainerQuery = async (query) => {
   const clauses = [];
@@ -168,6 +170,10 @@ export const createTrainer = async (req, res) => {
     .populate('department', 'name code')
     .populate('subjects', 'name code');
 
+  if (email) {
+    await syncTrainerUser(populated, { resetPassword: true });
+  }
+
   res.status(201).json(populated);
 };
 
@@ -229,6 +235,12 @@ export const updateTrainer = async (req, res) => {
     .populate('department', 'name code')
     .populate('subjects', 'name code');
 
+  if (payload.email) {
+    await syncTrainerUser(refreshed);
+  } else if (!req.body.email?.trim()) {
+    await removeTrainerUser(req.params.id);
+  }
+
   res.json(refreshed);
 };
 
@@ -237,8 +249,26 @@ export const deleteTrainer = async (req, res) => {
   if (!trainer) {
     return res.status(404).json({ message: 'Trainer not found' });
   }
+  await removeTrainerUser(trainer._id);
   await trainer.deleteOne();
   res.json({ message: 'Trainer removed' });
+};
+
+export const resetTrainerPassword = async (req, res) => {
+  const trainer = await Trainer.findById(req.params.id);
+  if (!trainer) {
+    return res.status(404).json({ message: 'Trainer not found' });
+  }
+  if (!trainer.email?.trim()) {
+    return res.status(400).json({ message: 'Trainer does not have an email address for login' });
+  }
+
+  await syncTrainerUser(trainer, { resetPassword: true });
+
+  res.json({
+    message: `Password reset to initial OTP (${INITIAL_TRAINER_PASSWORD}). Trainer must set a new password on next login.`,
+    email: trainer.email.trim().toLowerCase(),
+  });
 };
 
 export const getDepartments = async (req, res) => {

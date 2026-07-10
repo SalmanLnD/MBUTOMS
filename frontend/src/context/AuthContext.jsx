@@ -1,7 +1,13 @@
-import { createContext, useContext, useState, useEffect, useCallback } from 'react';
-import { login as loginApi, getMe } from '../services/authService.js';
+import { useState, useEffect, useCallback } from 'react';
+import { createContext, useContext } from 'react';
+import { login as loginApi, getMe, resetPassword as resetPasswordApi } from '../services/authService.js';
 
 const AuthContext = createContext(null);
+
+const storeUser = (userData, token) => {
+  if (token) localStorage.setItem('toms_token', token);
+  localStorage.setItem('toms_user', JSON.stringify(userData));
+};
 
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(() => {
@@ -35,17 +41,32 @@ export const AuthProvider = ({ children }) => {
 
   const login = async (email, password) => {
     const data = await loginApi({ email, password });
-    localStorage.setItem('toms_token', data.token);
     const userData = {
       _id: data._id,
       name: data.name,
       email: data.email,
       role: data.role,
       trainer: data.trainer,
+      mustResetPassword: data.mustResetPassword,
+      requiresPasswordReset: data.requiresPasswordReset,
     };
-    localStorage.setItem('toms_user', JSON.stringify(userData));
+    storeUser(userData, data.token);
     setUser(userData);
     return data;
+  };
+
+  const completePasswordReset = (data) => {
+    const userData = {
+      _id: data._id,
+      name: data.name,
+      email: data.email,
+      role: data.role,
+      trainer: data.trainer,
+      mustResetPassword: false,
+      requiresPasswordReset: false,
+    };
+    storeUser(userData, data.token);
+    setUser(userData);
   };
 
   const logout = () => {
@@ -57,7 +78,16 @@ export const AuthProvider = ({ children }) => {
   const hasRole = (...roles) => roles.includes(user?.role);
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, logout, hasRole }}>
+    <AuthContext.Provider value={{
+      user,
+      loading,
+      login,
+      logout,
+      hasRole,
+      completePasswordReset,
+      resetPasswordApi,
+    }}
+    >
       {children}
     </AuthContext.Provider>
   );

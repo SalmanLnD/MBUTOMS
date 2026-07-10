@@ -164,3 +164,28 @@ export const TrashIcon = (props) => (
     <path d="M14 11v6" />
   </IconBase>
 );
+
+export const KeyIcon = (props) => (
+  <IconBase {...props}>
+    <circle cx="8" cy="15" r="4" />
+    <path d="m10.5 13.5 7-7" />
+    <path d="m15.5 6.5 2 2" />
+    <path d="m18 4 2 2" />
+  </IconBase>
+);
+
+export const ChartIcon = (props) => (
+  <IconBase {...props}>
+    <path d="M3 3v18h18" />
+    <path d="M7 16V9" />
+    <path d="M12 16V5" />
+    <path d="M17 16v-7" />
+  </IconBase>
+);
+
+export const CopyIcon = (props) => (
+  <IconBase {...props}>
+    <rect x="9" y="9" width="13" height="13" rx="2" />
+    <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+  </IconBase>
+);

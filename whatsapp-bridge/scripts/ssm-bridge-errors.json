@@ -1,0 +1,5 @@
+{
+  "commands": [
+    "python3 - <<'PY'\nfrom pathlib import Path\nfor name in ('mbutoms-whatsapp-bridge-out.log', 'mbutoms-whatsapp-bridge-error.log'):\n    p = Path('/home/ubuntu/.pm2/logs') / name\n    print('--- ' + name + ' ---')\n    if not p.exists():\n        print('missing')\n        continue\n    for line in p.read_text(errors='ignore').splitlines()[-30:]:\n        print(line.encode('ascii', 'ignore').decode())\nPY"
+  ]
+}

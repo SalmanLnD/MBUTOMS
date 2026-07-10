@@ -1,9 +1,11 @@
 import Trainer from '../models/Trainer.js';
 import TrainerDailyAttendance from '../models/TrainerDailyAttendance.js';
-import { normalizeDate } from '../utils/scheduleHelpers.js';
-import { toDateKey } from '../utils/dateRange.js';
 import { normalizePhone, isValidMobileKey } from '../utils/phone.js';
-import { TRAINER_ATTENDANCE_TRACKING_START } from '../utils/attendanceTracking.js';
+import {
+  normalizeAttendanceDate,
+  toAttendanceDateKey,
+  TRAINER_ATTENDANCE_TRACKING_START,
+} from '../utils/attendanceTracking.js';
 import { clearAttendanceGridCache } from '../utils/attendanceGridCache.js';
 import {
   applyItOifAttendanceRules,
@@ -64,7 +66,7 @@ export const recordWhatsappPunchIn = async (req, res) => {
     return res.status(400).json({ message: 'punchInAt is not a valid date' });
   }
 
-  const day = normalizeDate(punchDate);
+  const day = normalizeAttendanceDate(punchDate);
   if (day < TRAINER_ATTENDANCE_TRACKING_START) {
     return res.status(400).json({ message: 'Attendance tracking has not started for this date' });
   }
@@ -103,7 +105,7 @@ export const recordWhatsappPunchIn = async (req, res) => {
       name: trainer.name,
       employeeId: trainer.employeeId,
     },
-    date: toDateKey(day),
+    date: toAttendanceDateKey(day),
     oifNumber: record.oifNumber,
     punchInAt: record.punchInAt,
   });

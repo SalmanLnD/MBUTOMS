@@ -1,0 +1,1 @@
+export const INITIAL_TRAINER_PASSWORD = 'Mbu#2026';

@@ -1,0 +1,8 @@
+{
+  "commands": [
+    "sudo su - ubuntu -c 'pm2 jlist' | node -e \"let d='';process.stdin.on('data',c=>d+=c);process.stdin.on('end',()=>{const j=JSON.parse(d||'[]');const p=j.find(x=>x.name==='mbutoms-whatsapp-bridge');console.log(JSON.stringify({status:p?.pm2_env?.status,restarts:p?.pm2_env?.restart_time,uptime:p?.pm2_env?.pm_uptime,unstable:p?.pm2_env?.unstable_restarts},null,2));});\"",
+    "grep -E 'GROUP_ID|WEBHOOK_URL|Listening' /home/ubuntu/mbutoms-whatsapp-bridge/.env 2>/dev/null || grep -E 'GROUP_ID|WEBHOOK_URL|Listening' /home/ubuntu/whatsapp-bridge/.env 2>/dev/null",
+    "tail -80 /home/ubuntu/.pm2/logs/mbutoms-whatsapp-bridge-out.log | tr -cd '\\11\\12\\15\\40-\\176'",
+    "tail -40 /home/ubuntu/.pm2/logs/mbutoms-whatsapp-bridge-error.log | tr -cd '\\11\\12\\15\\40-\\176'"
+  ]
+}
