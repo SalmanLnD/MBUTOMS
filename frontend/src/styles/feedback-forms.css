@@ -84,3 +84,26 @@
   border-radius: 8px;
   padding: 1rem;
 }
+
+@media (max-width: 480px) {
+  .feedback-form-shell {
+    max-width: 100%;
+    margin: 0;
+  }
+
+  .feedback-form-header {
+    padding: 1rem;
+  }
+
+  .feedback-form-header h1 {
+    font-size: 1.35rem;
+  }
+
+  .feedback-question-card {
+    padding: 1rem;
+  }
+
+  .feedback-public-page {
+    padding: 1rem 0.65rem 2.5rem;
+  }
+}

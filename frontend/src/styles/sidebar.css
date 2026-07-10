@@ -252,10 +252,6 @@
 
 /* On phone portrait the sidebar is replaced by the floating bubble nav. */
 @media (max-width: 480px) {
-  .app-layout {
-    grid-template-columns: minmax(0, 1fr);
-  }
-
   .sidebar {
     display: none;
   }
