@@ -254,7 +254,7 @@
 }
 
 /* On mobile the sidebar is replaced by the floating bubble nav. */
-@media (max-width: 768px) {
+@media (max-width: 768px), (max-width: 960px) and (max-height: 480px) {
   .app-layout {
     grid-template-columns: minmax(0, 1fr);
   }
