@@ -8,6 +8,7 @@ import {
   updateFeedbackForm,
   publishFeedbackForm,
 } from '../services/feedbackService.js';
+import { getTrainers } from '../services/trainerService.js';
 import { showError, showSuccess } from '../utils/toast.js';
 import { getErrorMessage } from '../utils/helpers.js';
 import '../styles/feedback-forms.css';
@@ -17,6 +18,7 @@ const FIELD_TYPES = [
   { value: 'paragraph', label: 'Paragraph' },
   { value: 'rating', label: 'Rating (1-5)' },
   { value: 'multiple_choice', label: 'Multiple choice' },
+  { value: 'trainer_select', label: 'Trainer' },
 ];
 
 const FeedbackFormTab = () => {
@@ -27,6 +29,7 @@ const FeedbackFormTab = () => {
   const [form, setForm] = useState(null);
   const [previewMode, setPreviewMode] = useState(false);
   const [shareUrl, setShareUrl] = useState('');
+  const [trainers, setTrainers] = useState([]);
 
   const loadForm = useCallback(async () => {
     setLoading(true);
@@ -47,6 +50,18 @@ const FeedbackFormTab = () => {
   useEffect(() => {
     loadForm();
   }, [loadForm]);
+
+  useEffect(() => {
+    const loadTrainers = async () => {
+      try {
+        const data = await getTrainers({ limit: 200, sortBy: 'name', sortOrder: 'asc' });
+        setTrainers(data.trainers || data);
+      } catch {
+        setTrainers([]);
+      }
+    };
+    loadTrainers();
+  }, []);
 
   const handleCreate = async () => {
     setSaving(true);
@@ -226,7 +241,14 @@ const FeedbackFormTab = () => {
 
         {sortedFields.map((field, index) => (
           previewMode || isPublished ? (
-            <FeedbackFieldPreview key={field.id} field={field} value="" onChange={() => {}} preview />
+            <FeedbackFieldPreview
+              key={field.id}
+              field={field}
+              value=""
+              onChange={() => {}}
+              preview
+              trainers={trainers}
+            />
           ) : (
             <div key={field.id} className="feedback-question-card">
               <div className="row g-2 align-items-start">
@@ -260,7 +282,7 @@ const FeedbackFormTab = () => {
                       placeholder="One option per line"
                     />
                   )}
-                  <FeedbackFieldPreview field={field} value="" onChange={() => {}} preview />
+                  <FeedbackFieldPreview field={field} value="" onChange={() => {}} preview trainers={trainers} />
                 </div>
                 <div className="col-md-4 text-md-end">
                   <div className="form-check form-check-inline">

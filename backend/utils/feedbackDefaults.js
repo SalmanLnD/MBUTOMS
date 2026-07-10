@@ -14,20 +14,50 @@ export const DEFAULT_FEEDBACK_FIELDS = [
     order: 1,
   },
   {
+    id: 'trainer',
+    type: 'trainer_select',
+    label: 'Trainer name',
+    required: true,
+    order: 2,
+  },
+  {
     id: 'rating',
     type: 'rating',
     label: 'Ratings',
     required: true,
-    order: 2,
+    order: 3,
   },
   {
     id: 'comments',
     type: 'paragraph',
     label: 'Comments',
-    required: false,
-    order: 3,
+    required: true,
+    order: 4,
   },
 ];
+
+/** Ensure draft forms include the latest default questions and required flags. */
+export const mergeDefaultFeedbackFields = (existingFields = []) => {
+  const existingById = new Map(existingFields.map((field) => [field.id, field]));
+
+  const mergedDefaults = DEFAULT_FEEDBACK_FIELDS.map((defaultField) => {
+    const existing = existingById.get(defaultField.id);
+    if (!existing) return { ...defaultField };
+    return {
+      ...existing,
+      type: defaultField.type,
+      required: defaultField.required,
+      label: existing.label?.trim() || defaultField.label,
+      order: defaultField.order,
+    };
+  });
+
+  const extraFields = existingFields.filter(
+    (field) => !DEFAULT_FEEDBACK_FIELDS.some((defaultField) => defaultField.id === field.id)
+  );
+
+  return [...mergedDefaults, ...extraFields].sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+};
 
 export const currentMonthKey = (date = new Date()) => {
   const year = date.getFullYear();

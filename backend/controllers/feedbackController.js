@@ -1,9 +1,11 @@
 import FeedbackForm from '../models/FeedbackForm.js';
 import FeedbackResponse from '../models/FeedbackResponse.js';
+import Trainer from '../models/Trainer.js';
 import {
   currentMonthKey,
   DEFAULT_FEEDBACK_FIELDS,
   generatePublicSlug,
+  mergeDefaultFeedbackFields,
 } from '../utils/feedbackDefaults.js';
 
 const extractRating = (answers = []) => {
@@ -15,6 +17,14 @@ const extractRating = (answers = []) => {
 const extractAnswer = (answers, fieldId) => {
   const match = answers.find((a) => a.fieldId === fieldId);
   return match?.value != null ? String(match.value).trim() : '';
+};
+
+const isRequiredAnswerMissing = (field, value) => {
+  if (field.type === 'rating') {
+    const rating = Number(value);
+    return !Number.isFinite(rating) || rating < 1 || rating > 5;
+  }
+  return String(value ?? '').trim() === '';
 };
 
 const formatMonthLabel = (monthKey) => {
@@ -29,17 +39,48 @@ const formatMonthLabel = (monthKey) => {
 export const getFeedbackSummary = async (req, res) => {
   const monthKey = currentMonthKey();
 
-  const [allResponses, monthResponses, publishedForms] = await Promise.all([
-    FeedbackResponse.find({ rating: { $gte: 1, $lte: 5 } }).select('rating monthKey createdAt'),
-    FeedbackResponse.find({ monthKey, rating: { $gte: 1, $lte: 5 } }).select('rating createdAt'),
-    FeedbackForm.find({ status: 'published' }).sort({ monthKey: -1 }).limit(6).select('monthKey title publishedAt'),
-  ]);
+  const [allResponses, monthResponses, publishedForms, trainers, overallByTrainer, monthByTrainer] =
+    await Promise.all([
+      FeedbackResponse.find({ rating: { $gte: 1, $lte: 5 } }).select('rating monthKey createdAt'),
+      FeedbackResponse.find({ monthKey, rating: { $gte: 1, $lte: 5 } }).select('rating createdAt'),
+      FeedbackForm.find({ status: 'published' }).sort({ monthKey: -1 }).limit(6).select('monthKey title publishedAt'),
+      Trainer.find().select('name employeeId status').sort({ name: 1 }).lean(),
+      FeedbackResponse.aggregate([
+        { $match: { trainer: { $ne: null }, rating: { $gte: 1, $lte: 5 } } },
+        { $group: { _id: '$trainer', average: { $avg: '$rating' }, count: { $sum: 1 } } },
+      ]),
+      FeedbackResponse.aggregate([
+        { $match: { monthKey, trainer: { $ne: null }, rating: { $gte: 1, $lte: 5 } } },
+        { $group: { _id: '$trainer', average: { $avg: '$rating' }, count: { $sum: 1 } } },
+      ]),
+    ]);
 
   const avg = (items) => {
     if (!items.length) return null;
     const sum = items.reduce((acc, item) => acc + item.rating, 0);
     return Math.round((sum / items.length) * 10) / 10;
   };
+
+  const roundAvg = (value) => (value != null ? Math.round(value * 10) / 10 : null);
+
+  const overallMap = new Map(overallByTrainer.map((row) => [row._id.toString(), row]));
+  const monthMap = new Map(monthByTrainer.map((row) => [row._id.toString(), row]));
+
+  const trainerSummaries = trainers.map((trainer) => {
+    const id = trainer._id.toString();
+    const overall = overallMap.get(id);
+    const month = monthMap.get(id);
+    return {
+      trainerId: trainer._id,
+      name: trainer.name,
+      employeeId: trainer.employeeId,
+      status: trainer.status,
+      overallAverage: roundAvg(overall?.average ?? null),
+      overallCount: overall?.count || 0,
+      currentMonthAverage: roundAvg(month?.average ?? null),
+      currentMonthCount: month?.count || 0,
+    };
+  });
 
   res.json({
     overallAverage: avg(allResponses),
@@ -56,6 +97,7 @@ export const getFeedbackSummary = async (req, res) => {
       title: form.title,
       publishedAt: form.publishedAt,
     })),
+    trainerSummaries,
   });
 };
 
@@ -70,6 +112,7 @@ export const getFeedbackResponses = async (req, res) => {
   const [responses, total] = await Promise.all([
     FeedbackResponse.find(filter)
       .populate('form', 'title monthKey')
+      .populate('trainer', 'name employeeId')
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(limit),
@@ -84,6 +127,9 @@ export const getFeedbackResponses = async (req, res) => {
       formTitle: r.form?.title || '',
       studentName: r.studentName,
       rollNumber: r.rollNumber,
+      trainer: r.trainer
+        ? { _id: r.trainer._id, name: r.trainer.name, employeeId: r.trainer.employeeId }
+        : null,
       rating: r.rating,
       comments: r.comments,
       answers: r.answers,
@@ -108,6 +154,16 @@ export const getFeedbackForms = async (req, res) => {
 export const getCurrentMonthForm = async (req, res) => {
   const monthKey = currentMonthKey();
   let form = await FeedbackForm.findOne({ monthKey });
+
+  if (form && form.status === 'draft') {
+    const mergedFields = mergeDefaultFeedbackFields(form.fields);
+    const fieldsChanged = JSON.stringify(mergedFields) !== JSON.stringify(form.fields);
+    if (fieldsChanged) {
+      form.fields = mergedFields;
+      await form.save();
+    }
+  }
+
   res.json({
     monthKey,
     monthLabel: formatMonthLabel(monthKey),
@@ -201,12 +257,18 @@ export const getPublicFeedbackForm = async (req, res) => {
     return res.status(404).json({ message: 'Feedback form not found or not published' });
   }
 
+  const trainers = await Trainer.find({ status: 'active' })
+    .select('name employeeId')
+    .sort({ name: 1 })
+    .lean();
+
   res.json({
     title: form.title,
     description: form.description,
     monthKey: form.monthKey,
     monthLabel: formatMonthLabel(form.monthKey),
     fields: form.fields.sort((a, b) => a.order - b.order),
+    trainers,
   });
 };
 
@@ -237,18 +299,35 @@ export const submitPublicFeedback = async (req, res) => {
   for (const field of form.fields) {
     if (!field.required) continue;
     const answer = normalizedAnswers.find((a) => a.fieldId === field.id);
-    const value = answer?.value;
-    if (value === '' || value === null || value === undefined) {
+    if (isRequiredAnswerMissing(field, answer?.value)) {
       return res.status(400).json({ message: `"${field.label}" is required` });
     }
   }
 
   const rating = extractRating(normalizedAnswers);
+  const trainerField = form.fields.find((f) => f.type === 'trainer_select' || f.id === 'trainer');
+  const trainerAnswer = normalizedAnswers.find(
+    (a) => a.fieldId === 'trainer' || a.fieldId === trainerField?.id
+  );
+  const trainerId = trainerAnswer?.value ? String(trainerAnswer.value).trim() : '';
+
+  let trainer = null;
+  if (trainerId) {
+    const trainerRecord = await Trainer.findById(trainerId).select('_id');
+    if (!trainerRecord) {
+      return res.status(400).json({ message: 'Selected trainer is not valid' });
+    }
+    trainer = trainerRecord._id;
+  } else if (trainerField?.required) {
+    return res.status(400).json({ message: `"${trainerField.label}" is required` });
+  }
+
   const response = await FeedbackResponse.create({
     form: form._id,
     monthKey: form.monthKey,
     answers: normalizedAnswers,
     rating,
+    trainer,
     studentName: extractAnswer(normalizedAnswers, 'student_name'),
     rollNumber: extractAnswer(normalizedAnswers, 'roll_number'),
     comments: extractAnswer(normalizedAnswers, 'comments'),

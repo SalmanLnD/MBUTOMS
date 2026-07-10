@@ -59,6 +59,7 @@ const FeedbackResponsesTab = () => {
                   <th>Month</th>
                   <th>Student</th>
                   <th>Roll number</th>
+                  <th>Trainer</th>
                   <th>Rating</th>
                   <th>Comments</th>
                 </tr>
@@ -66,7 +67,7 @@ const FeedbackResponsesTab = () => {
               <tbody>
                 {responses.length === 0 ? (
                   <tr>
-                    <td colSpan="6" className="text-center text-muted py-4">No responses yet</td>
+                    <td colSpan="7" className="text-center text-muted py-4">No responses yet</td>
                   </tr>
                 ) : (
                   responses.map((row) => (
@@ -75,6 +76,7 @@ const FeedbackResponsesTab = () => {
                       <td>{row.monthLabel}</td>
                       <td>{row.studentName || '-'}</td>
                       <td><code>{row.rollNumber || '-'}</code></td>
+                      <td>{row.trainer?.name || '-'}</td>
                       <td>{row.rating != null ? `${row.rating}/5` : '-'}</td>
                       <td className="text-truncate" style={{ maxWidth: '240px' }}>{row.comments || '-'}</td>
                     </tr>

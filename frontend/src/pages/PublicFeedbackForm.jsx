@@ -7,6 +7,14 @@ import { showError } from '../utils/toast.js';
 import { getErrorMessage } from '../utils/helpers.js';
 import '../styles/feedback-forms.css';
 
+const isRequiredAnswerMissing = (field, value) => {
+  if (field.type === 'rating') {
+    const rating = Number(value);
+    return !Number.isFinite(rating) || rating < 1 || rating > 5;
+  }
+  return String(value ?? '').trim() === '';
+};
+
 const PublicFeedbackForm = () => {
   const { slug } = useParams();
   const [form, setForm] = useState(null);
@@ -36,6 +44,16 @@ const PublicFeedbackForm = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+
+    const sortedFields = [...(form.fields || [])].sort((a, b) => a.order - b.order);
+    const missingField = sortedFields.find(
+      (field) => field.required && isRequiredAnswerMissing(field, answers[field.id])
+    );
+    if (missingField) {
+      showError(`"${missingField.label}" is required`);
+      return;
+    }
+
     setSubmitting(true);
     try {
       const payload = (form.fields || []).map((field) => ({
@@ -101,6 +119,7 @@ const PublicFeedbackForm = () => {
             field={field}
             value={answers[field.id]}
             onChange={(value) => handleChange(field.id, value)}
+            trainers={form.trainers || []}
           />
         ))}
 

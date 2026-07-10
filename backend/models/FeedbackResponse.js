@@ -18,12 +18,14 @@ const feedbackResponseSchema = new mongoose.Schema(
     studentName: { type: String, trim: true, default: '' },
     rollNumber: { type: String, trim: true, default: '' },
     comments: { type: String, trim: true, default: '' },
+    trainer: { type: mongoose.Schema.Types.ObjectId, ref: 'Trainer' },
   },
   { timestamps: true }
 );
 
 feedbackResponseSchema.index({ form: 1, createdAt: -1 });
 feedbackResponseSchema.index({ monthKey: 1, createdAt: -1 });
+feedbackResponseSchema.index({ trainer: 1, monthKey: 1 });
 
 const FeedbackResponse = mongoose.model('FeedbackResponse', feedbackResponseSchema);
 export default FeedbackResponse;

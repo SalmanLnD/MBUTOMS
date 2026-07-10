@@ -1,3 +1,5 @@
+import StyledSelect from './StyledSelect.jsx';
+
 const RatingInput = ({ value, onChange, disabled = false }) => (
   <div className="feedback-rating-row">
     {[1, 2, 3, 4, 5].map((score) => (
@@ -15,7 +17,7 @@ const RatingInput = ({ value, onChange, disabled = false }) => (
   </div>
 );
 
-const FeedbackFieldInput = ({ field, value, onChange, disabled = false }) => {
+const FeedbackFieldInput = ({ field, value, onChange, disabled = false, trainers = [] }) => {
   if (field.type === 'paragraph') {
     return (
       <textarea
@@ -31,6 +33,26 @@ const FeedbackFieldInput = ({ field, value, onChange, disabled = false }) => {
 
   if (field.type === 'rating') {
     return <RatingInput value={value} onChange={onChange} disabled={disabled} />;
+  }
+
+  if (field.type === 'trainer_select') {
+    const trainerOptions = trainers.map((trainer) => ({
+      value: trainer._id,
+      label: `${trainer.name}${trainer.employeeId ? ` (${trainer.employeeId})` : ''}`,
+    }));
+
+    return (
+      <StyledSelect
+        name={field.id}
+        value={value || ''}
+        onChange={(e) => onChange(e.target.value)}
+        disabled={disabled}
+        required={field.required}
+        placeholder="Select trainer"
+        options={trainerOptions}
+        aria-label={field.label}
+      />
+    );
   }
 
   if (field.type === 'multiple_choice') {
@@ -67,13 +89,19 @@ const FeedbackFieldInput = ({ field, value, onChange, disabled = false }) => {
   );
 };
 
-export const FeedbackFieldPreview = ({ field, value, onChange, preview = false }) => (
+export const FeedbackFieldPreview = ({ field, value, onChange, preview = false, trainers = [] }) => (
   <div className={`feedback-question-card ${preview ? '' : 'is-focused'}`}>
     <label className="d-block">
       {field.label}
       {field.required && <span className="text-danger ms-1">*</span>}
     </label>
-    <FeedbackFieldInput field={field} value={value} onChange={onChange} disabled={preview} />
+    <FeedbackFieldInput
+      field={field}
+      value={value}
+      onChange={onChange}
+      disabled={preview}
+      trainers={trainers}
+    />
   </div>
 );
 
