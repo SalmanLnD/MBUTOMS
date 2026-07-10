@@ -31,7 +31,7 @@ router
 
 router.post(
   '/:id/reset-password',
-  authorize('admin'),
+  authorize('admin', 'manager', 'campus_manager'),
   asyncHandler(resetTrainerPassword)
 );
 

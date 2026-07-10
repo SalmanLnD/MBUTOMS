@@ -1,3 +1,5 @@
+import { ROLES } from './roles.js';
+
 export const formatDate = (date) => {
   if (!date) return '-';
   return new Date(date).toLocaleDateString('en-IN', {
@@ -21,9 +23,11 @@ export const formatDateTime = (date) => {
 
 export const formatRole = (role) => {
   const roles = {
-    admin: 'Admin',
-    campus_manager: 'Campus Manager',
-    trainer: 'Trainer',
+    [ROLES.ADMIN]: 'Admin',
+    [ROLES.MANAGER]: 'Manager',
+    [ROLES.SUBJECT_COORDINATOR]: 'Subject Coordinator',
+    [ROLES.CAMPUS_MANAGER]: 'Campus Manager',
+    [ROLES.TRAINER]: 'Trainer',
   };
   return roles[role] || role;
 };

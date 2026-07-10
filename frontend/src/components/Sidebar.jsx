@@ -2,6 +2,7 @@ import { NavLink } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.jsx';
 import { ChevronLeftIcon } from './icons.jsx';
 import { navItems } from '../config/navItems.js';
+import { formatRole } from '../utils/helpers.js';
 import '../styles/sidebar.css';
 
 const Sidebar = ({ collapsed = false, labelsVisible = true, onToggle }) => {
@@ -64,7 +65,7 @@ const Sidebar = ({ collapsed = false, labelsVisible = true, onToggle }) => {
           </div>
           <div className="sidebar-user-text">
             <div className="user-name">{user?.name}</div>
-            <small className="text-white-50">{user?.role?.replace('_', ' ')}</small>
+            <small className="text-white-50">{formatRole(user?.role)}</small>
           </div>
         </div>
       </div>

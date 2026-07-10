@@ -11,8 +11,8 @@ import { formatDate, getErrorMessage } from '../utils/helpers.js';
 
 const TrainerProfile = () => {
   const { id } = useParams();
-  const { hasRole } = useAuth();
-  const canEdit = hasRole('admin', 'campus_manager');
+  const { hasManagementRole } = useAuth();
+  const canEdit = hasManagementRole();
   const [trainer, setTrainer] = useState(null);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState('');

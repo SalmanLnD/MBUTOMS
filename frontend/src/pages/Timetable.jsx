@@ -54,8 +54,8 @@ const buildSubjectLabel = (visibleSchedules, trainerSubjects, selectedSubject, t
 };
 
 const Timetable = () => {
-  const { hasRole } = useAuth();
-  const canEdit = hasRole('admin', 'campus_manager');
+  const { hasManagementRole } = useAuth();
+  const canEdit = hasManagementRole();
 
   const [trainers, setTrainers] = useState([]);
   const [schedulesByTrainer, setSchedulesByTrainer] = useState({});
@@ -76,7 +76,7 @@ const Timetable = () => {
     setLoading(true);
     try {
       const [trainerData, subjectData, boardData] = await Promise.all([
-        getTrainers({ limit: 200, sortBy: 'employeeId', sortOrder: 'asc' }),
+        getTrainers({ limit: 200, sortBy: 'employeeId', sortOrder: 'asc', rosterOnly: true }),
         getSubjects({ limit: 100 }),
         getTimetableBoard({ referenceDate: toInputDate(new Date()) }),
       ]);
@@ -151,6 +151,7 @@ const Timetable = () => {
         }
 
         if (selectedSubject && !visibleSchedules.length) return false;
+        if (!visibleSchedules.length && !search) return false;
         return true;
       });
   }, [trainerOptions, schedulesByTrainer, debouncedTrainerSearch, selectedSubject]);

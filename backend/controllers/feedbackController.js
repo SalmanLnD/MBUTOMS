@@ -7,6 +7,7 @@ import {
   generatePublicSlug,
   mergeDefaultFeedbackFields,
 } from '../utils/feedbackDefaults.js';
+import { mergeRosterFilter } from '../utils/rosterFilter.js';
 
 const extractRating = (answers = []) => {
   const ratingAnswer = answers.find((a) => a.fieldId === 'rating' || a.label?.toLowerCase().includes('rating'));
@@ -39,12 +40,14 @@ const formatMonthLabel = (monthKey) => {
 export const getFeedbackSummary = async (req, res) => {
   const monthKey = currentMonthKey();
 
+  const trainerRosterFilter = await mergeRosterFilter({}, { rosterOnly: true });
+
   const [allResponses, monthResponses, publishedForms, trainers, overallByTrainer, monthByTrainer] =
     await Promise.all([
       FeedbackResponse.find({ rating: { $gte: 1, $lte: 5 } }).select('rating monthKey createdAt'),
       FeedbackResponse.find({ monthKey, rating: { $gte: 1, $lte: 5 } }).select('rating createdAt'),
       FeedbackForm.find({ status: 'published' }).sort({ monthKey: -1 }).limit(6).select('monthKey title publishedAt'),
-      Trainer.find().select('name employeeId status').sort({ name: 1 }).lean(),
+      Trainer.find(trainerRosterFilter).select('name employeeId status').sort({ name: 1 }).lean(),
       FeedbackResponse.aggregate([
         { $match: { trainer: { $ne: null }, rating: { $gte: 1, $lte: 5 } } },
         { $group: { _id: '$trainer', average: { $avg: '$rating' }, count: { $sum: 1 } } },
@@ -257,7 +260,8 @@ export const getPublicFeedbackForm = async (req, res) => {
     return res.status(404).json({ message: 'Feedback form not found or not published' });
   }
 
-  const trainers = await Trainer.find({ status: 'active' })
+  const trainerRosterFilter = await mergeRosterFilter({ status: 'active' }, { rosterOnly: true });
+  const trainers = await Trainer.find(trainerRosterFilter)
     .select('name employeeId')
     .sort({ name: 1 })
     .lean();

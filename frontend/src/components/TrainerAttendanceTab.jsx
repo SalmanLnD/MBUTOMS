@@ -22,8 +22,8 @@ import {
 } from '../utils/monthDates.js';
 
 const TrainerAttendanceTab = () => {
-  const { user, hasRole } = useAuth();
-  const canManageAll = hasRole('admin', 'campus_manager');
+  const { user, hasManagementRole } = useAuth();
+  const canManageAll = hasManagementRole();
 
   const [monthParts, setMonthParts] = useState(() =>
     clampMonthParts(getCurrentMonthParts())

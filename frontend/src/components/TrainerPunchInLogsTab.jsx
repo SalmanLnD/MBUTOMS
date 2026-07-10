@@ -4,6 +4,7 @@ import LoadingSpinner from './LoadingSpinner.jsx';
 import Pagination from './Pagination.jsx';
 import ConfirmModal from './ConfirmModal.jsx';
 import { TrashIcon } from './icons.jsx';
+import ActionIconButton from './ActionIconButton.jsx';
 import { showError, showSuccess } from '../utils/toast.js';
 import { useAuth } from '../context/AuthContext.jsx';
 import { useDebounce } from '../hooks/useDebounce.js';
@@ -16,8 +17,8 @@ const SOURCE_BADGE = {
 };
 
 const TrainerPunchInLogsTab = () => {
-  const { hasRole } = useAuth();
-  const canManageAll = hasRole('admin', 'campus_manager');
+  const { hasManagementRole } = useAuth();
+  const canManageAll = hasManagementRole();
 
   const [logs, setLogs] = useState([]);
   const [pagination, setPagination] = useState(null);
@@ -237,16 +238,13 @@ const TrainerPunchInLogsTab = () => {
                       <td className="text-nowrap">{formatPhone(log.punchInRawPhone)}</td>
                       {canManageAll && (
                         <td className="text-end">
-                          <button
-                            type="button"
-                            className="btn btn-sm btn-outline-danger d-inline-flex align-items-center justify-content-center"
-                            style={{ width: '2rem', height: '2rem', padding: 0 }}
-                            aria-label={`Delete punch-in log for ${log.trainer?.name || 'trainer'}`}
+                          <ActionIconButton
+                            variant="delete"
+                            icon={TrashIcon}
                             title="Delete log and attendance"
+                            aria-label={`Delete punch-in log for ${log.trainer?.name || 'trainer'}`}
                             onClick={() => setPendingDelete(log)}
-                          >
-                            <TrashIcon size={16} />
-                          </button>
+                          />
                         </td>
                       )}
                     </tr>

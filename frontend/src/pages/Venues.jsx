@@ -8,6 +8,8 @@ import ConfirmModal from '../components/ConfirmModal.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
 import { useDebounce } from '../hooks/useDebounce.js';
 import { getVenues, deleteVenue } from '../services/venueService.js';
+import { EditIcon, TrashIcon } from '../components/icons.jsx';
+import ActionIconButton from '../components/ActionIconButton.jsx';
 import { formatStatus, getErrorMessage } from '../utils/helpers.js';
 
 const venueTypes = {
@@ -19,8 +21,8 @@ const venueTypes = {
 };
 
 const Venues = () => {
-  const { hasRole } = useAuth();
-  const canManage = hasRole('admin', 'campus_manager');
+  const { hasManagementRole, hasFullAccess } = useAuth();
+  const canManage = hasManagementRole();
 
   const [venues, setVenues] = useState([]);
   const [pagination, setPagination] = useState(null);
@@ -139,14 +141,22 @@ const Venues = () => {
                           </td>
                           {canManage && (
                             <td>
-                              <div className="btn-group btn-group-sm">
-                                <button className="btn btn-outline-secondary" onClick={() => { setEditingVenue(venue); setShowModal(true); }}>
-                                  Edit
-                                </button>
-                                {hasRole('admin') && (
-                                  <button className="btn btn-outline-danger" onClick={() => handleDelete(venue._id, venue.name)}>
-                                    Delete
-                                  </button>
+                              <div className="btn-group btn-group-sm action-btn-group">
+                                <ActionIconButton
+                                  variant="edit"
+                                  icon={EditIcon}
+                                  title="Edit venue"
+                                  aria-label={`Edit ${venue.name}`}
+                                  onClick={() => { setEditingVenue(venue); setShowModal(true); }}
+                                />
+                                {hasFullAccess() && (
+                                  <ActionIconButton
+                                    variant="delete"
+                                    icon={TrashIcon}
+                                    title="Delete venue"
+                                    aria-label={`Delete ${venue.name}`}
+                                    onClick={() => handleDelete(venue._id, venue.name)}
+                                  />
                                 )}
                               </div>
                             </td>

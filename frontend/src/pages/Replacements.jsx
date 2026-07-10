@@ -13,6 +13,7 @@ import Modal from '../components/Modal.jsx';
 import TrainerAvailabilityPanel from '../components/TrainerAvailabilityPanel.jsx';
 import AddSlotReplacementModal from '../components/AddSlotReplacementModal.jsx';
 import { EditIcon } from '../components/icons.jsx';
+import ActionIconButton from '../components/ActionIconButton.jsx';
 
 const Replacements = () => {
   const [activeTab, setActiveTab] = useState('pending');
@@ -183,16 +184,13 @@ const Replacements = () => {
                             <span className="small text-success">
                               Replaced by <strong>{replacement.name}</strong>
                             </span>
-                            <button
-                              type="button"
-                              className="btn btn-sm btn-outline-secondary d-inline-flex align-items-center justify-content-center"
-                              style={{ width: '2rem', height: '2rem', padding: 0 }}
-                              aria-label={`Change replacement for ${schedule.department} ${schedule.section}`}
+                            <ActionIconButton
+                              variant="edit"
+                              icon={EditIcon}
                               title="Change replacement"
+                              aria-label={`Change replacement for ${schedule.department} ${schedule.section}`}
                               onClick={() => handleViewSuggestions(schedule, replacement)}
-                            >
-                              <EditIcon size={16} />
-                            </button>
+                            />
                           </div>
                         ) : (
                           <button

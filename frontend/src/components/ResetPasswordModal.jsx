@@ -39,6 +39,7 @@ const ResetPasswordModal = ({ show, onComplete }) => {
       show={show}
       title="Set Your Password"
       size="toms-modal-md"
+      dismissible={false}
       onClose={() => {}}
     >
       <form onSubmit={handleSubmit}>

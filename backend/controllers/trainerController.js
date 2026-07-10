@@ -5,6 +5,7 @@ import Schedule from '../models/Schedule.js';
 import { applyTrainerSubjectsChange, toIdStrings } from '../utils/syncTrainerSubjectLinks.js';
 import { syncTrainerUser, removeTrainerUser } from '../utils/trainerUserSync.js';
 import { INITIAL_TRAINER_PASSWORD } from '../constants/trainerAuth.js';
+import { mergeRosterFilter, shouldApplyRosterFilter } from '../utils/rosterFilter.js';
 
 const buildTrainerQuery = async (query) => {
   const clauses = [];
@@ -51,6 +52,10 @@ const buildTrainerQuery = async (query) => {
     }
   }
 
+  if (query.status?.trim()) {
+    clauses.push({ status: query.status.trim() });
+  }
+
   if (!clauses.length) return {};
   if (clauses.length === 1) return clauses[0];
   return { $and: clauses };
@@ -69,16 +74,18 @@ export const getTrainers = async (req, res) => {
   const skip = (page - 1) * limit;
 
   const filter = await buildTrainerQuery(req.query);
+  const rosterOnly = shouldApplyRosterFilter(req.query);
+  const finalFilter = await mergeRosterFilter(filter, { rosterOnly });
   const sort = getSortOption(req.query.sortBy, req.query.sortOrder);
 
   const [trainers, total] = await Promise.all([
-    Trainer.find(filter)
+    Trainer.find(finalFilter)
       .populate('department', 'name code')
       .populate('subjects', 'name code slotCount slotTimings')
       .sort(sort)
       .skip(skip)
       .limit(limit),
-    Trainer.countDocuments(filter),
+    Trainer.countDocuments(finalFilter),
   ]);
 
   res.json({

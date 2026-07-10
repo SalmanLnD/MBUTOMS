@@ -16,6 +16,8 @@ import {
 } from '../services/studentService.js';
 import { getAttendance, markAttendance } from '../services/attendanceService.js';
 import { formatDate, formatStatus, getErrorMessage, toInputDate } from '../utils/helpers.js';
+import { EditIcon, EyeIcon, TrashIcon } from '../components/icons.jsx';
+import ActionIconButton from '../components/ActionIconButton.jsx';
 
 const statusOptions = ['present', 'absent', 'late', 'leave', 'od', 'holiday'];
 const SEMESTER_ORDER = { I: 1, II: 2, III: 3, IV: 4, V: 5, VI: 6, VII: 7, VIII: 8 };
@@ -27,8 +29,8 @@ const tabs = [
 ];
 
 const ClassesStudents = () => {
-  const { hasRole } = useAuth();
-  const canManage = hasRole('admin', 'campus_manager');
+  const { hasManagementRole } = useAuth();
+  const canManage = hasManagementRole();
 
   const [activeTab, setActiveTab] = useState('classes');
 
@@ -423,37 +425,39 @@ const ClassesStudents = () => {
                           <td>{cls.currentSemester || '-'}</td>
                           <td>{cls.studentCount}</td>
                           <td className="text-end">
-                            <button
-                              type="button"
-                              className="btn btn-sm btn-outline-primary me-1"
-                              onClick={() => handleViewClassStudents(cls)}
-                            >
-                              View Students
-                            </button>
-                            {canManage && (
-                              <>
-                                <button
-                                  type="button"
-                                  className="btn btn-sm btn-outline-secondary me-1"
-                                  onClick={() => {
-                                    setEditingClass(cls);
-                                    setShowClassForm(true);
-                                  }}
-                                >
-                                  Edit
-                                </button>
-                                <button
-                                  type="button"
-                                  className="btn btn-sm btn-outline-danger"
-                                  onClick={() => setPendingClassDelete({
-                                    id: cls._id,
-                                    name: classLabel(cls),
-                                  })}
-                                >
-                                  Delete
-                                </button>
-                              </>
-                            )}
+                            <div className="btn-group btn-group-sm action-btn-group d-inline-flex">
+                              <ActionIconButton
+                                variant="view"
+                                icon={EyeIcon}
+                                title="View students"
+                                aria-label={`View students for ${classLabel(cls)}`}
+                                onClick={() => handleViewClassStudents(cls)}
+                              />
+                              {canManage && (
+                                <>
+                                  <ActionIconButton
+                                    variant="edit"
+                                    icon={EditIcon}
+                                    title="Edit class"
+                                    aria-label={`Edit ${classLabel(cls)}`}
+                                    onClick={() => {
+                                      setEditingClass(cls);
+                                      setShowClassForm(true);
+                                    }}
+                                  />
+                                  <ActionIconButton
+                                    variant="delete"
+                                    icon={TrashIcon}
+                                    title="Delete class"
+                                    aria-label={`Delete ${classLabel(cls)}`}
+                                    onClick={() => setPendingClassDelete({
+                                      id: cls._id,
+                                      name: classLabel(cls),
+                                    })}
+                                  />
+                                </>
+                              )}
+                            </div>
                           </td>
                         </tr>
                       ))
@@ -561,23 +565,25 @@ const ClassesStudents = () => {
                           </td>
                           {canManage && (
                             <td className="text-end">
-                              <button
-                                type="button"
-                                className="btn btn-sm btn-outline-secondary me-1"
-                                onClick={() => {
-                                  setEditingStudent(s);
-                                  setShowStudentForm(true);
-                                }}
-                              >
-                                Edit
-                              </button>
-                              <button
-                                type="button"
-                                className="btn btn-sm btn-outline-danger"
-                                onClick={() => setPendingDelete({ id: s._id, name: s.name })}
-                              >
-                                Delete
-                              </button>
+                              <div className="btn-group btn-group-sm action-btn-group d-inline-flex">
+                                <ActionIconButton
+                                  variant="edit"
+                                  icon={EditIcon}
+                                  title="Edit student"
+                                  aria-label={`Edit ${s.name}`}
+                                  onClick={() => {
+                                    setEditingStudent(s);
+                                    setShowStudentForm(true);
+                                  }}
+                                />
+                                <ActionIconButton
+                                  variant="delete"
+                                  icon={TrashIcon}
+                                  title="Delete student"
+                                  aria-label={`Delete ${s.name}`}
+                                  onClick={() => setPendingDelete({ id: s._id, name: s.name })}
+                                />
+                              </div>
                             </td>
                           )}
                         </tr>

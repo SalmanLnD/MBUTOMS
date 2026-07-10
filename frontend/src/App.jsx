@@ -4,6 +4,7 @@ import ProtectedRoute from './components/ProtectedRoute.jsx';
 import LoadingSpinner from './components/LoadingSpinner.jsx';
 import MainLayout from './layouts/MainLayout.jsx';
 import Login from './pages/Login.jsx';
+import { needsPasswordReset, MANAGEMENT_ROLES } from './utils/roles.js';
 import Dashboard from './pages/Dashboard.jsx';
 import Trainers from './pages/Trainers.jsx';
 import TrainerProfile from './pages/TrainerProfile.jsx';
@@ -29,7 +30,7 @@ const App = () => {
     <Routes>
       <Route
         path="/login"
-        element={user ? <Navigate to="/dashboard" replace /> : <Login />}
+        element={user && !needsPasswordReset(user) ? <Navigate to="/dashboard" replace /> : <Login />}
       />
       <Route path="/f/:slug" element={<PublicFeedbackForm />} />
 
@@ -51,7 +52,7 @@ const App = () => {
         <Route
           path="/replacements"
           element={
-            <ProtectedRoute roles={['admin', 'campus_manager']}>
+            <ProtectedRoute roles={MANAGEMENT_ROLES}>
               <Replacements />
             </ProtectedRoute>
           }
@@ -59,7 +60,7 @@ const App = () => {
         <Route
           path="/venue-schedule"
           element={
-            <ProtectedRoute roles={['admin', 'campus_manager']}>
+            <ProtectedRoute roles={MANAGEMENT_ROLES}>
               <VenueSchedule />
             </ProtectedRoute>
           }
@@ -67,7 +68,7 @@ const App = () => {
         <Route
           path="/subjects"
           element={
-            <ProtectedRoute roles={['admin', 'campus_manager']}>
+            <ProtectedRoute roles={MANAGEMENT_ROLES}>
               <Subjects />
             </ProtectedRoute>
           }
@@ -75,7 +76,7 @@ const App = () => {
         <Route
           path="/performance"
           element={
-            <ProtectedRoute roles={['admin', 'campus_manager']}>
+            <ProtectedRoute roles={MANAGEMENT_ROLES}>
               <Performance />
             </ProtectedRoute>
           }
@@ -83,7 +84,7 @@ const App = () => {
         <Route
           path="/venues"
           element={
-            <ProtectedRoute roles={['admin', 'campus_manager']}>
+            <ProtectedRoute roles={MANAGEMENT_ROLES}>
               <Venues />
             </ProtectedRoute>
           }

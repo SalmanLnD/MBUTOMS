@@ -113,6 +113,13 @@ export const EditIcon = (props) => (
   </IconBase>
 );
 
+export const EyeIcon = (props) => (
+  <IconBase {...props}>
+    <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z" />
+    <circle cx="12" cy="12" r="3" />
+  </IconBase>
+);
+
 export const AttendanceIcon = (props) => (
   <IconBase {...props}>
     <path d="M9 11l3 3L22 4" />

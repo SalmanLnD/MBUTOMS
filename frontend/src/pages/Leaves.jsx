@@ -11,10 +11,11 @@ import { formatTimeRange } from '../utils/scheduleUtils.js';
 import Modal from '../components/Modal.jsx';
 import ConfirmModal from '../components/ConfirmModal.jsx';
 import { TrashIcon } from '../components/icons.jsx';
+import ActionIconButton from '../components/ActionIconButton.jsx';
 
 const Leaves = () => {
-  const { hasRole } = useAuth();
-  const canApprove = hasRole('admin', 'campus_manager');
+  const { hasManagementRole } = useAuth();
+  const canApprove = hasManagementRole();
 
   const [leaves, setLeaves] = useState([]);
   const [pagination, setPagination] = useState(null);
@@ -73,7 +74,7 @@ const Leaves = () => {
   useEffect(() => {
     if (!showForm || !form.startDate || !form.endDate) return;
     // Preview only works when a trainer context exists (trainer role)
-    if (hasRole('admin', 'campus_manager') && !form.trainer) {
+    if (hasManagementRole() && !form.trainer) {
       setPreview(null);
       return;
     }
@@ -187,16 +188,13 @@ const Leaves = () => {
                           </div>
                         )}
                         {canCancelLeave(leave) && (
-                          <button
-                            type="button"
-                            className="btn btn-sm btn-outline-danger d-inline-flex align-items-center justify-content-center"
-                            style={{ width: '2rem', height: '2rem', padding: 0 }}
-                            aria-label={`Cancel leave for ${leave.trainer?.name}`}
+                          <ActionIconButton
+                            variant="delete"
+                            icon={TrashIcon}
                             title="Cancel leave"
+                            aria-label={`Cancel leave for ${leave.trainer?.name}`}
                             onClick={() => handleDelete(leave)}
-                          >
-                            <TrashIcon size={16} />
-                          </button>
+                          />
                         )}
                       </div>
                     </td>

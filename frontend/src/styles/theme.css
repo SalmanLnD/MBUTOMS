@@ -106,6 +106,76 @@ body {
   transform: translateY(-1px);
 }
 
+/* Table row action buttons — muted, icon-only */
+.action-btn-group .action-btn {
+  width: 2rem;
+  height: 2rem;
+  padding: 0;
+}
+
+.action-btn {
+  width: 2rem;
+  height: 2rem;
+  padding: 0;
+  background: transparent;
+  border: 1px solid;
+  transition: background-color 0.2s, border-color 0.2s, color 0.2s;
+}
+
+.action-btn:hover,
+.action-btn:focus-visible {
+  transform: none;
+  box-shadow: none;
+}
+
+.action-btn-view {
+  color: #475569;
+  border-color: #94a3b8;
+}
+
+.action-btn-view:hover,
+.action-btn-view:focus-visible {
+  color: #1e293b;
+  background: #f1f5f9;
+  border-color: #64748b;
+}
+
+.action-btn-edit {
+  color: #334155;
+  border-color: #94a3b8;
+}
+
+.action-btn-edit:hover,
+.action-btn-edit:focus-visible {
+  color: #0f172a;
+  background: #f1f5f9;
+  border-color: #64748b;
+}
+
+.action-btn-key {
+  color: #57534e;
+  border-color: #a8a29e;
+}
+
+.action-btn-key:hover,
+.action-btn-key:focus-visible {
+  color: #292524;
+  background: #f5f5f4;
+  border-color: #78716c;
+}
+
+.action-btn-delete {
+  color: #7f1d1d;
+  border-color: #b91c1c;
+}
+
+.action-btn-delete:hover,
+.action-btn-delete:focus-visible {
+  color: #fff;
+  background: #7f1d1d;
+  border-color: #7f1d1d;
+}
+
 /* Form controls — depth + gradient focus ring */
 .form-control,
 .form-select {

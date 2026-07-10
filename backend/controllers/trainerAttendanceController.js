@@ -24,6 +24,7 @@ import {
   isItOif,
   resolveMockPrepHoursForOif,
 } from '../utils/attendanceOifRules.js';
+import { mergeRosterFilter } from '../utils/rosterFilter.js';
 
 const buildLogMap = (logs) => {
   const map = new Map();
@@ -88,7 +89,9 @@ export const getTrainerAttendanceGrid = async (req, res) => {
     trainerFilter._id = req.user.trainer;
   }
 
-  const trainers = await Trainer.find(trainerFilter)
+  const finalTrainerFilter = await mergeRosterFilter(trainerFilter, { rosterOnly: true });
+
+  const trainers = await Trainer.find(finalTrainerFilter)
     .select('name employeeId scheduleTrainerCodes')
     .sort({ name: 1 })
     .lean();

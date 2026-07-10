@@ -12,12 +12,17 @@
   box-shadow: var(--shadow-lift);
 }
 
-.topbar h1 {
-  background: linear-gradient(135deg, var(--toms-navy-900) 0%, var(--toms-navy-700) 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
-  font-weight: 700;
+.topbar-view-as .styled-select-trigger {
+  min-height: 2rem;
+  font-size: 0.82rem;
+}
+
+.impersonation-banner {
+  padding: 0.55rem 0.85rem;
+  border-radius: var(--radius-md, 0.75rem);
+  border: 1px solid rgba(20, 184, 166, 0.35);
+  background: rgba(20, 184, 166, 0.1);
+  color: var(--toms-navy-800, #162033);
 }
 
 .topbar-user {

@@ -24,6 +24,7 @@ const trainerSchema = new mongoose.Schema(
     weeklyWorkloadHours: { type: Number, default: 0 },
     performanceScore: { type: Number, default: 0, min: 0, max: 100 },
     scheduleTrainerCodes: [{ type: String, trim: true }],
+    showInRoster: { type: Boolean, default: true },
   },
   { timestamps: true }
 );

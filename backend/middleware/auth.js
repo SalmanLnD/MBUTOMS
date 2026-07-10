@@ -1,5 +1,6 @@
 import jwt from 'jsonwebtoken';
 import User from '../models/User.js';
+import { isAuthorizedRole } from '../utils/roles.js';
 
 export const protect = async (req, res, next) => {
   let token;
@@ -18,6 +19,14 @@ export const protect = async (req, res, next) => {
     if (!req.user) {
       return res.status(401).json({ message: 'User not found' });
     }
+
+    if (decoded.impersonatedBy) {
+      req.impersonator = await User.findById(decoded.impersonatedBy).select('-password');
+      if (!req.impersonator) {
+        return res.status(401).json({ message: 'Impersonation session is invalid' });
+      }
+    }
+
     next();
   } catch {
     return res.status(401).json({ message: 'Not authorized, token invalid' });
@@ -25,9 +34,15 @@ export const protect = async (req, res, next) => {
 };
 
 export const authorize = (...roles) => (req, res, next) => {
-  if (!roles.includes(req.user.role)) {
+  if (req.impersonator) {
     return res.status(403).json({
-      message: `Role '${req.user.role}' is not authorized for this action`,
+      message: 'Exit trainer view before using admin features.',
+    });
+  }
+
+  if (!isAuthorizedRole(req.user?.role, roles)) {
+    return res.status(403).json({
+      message: `Role '${req.user?.role}' is not authorized for this action`,
     });
   }
   next();

@@ -11,6 +11,7 @@ const Modal = ({
   footer,
   size = '',
   scrollable = false,
+  dismissible = true,
 }) => {
   const onCloseRef = useRef(onClose);
   onCloseRef.current = onClose;
@@ -22,7 +23,7 @@ const Modal = ({
     cleanupBootstrapArtifacts();
 
     const handleEscape = (e) => {
-      if (e.key === 'Escape') onCloseRef.current?.();
+      if (e.key === 'Escape' && dismissible) onCloseRef.current?.();
     };
 
     document.addEventListener('keydown', handleEscape);
@@ -31,7 +32,7 @@ const Modal = ({
       document.removeEventListener('keydown', handleEscape);
       unlockBodyScroll();
     };
-  }, [show]);
+  }, [show, dismissible]);
 
   if (!show) return null;
 
@@ -40,7 +41,13 @@ const Modal = ({
     .join(' ');
 
   return createPortal(
-    <div className="toms-modal-overlay" onClick={() => onCloseRef.current?.()} role="presentation">
+    <div
+      className="toms-modal-overlay"
+      onClick={() => {
+        if (dismissible) onCloseRef.current?.();
+      }}
+      role="presentation"
+    >
       <div
         className={dialogClass}
         onClick={(e) => e.stopPropagation()}
@@ -52,12 +59,14 @@ const Modal = ({
           {title && (
             <div className="toms-modal-header">
               <h5 className="toms-modal-title" id="toms-modal-title">{title}</h5>
-              <button
-                type="button"
-                className="btn-close"
-                onClick={() => onCloseRef.current?.()}
-                aria-label="Close"
-              />
+              {dismissible && (
+                <button
+                  type="button"
+                  className="btn-close"
+                  onClick={() => onCloseRef.current?.()}
+                  aria-label="Close"
+                />
+              )}
             </div>
           )}
           {children}

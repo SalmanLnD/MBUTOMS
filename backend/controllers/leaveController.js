@@ -3,6 +3,7 @@ import Schedule from '../models/Schedule.js';
 import Trainer from '../models/Trainer.js';
 import { normalizeDate } from '../utils/scheduleHelpers.js';
 import { resolveTrainerScheduleCodes } from '../utils/trainerMappings.js';
+import { isAuthorizedRole, MANAGEMENT_ROLES } from '../utils/roles.js';
 
 const WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
@@ -100,7 +101,7 @@ export const updateLeave = async (req, res) => {
   const leave = await Leave.findById(req.params.id);
   if (!leave) return res.status(404).json({ message: 'Leave not found' });
 
-  if (!['admin', 'campus_manager'].includes(req.user.role)) {
+  if (!isAuthorizedRole(req.user.role, MANAGEMENT_ROLES)) {
     return res.status(403).json({ message: 'Only managers can approve or reject leaves' });
   }
 
@@ -166,7 +167,7 @@ export const deleteLeave = async (req, res) => {
     if (leave.trainer._id.toString() !== req.user.trainer?.toString()) {
       return res.status(403).json({ message: 'Not authorized' });
     }
-  } else if (!['admin', 'campus_manager'].includes(req.user.role)) {
+  } else if (!isAuthorizedRole(req.user.role, MANAGEMENT_ROLES)) {
     return res.status(403).json({ message: 'Not authorized' });
   }
 

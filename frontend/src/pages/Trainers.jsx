@@ -11,12 +11,13 @@ import ConfirmModal from '../components/ConfirmModal.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
 import { useDebounce } from '../hooks/useDebounce.js';
 import { getTrainers, deleteTrainer, resetTrainerPassword } from '../services/trainerService.js';
-import { KeyIcon } from '../components/icons.jsx';
+import { EditIcon, EyeIcon, KeyIcon, TrashIcon } from '../components/icons.jsx';
+import ActionIconButton from '../components/ActionIconButton.jsx';
 import { getErrorMessage } from '../utils/helpers.js';
 
 const Trainers = () => {
-  const { hasRole } = useAuth();
-  const canManage = hasRole('admin', 'campus_manager');
+  const { hasManagementRole, hasFullAccess } = useAuth();
+  const canManage = hasManagementRole();
   const [searchParams, setSearchParams] = useSearchParams();
   const tabParam = searchParams.get('tab');
   const activeTab = ['attendance', 'logs'].includes(tabParam) ? tabParam : 'directory';
@@ -247,20 +248,28 @@ const Trainers = () => {
                                 : '-'}
                             </td>
                             <td>
-                              <div className="btn-group btn-group-sm">
-                                <Link to={`/trainers/${trainer._id}`} className="btn btn-outline-primary">
-                                  View
-                                </Link>
+                              <div className="btn-group btn-group-sm action-btn-group">
+                                <ActionIconButton
+                                  variant="view"
+                                  icon={EyeIcon}
+                                  to={`/trainers/${trainer._id}`}
+                                  title="View trainer"
+                                  aria-label={`View ${trainer.name}`}
+                                />
                                 {canManage && (
                                   <>
-                                    <button type="button" className="btn btn-outline-secondary" onClick={() => handleEdit(trainer)}>
-                                      Edit
-                                    </button>
-                                    {hasRole('admin') && (
+                                    <ActionIconButton
+                                      variant="edit"
+                                      icon={EditIcon}
+                                      title="Edit trainer"
+                                      aria-label={`Edit ${trainer.name}`}
+                                      onClick={() => handleEdit(trainer)}
+                                    />
+                                    {hasFullAccess() && (
                                       <>
-                                        <button
-                                          type="button"
-                                          className="btn btn-outline-warning"
+                                        <ActionIconButton
+                                          variant="key"
+                                          icon={KeyIcon}
                                           title="Reset password to initial OTP"
                                           aria-label={`Reset password for ${trainer.name}`}
                                           onClick={() => setPendingReset({
@@ -268,16 +277,14 @@ const Trainers = () => {
                                             name: trainer.name,
                                             email: trainer.email,
                                           })}
-                                        >
-                                          <KeyIcon size={16} aria-hidden="true" />
-                                        </button>
-                                        <button
-                                          type="button"
-                                          className="btn btn-outline-danger"
+                                        />
+                                        <ActionIconButton
+                                          variant="delete"
+                                          icon={TrashIcon}
+                                          title="Delete trainer"
+                                          aria-label={`Delete ${trainer.name}`}
                                           onClick={() => handleDelete(trainer._id, trainer.name)}
-                                        >
-                                          Delete
-                                        </button>
+                                        />
                                       </>
                                     )}
                                   </>
