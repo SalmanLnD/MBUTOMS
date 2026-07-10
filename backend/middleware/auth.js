@@ -1,6 +1,7 @@
 import jwt from 'jsonwebtoken';
 import User from '../models/User.js';
 import { isAuthorizedRole } from '../utils/roles.js';
+import { attachManagerEditNotifier } from '../utils/managerEditNotifications.js';
 
 export const protect = async (req, res, next) => {
   let token;
@@ -27,6 +28,7 @@ export const protect = async (req, res, next) => {
       }
     }
 
+    attachManagerEditNotifier(req, res);
     next();
   } catch {
     return res.status(401).json({ message: 'Not authorized, token invalid' });

@@ -17,6 +17,7 @@ import studentRoutes from './routes/studentRoutes.js';
 import sheetsRoutes from './routes/sheetsRoutes.js';
 import feedbackRoutes from './routes/feedbackRoutes.js';
 import webhookRoutes from './routes/webhookRoutes.js';
+import notificationRoutes from './routes/notificationRoutes.js';
 
 dotenv.config();
 const app = express();
@@ -61,6 +62,7 @@ app.use('/api/students', studentRoutes);
 app.use('/api/sheets', sheetsRoutes);
 app.use('/api/feedback', feedbackRoutes);
 app.use('/api/webhooks', webhookRoutes);
+app.use('/api/notifications', notificationRoutes);
 
 app.use(notFound);
 app.use(errorHandler);

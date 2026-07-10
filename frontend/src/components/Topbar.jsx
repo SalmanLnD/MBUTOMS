@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.jsx';
 import StyledSelect from './StyledSelect.jsx';
+import NotificationBell from './NotificationBell.jsx';
 import { formatRole } from '../utils/helpers.js';
 import { showError } from '../utils/toast.js';
 import { getErrorMessage } from '../utils/helpers.js';
@@ -111,6 +112,8 @@ const Topbar = ({ title }) => {
               />
             </div>
           )}
+
+          <NotificationBell />
 
           <span className="topbar-user small">
             {user?.name} · {formatRole(user?.role)}
