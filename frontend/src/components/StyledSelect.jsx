@@ -50,11 +50,13 @@ const StyledSelect = ({
   const rootRef = useRef(null);
   const triggerRef = useRef(null);
   const menuRef = useRef(null);
+  const shouldScrollHighlightRef = useRef(false);
   const [open, setOpen] = useState(false);
   const [highlightIndex, setHighlightIndex] = useState(-1);
   const [menuStyle, setMenuStyle] = useState({ top: 0, left: 0, width: 0, maxHeight: 240 });
 
   const allOptions = flattenOptions(options, groups);
+  const optionsKey = allOptions.map((item) => `${item.value}:${item.label}:${item.disabled ? 1 : 0}`).join('|');
   const selectedOption = allOptions.find((item) => String(item.value) === String(value));
   const displayLabel = selectedOption?.label || placeholder;
   const isPlaceholder = !selectedOption;
@@ -104,7 +106,13 @@ const StyledSelect = ({
     if (!open) return undefined;
     updateMenuPosition();
 
-    const handleReposition = () => updateMenuPosition();
+    const handleReposition = (event) => {
+      const menu = menuRef.current;
+      if (menu && event.target instanceof Node && menu.contains(event.target)) {
+        return;
+      }
+      updateMenuPosition();
+    };
     window.addEventListener('resize', handleReposition);
     window.addEventListener('scroll', handleReposition, true);
 
@@ -132,10 +140,11 @@ const StyledSelect = ({
     if (!open) return;
     const selectedIndex = enabledOptions.findIndex((item) => String(item.value) === String(value));
     setHighlightIndex(selectedIndex >= 0 ? selectedIndex : 0);
-  }, [enabledOptions, open, value]);
+  }, [open, optionsKey, value]);
 
   useEffect(() => {
-    if (!open || highlightIndex < 0) return;
+    if (!open || highlightIndex < 0 || !shouldScrollHighlightRef.current) return;
+    shouldScrollHighlightRef.current = false;
     const optionEl = menuRef.current?.querySelector(`[data-option-index="${highlightIndex}"]`);
     optionEl?.scrollIntoView({ block: 'nearest' });
   }, [highlightIndex, open]);
@@ -153,6 +162,7 @@ const StyledSelect = ({
         const next = prev < enabledOptions.length - 1 ? prev + 1 : 0;
         return next;
       });
+      shouldScrollHighlightRef.current = true;
       return;
     }
 
@@ -166,6 +176,7 @@ const StyledSelect = ({
         const next = prev > 0 ? prev - 1 : enabledOptions.length - 1;
         return next;
       });
+      shouldScrollHighlightRef.current = true;
       return;
     }
 

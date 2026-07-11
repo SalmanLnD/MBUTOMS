@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.jsx';
 import { useLoginModal } from '../context/LoginModalContext.jsx';
@@ -77,13 +77,16 @@ const Topbar = ({ title }) => {
     }
   };
 
-  const impersonationOptions = [
-    { value: '', label: loadingTargets ? 'Loading trainers...' : 'View as trainer...' },
-    ...targets.map((target) => ({
-      value: target._id,
-      label: `${target.name} (${target.employeeId})`,
-    })),
-  ];
+  const impersonationOptions = useMemo(
+    () => [
+      { value: '', label: loadingTargets ? 'Loading trainers...' : 'View as trainer...' },
+      ...targets.map((target) => ({
+        value: target._id,
+        label: `${target.name} (${target.employeeId})`,
+      })),
+    ],
+    [loadingTargets, targets]
+  );
 
   return (
     <>
