@@ -2,15 +2,17 @@ import { useState, useEffect } from 'react';
 import Topbar from '../components/Topbar.jsx';
 import LoadingSpinner from '../components/LoadingSpinner.jsx';
 import Pagination from '../components/Pagination.jsx';
+import VenueDetailModal from '../components/VenueDetailModal.jsx';
 import { showError, showSuccess } from '../utils/toast.js';
 import VenueFormModal from '../components/VenueFormModal.jsx';
 import ConfirmModal from '../components/ConfirmModal.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
 import { useDebounce } from '../hooks/useDebounce.js';
-import { getVenues, deleteVenue } from '../services/venueService.js';
+import { getVenues, getVenueMappingReference, deleteVenue } from '../services/venueService.js';
 import { EditIcon, TrashIcon } from '../components/icons.jsx';
 import ActionIconButton from '../components/ActionIconButton.jsx';
-import { formatStatus, getErrorMessage } from '../utils/helpers.js';
+import { getErrorMessage } from '../utils/helpers.js';
+import { ROLES } from '../utils/roles.js';
 
 const venueTypes = {
   classroom: 'Classroom',
@@ -21,10 +23,12 @@ const venueTypes = {
 };
 
 const Venues = () => {
-  const { hasManagementRole, hasFullAccess } = useAuth();
+  const { user, hasManagementRole, hasFullAccess } = useAuth();
   const canManage = hasManagementRole();
+  const isTrainerView = user?.role === ROLES.TRAINER;
 
   const [venues, setVenues] = useState([]);
+  const [mappingReference, setMappingReference] = useState([]);
   const [pagination, setPagination] = useState(null);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -32,6 +36,7 @@ const Venues = () => {
   const [page, setPage] = useState(1);
   const [showModal, setShowModal] = useState(false);
   const [editingVenue, setEditingVenue] = useState(null);
+  const [viewingVenue, setViewingVenue] = useState(null);
   const [pendingDelete, setPendingDelete] = useState(null);
 
   const debouncedSearch = useDebounce(search);
@@ -39,7 +44,15 @@ const Venues = () => {
   const fetchVenues = async () => {
     setLoading(true);
     try {
-      const data = await getVenues({ page, limit: 10, search: debouncedSearch, type: typeFilter });
+      const data = await getVenues({
+        page,
+        limit: 20,
+        search: debouncedSearch,
+        type: typeFilter,
+        isActive: 'true',
+        sortBy: 'name',
+        sortOrder: 'asc',
+      });
       setVenues(data.venues);
       setPagination(data.pagination);
     } catch (err) {
@@ -52,6 +65,12 @@ const Venues = () => {
   useEffect(() => {
     fetchVenues();
   }, [page, debouncedSearch, typeFilter]);
+
+  useEffect(() => {
+    getVenueMappingReference()
+      .then((data) => setMappingReference(data.reference || []))
+      .catch(() => setMappingReference([]));
+  }, []);
 
   const handleDelete = async (id, name) => {
     setPendingDelete({ id, name });
@@ -71,7 +90,41 @@ const Venues = () => {
 
   return (
     <>
-      <Topbar title="Venue Management" />
+      <Topbar title={canManage ? 'Venue Management' : 'Venues'} />
+
+      {isTrainerView && (
+        <div className="venues-view-only-banner mb-3" role="status">
+          View only — room list and campus block mapping for reference.
+        </div>
+      )}
+
+      <div className="card table-card mb-3">
+        <div className="card-body">
+          <h2 className="h6 fw-semibold mb-3">Campus room mapping</h2>
+          <div className="table-responsive">
+            <table className="table table-sm align-middle venue-mapping-table mb-0">
+              <thead className="table-light">
+                <tr>
+                  <th>Room numbers</th>
+                  <th>Building / block</th>
+                  <th>Floor</th>
+                  <th>Notes</th>
+                </tr>
+              </thead>
+              <tbody>
+                {mappingReference.map((row) => (
+                  <tr key={row.rooms}>
+                    <td className="fw-semibold">{row.rooms}</td>
+                    <td>{row.building}</td>
+                    <td>{row.floor || '—'}</td>
+                    <td className="text-muted small">{row.notes}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
 
       <div className="card table-card">
         <div className="card-body">
@@ -80,7 +133,7 @@ const Venues = () => {
               <input
                 type="search"
                 className="form-control"
-                placeholder="Search venues..."
+                placeholder="Search room, building, or floor..."
                 value={search}
                 onChange={(e) => { setSearch(e.target.value); setPage(1); }}
               />
@@ -114,24 +167,24 @@ const Venues = () => {
                 <table className="table table-hover align-middle">
                   <thead className="table-light">
                     <tr>
-                      <th>Name</th>
-                      <th>Building</th>
+                      <th>Room</th>
+                      <th>Building / block</th>
                       <th>Floor</th>
                       <th>Capacity</th>
                       <th>Type</th>
                       <th>Status</th>
-                      {canManage && <th>Actions</th>}
+                      <th>{canManage ? 'Actions' : 'Details'}</th>
                     </tr>
                   </thead>
                   <tbody>
                     {venues.length === 0 ? (
-                      <tr><td colSpan={canManage ? 7 : 6} className="text-center text-muted py-4">No venues found</td></tr>
+                      <tr><td colSpan={7} className="text-center text-muted py-4">No venues found</td></tr>
                     ) : (
                       venues.map((venue) => (
                         <tr key={venue._id}>
                           <td className="fw-medium">{venue.name}</td>
-                          <td>{venue.building}</td>
-                          <td>{venue.floor || '-'}</td>
+                          <td>{venue.displayBuilding || venue.building}</td>
+                          <td>{venue.displayFloor || venue.floor || '—'}</td>
                           <td>{venue.capacity}</td>
                           <td>{venueTypes[venue.type] || venue.type}</td>
                           <td>
@@ -139,8 +192,8 @@ const Venues = () => {
                               {venue.isActive ? 'Active' : 'Inactive'}
                             </span>
                           </td>
-                          {canManage && (
-                            <td>
+                          <td>
+                            {canManage ? (
                               <div className="btn-group btn-group-sm action-btn-group">
                                 <ActionIconButton
                                   variant="edit"
@@ -159,8 +212,16 @@ const Venues = () => {
                                   />
                                 )}
                               </div>
-                            </td>
-                          )}
+                            ) : (
+                              <button
+                                type="button"
+                                className="btn btn-outline-primary btn-sm"
+                                onClick={() => setViewingVenue(venue)}
+                              >
+                                View
+                              </button>
+                            )}
+                          </td>
                         </tr>
                       ))
                     )}
@@ -173,7 +234,7 @@ const Venues = () => {
         </div>
       </div>
 
-      {showModal && (
+      {showModal && canManage && (
         <VenueFormModal
           venue={editingVenue}
           onClose={(saved) => {
@@ -181,6 +242,13 @@ const Venues = () => {
             setEditingVenue(null);
             if (saved) { showSuccess('Venue saved successfully'); fetchVenues(); }
           }}
+        />
+      )}
+
+      {viewingVenue && (
+        <VenueDetailModal
+          venue={viewingVenue}
+          onClose={() => setViewingVenue(null)}
         />
       )}
 

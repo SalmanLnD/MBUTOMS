@@ -10,13 +10,12 @@ import {
   PSTP_T9_TRAINER_CODE,
 } from '../utils/pstpTimetable.js';
 import {
-  PSTP_VENUE_BUILDING,
   PSTP_VENUE_NUMBERS,
   PSTP_VENUE_TRAINER_CODES,
   resolvePstpVenueNumber,
-  venueNumberToName,
   defaultVenueTypeForNumber,
 } from '../utils/pstpVenueMappings.js';
+import { upsertVenueByNumber } from '../utils/venueUpsert.js';
 
 dotenv.config();
 
@@ -29,22 +28,14 @@ if (!pstpSubject) {
 
 const venueByNumber = new Map();
 for (const venueNumber of PSTP_VENUE_NUMBERS) {
-  const name = venueNumberToName(venueNumber);
-  const venue = await Venue.findOneAndUpdate(
-    { name, building: PSTP_VENUE_BUILDING },
-    {
-      name,
-      building: PSTP_VENUE_BUILDING,
-      floor: '',
-      capacity: 60,
-      type: defaultVenueTypeForNumber(venueNumber),
-      isActive: true,
-    },
-    { upsert: true, new: true, setDefaultsOnInsert: true }
-  );
+  const venue = await upsertVenueByNumber(venueNumber, {
+    capacity: 60,
+    type: defaultVenueTypeForNumber(venueNumber),
+    isActive: true,
+  });
   venueByNumber.set(venueNumber, venue._id);
 }
-console.log(`Ensured ${venueByNumber.size} PSTP venue(s).`);
+console.log(`Ensured ${venueByNumber.size} PSTP venue(s) with mapped building details.`);
 
 const removed = await Schedule.deleteMany({
   trainerCode: { $in: [PSTP_T8_TRAINER_CODE, PSTP_T9_TRAINER_CODE] },

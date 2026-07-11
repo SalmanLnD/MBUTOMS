@@ -532,6 +532,26 @@ body {
   cursor: default;
 }
 
+.venues-view-only-banner {
+  padding: 0.55rem 0.85rem;
+  border-radius: var(--radius-md);
+  border: 1px solid rgba(59, 130, 246, 0.22);
+  background: rgba(219, 234, 254, 0.65);
+  color: #1e3a8a;
+  font-size: 0.82rem;
+  font-weight: 600;
+}
+
+.venue-mapping-table th,
+.venue-mapping-table td {
+  font-size: 0.82rem;
+}
+
+.venue-detail-list dt {
+  color: #64748b;
+  font-weight: 600;
+}
+
 .timetable-controls {
   background: rgba(255, 255, 255, 0.68);
   backdrop-filter: blur(14px);

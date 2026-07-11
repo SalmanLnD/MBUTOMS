@@ -3,13 +3,12 @@ import mongoose from 'mongoose';
 import Schedule from '../models/Schedule.js';
 import Venue from '../models/Venue.js';
 import {
-  CLASS_VENUE_BUILDING,
   CLASS_VENUE_NUMBERS,
   SAI_PRIYA_SCHEDULE_CODE,
   resolveClassVenueNumber,
-  venueNumberToName,
   defaultVenueTypeForNumber,
 } from '../utils/classVenueMappings.js';
+import { upsertVenueByNumber } from '../utils/venueUpsert.js';
 import { ADMIN_TRAINER_EMPLOYEE_ID } from '../utils/trainerMappings.js';
 import { QAVA_TRAINER_EMPLOYEE_ID } from '../utils/qavaTimetable.js';
 
@@ -20,23 +19,15 @@ await mongoose.connect(process.env.MONGODB_URI);
 const venueByNumber = new Map();
 
 for (const venueNumber of CLASS_VENUE_NUMBERS) {
-  const name = venueNumberToName(venueNumber);
-  const venue = await Venue.findOneAndUpdate(
-    { name, building: CLASS_VENUE_BUILDING },
-    {
-      name,
-      building: CLASS_VENUE_BUILDING,
-      floor: '',
-      capacity: 60,
-      type: defaultVenueTypeForNumber(venueNumber),
-      isActive: true,
-    },
-    { upsert: true, new: true, setDefaultsOnInsert: true }
-  );
+  const venue = await upsertVenueByNumber(venueNumber, {
+    capacity: 60,
+    type: defaultVenueTypeForNumber(venueNumber),
+    isActive: true,
+  });
   venueByNumber.set(venueNumber, venue._id);
 }
 
-console.log(`Ensured ${venueByNumber.size} venue(s) with building "${CLASS_VENUE_BUILDING}".`);
+console.log(`Ensured ${venueByNumber.size} class venue(s) with mapped building details.`);
 
 const schedules = await Schedule.find({
   trainerCode: { $in: [SAI_PRIYA_SCHEDULE_CODE, QAVA_TRAINER_EMPLOYEE_ID, ADMIN_TRAINER_EMPLOYEE_ID] },

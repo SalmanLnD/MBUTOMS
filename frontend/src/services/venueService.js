@@ -1,5 +1,10 @@
 import api from './api.js';
 
+export const getVenueMappingReference = async () => {
+  const { data } = await api.get('/venues/mapping-reference');
+  return data;
+};
+
 export const getVenues = async (params = {}) => {
   const { data } = await api.get('/venues', { params });
   return data;

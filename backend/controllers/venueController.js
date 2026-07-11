@@ -1,4 +1,8 @@
 import Venue from '../models/Venue.js';
+import {
+  VENUE_MAPPING_REFERENCE,
+  enrichVenueRecord,
+} from '../utils/venueBuildingMappings.js';
 
 const buildVenueQuery = (query) => {
   const filter = {};
@@ -15,9 +19,13 @@ const buildVenueQuery = (query) => {
   return filter;
 };
 
+export const getVenueMappingReference = async (req, res) => {
+  res.json({ reference: VENUE_MAPPING_REFERENCE });
+};
+
 export const getVenues = async (req, res) => {
   const page = Math.max(1, parseInt(req.query.page, 10) || 1);
-  const limit = Math.min(50, Math.max(1, parseInt(req.query.limit, 10) || 10));
+  const limit = Math.min(100, Math.max(1, parseInt(req.query.limit, 10) || 10));
   const skip = (page - 1) * limit;
 
   const filter = buildVenueQuery(req.query);
@@ -32,7 +40,7 @@ export const getVenues = async (req, res) => {
   ]);
 
   res.json({
-    venues,
+    venues: venues.map(enrichVenueRecord),
     pagination: { page, limit, total, pages: Math.ceil(total / limit) },
   });
 };
@@ -40,7 +48,7 @@ export const getVenues = async (req, res) => {
 export const getVenueById = async (req, res) => {
   const venue = await Venue.findById(req.params.id);
   if (!venue) return res.status(404).json({ message: 'Venue not found' });
-  res.json(venue);
+  res.json(enrichVenueRecord(venue));
 };
 
 export const createVenue = async (req, res) => {
@@ -53,7 +61,7 @@ export const createVenue = async (req, res) => {
   }
 
   const venue = await Venue.create(req.body);
-  res.status(201).json(venue);
+  res.status(201).json(enrichVenueRecord(venue));
 };
 
 export const updateVenue = async (req, res) => {
@@ -73,7 +81,7 @@ export const updateVenue = async (req, res) => {
 
   Object.assign(venue, req.body);
   await venue.save();
-  res.json(venue);
+  res.json(enrichVenueRecord(venue));
 };
 
 export const deleteVenue = async (req, res) => {

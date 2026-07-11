@@ -3,15 +3,14 @@ import mongoose from 'mongoose';
 import Schedule from '../models/Schedule.js';
 import Venue from '../models/Venue.js';
 import {
-  IDSA_VENUE_BUILDING,
   IDSA_VENUE_NUMBERS,
   IDSA_VENUE_TRAINER_CODES,
   IDSA_SUBJECT_CODE,
   NAVYA_IDSA_VENUE_SLOTS,
   resolveIdsaVenueNumber,
-  venueNumberToName,
   defaultVenueTypeForNumber,
 } from '../utils/idsaVenueMappings.js';
+import { upsertVenueByNumber } from '../utils/venueUpsert.js';
 import { NAVYA_TRAINER_CODE } from '../utils/navyaTimetable.js';
 import { PSTJ_SUBJECT_CODE } from '../utils/subjectSlotTimings.js';
 
@@ -22,23 +21,15 @@ await mongoose.connect(process.env.MONGODB_URI);
 const venueByNumber = new Map();
 
 for (const venueNumber of IDSA_VENUE_NUMBERS) {
-  const name = venueNumberToName(venueNumber);
-  const venue = await Venue.findOneAndUpdate(
-    { name, building: IDSA_VENUE_BUILDING },
-    {
-      name,
-      building: IDSA_VENUE_BUILDING,
-      floor: '',
-      capacity: 60,
-      type: defaultVenueTypeForNumber(venueNumber),
-      isActive: true,
-    },
-    { upsert: true, new: true, setDefaultsOnInsert: true }
-  );
+  const venue = await upsertVenueByNumber(venueNumber, {
+    capacity: 60,
+    type: defaultVenueTypeForNumber(venueNumber),
+    isActive: true,
+  });
   venueByNumber.set(venueNumber, venue._id);
 }
 
-console.log(`Ensured ${venueByNumber.size} venue(s) with building "${IDSA_VENUE_BUILDING}".`);
+console.log(`Ensured ${venueByNumber.size} IDSA venue(s) with mapped building details.`);
 
 let mapped = 0;
 let cleared = 0;

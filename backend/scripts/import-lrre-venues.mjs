@@ -3,15 +3,14 @@ import mongoose from 'mongoose';
 import Schedule from '../models/Schedule.js';
 import Venue from '../models/Venue.js';
 import {
-  LRRE_VENUE_BUILDING,
   LRRE_VENUE_NUMBERS,
   LRRE_SUBJECT_CODE,
   LRRE_V_TRAINER_EMPLOYEE_IDS,
   LRRE_TRAINER_VENUE_SLOTS,
   resolveLrreVenueNumber,
-  venueNumberToName,
   defaultVenueTypeForNumber,
 } from '../utils/lrreVenueMappings.js';
+import { upsertVenueByNumber } from '../utils/venueUpsert.js';
 import { LRRE_V_TRAINER_ALLOCATIONS } from '../utils/lrreVSemesterTimetable.js';
 
 dotenv.config();
@@ -21,23 +20,15 @@ await mongoose.connect(process.env.MONGODB_URI);
 const venueByNumber = new Map();
 
 for (const venueNumber of LRRE_VENUE_NUMBERS) {
-  const name = venueNumberToName(venueNumber);
-  const venue = await Venue.findOneAndUpdate(
-    { name, building: LRRE_VENUE_BUILDING },
-    {
-      name,
-      building: LRRE_VENUE_BUILDING,
-      floor: '',
-      capacity: 60,
-      type: defaultVenueTypeForNumber(venueNumber),
-      isActive: true,
-    },
-    { upsert: true, new: true, setDefaultsOnInsert: true }
-  );
+  const venue = await upsertVenueByNumber(venueNumber, {
+    capacity: 60,
+    type: defaultVenueTypeForNumber(venueNumber),
+    isActive: true,
+  });
   venueByNumber.set(venueNumber, venue._id);
 }
 
-console.log(`Ensured ${venueByNumber.size} LRRE venue(s) with building "${LRRE_VENUE_BUILDING}".`);
+console.log(`Ensured ${venueByNumber.size} LRRE venue(s) with mapped building details.`);
 
 const schedules = await Schedule.find({
   trainerCode: { $in: LRRE_V_TRAINER_EMPLOYEE_IDS },

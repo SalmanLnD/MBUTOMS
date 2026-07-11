@@ -2,6 +2,7 @@ import express from 'express';
 import {
   getVenues,
   getVenueById,
+  getVenueMappingReference,
   createVenue,
   updateVenue,
   deleteVenue,
@@ -14,6 +15,8 @@ import { venueValidation } from '../utils/validators.js';
 const router = express.Router();
 
 router.use(protect);
+
+router.get('/mapping-reference', asyncHandler(getVenueMappingReference));
 
 router
   .route('/')

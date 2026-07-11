@@ -20,6 +20,7 @@
     "import:class-venues": "node scripts/import-class-venues.mjs",
     "import:lrre-venues": "node scripts/import-lrre-venues.mjs",
     "import:pstp": "node scripts/import-pstp-timetables-venues.mjs",
+    "import:venue-locations": "node scripts/apply-venue-building-mappings.mjs",
     "seed:legacy": "node utils/seed.js",
     "parse:workbook": "node utils/parseWorkbook.js"
   },

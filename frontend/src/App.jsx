@@ -108,14 +108,7 @@ const App = () => (
             </ProtectedRoute>
           }
         />
-        <Route
-          path="/venues"
-          element={
-            <ProtectedRoute roles={MANAGEMENT_ROLES}>
-              <Venues />
-            </ProtectedRoute>
-          }
-        />
+        <Route path="/venues" element={<Venues />} />
       </Route>
 
       <Route path="/" element={<HomeRedirect />} />

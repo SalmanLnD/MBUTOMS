@@ -20,7 +20,7 @@ export const navItems = [
   { path: '/subjects', label: 'Subjects', Icon: SubjectIcon, roles: ALL_STAFF },
   { path: '/timetable', label: 'Timetable', Icon: CalendarIcon, roles: [...ALL_STAFF, ROLES.TRAINER] },
   { path: '/venue-schedule', label: 'Venue Schedule', Icon: VenueScheduleIcon, roles: ALL_STAFF },
-  { path: '/venues', label: 'Venues', Icon: VenueIcon, roles: ALL_STAFF },
+  { path: '/venues', label: 'Venues', Icon: VenueIcon, roles: [...ALL_STAFF, ROLES.TRAINER] },
   { path: '/classes-students', label: 'Classes & Students', Icon: ClassesIcon, roles: [...ALL_STAFF, ROLES.TRAINER] },
   { path: '/leaves', label: 'Leaves', Icon: LeaveNavIcon, roles: [...ALL_STAFF, ROLES.TRAINER] },
   { path: '/performance', label: 'Performance', Icon: ChartIcon, roles: ALL_STAFF },
