@@ -6,7 +6,7 @@ import LoadingSpinner from '../components/LoadingSpinner.jsx';
 import { showError, showSuccess } from '../utils/toast.js';
 import { useAuth } from '../context/AuthContext.jsx';
 import { useDebounce } from '../hooks/useDebounce.js';
-import { getTimetableBoard } from '../services/scheduleService.js';
+import { getPublicTimetable, getTimetableBoard } from '../services/scheduleService.js';
 import { getTrainers } from '../services/trainerService.js';
 import { getSubjects } from '../services/subjectService.js';
 import {
@@ -54,8 +54,9 @@ const buildSubjectLabel = (visibleSchedules, trainerSubjects, selectedSubject, t
 };
 
 const Timetable = () => {
-  const { hasManagementRole } = useAuth();
-  const canEdit = hasManagementRole();
+  const { user, hasManagementRole } = useAuth();
+  const isViewOnly = !user;
+  const canEdit = Boolean(user) && hasManagementRole();
 
   const [trainers, setTrainers] = useState([]);
   const [schedulesByTrainer, setSchedulesByTrainer] = useState({});
@@ -72,17 +73,34 @@ const Timetable = () => {
 
   const debouncedTrainerSearch = useDebounce(trainerSearch);
 
+  useEffect(() => {
+    if (!isViewOnly) return;
+    setEditMode(false);
+    setSlotModal(null);
+    setShowSheetSetup(false);
+    setSheetStatus(null);
+  }, [isViewOnly]);
+
   const loadData = useCallback(async () => {
     setLoading(true);
     try {
+      const referenceDate = toInputDate(new Date());
+
+      if (isViewOnly) {
+        const data = await getPublicTimetable({ referenceDate });
+        setTrainers(data.trainers || []);
+        setSchedulesByTrainer(data.schedulesByTrainer || {});
+        setAllSubjects(data.subjects || []);
+        return;
+      }
+
       const [trainerData, subjectData, boardData] = await Promise.all([
         getTrainers({ limit: 200, sortBy: 'employeeId', sortOrder: 'asc', rosterOnly: true }),
         getSubjects({ limit: 100 }),
-        getTimetableBoard({ referenceDate: toInputDate(new Date()) }),
+        getTimetableBoard({ referenceDate }),
       ]);
-      const trainerList = trainerData.trainers || [];
 
-      setTrainers(trainerList);
+      setTrainers(trainerData.trainers || []);
       setSchedulesByTrainer(boardData.schedulesByTrainer || {});
       setAllSubjects(subjectData.subjects || []);
     } catch (err) {
@@ -90,7 +108,7 @@ const Timetable = () => {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [isViewOnly]);
 
   useEffect(() => {
     loadData();
@@ -106,8 +124,9 @@ const Timetable = () => {
   }, []);
 
   useEffect(() => {
+    if (!canEdit) return;
     loadSheetStatus();
-  }, [loadSheetStatus]);
+  }, [canEdit, loadSheetStatus]);
 
   const handleSheetLinked = () => {
     setShowSheetSetup(false);
@@ -203,7 +222,7 @@ const Timetable = () => {
   };
 
   const handleCellClick = async ({ trainerCode, schedule, day, slot }) => {
-    if (!canEdit || !editMode) return;
+    if (isViewOnly || !canEdit || !editMode) return;
 
     const trainer = trainerOptions.find((item) => item.employeeId === trainerCode);
     if (!trainer) return;
@@ -260,7 +279,13 @@ const Timetable = () => {
     <>
       <Topbar title="Timetable" />
 
-      <div className="row g-3 mb-3 align-items-end timetable-controls">
+      {isViewOnly && (
+        <div className="timetable-view-only-banner mb-3" role="status">
+          View only — sign in to manage timetables and access other sections.
+        </div>
+      )}
+
+      <div className={`row g-3 mb-3 align-items-end timetable-controls${isViewOnly ? ' timetable-controls--view-only' : ''}`}>
         <div className="col-md-4">
           <label htmlFor="trainer-search" className="form-label fw-semibold">
             Search Trainers
@@ -407,10 +432,15 @@ const Timetable = () => {
                   trainerCode={trainer.employeeId}
                   subjectLabel={subjectLabel}
                   fixedSlots={fixedSlots}
+                  viewOnly={isViewOnly}
                   editMode={canEdit && editMode}
                   showSubjectInCells={!selectedSubject}
                   showTimingsInCells={showTimingsInCells}
-                  onCellClick={(cellData) => handleCellClick({ ...cellData, trainerCode: trainer.employeeId })}
+                  onCellClick={
+                    isViewOnly
+                      ? undefined
+                      : (cellData) => handleCellClick({ ...cellData, trainerCode: trainer.employeeId })
+                  }
                 />
               </section>
             );
@@ -418,7 +448,7 @@ const Timetable = () => {
         </div>
       )}
 
-      {slotModal && (
+      {slotModal && canEdit && !isViewOnly && (
         <TimetableSlotModal
           schedule={slotModal.schedule}
           trainerCode={slotModal.trainerCode}
@@ -431,7 +461,7 @@ const Timetable = () => {
         />
       )}
 
-      {showSheetSetup && (
+      {showSheetSetup && canEdit && !isViewOnly && (
         <TimetableSheetSetupModal
           show
           initialUrl={sheetStatus?.spreadsheetUrl || ''}

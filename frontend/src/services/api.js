@@ -19,8 +19,10 @@ api.interceptors.response.use(
     if (error.response?.status === 401) {
       localStorage.removeItem('toms_token');
       localStorage.removeItem('toms_user');
-      if (window.location.pathname !== '/login') {
-        window.location.href = '/login';
+      const path = window.location.pathname;
+      const isPublicPath = path === '/timetable' || path.startsWith('/f/');
+      if (!isPublicPath && path !== '/login') {
+        window.location.href = '/timetable';
       }
     }
     return Promise.reject(error);

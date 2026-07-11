@@ -6,6 +6,7 @@ import 'bootstrap/dist/css/bootstrap.min.css';
 import 'react-toastify/dist/ReactToastify.css';
 import App from './App.jsx';
 import { AuthProvider } from './context/AuthContext.jsx';
+import { LoginModalProvider } from './context/LoginModalContext.jsx';
 import { resetAllModalArtifacts } from './utils/modalCleanup.js';
 import './styles/global.css';
 import './styles/theme.css';
@@ -23,18 +24,20 @@ ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
     <BrowserRouter>
       <AuthProvider>
-        <App />
-        <ToastContainer
-          position="top-right"
-          autoClose={3000}
-          hideProgressBar={false}
-          newestOnTop
-          closeOnClick
-          pauseOnFocusLoss
-          draggable
-          pauseOnHover
-          theme="colored"
-        />
+        <LoginModalProvider>
+          <App />
+          <ToastContainer
+            position="top-right"
+            autoClose={3000}
+            hideProgressBar={false}
+            newestOnTop
+            closeOnClick
+            pauseOnFocusLoss
+            draggable
+            pauseOnHover
+            theme="colored"
+          />
+        </LoginModalProvider>
       </AuthProvider>
     </BrowserRouter>
   </React.StrictMode>

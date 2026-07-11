@@ -1,6 +1,7 @@
 import express from 'express';
 import {
   getSchedules,
+  getPublicTimetable,
   getTimetableBoard,
   getScheduleById,
   getTrainerSchedule,
@@ -16,6 +17,8 @@ import { asyncHandler } from '../middleware/asyncHandler.js';
 import { scheduleValidation } from '../utils/validators.js';
 
 const router = express.Router();
+
+router.get('/public-timetable', asyncHandler(getPublicTimetable));
 
 router.use(protect);
 

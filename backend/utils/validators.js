@@ -49,6 +49,8 @@ export const scheduleValidation = [
   body('subject').optional().isMongoId().withMessage('Invalid subject'),
   body('classId').optional().isMongoId().withMessage('Invalid class'),
   body('venue').optional({ values: 'null' }).isMongoId().withMessage('Invalid venue'),
+  body('isLab').optional().isBoolean().withMessage('isLab must be a boolean'),
+  body('isProject').optional().isBoolean().withMessage('isProject must be a boolean'),
 ];
 
 export const classValidation = [

@@ -21,6 +21,8 @@ const emptyForm = {
   endTime: '10:50',
   semester: 'III',
   venueId: '',
+  isLab: false,
+  isProject: false,
 };
 
 const TimetableSlotModal = ({
@@ -115,6 +117,8 @@ const TimetableSlotModal = ({
       endTime: schedule?.endTime || times.endTime,
       semester: schedule?.semester || matchedClass?.currentSemester || subjectSemesterRoman,
       venueId: schedule?.venue?._id || schedule?.venue || '',
+      isLab: Boolean(schedule?.isLab),
+      isProject: Boolean(schedule?.isProject),
     });
   }, [schedule, trainerCode, day, slot, subject, subjects, subjectSemesterRoman, classOptions]);
 
@@ -165,6 +169,10 @@ const TimetableSlotModal = ({
     setForm((prev) => ({ ...prev, [name]: value }));
   };
 
+  const toggleSessionTag = (field) => {
+    setForm((prev) => ({ ...prev, [field]: !prev[field] }));
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
@@ -183,6 +191,8 @@ const TimetableSlotModal = ({
       subject: form.subjectId || undefined,
       semester: form.semester,
       venue: form.venueId || null,
+      isLab: form.isLab,
+      isProject: form.isProject,
     };
 
     try {
@@ -225,115 +235,139 @@ const TimetableSlotModal = ({
           <div className="toms-modal-body">
             {error && <div className="alert alert-danger">{error}</div>}
 
-            <div className="row g-3">
-              <div className="col-md-6">
-                <label className="form-label" htmlFor="slot-subject">Subject *</label>
-                <StyledSelect
-                  id="slot-subject"
-                  name="subjectId"
-                  value={form.subjectId}
-                  onChange={handleChange}
-                  required
-                  disabled={Boolean(subject) && !isEdit}
-                  placeholder="Select subject"
-                  options={[
-                    { value: '', label: 'Select subject' },
-                    ...subjects.map((item) => ({
-                      value: item._id,
-                      label: `${item.name} (${item.code})`,
-                    })),
-                  ]}
-                />
+            <div className="timetable-slot-modal-layout">
+              <div className="timetable-slot-modal-main">
+                <div className="row g-3">
+                  <div className="col-md-6">
+                    <label className="form-label" htmlFor="slot-subject">Subject *</label>
+                    <StyledSelect
+                      id="slot-subject"
+                      name="subjectId"
+                      value={form.subjectId}
+                      onChange={handleChange}
+                      required
+                      disabled={Boolean(subject) && !isEdit}
+                      placeholder="Select subject"
+                      options={[
+                        { value: '', label: 'Select subject' },
+                        ...subjects.map((item) => ({
+                          value: item._id,
+                          label: `${item.name} (${item.code})`,
+                        })),
+                      ]}
+                    />
+                  </div>
+                  <div className="col-md-6">
+                    <label className="form-label" htmlFor="slot-period">Period *</label>
+                    <StyledSelect
+                      id="slot-period"
+                      name="slot"
+                      value={form.slot}
+                      onChange={handleChange}
+                      required
+                      options={getActiveSlotKeys(selectedSubject).map((slotKey) => {
+                        const times = getSlotTimesForSubject(selectedSubject, slotKey);
+                        return {
+                          value: slotKey,
+                          label: `${slotKey} (${times.startTime} – ${times.endTime})`,
+                        };
+                      })}
+                    />
+                  </div>
+                  <div className="col-md-4">
+                    <label className="form-label" htmlFor="slot-day">Day *</label>
+                    <StyledSelect
+                      id="slot-day"
+                      name="day"
+                      value={form.day}
+                      onChange={handleChange}
+                      required
+                      options={['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'].map((weekday) => ({
+                        value: weekday,
+                        label: weekday,
+                      }))}
+                    />
+                  </div>
+                  <div className="col-md-4">
+                    <label className="form-label">Start time</label>
+                    <input className="form-control" value={form.startTime} readOnly />
+                  </div>
+                  <div className="col-md-4">
+                    <label className="form-label">End time</label>
+                    <input className="form-control" value={form.endTime} readOnly />
+                  </div>
+                  <div className="col-12">
+                    <label className="form-label" htmlFor="slot-class">Class *</label>
+                    {classesLoading ? (
+                      <div className="text-muted small">Loading registered classes...</div>
+                    ) : (
+                      <StyledSelect
+                        id="slot-class"
+                        name="classId"
+                        value={form.classId}
+                        onChange={handleChange}
+                        required
+                        placeholder="Select a registered class"
+                        options={[
+                          { value: '', label: 'Select a registered class' },
+                          ...visibleClassOptions.map((item) => ({
+                            value: item._id,
+                            label: `${item.department} ${item.section} · PY ${item.py} · Sem ${item.currentSemester}${item.__legacy ? ' (current assignment)' : ''}`,
+                          })),
+                        ]}
+                      />
+                    )}
+                    {!classesLoading && visibleClassOptions.length === 0 && (
+                      <small className="text-muted d-block mt-1">
+                        {subjectHasClassRestrictions(selectedSubject)
+                          ? `No classes registered for this subject${subjectSemesterRoman ? ` in semester ${subjectSemesterRoman}` : ''}. Add matching classes under Classes & Students first.`
+                          : `No classes registered for semester ${subjectSemesterRoman}. Add classes under Classes & Students first.`}
+                      </small>
+                    )}
+                  </div>
+                  <div className="col-12">
+                    <label className="form-label" htmlFor="slot-venue">Venue</label>
+                    {venuesLoading ? (
+                      <div className="text-muted small">Loading venues...</div>
+                    ) : (
+                      <StyledSelect
+                        id="slot-venue"
+                        name="venueId"
+                        value={form.venueId}
+                        onChange={handleChange}
+                        placeholder="No venue assigned"
+                        options={[
+                          { value: '', label: 'No venue assigned' },
+                          ...venueOptions.map((item) => ({
+                            value: item._id,
+                            label: `${item.name}${item.building ? ` · ${item.building}` : ''}`,
+                          })),
+                        ]}
+                      />
+                    )}
+                  </div>
+                </div>
               </div>
-              <div className="col-md-6">
-                <label className="form-label" htmlFor="slot-period">Period *</label>
-                <StyledSelect
-                  id="slot-period"
-                  name="slot"
-                  value={form.slot}
-                  onChange={handleChange}
-                  required
-                  options={getActiveSlotKeys(selectedSubject).map((slotKey) => {
-                    const times = getSlotTimesForSubject(selectedSubject, slotKey);
-                    return {
-                      value: slotKey,
-                      label: `${slotKey} (${times.startTime} – ${times.endTime})`,
-                    };
-                  })}
-                />
-              </div>
-              <div className="col-md-4">
-                <label className="form-label" htmlFor="slot-day">Day *</label>
-                <StyledSelect
-                  id="slot-day"
-                  name="day"
-                  value={form.day}
-                  onChange={handleChange}
-                  required
-                  options={['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'].map((weekday) => ({
-                    value: weekday,
-                    label: weekday,
-                  }))}
-                />
-              </div>
-              <div className="col-md-4">
-                <label className="form-label">Start time</label>
-                <input className="form-control" value={form.startTime} readOnly />
-              </div>
-              <div className="col-md-4">
-                <label className="form-label">End time</label>
-                <input className="form-control" value={form.endTime} readOnly />
-              </div>
-              <div className="col-12">
-                <label className="form-label" htmlFor="slot-class">Class *</label>
-                {classesLoading ? (
-                  <div className="text-muted small">Loading registered classes...</div>
-                ) : (
-                  <StyledSelect
-                    id="slot-class"
-                    name="classId"
-                    value={form.classId}
-                    onChange={handleChange}
-                    required
-                    placeholder="Select a registered class"
-                    options={[
-                      { value: '', label: 'Select a registered class' },
-                      ...visibleClassOptions.map((item) => ({
-                        value: item._id,
-                        label: `${item.department} ${item.section} · PY ${item.py} · Sem ${item.currentSemester}${item.__legacy ? ' (current assignment)' : ''}`,
-                      })),
-                    ]}
-                  />
-                )}
-                {!classesLoading && visibleClassOptions.length === 0 && (
-                  <small className="text-muted d-block mt-1">
-                    {subjectHasClassRestrictions(selectedSubject)
-                      ? `No classes registered for this subject${subjectSemesterRoman ? ` in semester ${subjectSemesterRoman}` : ''}. Add matching classes under Classes & Students first.`
-                      : `No classes registered for semester ${subjectSemesterRoman}. Add classes under Classes & Students first.`}
-                  </small>
-                )}
-              </div>
-              <div className="col-12">
-                <label className="form-label" htmlFor="slot-venue">Venue</label>
-                {venuesLoading ? (
-                  <div className="text-muted small">Loading venues...</div>
-                ) : (
-                  <StyledSelect
-                    id="slot-venue"
-                    name="venueId"
-                    value={form.venueId}
-                    onChange={handleChange}
-                    placeholder="No venue assigned"
-                    options={[
-                      { value: '', label: 'No venue assigned' },
-                      ...venueOptions.map((item) => ({
-                        value: item._id,
-                        label: `${item.name}${item.building ? ` · ${item.building}` : ''}`,
-                      })),
-                    ]}
-                  />
-                )}
-              </div>
+
+              <aside className="timetable-slot-modal-tags" aria-label="Session tags">
+                <span className="timetable-slot-modal-tags-label">Tags</span>
+                <button
+                  type="button"
+                  className={`timetable-tag-toggle timetable-tag-toggle--lab${form.isLab ? ' is-active' : ''}`}
+                  aria-pressed={form.isLab}
+                  onClick={() => toggleSessionTag('isLab')}
+                >
+                  Lab
+                </button>
+                <button
+                  type="button"
+                  className={`timetable-tag-toggle timetable-tag-toggle--project${form.isProject ? ' is-active' : ''}`}
+                  aria-pressed={form.isProject}
+                  onClick={() => toggleSessionTag('isProject')}
+                >
+                  Project
+                </button>
+              </aside>
             </div>
           </div>
           <div className="toms-modal-footer d-flex justify-content-between">

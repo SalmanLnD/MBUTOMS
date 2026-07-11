@@ -5,6 +5,11 @@ export const getSchedules = async (params = {}) => {
   return data;
 };
 
+export const getPublicTimetable = async (params = {}) => {
+  const { data } = await api.get('/schedules/public-timetable', { params });
+  return data;
+};
+
 export const getTimetableBoard = async (params = {}) => {
   const { data } = await api.get('/schedules/timetable-board', { params });
   return data;

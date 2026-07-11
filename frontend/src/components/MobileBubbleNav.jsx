@@ -68,6 +68,11 @@ const MobileBubbleNav = () => {
     setOpen((current) => !current);
   };
 
+  const handleLogout = useCallback(() => {
+    logout();
+    navigate('/timetable');
+  }, [logout, navigate]);
+
   const handleNavigate = useCallback(
     (path) => {
       setOpen(false);
@@ -75,6 +80,8 @@ const MobileBubbleNav = () => {
     },
     [navigate]
   );
+
+  if (!user) return null;
 
   return (
     <div className={`bubble-nav ${open ? 'bubble-nav--open' : ''}`}>
@@ -96,7 +103,7 @@ const MobileBubbleNav = () => {
             <button
               type="button"
               className="bubble-nav-logout"
-              onClick={logout}
+              onClick={handleLogout}
             >
               Logout
             </button>

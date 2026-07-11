@@ -10,6 +10,12 @@ import { assertClassAllowedForSubject } from '../utils/subjectClassEligibility.j
 import ClassGroup from '../models/ClassGroup.js';
 
 import { buildTimetableBoardForDate } from '../utils/timetableBoard.js';
+import { mergeRosterFilter } from '../utils/rosterFilter.js';
+import {
+  sanitizeSchedulesByTrainerForPublic,
+  sanitizeTrainerForPublic,
+  sanitizeSubjectForPublic,
+} from '../utils/publicTimetable.js';
 
 const DAY_ORDER = {
   Monday: 1,
@@ -138,7 +144,40 @@ const enrichSchedulePayload = async (body) => {
     }
   }
 
+  payload.isLab = payload.isLab === true || payload.isLab === 'true';
+  payload.isProject = payload.isProject === true || payload.isProject === 'true';
+
   return payload;
+};
+
+export const getPublicTimetable = async (req, res) => {
+  const referenceDate = req.query.referenceDate || new Date();
+  const semester = req.query.semester;
+
+  const rosterFilter = await mergeRosterFilter({}, { rosterOnly: true });
+
+  const [{ schedulesByTrainer }, trainers, subjects] = await Promise.all([
+    buildTimetableBoardForDate({ referenceDate, semester }),
+    Trainer.find(rosterFilter)
+      .select('name employeeId scheduleTrainerCodes')
+      .populate('subjects', 'name code slotCount slotTimings')
+      .sort({ employeeId: 1 })
+      .limit(200)
+      .lean(),
+    Subject.find()
+      .select('code name slotCount slotTimings semester')
+      .populate('semester', 'name number')
+      .sort({ code: 1 })
+      .limit(100)
+      .lean(),
+  ]);
+
+  res.json({
+    referenceDate,
+    schedulesByTrainer: sanitizeSchedulesByTrainerForPublic(schedulesByTrainer),
+    trainers: trainers.map(sanitizeTrainerForPublic),
+    subjects: subjects.map(sanitizeSubjectForPublic),
+  });
 };
 
 export const getTimetableBoard = async (req, res) => {

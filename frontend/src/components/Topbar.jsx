@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.jsx';
+import { useLoginModal } from '../context/LoginModalContext.jsx';
 import StyledSelect from './StyledSelect.jsx';
 import NotificationBell from './NotificationBell.jsx';
 import { formatRole } from '../utils/helpers.js';
@@ -16,6 +17,7 @@ const Topbar = ({ title }) => {
     startImpersonation,
     stopImpersonation,
   } = useAuth();
+  const { openLoginModal } = useLoginModal();
   const navigate = useNavigate();
   const [targets, setTargets] = useState([]);
   const [loadingTargets, setLoadingTargets] = useState(false);
@@ -40,7 +42,11 @@ const Topbar = ({ title }) => {
 
   const handleLogout = () => {
     logout();
-    navigate('/login');
+    navigate('/timetable');
+  };
+
+  const handleLogin = () => {
+    openLoginModal();
   };
 
   const handleViewAsTrainer = async (userId) => {
@@ -100,28 +106,36 @@ const Topbar = ({ title }) => {
       <header className="topbar d-flex justify-content-between align-items-center mb-4">
         <h1 className="h4 mb-0 fw-semibold">{title}</h1>
         <div className="d-flex align-items-center gap-2 gap-md-3 flex-wrap justify-content-end">
-          {canImpersonateUsers() && (
-            <div className="topbar-view-as" style={{ minWidth: '12rem', maxWidth: '16rem' }}>
-              <StyledSelect
-                value=""
-                onChange={(event) => handleViewAsTrainer(event.target.value)}
-                options={impersonationOptions}
-                placeholder="View as trainer..."
-                aria-label="View as trainer"
-                disabled={switchingView || loadingTargets}
-              />
-            </div>
+          {user ? (
+            <>
+              {canImpersonateUsers() && (
+                <div className="topbar-view-as" style={{ minWidth: '12rem', maxWidth: '16rem' }}>
+                  <StyledSelect
+                    value=""
+                    onChange={(event) => handleViewAsTrainer(event.target.value)}
+                    options={impersonationOptions}
+                    placeholder="View as trainer..."
+                    aria-label="View as trainer"
+                    disabled={switchingView || loadingTargets}
+                  />
+                </div>
+              )}
+
+              <NotificationBell />
+
+              <span className="topbar-user small">
+                {user.name} · {formatRole(user.role)}
+              </span>
+
+              <button type="button" className="btn btn-outline-danger btn-sm" onClick={handleLogout}>
+                Logout
+              </button>
+            </>
+          ) : (
+            <button type="button" className="btn btn-primary btn-sm" onClick={handleLogin}>
+              Login
+            </button>
           )}
-
-          <NotificationBell />
-
-          <span className="topbar-user small">
-            {user?.name} · {formatRole(user?.role)}
-          </span>
-
-          <button className="btn btn-outline-danger btn-sm" onClick={handleLogout}>
-            Logout
-          </button>
         </div>
       </header>
     </>

@@ -11,11 +11,11 @@ const formatCellContent = (schedule, { showSubject, showTimingsInCells, trainerC
   if (showTimingsInCells) {
     return (
       <>
-        <small className="text-muted d-block">{timeLabel}</small>
-        <span className="d-block fw-semibold">{classLabel}</span>
-        {venueLabel && <small className="text-muted d-block">Venue {venueLabel}</small>}
+        <small className="timetable-cell-meta">{timeLabel}</small>
+        <span className="timetable-cell-class">{classLabel}</span>
+        {venueLabel && <small className="timetable-cell-meta">Venue {venueLabel}</small>}
         {showSubject && subjectCode && (
-          <small className="text-muted d-block">{subjectCode}</small>
+          <small className="timetable-cell-meta">{subjectCode}</small>
         )}
       </>
     );
@@ -24,17 +24,17 @@ const formatCellContent = (schedule, { showSubject, showTimingsInCells, trainerC
   if (showSubject && subjectCode) {
     return (
       <>
-        <span className="d-block fw-semibold">{classLabel}</span>
-        {venueLabel && <small className="text-muted d-block">Venue {venueLabel}</small>}
-        <small className="text-muted">{subjectCode}</small>
+        <span className="timetable-cell-class">{classLabel}</span>
+        {venueLabel && <small className="timetable-cell-meta">Venue {venueLabel}</small>}
+        <small className="timetable-cell-meta">{subjectCode}</small>
       </>
     );
   }
 
   return (
     <>
-      <span className="d-block fw-semibold">{classLabel}</span>
-      {venueLabel && <small className="text-muted d-block">Venue {venueLabel}</small>}
+      <span className="timetable-cell-class">{classLabel}</span>
+      {venueLabel && <small className="timetable-cell-meta">Venue {venueLabel}</small>}
     </>
   );
 };
@@ -46,6 +46,7 @@ const TrainerTimetableGrid = ({
   days = WEEKDAYS,
   fixedSlots = null,
   editMode = false,
+  viewOnly = false,
   showSubjectInCells = false,
   showTimingsInCells = false,
   onCellClick,
@@ -58,13 +59,14 @@ const TrainerTimetableGrid = ({
   );
   const hasFixedSlots = Boolean(fixedSlots?.length) || showTimingsInCells;
   const cellContentOptions = { showSubject: showSubjectInCells, showTimingsInCells, trainerCode };
+  const allowCellEdit = editMode && !viewOnly && Boolean(onCellClick) && !showTimingsInCells;
 
   if (!hasFixedSlots && timeSlots.length === 0) {
     return (
       <div className="card table-card">
         <div className="card-body text-center text-muted py-5">
           No classes scheduled{trainerCode ? ` for ${trainerCode}` : ''}.
-          {editMode && (
+          {editMode && !viewOnly && (
             <p className="mb-0 mt-2 small">
               Add a subject above, then click a cell to create timetable slots.
             </p>
@@ -84,23 +86,23 @@ const TrainerTimetableGrid = ({
         </div>
       )}
       <div className="card-body p-0">
-        <div className={`timetable-grid-wrap${showHeaderLabel ? '' : ' timetable-grid-wrap--full'}`}>
-          <table className="table timetable-grid mb-0">
-            <thead className="table-light">
+        <div className={`timetable-grid-wrap${showHeaderLabel ? '' : ' timetable-grid-wrap--full'}${viewOnly ? ' timetable-grid-wrap--view-only' : ''}`}>
+          <table className={`table timetable-grid mb-0${viewOnly ? ' timetable-grid--view-only' : ''}`}>
+            <thead>
               <tr>
-                <th className="timetable-day-col">Day</th>
+                <th className="timetable-day-col timetable-head-day">Day</th>
                 {timeSlots.map((slot) => (
                   <th key={slot.key || `${slot.startTime}-${slot.endTime}`} className="text-center timetable-slot-col">
                     {showTimingsInCells ? (
-                      <span className="d-block fw-bold">{slot.headerLabel || slot.key}</span>
+                      <span className="timetable-slot-key">{slot.headerLabel || slot.key}</span>
                     ) : (
                       <>
                         {slot.headerLabel && (
-                          <span className="d-block fw-bold">{slot.headerLabel}</span>
+                          <span className="timetable-slot-key">{slot.headerLabel}</span>
                         )}
-                        <span className={slot.headerLabel ? 'd-block small text-muted' : ''}>
-                          {slot.subLabel}
-                        </span>
+                        {slot.subLabel && (
+                          <span className="timetable-slot-time">{slot.subLabel}</span>
+                        )}
                       </>
                     )}
                   </th>
@@ -117,7 +119,7 @@ const TrainerTimetableGrid = ({
                     const columnKey = periodOnly ? slot.key : `${slot.startTime}|${slot.endTime}`;
                     const key = `${day}|${columnKey}`;
                     const schedule = cells[key];
-                    const isClickable = editMode && onCellClick && !showTimingsInCells;
+                    const isClickable = allowCellEdit;
                     const cellClass = [
                       'text-center',
                       'timetable-cell',
@@ -126,6 +128,8 @@ const TrainerTimetableGrid = ({
                     ]
                       .filter(Boolean)
                       .join(' ');
+
+                    const hasSessionTag = Boolean(schedule?.isLab || schedule?.isProject);
 
                     return (
                       <td
@@ -166,9 +170,21 @@ const TrainerTimetableGrid = ({
                             : undefined
                         }
                       >
-                        {schedule
-                          ? formatCellContent(schedule, cellContentOptions)
-                          : (editMode && !showTimingsInCells ? '+' : '—')}
+                        {hasSessionTag && (
+                          <div className="timetable-cell-tags" aria-hidden="true">
+                            {schedule?.isProject && (
+                              <span className="timetable-session-tag timetable-session-tag--project">Project</span>
+                            )}
+                            {schedule?.isLab && (
+                              <span className="timetable-session-tag timetable-session-tag--lab">Lab</span>
+                            )}
+                          </div>
+                        )}
+                        <div className={`timetable-cell-body${hasSessionTag ? ' timetable-cell-body--tagged' : ''}`}>
+                          {schedule
+                            ? formatCellContent(schedule, cellContentOptions)
+                            : (allowCellEdit ? '+' : '—')}
+                        </div>
                       </td>
                     );
                   })}

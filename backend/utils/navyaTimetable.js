@@ -42,7 +42,7 @@ export const NAVYA_WEEKLY_SLOTS = [
 
   { day: 'Tuesday', department: 'AI&DS', section: 'AI&DS-3', ...idsa('S1') },
   { day: 'Tuesday', department: 'AI&DS', section: 'AI&DS-2', ...idsa('S2') },
-  { day: 'Tuesday', department: 'B.COM(CA)', section: '1', ...pstjAfternoon() },
+  { day: 'Tuesday', department: 'B.COM(CA)', section: '1', ...pstjAfternoon(), isLab: true },
 
   { day: 'Wednesday', department: 'AI&DS', section: 'AI&DS-2', ...idsa('S1') },
 
@@ -50,7 +50,7 @@ export const NAVYA_WEEKLY_SLOTS = [
   { day: 'Thursday', department: 'AI&DS', section: 'AI&DS-3', ...idsa('S2') },
   { day: 'Thursday', department: 'B.COM(CA)', section: '1', ...pstjAfternoon() },
 
-  { day: 'Friday', department: 'B.COM(CA)', section: '1', ...pstj('S1') },
+  { day: 'Friday', department: 'B.COM(CA)', section: '1', ...pstj('S1'), isProject: true },
   { day: 'Friday', department: 'AI&DS', section: 'AI&DS-3', ...idsa('S3') },
 ];
 
@@ -65,4 +65,6 @@ export const buildNavyaSchedulePayloads = () =>
     endTime: entry.endTime,
     slot: entry.slot,
     subjectCode: entry.subjectCode,
+    isLab: Boolean(entry.isLab),
+    isProject: Boolean(entry.isProject),
   }));
