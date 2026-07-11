@@ -1,0 +1,14 @@
+{
+  "commands": [
+    "sudo -u ubuntu bash -lc 'cd /opt/MBUTOMS && git pull --ff-only origin main'",
+    "sudo -u ubuntu bash -lc 'cd /opt/MBUTOMS/whatsapp-bridge && npm install'",
+    "grep -n 'Scheduling reconnect\\|Watchdog health check\\|ensureSingleBridgeInstance' /opt/MBUTOMS/whatsapp-bridge/index.js | head -3 | tr -cd '\\11\\12\\15\\40-\\176'",
+    "sudo pkill -9 -f 'wwebjs_auth/session' || true",
+    "sleep 2",
+    "sudo -u ubuntu bash -lc 'cd /opt/MBUTOMS/whatsapp-bridge && pm2 delete mbutoms-whatsapp-bridge 2>/dev/null || true'",
+    "sudo -u ubuntu bash -lc 'cd /opt/MBUTOMS/whatsapp-bridge && pm2 start ecosystem.config.cjs && pm2 save'",
+    "sleep 45",
+    "sudo -u ubuntu bash -lc 'pm2 jlist' | node -e \"let d='';process.stdin.on('data',c=>d+=c);process.stdin.on('end',()=>{const j=JSON.parse(d||'[]');const p=j.find(x=>x.name==='mbutoms-whatsapp-bridge');console.log('status='+p?.pm2_env?.status);console.log('restarts='+p?.pm2_env?.restart_time);console.log('uptime_sec='+Math.floor((Date.now()-p?.pm2_env?.pm_uptime)/1000));});\"",
+    "grep -E 'Bridge is ready|Listening to group|Scheduling reconnect|Watchdog|Forwarding|Recorded|Disconnected' /home/ubuntu/.pm2/logs/mbutoms-whatsapp-bridge-out.log | tail -12 | tr -cd '\\11\\12\\15\\40-\\176'"
+  ]
+}

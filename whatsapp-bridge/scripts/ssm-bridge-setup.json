@@ -12,7 +12,7 @@
     "sudo pkill -9 -f \"wwebjs_auth\" || true",
     "sudo pkill -9 -f \"chrome\" || true",
     "rm -f /opt/MBUTOMS/whatsapp-bridge/.bridge-instance.lock",
-    "sudo -u ubuntu bash -lc \"cd /opt/MBUTOMS/whatsapp-bridge && pm2 start index.js --name mbutoms-whatsapp-bridge\"",
+    "sudo -u ubuntu bash -lc \"cd /opt/MBUTOMS/whatsapp-bridge && pm2 start ecosystem.config.cjs\"",
     "sudo -u ubuntu bash -lc \"pm2 save\"",
     "sleep 15",
     "sudo -u ubuntu bash -lc \"pm2 status\"",

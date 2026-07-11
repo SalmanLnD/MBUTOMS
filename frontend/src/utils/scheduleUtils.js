@@ -39,6 +39,13 @@ export const formatScheduleClassLabel = (schedule) => {
   return `${base} (${trainerName}'s class)`;
 };
 
+export const formatScheduleVenueLabel = (schedule) => {
+  const venue = schedule?.venue;
+  if (!venue) return '';
+  if (typeof venue === 'object' && venue.name) return venue.name;
+  return '';
+};
+
 export const scheduleToEvent = (schedule, rangeStart, rangeEnd, colorIndex = 0) => {
   const date = getDateForDayInRange(schedule.day, rangeStart, rangeEnd);
   if (!date) return null;

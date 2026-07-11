@@ -4,6 +4,7 @@ import ConfirmModal from './ConfirmModal.jsx';
 import StyledSelect from './StyledSelect.jsx';
 import { createSchedule, updateSchedule, deleteSchedule } from '../services/scheduleService.js';
 import { getClasses } from '../services/classService.js';
+import { getVenues } from '../services/venueService.js';
 import { getSlotTimesForSubject, getActiveSlotKeys } from '../utils/timetableSlots.js';
 import { getErrorMessage } from '../utils/helpers.js';
 import { subjectHasClassRestrictions } from '../utils/subjectClassEligibility.js';
@@ -19,6 +20,7 @@ const emptyForm = {
   startTime: '09:00',
   endTime: '10:50',
   semester: 'III',
+  venueId: '',
 };
 
 const TimetableSlotModal = ({
@@ -38,13 +40,22 @@ const TimetableSlotModal = ({
   const [pendingDelete, setPendingDelete] = useState(false);
   const [classOptions, setClassOptions] = useState([]);
   const [classesLoading, setClassesLoading] = useState(true);
+  const [venueOptions, setVenueOptions] = useState([]);
+  const [venuesLoading, setVenuesLoading] = useState(true);
 
   const selectedSubject = subjects.find((item) => item._id === form.subjectId) || subject;
   const subjectIdForClasses = selectedSubject?._id || '';
   const subjectSemesterRoman = getSubjectSemesterRoman(selectedSubject) || semester;
 
   useEffect(() => {
-    setClassesLoading(true);
+    setVenuesLoading(true);
+    getVenues({ limit: 50, isActive: 'true' })
+      .then((data) => setVenueOptions(data?.venues || []))
+      .catch(() => setVenueOptions([]))
+      .finally(() => setVenuesLoading(false));
+  }, []);
+
+  useEffect(() => {
     const params = { semester: subjectSemesterRoman };
     if (subjectIdForClasses) {
       params.subjectId = subjectIdForClasses;
@@ -103,6 +114,7 @@ const TimetableSlotModal = ({
       startTime: schedule?.startTime || times.startTime,
       endTime: schedule?.endTime || times.endTime,
       semester: schedule?.semester || matchedClass?.currentSemester || subjectSemesterRoman,
+      venueId: schedule?.venue?._id || schedule?.venue || '',
     });
   }, [schedule, trainerCode, day, slot, subject, subjects, subjectSemesterRoman, classOptions]);
 
@@ -170,6 +182,7 @@ const TimetableSlotModal = ({
       subjectCode: selectedSubject?.code || '',
       subject: form.subjectId || undefined,
       semester: form.semester,
+      venue: form.venueId || null,
     };
 
     try {
@@ -298,6 +311,27 @@ const TimetableSlotModal = ({
                       ? `No classes registered for this subject${subjectSemesterRoman ? ` in semester ${subjectSemesterRoman}` : ''}. Add matching classes under Classes & Students first.`
                       : `No classes registered for semester ${subjectSemesterRoman}. Add classes under Classes & Students first.`}
                   </small>
+                )}
+              </div>
+              <div className="col-12">
+                <label className="form-label" htmlFor="slot-venue">Venue</label>
+                {venuesLoading ? (
+                  <div className="text-muted small">Loading venues...</div>
+                ) : (
+                  <StyledSelect
+                    id="slot-venue"
+                    name="venueId"
+                    value={form.venueId}
+                    onChange={handleChange}
+                    placeholder="No venue assigned"
+                    options={[
+                      { value: '', label: 'No venue assigned' },
+                      ...venueOptions.map((item) => ({
+                        value: item._id,
+                        label: `${item.name}${item.building ? ` · ${item.building}` : ''}`,
+                      })),
+                    ]}
+                  />
                 )}
               </div>
             </div>

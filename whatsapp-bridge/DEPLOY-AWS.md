@@ -97,7 +97,7 @@ cd /opt/MBUTOMS/whatsapp-bridge
 pm2 stop mbutoms-whatsapp-bridge
 npm start
 # scan QR, then Ctrl+C
-pm2 start index.js --name mbutoms-whatsapp-bridge
+pm2 start ecosystem.config.cjs
 pm2 save
 ```
 
@@ -159,6 +159,20 @@ aws ssm start-session --target i-04219aaf606896599 --region ap-south-1
 | `Failed to forward punch-in (404)` | Trainer phone not in MBUTOMS |
 | `Could not resolve sender phone (author=...@lid)` | WhatsApp privacy ID not resolved |
 | `No OIF found in message` | Caption missing OIF text |
+| `Disconnected:` / `Scheduling reconnect` | WhatsApp session dropped; bridge is auto-recovering |
+| `Watchdog health check failed` | Chrome/session zombie; bridge is forcing reconnect |
+
+## Deploy code updates (SSM, no SSH)
+
+After pushing changes to `main`:
+
+```powershell
+cd backend
+node scripts/ssm-run.mjs ../whatsapp-bridge/scripts/ssm-bridge-deploy.json i-0c1d0870a388d973f
+```
+
+This pulls latest code, installs deps, and restarts PM2 with `ecosystem.config.cjs`
+(memory limit + auto-restart).
 
 ## Useful commands
 

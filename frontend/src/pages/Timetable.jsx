@@ -18,7 +18,7 @@ import { getErrorMessage, toInputDate } from '../utils/helpers.js';
 import { buildFixedSlotsForSubject, resolveTrainerGridSlots } from '../utils/timetableGrid.js';
 import { shouldShowTimingsInCells } from '../utils/timetableSlots.js';
 import { getSubjectSlotProfile } from '../utils/subjectSlotTimings.js';
-import { getEffectiveSubjectCode, scheduleMatchesSubject } from '../utils/scheduleSubject.js';
+import { getEffectiveSubjectCode, scheduleMatchesSubject, resolveScheduleTrainerCode } from '../utils/scheduleSubject.js';
 import { getSubjectSemesterRoman } from '../utils/classPy.js';
 
 const inferSemesterForTrainer = (trainerCode, schedules, subject) => {
@@ -208,6 +208,8 @@ const Timetable = () => {
     const trainer = trainerOptions.find((item) => item.employeeId === trainerCode);
     if (!trainer) return;
 
+    const scheduleTrainerCode = resolveScheduleTrainerCode(trainer, schedule);
+
     let trainerSubjects = [];
     try {
       trainerSubjects = await loadTrainerSubjectsForModal(trainer._id);
@@ -226,7 +228,7 @@ const Timetable = () => {
     }
 
     setSlotModal({
-      trainerCode,
+      trainerCode: scheduleTrainerCode,
       schedule,
       day,
       slot,
@@ -234,8 +236,8 @@ const Timetable = () => {
       subjects: trainerSubjects,
       semester: schedule?.semester
         || inferSemesterForTrainer(
-          trainerCode,
-          schedulesByTrainer[trainerCode] || [],
+          scheduleTrainerCode,
+          schedulesByTrainer[trainer.employeeId] || [],
           activeSubject
         ),
     });

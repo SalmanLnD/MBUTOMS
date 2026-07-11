@@ -1,4 +1,4 @@
-﻿# Copy bridge config (and optional WhatsApp session) to EC2 and start with PM2.
+# Copy bridge config (and optional WhatsApp session) to EC2 and start with PM2.
 #
 # Usage:
 #   cd whatsapp-bridge
@@ -72,7 +72,7 @@ set -e
 cd $RemoteBridge
 npm install
 pm2 delete mbutoms-whatsapp-bridge 2>/dev/null || true
-pm2 start index.js --name mbutoms-whatsapp-bridge
+pm2 start ecosystem.config.cjs
 pm2 save
 pm2 startup systemd -u ubuntu --hp /home/ubuntu | tail -1 | bash || true
 pm2 status

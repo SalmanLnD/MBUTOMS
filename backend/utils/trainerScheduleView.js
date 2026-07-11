@@ -41,7 +41,7 @@ export const buildTrainerSchedulesForDate = async ({
   const ownedFilter = { trainerCode: { $in: scheduleCodes } };
   if (semester) ownedFilter.semester = semester;
 
-  const owned = await Schedule.find(ownedFilter);
+  const owned = await Schedule.find(ownedFilter).populate('venue', 'name building floor type');
   const ref = normalizeDate(referenceDate);
 
   const leaves = await Leave.find({

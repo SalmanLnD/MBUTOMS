@@ -48,6 +48,7 @@ export const scheduleValidation = [
   body('slot').optional().isIn(['S1', 'S2', 'S3', 'S4', '']).withMessage('Invalid slot'),
   body('subject').optional().isMongoId().withMessage('Invalid subject'),
   body('classId').optional().isMongoId().withMessage('Invalid class'),
+  body('venue').optional({ values: 'null' }).isMongoId().withMessage('Invalid venue'),
 ];
 
 export const classValidation = [

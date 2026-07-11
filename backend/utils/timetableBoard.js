@@ -43,7 +43,7 @@ export const buildTimetableBoardForDate = async ({
   const trainerById = new Map(trainers.map((trainer) => [trainer._id.toString(), trainer]));
 
   const [ownedSchedules, leaves] = await Promise.all([
-    Schedule.find(ownedFilter).lean(),
+    Schedule.find(ownedFilter).populate('venue', 'name building floor type').lean(),
     Leave.find({
       status: 'approved',
       startDate: { $lte: ref },
@@ -75,7 +75,9 @@ export const buildTimetableBoardForDate = async ({
   if (replacementScheduleIds.length) {
     const replacementSchedules = await Schedule.find({
       _id: { $in: replacementScheduleIds },
-    }).lean();
+    })
+      .populate('venue', 'name building floor type')
+      .lean();
     const scheduleById = new Map(
       replacementSchedules.map((schedule) => [schedule._id.toString(), schedule])
     );

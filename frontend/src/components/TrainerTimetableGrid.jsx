@@ -1,9 +1,10 @@
 import { buildTimetableGrid, WEEKDAYS, formatDayShort } from '../utils/timetableGrid.js';
-import { formatTimeRange, formatScheduleClassLabel } from '../utils/scheduleUtils.js';
+import { formatTimeRange, formatScheduleClassLabel, formatScheduleVenueLabel } from '../utils/scheduleUtils.js';
 import { getEffectiveSubjectCode } from '../utils/scheduleSubject.js';
 
 const formatCellContent = (schedule, { showSubject, showTimingsInCells, trainerCode }) => {
   const classLabel = formatScheduleClassLabel(schedule);
+  const venueLabel = formatScheduleVenueLabel(schedule);
   const timeLabel = formatTimeRange(schedule.startTime, schedule.endTime);
   const subjectCode = getEffectiveSubjectCode(schedule, trainerCode) || schedule.subjectCode;
 
@@ -12,6 +13,7 @@ const formatCellContent = (schedule, { showSubject, showTimingsInCells, trainerC
       <>
         <small className="text-muted d-block">{timeLabel}</small>
         <span className="d-block fw-semibold">{classLabel}</span>
+        {venueLabel && <small className="text-muted d-block">Venue {venueLabel}</small>}
         {showSubject && subjectCode && (
           <small className="text-muted d-block">{subjectCode}</small>
         )}
@@ -23,12 +25,18 @@ const formatCellContent = (schedule, { showSubject, showTimingsInCells, trainerC
     return (
       <>
         <span className="d-block fw-semibold">{classLabel}</span>
+        {venueLabel && <small className="text-muted d-block">Venue {venueLabel}</small>}
         <small className="text-muted">{subjectCode}</small>
       </>
     );
   }
 
-  return classLabel;
+  return (
+    <>
+      <span className="d-block fw-semibold">{classLabel}</span>
+      {venueLabel && <small className="text-muted d-block">Venue {venueLabel}</small>}
+    </>
+  );
 };
 
 const TrainerTimetableGrid = ({

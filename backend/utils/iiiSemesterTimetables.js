@@ -1,4 +1,4 @@
-import { IDSA_SUBJECT, PEDH_SUBJECT } from './trainerMappings.js';
+import { IDSA_SUBJECT } from './trainerMappings.js';
 import { SOC_FOUR_SLOT_TIMINGS } from './subjectSlotTimings.js';
 
 export const III_SEMESTER = 'III';
@@ -14,7 +14,6 @@ const toSlot = (slotKey, subjectCode) => {
 };
 
 const idsa = (slotKey) => toSlot(slotKey, IDSA_SUBJECT.code);
-const pedh = (slotKey) => toSlot(slotKey, PEDH_SUBJECT.code);
 
 const cls = (department, section) => ({ department, section });
 
@@ -43,24 +42,23 @@ const IT_IT = cls('IT', 'IT');
 const DS_1 = cls('DS', 'DS1');
 const DS_2_ECM = cls('DS', 'DS2 + ECM');
 
-const entry = (trainerCode, day, slotKey, classInfo, subjectKind) => ({
+const entry = (trainerCode, day, slotKey, classInfo) => ({
   trainerCode,
   day,
   ...classInfo,
-  ...(subjectKind === 'PEDH' ? pedh(slotKey) : idsa(slotKey)),
+  ...idsa(slotKey),
 });
 
-const expandTrainer = ({ trainerCode, subjectKind, rows }) =>
+const expandTrainer = ({ trainerCode, rows }) =>
   rows.flatMap(([day, slots]) =>
     slots.flatMap((classInfo, index) =>
-      classInfo ? [entry(trainerCode, day, `S${index + 1}`, classInfo, subjectKind)] : []
+      classInfo ? [entry(trainerCode, day, `S${index + 1}`, classInfo)] : []
     )
   );
 
 export const TRAINER_TIMETABLE_DEFINITIONS = [
   {
     trainerCode: 'IDSA-T1',
-    subjectKind: 'IDSA',
     rows: [
       ['Monday', [CSE_A1, CSE_A1, CSE_A3, null]],
       ['Tuesday', [CSE_A1, CSE_A4, CSE_A2, CSE_A3]],
@@ -70,19 +68,7 @@ export const TRAINER_TIMETABLE_DEFINITIONS = [
     ],
   },
   {
-    trainerCode: 'PEDH- T04',
-    subjectKind: 'PEDH',
-    rows: [
-      ['Monday', [AIML_B1, CSE_A6_DEVOPS, CSE_A5, CSE_A5]],
-      ['Tuesday', [null, CSE_A7_CC, AIML_B1, null]],
-      ['Wednesday', [CSE_A6_DEVOPS, null, AIML_B1, CSE_A7_CC]],
-      ['Thursday', [CSE_A5, null, CSE_A6_DEVOPS, CSE_A7_CC]],
-      ['Friday', [CSE_A6_DEVOPS, CSE_A7_CC, CSE_A5, AIML_B1]],
-    ],
-  },
-  {
     trainerCode: 'IDSA-T5',
-    subjectKind: 'IDSA',
     rows: [
       ['Monday', [CSE_A6_DEVOPS, AIML_B1, null, null]],
       ['Tuesday', [CSE_A5, null, CSE_A6_DEVOPS, CSE_A7_CC]],
@@ -93,7 +79,6 @@ export const TRAINER_TIMETABLE_DEFINITIONS = [
   },
   {
     trainerCode: 'IDSA-T7',
-    subjectKind: 'IDSA',
     rows: [
       ['Monday', [null, AIML_B2, AIML_B5, AIML_B5]],
       ['Tuesday', [AIML_B3, AIML_B3, AIML_B4, null]],
@@ -103,19 +88,7 @@ export const TRAINER_TIMETABLE_DEFINITIONS = [
     ],
   },
   {
-    trainerCode: 'PEDH- T05',
-    subjectKind: 'PEDH',
-    rows: [
-      ['Monday', [AIML_B3, AIML_B4, AIML_B3, AIML_B2]],
-      ['Tuesday', [AIML_B5, AIML_B2, AIML_B5, AIML_B4]],
-      ['Wednesday', [AIML_B4, AIML_B3, AIML_B4, AIML_B5]],
-      ['Thursday', [null, AIML_B2, null, AIML_B2]],
-      ['Friday', [AIML_B3, null, AIML_B5, null]],
-    ],
-  },
-  {
     trainerCode: 'IDSA-T6',
-    subjectKind: 'IDSA',
     rows: [
       ['Monday', [AIML_B6, AIML_B9, AIML_B6, null]],
       ['Tuesday', [AIML_B9, null, AIML_B8, null]],
@@ -125,19 +98,7 @@ export const TRAINER_TIMETABLE_DEFINITIONS = [
     ],
   },
   {
-    trainerCode: 'PEDH- T01',
-    subjectKind: 'PEDH',
-    rows: [
-      ['Monday', [AIML_B9, AIML_B8, null, AIML_B9]],
-      ['Tuesday', [AIML_B6, AIML_B7, AIML_B7, AIML_B8]],
-      ['Wednesday', [AIML_B7, AIML_B6, AIML_B9, AIML_B6]],
-      ['Thursday', [AIML_B7, null, AIML_B9, null]],
-      ['Friday', [AIML_B8, AIML_B6, AIML_B8, null]],
-    ],
-  },
-  {
     trainerCode: 'IDSA-T4',
-    subjectKind: 'IDSA',
     rows: [
       ['Monday', [AIML_B10, AIML_B10, DS_1, null]],
       ['Tuesday', [AIML_B10, DS_1, null, DS_2_ECM]],
@@ -147,30 +108,7 @@ export const TRAINER_TIMETABLE_DEFINITIONS = [
     ],
   },
   {
-    trainerCode: 'PEDH- T03',
-    subjectKind: 'PEDH',
-    rows: [
-      ['Monday', [AIML_B11, DS_2_ECM, AIML_B11, DS_1]],
-      ['Tuesday', [null, AIML_B11, AIML_B10, DS_1]],
-      ['Wednesday', [DS_2_ECM, null, null, AIML_B10]],
-      ['Thursday', [AIML_B11, DS_1, AIML_B10, DS_2_ECM]],
-      ['Friday', [null, DS_1, DS_2_ECM, AIML_B10]],
-    ],
-  },
-  {
-    trainerCode: 'PEDH- T06',
-    subjectKind: 'PEDH',
-    rows: [
-      ['Monday', [AI_DS_1, null, CS_CS1, CS_CS2]],
-      ['Tuesday', [AI_DS_1, IT_IT, AI_DS_1, IT_IT]],
-      ['Wednesday', [IT_IT, CS_CS1, CS_CS2, CS_CS1]],
-      ['Thursday', [null, AI_DS_1, null, CS_CS2]],
-      ['Friday', [CS_CS1, CS_CS2, IT_IT, null]],
-    ],
-  },
-  {
     trainerCode: 'IDSA-T3',
-    subjectKind: 'IDSA',
     rows: [
       ['Monday', [null, IT_IT, CS_CS2, AI_DS_1]],
       ['Tuesday', [CS_CS1, CS_CS2, null, CS_CS1]],

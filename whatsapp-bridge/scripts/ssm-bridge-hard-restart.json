@@ -7,7 +7,7 @@
     "sudo su - ubuntu -c 'pm2 delete all 2>/dev/null || true'",
     "sleep 2",
     "pgrep -af 'node.*index.js' || echo 'no node bridge'",
-    "sudo su - ubuntu -c 'cd /opt/MBUTOMS/whatsapp-bridge && pm2 start index.js --name mbutoms-whatsapp-bridge'",
+    "sudo su - ubuntu -c 'cd /opt/MBUTOMS/whatsapp-bridge && pm2 start ecosystem.config.cjs && pm2 save'",
     "sleep 50",
     "pgrep -af 'node.*index.js' | tr -cd '\\11\\12\\15\\40-\\176'",
     "date -u",

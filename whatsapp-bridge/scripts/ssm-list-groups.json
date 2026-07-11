@@ -8,6 +8,6 @@
     "sleep 10",
     "pgrep -af 'wwebjs_auth/session' || echo CHROME_STOPPED",
     "sudo -u ubuntu bash -lc 'cd /opt/MBUTOMS/whatsapp-bridge && timeout 300 npm run list-groups'",
-    "sudo -u ubuntu bash -lc 'cd /opt/MBUTOMS/whatsapp-bridge && pm2 start index.js --name mbutoms-whatsapp-bridge && pm2 save'"
+    "sudo -u ubuntu bash -lc 'cd /opt/MBUTOMS/whatsapp-bridge && pm2 start ecosystem.config.cjs && pm2 save'"
   ]
 }

@@ -1,0 +1,6 @@
+{
+  "commands": [
+    "grep -n 'Scheduling reconnect\\|runWatchdog\\|ensureSingleBridgeInstance' /opt/MBUTOMS/whatsapp-bridge/index.js | head -5 | tr -cd '\\11\\12\\15\\40-\\176'",
+    "grep max_memory_restart /opt/MBUTOMS/whatsapp-bridge/ecosystem.config.cjs | tr -cd '\\11\\12\\15\\40-\\176'"
+  ]
+}

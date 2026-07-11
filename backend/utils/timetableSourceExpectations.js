@@ -1,7 +1,8 @@
 import { buildIIIsemesterSchedulePayloads } from './iiiSemesterTimetables.js';
 import { buildQavaSchedulePayloads } from './qavaTimetable.js';
 import { buildNavyaSchedulePayloads } from './navyaTimetable.js';
-import { buildSaiPriyaSchedulePayloads } from './saiPriyaTimetable.js';
+import { buildAdminMcaSchedulePayloads } from './adminTimetable.js';
+import { buildPstpSchedulePayloads } from './pstpTimetable.js';
 import {
   LRRE_V_TRAINER_ALLOCATIONS,
   buildExpectedScheduleRecord,
@@ -13,7 +14,8 @@ export const buildAllExpectedSchedulePayloads = () => {
     ...buildIIIsemesterSchedulePayloads(),
     ...buildQavaSchedulePayloads(),
     ...buildNavyaSchedulePayloads(),
-    ...buildSaiPriyaSchedulePayloads(),
+    ...buildAdminMcaSchedulePayloads(),
+    ...buildPstpSchedulePayloads(),
   ];
 
   for (const [employeeId, allocation] of Object.entries(LRRE_V_TRAINER_ALLOCATIONS)) {

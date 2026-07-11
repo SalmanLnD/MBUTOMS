@@ -1,32 +1,9 @@
-export const SAI_PRIYA_TRAINER_CODE = 'PEDH- T07';
+export const getEffectiveSubjectCode = (schedule) => schedule?.subjectCode || '';
 
-export const PEDH_SUBJECT_CODE = '22CS102037';
-export const DSAP_SUBJECT_CODE = '25CA202009';
-
-export const inferSaiPriyaSubjectCode = (schedule) => {
-  const department = String(schedule?.department || '').trim();
-  const section = String(schedule?.section || '').trim();
-
-  if (department === 'MCA' || section.toLowerCase().startsWith('mca')) {
-    return DSAP_SUBJECT_CODE;
-  }
-  if (['CSE', 'AIML', 'DS', 'IT', 'CS', 'AI&DS'].includes(department)) {
-    return PEDH_SUBJECT_CODE;
-  }
-  return null;
-};
-
-export const getEffectiveSubjectCode = (schedule, trainerCode) => {
-  if (trainerCode === SAI_PRIYA_TRAINER_CODE) {
-    return inferSaiPriyaSubjectCode(schedule) || schedule?.subjectCode || '';
-  }
-  return schedule?.subjectCode || '';
-};
-
-export const scheduleMatchesSubject = (schedule, subject, trainerCode) => {
+export const scheduleMatchesSubject = (schedule, subject) => {
   if (!subject) return true;
 
-  const effectiveCode = getEffectiveSubjectCode(schedule, trainerCode);
+  const effectiveCode = getEffectiveSubjectCode(schedule);
   if (effectiveCode && effectiveCode === subject.code) return true;
 
   const scheduleSubjectId = schedule?.subject?._id || schedule?.subject;
@@ -35,4 +12,12 @@ export const scheduleMatchesSubject = (schedule, subject, trainerCode) => {
   }
 
   return false;
+};
+
+/** Prefer an explicit legacy schedule code when the trainer has one. */
+export const resolveScheduleTrainerCode = (trainer, existingSchedule) => {
+  if (existingSchedule?.trainerCode) return existingSchedule.trainerCode;
+  const legacyCode = (trainer?.scheduleTrainerCodes || []).find(Boolean);
+  if (legacyCode) return legacyCode;
+  return trainer?.employeeId || '';
 };

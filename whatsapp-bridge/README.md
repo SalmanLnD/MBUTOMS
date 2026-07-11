@@ -63,8 +63,16 @@ MBUTOMS API  ->  match trainer by phone  ->  save TrainerDailyAttendance
    npm start
    ```
 
-   Leave it running. It reconnects automatically and reuses the saved session
-   (no need to scan the QR again unless you unlink the device).
+   Leave it running. It reconnects automatically when WhatsApp disconnects,
+   reuses the saved session (no need to scan the QR again unless you unlink the
+   device), and runs a health watchdog during the morning punch window.
+
+   On EC2, start with PM2 for production:
+
+   ```bash
+   pm2 start ecosystem.config.cjs
+   pm2 save
+   ```
 
 ## OIF format
 
@@ -85,3 +93,6 @@ If your trainers put the OIF **inside the image** (not the caption), set
 - This uses an unofficial WhatsApp automation library. Use a number you control
   and are comfortable automating; heavy automation can risk WhatsApp account
   restrictions.
+- The bridge auto-reconnects on disconnect and runs a watchdog every 5 minutes.
+  During the punch window (default 06:30–11:00 IST), it reconnects if there has
+  been no group activity for 2 hours.

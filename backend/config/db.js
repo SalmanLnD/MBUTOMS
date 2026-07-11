@@ -53,7 +53,7 @@ const runFullStartupTasks = async () => {
 
   console.log(`Subject commercial fields migration: ${commercialFieldsMigration.updatedCount} subject(s) backfilled (start date ${commercialFieldsMigration.defaultStartDate})`);
   console.log(`IDSA sync: ${idsaSync.trainersUpdated} trainers, subject ${idsaSync.subjectCode}, ${idsaSync.schedulesTagged} schedule slots tagged`);
-  console.log(`PEDH sync: ${pedhSync.trainersUpdated} trainers, subject ${pedhSync.subjectCode}, ${pedhSync.schedulesTagged} schedule slots tagged, Sai Priya ${pedhSync.saiPriya?.pedhSlots || 0} PEDH / ${pedhSync.saiPriya?.dsapSlots || 0} DSAP`);
+  console.log(`PEDH sync: retired (archived in pedhTimetableArchive.js)`);
   console.log(`PSTP sync: ${pstpSync.trainersUpdated} trainers, subject ${pstpSync.subjectCode}, ${pstpSync.schedulesTagged} schedule slots tagged`);
   console.log(`Replacement repair: ${repair.migrated} assignment(s) migrated to leave records, ${repair.restored} schedule slot(s) restored to original trainers`);
   console.log(`Trainer email migration: ${emailMigration.unsetCount} trainer(s) cleared of empty email values`);

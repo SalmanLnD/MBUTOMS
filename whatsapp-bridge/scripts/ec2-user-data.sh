@@ -63,6 +63,6 @@ sudo -u ubuntu git config --global --add safe.directory "$INSTALL_DIR"
 
 echo "=== Bootstrap complete at $(date -Is) ==="
 touch /var/log/mbutoms-bridge-bootstrap.done
-echo "Next: copy .env to $INSTALL_DIR/whatsapp-bridge/.env and run pm2 start index.js" \
+echo "Next: copy .env to $INSTALL_DIR/whatsapp-bridge/.env and run pm2 start ecosystem.config.cjs" \
   > /home/ubuntu/BRIDGE_SETUP_NEXT.txt
 chown ubuntu:ubuntu /home/ubuntu/BRIDGE_SETUP_NEXT.txt || true

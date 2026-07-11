@@ -18,11 +18,11 @@ export const IDSA_DEPARTMENT_CODES = ['CSE', 'AIML', 'DS', 'IT', 'CS', 'AI&DS'];
 export const PEDH_TRAINER_NAMES = {
   'PEDH- T01': 'Megha Sree S',
   'PEDH- T02': 'Sumit Kumar Gupta',
-  'PEDH- T03': 'Mahendra Urumu',
+  'PEDH- T03': 'PEDH- T03',
   'PEDH- T04': 'Viswateja Jana',
   'PEDH- T05': 'Rahmathullah Shaik',
   'PEDH- T06': 'PEDH- T06',
-  'PEDH- T07': 'Sai Priya',
+  'PEDH- T07': 'PEDH- T07',
 };
 
 export const PEDH_SUBJECT = {
@@ -32,7 +32,7 @@ export const PEDH_SUBJECT = {
 
 export const PEDH_DEPARTMENT_CODES = ['CSE', 'AIML', 'DS', 'IT', 'CS', 'AI&DS'];
 
-export const SAI_PRIYA_TRAINER_CODE = 'PEDH- T07';
+export const ADMIN_TRAINER_EMPLOYEE_ID = '131665';
 
 export const DSAP_SUBJECT = {
   code: '25CA202009',
@@ -41,7 +41,7 @@ export const DSAP_SUBJECT = {
 
 export const PSTP_TRAINER_NAMES = {
   'PSTP-T8': 'Ashwini',
-  'PSTP-T9': 'PSTP-T9',
+  'PSTP-T9': 'Mahendra Urumu',
 };
 
 export const PSTP_SUBJECT = {
@@ -50,19 +50,6 @@ export const PSTP_SUBJECT = {
 };
 
 export const PSTP_DEPARTMENT_CODES = ['ECE', 'EIE', 'EEE', 'CE'];
-
-export const resolveSaiPriyaSubjectCode = ({ department, section }) => {
-  const dept = String(department || '').trim();
-  const sect = String(section || '').trim();
-
-  if (dept === 'MCA' || sect.toLowerCase().startsWith('mca')) {
-    return DSAP_SUBJECT.code;
-  }
-  if (PEDH_DEPARTMENT_CODES.includes(dept)) {
-    return PEDH_SUBJECT.code;
-  }
-  return null;
-};
 
 export const getTrainerDisplayName = (employeeId) =>
   IDSA_TRAINER_NAMES[employeeId]

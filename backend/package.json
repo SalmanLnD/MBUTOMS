@@ -17,6 +17,10 @@
     "test": "node --test tests/unit/**/*.test.js",
     "verify:timetable": "node scripts/verify-timetable-integrity.js",
     "verify:display": "node scripts/verify-subject-timetable-display.js",
+    "import:idsa-venues": "node scripts/import-idsa-venues.mjs",
+    "import:class-venues": "node scripts/import-class-venues.mjs",
+    "import:lrre-venues": "node scripts/import-lrre-venues.mjs",
+    "retire:pedh": "node scripts/retire-pedh-timetables.mjs",
     "seed:legacy": "node utils/seed.js",
     "parse:workbook": "node utils/parseWorkbook.js"
   },

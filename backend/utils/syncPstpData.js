@@ -9,6 +9,7 @@ import {
   PSTP_TRAINER_NAMES,
   PSTP_SUBJECT,
   PSTP_DEPARTMENT_CODES,
+  findTrainerByScheduleCode,
 } from './trainerMappings.js';
 import { DEFAULT_SLOT_TIMINGS } from './timetableSlots.js';
 import { SOC_FOUR_SLOT_TIMINGS } from './subjectSlotTimings.js';
@@ -19,9 +20,7 @@ export const syncPstpTrainersAndSubject = async () => {
   const trainers = [];
 
   for (const [employeeId, name] of Object.entries(PSTP_TRAINER_NAMES)) {
-    const trainer = await Trainer.findOne({
-      $or: [{ employeeId }, { scheduleTrainerCodes: employeeId }],
-    });
+    const trainer = await findTrainerByScheduleCode(Trainer, employeeId);
     if (!trainer) continue;
 
     if (trainer.employeeId === employeeId && trainer.name !== name) {

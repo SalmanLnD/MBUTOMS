@@ -18,6 +18,7 @@ const scheduleSchema = new mongoose.Schema(
       trainerCode: { type: String, trim: true, default: '' },
       trainerName: { type: String, trim: true, default: '' },
     },
+    venue: { type: mongoose.Schema.Types.ObjectId, ref: 'Venue', default: null },
   },
   { timestamps: true, collection: 'schedules' }
 );

@@ -1,6 +1,7 @@
 import Schedule from '../models/Schedule.js';
 import Subject from '../models/Subject.js';
 import Trainer from '../models/Trainer.js';
+import Venue from '../models/Venue.js';
 import { timesOverlap } from '../utils/timetableSlots.js';
 import { buildTrainerSchedulesForDate } from '../utils/trainerScheduleView.js';
 import { resolveTrainerScheduleCodes } from '../utils/trainerMappings.js';
@@ -126,6 +127,17 @@ const enrichSchedulePayload = async (body) => {
     await assertClassAllowedForSubject(subjectDoc, payload.department);
   }
 
+  if (payload.venue === '' || payload.venue === null) {
+    payload.venue = null;
+  } else if (payload.venue) {
+    const venueDoc = await Venue.findById(payload.venue);
+    if (!venueDoc || !venueDoc.isActive) {
+      const error = new Error('Selected venue is not available.');
+      error.statusCode = 400;
+      throw error;
+    }
+  }
+
   return payload;
 };
 
@@ -156,12 +168,14 @@ export const getSchedules = async (req, res) => {
   }
 
   const filter = await buildFilter(req.query);
-  const schedules = sortSchedules(await Schedule.find(filter));
+  const schedules = sortSchedules(
+    await Schedule.find(filter).populate('venue', 'name building floor type')
+  );
   res.json(schedules);
 };
 
 export const getScheduleById = async (req, res) => {
-  const schedule = await Schedule.findById(req.params.id);
+  const schedule = await Schedule.findById(req.params.id).populate('venue', 'name building floor type');
   if (!schedule) return res.status(404).json({ message: 'Schedule not found' });
   res.json(schedule);
 };
@@ -218,6 +232,7 @@ export const createSchedule = async (req, res) => {
   }
 
   const schedule = await Schedule.create(payload);
+  await schedule.populate('venue', 'name building floor type');
   res.status(201).json(schedule);
 };
 
@@ -245,6 +260,7 @@ export const updateSchedule = async (req, res) => {
 
   Object.assign(schedule, payload);
   await schedule.save();
+  await schedule.populate('venue', 'name building floor type');
   res.json(schedule);
 };
 

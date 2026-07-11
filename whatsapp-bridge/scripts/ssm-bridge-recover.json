@@ -9,7 +9,7 @@
     "rm -f /opt/MBUTOMS/whatsapp-bridge/.bridge-instance.lock",
     "sudo -u ubuntu bash -lc 'pm2 delete all 2>/dev/null || true'",
     "sleep 2",
-    "sudo -u ubuntu bash -lc 'cd /opt/MBUTOMS/whatsapp-bridge && pm2 start index.js --name mbutoms-whatsapp-bridge && pm2 save'",
+    "sudo -u ubuntu bash -lc 'cd /opt/MBUTOMS/whatsapp-bridge && pm2 start ecosystem.config.cjs && pm2 save'",
     "sleep 45",
     "pgrep -af 'node /opt/MBUTOMS/whatsapp-bridge/index.js' | wc -l",
     "python3 - <<'PY'\nfrom pathlib import Path\np = Path('/home/ubuntu/.pm2/logs/mbutoms-whatsapp-bridge-out.log')\nif p.exists():\n    for line in p.read_text(errors='ignore').splitlines()[-15:]:\n        clean = line.encode('ascii', 'ignore').decode().strip()\n        if clean:\n            print(clean)\nPY",
