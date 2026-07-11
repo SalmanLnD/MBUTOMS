@@ -10,7 +10,6 @@
     "seed": "node utils/seedWorkbook.js",
     "seed:reference": "node utils/seedReference.js",
     "seed:idsa": "node utils/runIdsaSync.js",
-    "seed:pedh": "node utils/runPedhSync.js",
     "seed:pstp": "node utils/runPstpSync.js",
     "seed:classes": "node utils/runClassMigration.js",
     "seed:lrre-v": "node scripts/verify-lrre-v-semester-timetable.js",
@@ -20,7 +19,7 @@
     "import:idsa-venues": "node scripts/import-idsa-venues.mjs",
     "import:class-venues": "node scripts/import-class-venues.mjs",
     "import:lrre-venues": "node scripts/import-lrre-venues.mjs",
-    "retire:pedh": "node scripts/retire-pedh-timetables.mjs",
+    "import:pstp": "node scripts/import-pstp-timetables-venues.mjs",
     "seed:legacy": "node utils/seed.js",
     "parse:workbook": "node utils/parseWorkbook.js"
   },

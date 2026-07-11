@@ -1,7 +1,0 @@
-{
-  "commands": [
-    "sudo -u ubuntu bash -lc \"pm2 jlist\" | node -e \"let d='';process.stdin.on('data',c=>d+=c);process.stdin.on('end',()=>{const j=JSON.parse(d||'[]');const p=j.find(x=>x.name==='mbutoms-whatsapp-bridge');console.log('PM2_STATUS='+(p?p.pm2_env.status:'missing'));console.log('PM2_RESTARTS='+(p?p.pm2_env.restart_time:'n/a'));});\"",
-    "python3 - <<'PY'\nfrom pathlib import Path\nfor key in ('WEBHOOK_URL','GROUP_ID','ENABLE_OCR'):\n    for line in Path('/opt/MBUTOMS/whatsapp-bridge/.env').read_text(errors='ignore').splitlines():\n        if line.startswith(key+'='):\n            print(line)\nPY",
-    "python3 - <<'PY'\nfrom pathlib import Path\np = Path('/home/ubuntu/.pm2/logs/mbutoms-whatsapp-bridge-out.log')\nprint('LOG_EXISTS=' + str(p.exists()).lower())\nif p.exists():\n    for line in p.read_text(errors='ignore').splitlines()[-12:]:\n        print(line.encode('ascii', 'ignore').decode())\nPY"
-  ]
-}
