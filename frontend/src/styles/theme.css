@@ -552,6 +552,21 @@ body {
   font-weight: 600;
 }
 
+.venue-campus-map-wrap {
+  overflow: hidden;
+  border-radius: var(--radius-md);
+  border: 1px solid rgba(148, 163, 184, 0.28);
+  background: #f8fafc;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.65);
+}
+
+.venue-campus-map {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  height: auto;
+}
+
 .timetable-controls {
   background: rgba(255, 255, 255, 0.68);
   backdrop-filter: blur(14px);

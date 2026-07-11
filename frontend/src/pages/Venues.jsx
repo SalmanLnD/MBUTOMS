@@ -100,6 +100,23 @@ const Venues = () => {
 
       <div className="card table-card mb-3">
         <div className="card-body">
+          <h2 className="h6 fw-semibold mb-2">Campus block map</h2>
+          <p className="text-muted small mb-3">
+            Match your room number to the labelled blocks below, then use the room mapping table for floor details.
+          </p>
+          <div className="venue-campus-map-wrap">
+            <img
+              src="/images/campus-block-map.png"
+              alt="Campus aerial map showing MNS Block, M Block West, M Block East, M Block North, Diploma, Civil, Mechanical, and NAB buildings"
+              className="venue-campus-map"
+              loading="lazy"
+            />
+          </div>
+        </div>
+      </div>
+
+      <div className="card table-card mb-3">
+        <div className="card-body">
           <h2 className="h6 fw-semibold mb-3">Campus room mapping</h2>
           <div className="table-responsive">
             <table className="table table-sm align-middle venue-mapping-table mb-0">
