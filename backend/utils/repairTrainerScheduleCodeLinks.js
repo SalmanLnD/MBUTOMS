@@ -2,13 +2,12 @@ import Trainer from '../models/Trainer.js';
 import Schedule from '../models/Schedule.js';
 import {
   IDSA_TRAINER_NAMES,
-  PEDH_TRAINER_NAMES,
   PSTP_TRAINER_NAMES,
   isPlaceholderLegacyName,
   trainerNameMatchesLegacy,
 } from './trainerMappings.js';
 
-const LEGACY_SCHEDULE_MAPS = [IDSA_TRAINER_NAMES, PEDH_TRAINER_NAMES, PSTP_TRAINER_NAMES];
+const LEGACY_SCHEDULE_MAPS = [IDSA_TRAINER_NAMES, PSTP_TRAINER_NAMES];
 
 const scoreLegacyNameMatch = (trainerName, legacyName) => {
   const trainer = String(trainerName || '').trim().toLowerCase();

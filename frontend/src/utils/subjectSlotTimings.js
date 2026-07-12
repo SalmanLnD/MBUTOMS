@@ -22,7 +22,6 @@ export const LRRE_THREE_SLOT_TIMINGS = {
   s4: { startTime: '14:45', endTime: '16:45' },
 };
 
-export const PEDH_SUBJECT_CODE = '22CS102037';
 export const IDSA_SUBJECT_CODE = '22CS102033';
 export const PSTP_SUBJECT_CODE = '22CS102034';
 export const DSAP_SUBJECT_CODE = '25CA202009';
@@ -31,7 +30,6 @@ export const LRRE_SUBJECT_CODE = '22LG101703';
 export const QAVA_SUBJECT_CODE = '22LG101702';
 
 export const SUBJECT_SLOT_PROFILES = {
-  [PEDH_SUBJECT_CODE]: { timings: SOC_FOUR_SLOT_TIMINGS, slotCount: 4 },
   [IDSA_SUBJECT_CODE]: { timings: SOC_FOUR_SLOT_TIMINGS, slotCount: 4 },
   [PSTP_SUBJECT_CODE]: { timings: SOC_FOUR_SLOT_TIMINGS, slotCount: 4 },
   [DSAP_SUBJECT_CODE]: { timings: SOLAS_THREE_SLOT_TIMINGS, slotCount: 3 },

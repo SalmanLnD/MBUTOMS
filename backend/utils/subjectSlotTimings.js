@@ -1,7 +1,7 @@
-import { IDSA_SUBJECT, PEDH_SUBJECT, PSTP_SUBJECT, DSAP_SUBJECT } from './trainerMappings.js';
+import { IDSA_SUBJECT, PSTP_SUBJECT, DSAP_SUBJECT } from './trainerMappings.js';
 import { LRRE_SUBJECT_CODE } from './lrreVSemesterTimetable.js';
 
-/** PEDH, IDSA, PSTP — SOC 4 periods */
+/** IDSA, PSTP — SOC 4 periods */
 export const SOC_FOUR_SLOT_TIMINGS = {
   s1: { startTime: '09:00', endTime: '10:00' },
   s2: { startTime: '10:30', endTime: '12:30' },
@@ -32,7 +32,6 @@ export const PSTJ_SUBJECT_CODE = '22CA102006';
 export const QAVA_SUBJECT_CODE = '22LG101702';
 
 export const SUBJECT_SLOT_PROFILES = {
-  [PEDH_SUBJECT.code]: { timings: SOC_FOUR_SLOT_TIMINGS, slotCount: 4 },
   [IDSA_SUBJECT.code]: { timings: SOC_FOUR_SLOT_TIMINGS, slotCount: 4 },
   [PSTP_SUBJECT.code]: { timings: SOC_FOUR_SLOT_TIMINGS, slotCount: 4 },
   [DSAP_SUBJECT.code]: { timings: SOLAS_THREE_SLOT_TIMINGS, slotCount: 3 },

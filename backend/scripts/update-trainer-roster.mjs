@@ -24,7 +24,6 @@ const FINALIZED_ROSTER = [
   { employeeId: '135402', email: 'barath.muthukumaran@faceprep.in', phone: '8591374136', camuErpId: 'adjfaculty-cdc077@mbu.asia', camuPassword: CAMU_PASSWORD },
   { employeeId: '135887', email: 'suraydeo.rana@faceprep.in', phone: '7979974981', camuErpId: 'adjfaculty-cdc084@mbu.asia', camuPassword: CAMU_PASSWORD },
   { employeeId: '136316', email: 'sumitkumar.gupta@faceprep.in', phone: '6306859275', camuErpId: 'adjfaculty-cdc058@mbu.asia', camuPassword: CAMU_PASSWORD },
-  { employeeId: '801757', email: 'viswateja.jana@faceprep.in', phone: '9347454474', camuErpId: 'adjfaculty-cdc059@mbu.asia', camuPassword: CAMU_PASSWORD },
   { employeeId: '801741', email: 'meghasree.srinivasan@faceprep.in', phone: '9176497147', camuErpId: 'adjfaculty-cdc060@mbu.asia', camuPassword: CAMU_PASSWORD },
   { employeeId: '801711', email: 'shaik.rahamthulla@faceprep.in', phone: '8978115263', camuErpId: 'adjfaculty-cdc061@mbu.asia', camuPassword: CAMU_PASSWORD },
   { employeeId: '801754', email: 'mahendra.urumu@faceprep.in', phone: '9014597169', camuErpId: 'adjfaculty-cdc062@mbu.asia', camuPassword: CAMU_PASSWORD },
@@ -33,7 +32,6 @@ const FINALIZED_ROSTER = [
 
 /** Placeholder trainers: CAMU credentials only. */
 const PLACEHOLDER_ROSTER = [
-  { employeeId: 'PEDH- T06', camuErpId: 'adjfaculty-cdc063@mbu.asia', camuPassword: CAMU_PASSWORD },
   { employeeId: 'PSTP-T9', camuErpId: 'adjfaculty-cdc066@mbu.asia', camuPassword: CAMU_PASSWORD },
   { employeeId: 'PSTJ1', camuErpId: 'adjfaculty-cdc083@mbu.asia', camuPassword: CAMU_PASSWORD },
 ];

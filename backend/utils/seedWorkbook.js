@@ -12,7 +12,6 @@ import { extractSchedulesFromWorkbook } from './parseWorkbook.js';
 import { ensureReferenceData } from './seedReferenceData.js';
 import { getTrainerDisplayName } from './trainerMappings.js';
 import { syncIdsaTrainersAndSubject } from './syncIdsaData.js';
-import { syncPedhTrainersAndSubject } from './syncPedhData.js';
 
 dotenv.config();
 
@@ -33,7 +32,8 @@ const seed = async () => {
   let trainerCodes;
 
   if (fs.existsSync(jsonPath)) {
-    schedules = JSON.parse(fs.readFileSync(jsonPath, 'utf8'));
+    schedules = JSON.parse(fs.readFileSync(jsonPath, 'utf8'))
+      .filter((schedule) => !/^PEDH-\s*T\d+$/i.test(String(schedule.trainerCode || '').trim()));
     trainerCodes = [...new Set(schedules.map((s) => s.trainerCode))];
     console.log(`Loaded ${schedules.length} schedules from JSON`);
   } else {
@@ -67,7 +67,6 @@ const seed = async () => {
 
   await Schedule.insertMany(schedules);
   await syncIdsaTrainersAndSubject();
-  await syncPedhTrainersAndSubject();
 
   const adminExists = await User.findOne({ email: 'mbu.campusmanager@faceprep.in' });
   if (!adminExists) {

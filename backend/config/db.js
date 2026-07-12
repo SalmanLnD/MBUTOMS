@@ -2,7 +2,6 @@ import mongoose from 'mongoose';
 import { ensureReferenceData } from '../utils/seedReferenceData.js';
 import { migrateSubjectSchoolsAndDepartments, migrateSubjectSlotTimings, migrateSubjectSlotProfiles } from '../controllers/subjectController.js';
 import { syncIdsaTrainersAndSubject } from '../utils/syncIdsaData.js';
-import { syncPedhTrainersAndSubject } from '../utils/syncPedhData.js';
 import { syncPstpTrainersAndSubject } from '../utils/syncPstpData.js';
 import { repairReplacementSchedules } from '../utils/repairReplacementSchedules.js';
 import { migrateTrainerEmailOptional } from '../utils/migrateTrainerEmailOptional.js';
@@ -11,6 +10,7 @@ import { clearEmployeeTimetableSchedules } from '../utils/clearEmployeeTimetable
 import { syncAllTrainerSubjectLinks } from '../utils/syncTrainerSubjectLinks.js';
 import { migrateSubjectCommercialFields } from '../utils/migrateSubjectCommercialFields.js';
 import { migrateSubjectAcademicYear } from '../utils/migrateSubjectAcademicYear.js';
+import { removeAllPedhData } from '../scripts/remove-all-pedh-data.mjs';
 import { syncLrreVSemesterTimetable } from '../utils/syncLrreVSemesterTimetable.js';
 import { repairMisplacedLrreVSemesterSlots } from '../utils/repairMisplacedLrreVSemesterSlots.js';
 import { migrateClassesFromSchedules } from '../utils/migrateClassesFromSchedules.js';
@@ -27,11 +27,17 @@ const getCache = () => {
 const runEssentialStartup = async () => {
   const counts = await ensureReferenceData();
   const academicYearMigration = await migrateSubjectAcademicYear();
+  const pedhCleanup = await removeAllPedhData();
   console.log(
     `Reference data ready: ${counts.schoolCount} schools, ${counts.semesterCount} semesters, ${counts.departmentCount} departments`
   );
   if (academicYearMigration.updatedCount) {
     console.log(`Subject academic year migration: ${academicYearMigration.updatedCount} subject(s) set to ${academicYearMigration.academicYear}`);
+  }
+  if (pedhCleanup.removedSchedules || pedhCleanup.removedTrainers || pedhCleanup.removedSubject) {
+    console.log(
+      `PEDH cleanup: ${pedhCleanup.removedSchedules} schedule slot(s), ${pedhCleanup.removedTrainers} placeholder trainer(s), subject removed=${pedhCleanup.removedSubject}`
+    );
   }
   return counts;
 };
@@ -43,7 +49,6 @@ const runFullStartupTasks = async () => {
   console.log(`Subject slot profile migration: ${slotProfileMigration.updated} subject(s) updated`);
   const commercialFieldsMigration = await migrateSubjectCommercialFields();
   const idsaSync = await syncIdsaTrainersAndSubject();
-  const pedhSync = await syncPedhTrainersAndSubject();
   const pstpSync = await syncPstpTrainersAndSubject();
   const repair = await repairReplacementSchedules();
   const emailMigration = await migrateTrainerEmailOptional();
@@ -58,7 +63,6 @@ const runFullStartupTasks = async () => {
 
   console.log(`Subject commercial fields migration: ${commercialFieldsMigration.updatedCount} subject(s) backfilled (start date ${commercialFieldsMigration.defaultStartDate})`);
   console.log(`IDSA sync: ${idsaSync.trainersUpdated} trainers, subject ${idsaSync.subjectCode}, ${idsaSync.schedulesTagged} schedule slots tagged`);
-  console.log(`PEDH sync: retired (archived in pedhTimetableArchive.js)`);
   console.log(`PSTP sync: ${pstpSync.trainersUpdated} trainers, subject ${pstpSync.subjectCode}, ${pstpSync.schedulesTagged} schedule slots tagged`);
   console.log(`Replacement repair: ${repair.migrated} assignment(s) migrated to leave records, ${repair.restored} schedule slot(s) restored to original trainers`);
   console.log(`Trainer email migration: ${emailMigration.unsetCount} trainer(s) cleared of empty email values`);

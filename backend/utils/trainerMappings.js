@@ -15,23 +15,6 @@ export const IDSA_SUBJECT = {
 
 export const IDSA_DEPARTMENT_CODES = ['CSE', 'AIML', 'DS', 'IT', 'CS', 'AI&DS'];
 
-export const PEDH_TRAINER_NAMES = {
-  'PEDH- T01': 'Megha Sree S',
-  'PEDH- T02': 'Sumit Kumar Gupta',
-  'PEDH- T03': 'PEDH- T03',
-  'PEDH- T04': 'Viswateja Jana',
-  'PEDH- T05': 'Rahmathullah Shaik',
-  'PEDH- T06': 'PEDH- T06',
-  'PEDH- T07': 'PEDH- T07',
-};
-
-export const PEDH_SUBJECT = {
-  code: '22CS102037',
-  name: 'Python Essentials and Data Handling',
-};
-
-export const PEDH_DEPARTMENT_CODES = ['CSE', 'AIML', 'DS', 'IT', 'CS', 'AI&DS'];
-
 export const ADMIN_TRAINER_EMPLOYEE_ID = '131665';
 
 export const DSAP_SUBJECT = {
@@ -53,7 +36,6 @@ export const PSTP_DEPARTMENT_CODES = ['ECE', 'EIE', 'EEE', 'CE'];
 
 export const getTrainerDisplayName = (employeeId) =>
   IDSA_TRAINER_NAMES[employeeId]
-  || PEDH_TRAINER_NAMES[employeeId]
   || PSTP_TRAINER_NAMES[employeeId]
   || employeeId;
 
@@ -118,7 +100,7 @@ export const resolveTrainerScheduleCodes = (trainer) => {
     if (code) codes.add(String(code).trim());
   });
 
-  const allLegacyMaps = [IDSA_TRAINER_NAMES, PEDH_TRAINER_NAMES, PSTP_TRAINER_NAMES];
+  const allLegacyMaps = [IDSA_TRAINER_NAMES, PSTP_TRAINER_NAMES];
 
   allLegacyMaps.forEach((legacyMap) => {
     Object.entries(legacyMap).forEach(([code, legacyName]) => {
