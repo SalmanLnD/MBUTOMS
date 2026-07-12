@@ -27,6 +27,23 @@ const toIdList = (value) => {
   return [value];
 };
 
+const trimOptionalUrl = (value) => {
+  if (value === undefined) return undefined;
+  return String(value || '').trim();
+};
+
+const trainerCanAccessSubject = async (trainerId, subject) => {
+  if (!trainerId || !subject) return false;
+
+  const trainer = await Trainer.findById(trainerId).select('subjects');
+  const subjectId = subject._id.toString();
+  const assignedIds = trainer?.subjects?.map((id) => id.toString()) || [];
+  if (assignedIds.includes(subjectId)) return true;
+
+  const eligibleIds = subject.trainerEligible?.map((id) => id.toString()) || [];
+  return eligibleIds.includes(trainerId.toString());
+};
+
 const normalizeSubjectPayload = (body) => {
   const payload = { ...body };
   const allDepartments = payload.allDepartments === true || payload.allDepartments === 'true';
@@ -52,6 +69,18 @@ const normalizeSubjectPayload = (body) => {
 
   if (payload.startDate) {
     payload.startDate = normalizeDate(payload.startDate);
+  }
+
+  if (payload.academicYear !== undefined) {
+    payload.academicYear = String(payload.academicYear || '').trim() || '2026-27';
+  }
+
+  if (payload.syllabusUrl !== undefined) {
+    payload.syllabusUrl = trimOptionalUrl(payload.syllabusUrl);
+  }
+
+  if (payload.choUrl !== undefined) {
+    payload.choUrl = trimOptionalUrl(payload.choUrl);
   }
 
   return payload;
@@ -159,7 +188,12 @@ export const getSubjects = async (req, res) => {
   const limit = Math.min(200, Math.max(1, parseInt(req.query.limit, 10) || 10));
   const skip = (page - 1) * limit;
 
-  const filter = await buildSubjectQuery(req.query);
+  const query = { ...req.query };
+  if (req.user.role === 'trainer' && req.user.trainer) {
+    query.trainer = req.user.trainer.toString();
+  }
+
+  const filter = await buildSubjectQuery(query);
   const sortField = ['name', 'code', 'hours', 'createdAt'].includes(req.query.sortBy)
     ? req.query.sortBy
     : 'name';
@@ -182,6 +216,14 @@ export const getSubjects = async (req, res) => {
 export const getSubjectById = async (req, res) => {
   const subject = await populateSubject(Subject.findById(req.params.id));
   if (!subject) return res.status(404).json({ message: 'Subject not found' });
+
+  if (req.user.role === 'trainer') {
+    const allowed = await trainerCanAccessSubject(req.user.trainer, subject);
+    if (!allowed) {
+      return res.status(403).json({ message: 'Not authorized to view this subject' });
+    }
+  }
+
   res.json(subject);
 };
 
@@ -225,6 +267,23 @@ export const updateSubject = async (req, res) => {
   );
   clearSubjectStartDateCache();
 
+  const updated = await populateSubject(Subject.findById(subject._id));
+  res.json(updated);
+};
+
+export const updateSubjectResources = async (req, res) => {
+  const subject = await Subject.findById(req.params.id);
+  if (!subject) return res.status(404).json({ message: 'Subject not found' });
+
+  const { syllabusUrl, choUrl } = req.body;
+  if (syllabusUrl !== undefined) {
+    subject.syllabusUrl = trimOptionalUrl(syllabusUrl);
+  }
+  if (choUrl !== undefined) {
+    subject.choUrl = trimOptionalUrl(choUrl);
+  }
+
+  await subject.save();
   const updated = await populateSubject(Subject.findById(subject._id));
   res.json(updated);
 };

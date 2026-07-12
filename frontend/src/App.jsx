@@ -83,14 +83,7 @@ const App = () => (
             </ProtectedRoute>
           }
         />
-        <Route
-          path="/subjects"
-          element={
-            <ProtectedRoute roles={MANAGEMENT_ROLES}>
-              <Subjects />
-            </ProtectedRoute>
-          }
-        />
+        <Route path="/subjects" element={<Subjects />} />
         <Route
           path="/performance"
           element={

@@ -4,6 +4,7 @@ import {
   getSubjectById,
   createSubject,
   updateSubject,
+  updateSubjectResources,
   deleteSubject,
   getSemesters,
   getDepartments,
@@ -12,7 +13,7 @@ import {
 import { protect, authorize } from '../middleware/auth.js';
 import { validate } from '../middleware/validate.js';
 import { asyncHandler } from '../middleware/asyncHandler.js';
-import { subjectValidation } from '../utils/validators.js';
+import { subjectValidation, subjectResourceValidation } from '../utils/validators.js';
 
 const router = express.Router();
 
@@ -26,6 +27,14 @@ router
   .route('/')
   .get(asyncHandler(getSubjects))
   .post(authorize('admin', 'campus_manager'), subjectValidation, validate, asyncHandler(createSubject));
+
+router.patch(
+  '/:id/resources',
+  authorize('admin', 'campus_manager', 'subject_coordinator', 'manager'),
+  subjectResourceValidation,
+  validate,
+  asyncHandler(updateSubjectResources)
+);
 
 router
   .route('/:id')

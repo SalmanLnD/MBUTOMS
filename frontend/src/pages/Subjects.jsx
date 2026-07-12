@@ -4,13 +4,15 @@ import LoadingSpinner from '../components/LoadingSpinner.jsx';
 import Pagination from '../components/Pagination.jsx';
 import { showError, showSuccess } from '../utils/toast.js';
 import SubjectFormModal from '../components/SubjectFormModal.jsx';
+import SubjectResourceLinkModal from '../components/SubjectResourceLinkModal.jsx';
 import ConfirmModal from '../components/ConfirmModal.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
 import { useDebounce } from '../hooks/useDebounce.js';
-import { getSubjects, deleteSubject } from '../services/subjectService.js';
+import { getSubjects, deleteSubject, updateSubjectResources } from '../services/subjectService.js';
 import { EditIcon, TrashIcon } from '../components/icons.jsx';
 import ActionIconButton from '../components/ActionIconButton.jsx';
 import { getErrorMessage } from '../utils/helpers.js';
+import { ROLES } from '../utils/roles.js';
 
 const formatSchools = (subject) => {
   if (subject.schools?.length) {
@@ -29,27 +31,39 @@ const formatDepartments = (subject) => {
   return '-';
 };
 
+const openExternalLink = (url) => {
+  window.open(url, '_blank', 'noopener,noreferrer');
+};
+
 const Subjects = () => {
-  const { hasManagementRole, hasFullAccess } = useAuth();
+  const { user, hasManagementRole, hasFullAccess } = useAuth();
   const canManage = hasManagementRole();
+  const isTrainerUser = user?.role === ROLES.TRAINER;
 
   const [subjects, setSubjects] = useState([]);
   const [pagination, setPagination] = useState(null);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(1);
+  const [selectedSubject, setSelectedSubject] = useState(null);
   const [showModal, setShowModal] = useState(false);
   const [editingSubject, setEditingSubject] = useState(null);
   const [pendingDelete, setPendingDelete] = useState(null);
+  const [resourceModal, setResourceModal] = useState(null);
 
   const debouncedSearch = useDebounce(search);
 
   const fetchSubjects = async () => {
     setLoading(true);
     try {
-      const data = await getSubjects({ page, limit: 10, search: debouncedSearch });
+      const params = { page, limit: 10, search: debouncedSearch };
+      const data = await getSubjects(params);
       setSubjects(data.subjects);
       setPagination(data.pagination);
+      setSelectedSubject((current) => {
+        if (!current) return null;
+        return data.subjects.find((subject) => subject._id === current._id) || null;
+      });
     } catch (err) {
       showError(getErrorMessage(err));
     } finally {
@@ -70,6 +84,9 @@ const Subjects = () => {
     try {
       await deleteSubject(pendingDelete.id);
       showSuccess('Subject deleted successfully');
+      if (selectedSubject?._id === pendingDelete.id) {
+        setSelectedSubject(null);
+      }
       setPendingDelete(null);
       fetchSubjects();
     } catch (err) {
@@ -77,11 +94,114 @@ const Subjects = () => {
     }
   };
 
+  const handleResourceSave = async (url) => {
+    if (!resourceModal || !selectedSubject) return;
+    const payload = resourceModal.type === 'syllabus'
+      ? { syllabusUrl: url }
+      : { choUrl: url };
+    const updated = await updateSubjectResources(selectedSubject._id, payload);
+    setSelectedSubject(updated);
+    setEditingSubject((current) => (current?._id === updated._id ? updated : current));
+    setSubjects((current) => current.map((subject) => (
+      subject._id === updated._id ? updated : subject
+    )));
+    showSuccess(`${resourceModal.type === 'syllabus' ? 'Syllabus' : 'CHO'} link saved`);
+  };
+
+  const handleRowSelect = (subject) => {
+    setSelectedSubject(subject);
+  };
+
+  const handleEditSubject = (subject) => {
+    setSelectedSubject(subject);
+    setEditingSubject(subject);
+    setShowModal(true);
+  };
+
+  const handleManageResource = (type, subject = selectedSubject) => {
+    if (!subject) return;
+    setSelectedSubject(subject);
+    setResourceModal({ type });
+  };
+
+  const renderResourceButtons = () => {
+    if (!selectedSubject) return null;
+
+    const hasSyllabus = Boolean(selectedSubject.syllabusUrl?.trim());
+    const hasCho = Boolean(selectedSubject.choUrl?.trim());
+
+    if (canManage) {
+      return (
+        <div>
+          <h3 className="h6 fw-semibold mb-2">Resources</h3>
+          <div className="d-flex flex-wrap gap-2">
+          <button
+            type="button"
+            className="btn btn-outline-primary btn-sm"
+            onClick={() => setResourceModal({ type: 'syllabus' })}
+          >
+            {hasSyllabus ? 'Update Syllabus' : 'Add Syllabus'}
+          </button>
+          <button
+            type="button"
+            className="btn btn-outline-primary btn-sm"
+            onClick={() => setResourceModal({ type: 'cho' })}
+          >
+            {hasCho ? 'Update CHO' : 'Add CHO'}
+          </button>
+          {hasSyllabus && (
+            <button
+              type="button"
+              className="btn btn-primary btn-sm"
+              onClick={() => openExternalLink(selectedSubject.syllabusUrl)}
+            >
+              Open Syllabus
+            </button>
+          )}
+          {hasCho && (
+            <button
+              type="button"
+              className="btn btn-primary btn-sm"
+              onClick={() => openExternalLink(selectedSubject.choUrl)}
+            >
+              Open CHO
+            </button>
+          )}
+          </div>
+        </div>
+      );
+    }
+
+    return (
+      <div>
+        <h3 className="h6 fw-semibold mb-2">Resources</h3>
+        <div className="d-flex flex-wrap gap-2">
+        <button
+          type="button"
+          className="btn btn-primary btn-sm"
+          disabled={!hasSyllabus}
+          onClick={() => hasSyllabus && openExternalLink(selectedSubject.syllabusUrl)}
+        >
+          Syllabus
+        </button>
+        <button
+          type="button"
+          className="btn btn-primary btn-sm"
+          disabled={!hasCho}
+          onClick={() => hasCho && openExternalLink(selectedSubject.choUrl)}
+        >
+          CHO
+        </button>
+        </div>
+      </div>
+    );
+  };
+
   return (
     <>
-      <Topbar title="Subject Management" />
+      <Topbar title={canManage ? 'Subject Management' : 'Subjects'} />
 
-      <div className="card table-card">
+      <div className="card table-card mb-3">
         <div className="card-body">
           <div className="row g-2 mb-3 align-items-center">
             <div className="col-md-6">
@@ -101,6 +221,11 @@ const Subjects = () => {
               </div>
             )}
           </div>
+          <p className="text-muted small mb-3">
+            {canManage
+              ? 'Click a subject row to view details, or use Edit to manage syllabus and CHO links.'
+              : 'Click a subject row to view details and open syllabus or CHO files.'}
+          </p>
 
           {loading ? (
             <LoadingSpinner />
@@ -112,49 +237,72 @@ const Subjects = () => {
                     <tr>
                       <th>Code</th>
                       <th>Name</th>
-                      <th>School</th>
-                      <th>Semester</th>
-                      <th>Department</th>
-                      <th>Hours</th>
+                      {!isTrainerUser && (
+                        <>
+                          <th>School</th>
+                          <th>Semester</th>
+                          <th>Department</th>
+                          <th>Hours</th>
+                        </>
+                      )}
                       {canManage && <th>Actions</th>}
                     </tr>
                   </thead>
                   <tbody>
                     {subjects.length === 0 ? (
-                      <tr><td colSpan={canManage ? 7 : 6} className="text-center text-muted py-4">No subjects found</td></tr>
+                      <tr>
+                        <td
+                          colSpan={isTrainerUser ? (canManage ? 3 : 2) : (canManage ? 7 : 6)}
+                          className="text-center text-muted py-4"
+                        >
+                          No subjects found
+                        </td>
+                      </tr>
                     ) : (
-                      subjects.map((subject) => (
-                        <tr key={subject._id}>
-                          <td><code>{subject.code}</code></td>
-                          <td className="fw-medium">{subject.name}</td>
-                          <td>{formatSchools(subject)}</td>
-                          <td>{subject.semester?.name || '-'}</td>
-                          <td>{formatDepartments(subject)}</td>
-                          <td>{subject.hours}</td>
-                          {canManage && (
-                            <td>
-                              <div className="btn-group btn-group-sm action-btn-group">
-                                <ActionIconButton
-                                  variant="edit"
-                                  icon={EditIcon}
-                                  title="Edit subject"
-                                  aria-label={`Edit ${subject.name}`}
-                                  onClick={() => { setEditingSubject(subject); setShowModal(true); }}
-                                />
-                                {hasFullAccess() && (
+                      subjects.map((subject) => {
+                        const isSelected = selectedSubject?._id === subject._id;
+                        return (
+                          <tr
+                            key={subject._id}
+                            className={isSelected ? 'table-active' : ''}
+                            onClick={() => handleRowSelect(subject)}
+                            style={{ cursor: 'pointer' }}
+                          >
+                            <td><code>{subject.code}</code></td>
+                            <td className="fw-medium">{subject.name}</td>
+                            {!isTrainerUser && (
+                              <>
+                                <td>{formatSchools(subject)}</td>
+                                <td>{subject.semester?.name || '-'}</td>
+                                <td>{formatDepartments(subject)}</td>
+                                <td>{subject.hours}</td>
+                              </>
+                            )}
+                            {canManage && (
+                              <td onClick={(event) => event.stopPropagation()}>
+                                <div className="btn-group btn-group-sm action-btn-group">
                                   <ActionIconButton
-                                    variant="delete"
-                                    icon={TrashIcon}
-                                    title="Delete subject"
-                                    aria-label={`Delete ${subject.name}`}
-                                    onClick={() => handleDelete(subject._id, subject.name)}
+                                    variant="edit"
+                                    icon={EditIcon}
+                                    title="Edit subject"
+                                    aria-label={`Edit ${subject.name}`}
+                                    onClick={() => handleEditSubject(subject)}
                                   />
-                                )}
-                              </div>
-                            </td>
-                          )}
-                        </tr>
-                      ))
+                                  {hasFullAccess() && (
+                                    <ActionIconButton
+                                      variant="delete"
+                                      icon={TrashIcon}
+                                      title="Delete subject"
+                                      aria-label={`Delete ${subject.name}`}
+                                      onClick={() => handleDelete(subject._id, subject.name)}
+                                    />
+                                  )}
+                                </div>
+                              </td>
+                            )}
+                          </tr>
+                        );
+                      })
                     )}
                   </tbody>
                 </table>
@@ -165,14 +313,67 @@ const Subjects = () => {
         </div>
       </div>
 
-      {showModal && (
+      {selectedSubject && (
+        <div className="card table-card">
+          <div className="card-body">
+            <h2 className="h5 fw-semibold mb-3">{selectedSubject.name}</h2>
+            <div className="row g-3 mb-3">
+              <div className="col-sm-4">
+                <label className="text-muted small">Subject Code</label>
+                <p className="mb-0"><code>{selectedSubject.code}</code></p>
+              </div>
+              <div className="col-sm-4">
+                <label className="text-muted small">Academic Year</label>
+                <p className="mb-0">{selectedSubject.academicYear || '2026-27'}</p>
+              </div>
+              {canManage && (
+                <>
+                  <div className="col-sm-4">
+                    <label className="text-muted small">Semester</label>
+                    <p className="mb-0">{selectedSubject.semester?.name || '-'}</p>
+                  </div>
+                  <div className="col-sm-4">
+                    <label className="text-muted small">School</label>
+                    <p className="mb-0">{formatSchools(selectedSubject)}</p>
+                  </div>
+                  <div className="col-sm-4">
+                    <label className="text-muted small">Department</label>
+                    <p className="mb-0">{formatDepartments(selectedSubject)}</p>
+                  </div>
+                  <div className="col-sm-4">
+                    <label className="text-muted small">Hours</label>
+                    <p className="mb-0">{selectedSubject.hours}</p>
+                  </div>
+                </>
+              )}
+            </div>
+            {renderResourceButtons()}
+          </div>
+        </div>
+      )}
+
+      {showModal && canManage && (
         <SubjectFormModal
           subject={editingSubject}
+          onManageResource={(type) => handleManageResource(type, editingSubject)}
           onClose={(saved) => {
             setShowModal(false);
             setEditingSubject(null);
-            if (saved) { showSuccess('Subject saved successfully'); fetchSubjects(); }
+            if (saved) {
+              showSuccess('Subject saved successfully');
+              fetchSubjects();
+            }
           }}
+        />
+      )}
+
+      {resourceModal && selectedSubject && canManage && (
+        <SubjectResourceLinkModal
+          show
+          title={resourceModal.type === 'syllabus' ? 'Add Syllabus Link' : 'Add CHO Link'}
+          initialUrl={resourceModal.type === 'syllabus' ? selectedSubject.syllabusUrl : selectedSubject.choUrl}
+          onClose={() => setResourceModal(null)}
+          onSave={handleResourceSave}
         />
       )}
 

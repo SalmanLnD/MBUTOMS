@@ -44,6 +44,9 @@ const subjectSchema = new mongoose.Schema(
     oifNumber: { type: String, required: true, trim: true },
     dealNumber: { type: String, required: true, trim: true },
     startDate: { type: Date, required: true },
+    academicYear: { type: String, trim: true, default: '2026-27' },
+    syllabusUrl: { type: String, trim: true, default: '' },
+    choUrl: { type: String, trim: true, default: '' },
   },
   { timestamps: true }
 );

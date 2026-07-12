@@ -1,5 +1,10 @@
 import { body } from 'express-validator';
 
+export const subjectResourceValidation = [
+  body('syllabusUrl').optional({ values: 'falsy' }).isString().trim(),
+  body('choUrl').optional({ values: 'falsy' }).isString().trim(),
+];
+
 export const loginValidation = [
   body('email').isEmail().withMessage('Valid email is required'),
   body('password').notEmpty().withMessage('Password is required'),
@@ -33,6 +38,7 @@ export const subjectValidation = [
   body('oifNumber').trim().notEmpty().withMessage('OIF number is required'),
   body('dealNumber').trim().notEmpty().withMessage('Deal number is required'),
   body('startDate').notEmpty().withMessage('Start date is required'),
+  body('academicYear').optional({ values: 'falsy' }).trim().notEmpty().withMessage('Academic year is required'),
   body('hours').optional().isInt({ min: 0 }).withMessage('Hours must be a positive number'),
 ];
 

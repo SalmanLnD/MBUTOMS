@@ -20,6 +20,7 @@ const emptyForm = {
   oifNumber: '',
   dealNumber: '',
   startDate: '',
+  academicYear: '2026-27',
   schools: [],
   semester: '',
   departments: [],
@@ -32,7 +33,7 @@ const emptyForm = {
 
 const toId = (value) => value?._id || value || '';
 
-const SubjectFormModal = ({ subject, onClose }) => {
+const SubjectFormModal = ({ subject, onClose, onManageResource }) => {
   const [form, setForm] = useState(emptyForm);
   const [schools, setSchools] = useState([]);
   const [semesters, setSemesters] = useState([]);
@@ -108,6 +109,7 @@ const SubjectFormModal = ({ subject, onClose }) => {
       oifNumber: subject.oifNumber || '',
       dealNumber: subject.dealNumber || '',
       startDate: subject.startDate ? toInputDate(subject.startDate) : '',
+      academicYear: subject.academicYear || '2026-27',
       schools: schoolIds,
       semester: toId(subject.semester),
       departments: departmentIds,
@@ -276,6 +278,17 @@ const SubjectFormModal = ({ subject, onClose }) => {
               <div className="col-md-4">
                 <label className="form-label">Start Date *</label>
                 <input type="date" name="startDate" className="form-control" value={form.startDate} onChange={handleChange} required />
+              </div>
+              <div className="col-md-4">
+                <label className="form-label">Academic Year *</label>
+                <input
+                  name="academicYear"
+                  className="form-control"
+                  value={form.academicYear}
+                  onChange={handleChange}
+                  placeholder="2026-27"
+                  required
+                />
               </div>
               <div className="col-md-6">
                 <label className="form-label">Schools</label>
@@ -462,6 +475,27 @@ const SubjectFormModal = ({ subject, onClose }) => {
                   Current timings: {formatSlotTimingsSummary(form.slotTimings, form.slotCount)}. These are used when adding this subject to a trainer timetable.
                 </small>
               </div>
+              {isEdit && onManageResource && (
+                <div className="col-12">
+                  <label className="form-label">Resources</label>
+                  <div className="d-flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      className="btn btn-outline-primary btn-sm"
+                      onClick={() => onManageResource('syllabus')}
+                    >
+                      {subject?.syllabusUrl ? 'Update Syllabus' : 'Add Syllabus'}
+                    </button>
+                    <button
+                      type="button"
+                      className="btn btn-outline-primary btn-sm"
+                      onClick={() => onManageResource('cho')}
+                    >
+                      {subject?.choUrl ? 'Update CHO' : 'Add CHO'}
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </div>

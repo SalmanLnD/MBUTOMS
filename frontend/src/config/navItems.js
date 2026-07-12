@@ -16,7 +16,7 @@ const ALL_STAFF = MANAGEMENT_ROLES;
 export const navItems = [
   { path: '/dashboard', label: 'Dashboard', Icon: DashboardIcon, roles: [...ALL_STAFF, ROLES.TRAINER] },
   { path: '/trainers', label: 'Trainers', Icon: TrainerIcon, roles: [...ALL_STAFF, ROLES.TRAINER] },
-  { path: '/subjects', label: 'Subjects', Icon: SubjectIcon, roles: ALL_STAFF },
+  { path: '/subjects', label: 'Subjects', Icon: SubjectIcon, roles: [...ALL_STAFF, ROLES.TRAINER] },
   { path: '/timetable', label: 'Timetable', Icon: CalendarIcon, roles: [...ALL_STAFF, ROLES.TRAINER] },
   { path: '/venues', label: 'Venues', Icon: VenueIcon, roles: [...ALL_STAFF, ROLES.TRAINER] },
   { path: '/classes-students', label: 'Classes & Students', Icon: ClassesIcon, roles: [...ALL_STAFF, ROLES.TRAINER] },

@@ -20,6 +20,11 @@ export const updateSubject = async (id, subjectData) => {
   return data;
 };
 
+export const updateSubjectResources = async (id, resourceData) => {
+  const { data } = await api.patch(`/subjects/${id}/resources`, resourceData);
+  return data;
+};
+
 export const deleteSubject = async (id) => {
   const { data } = await api.delete(`/subjects/${id}`);
   return data;

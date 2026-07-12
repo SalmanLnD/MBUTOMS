@@ -10,6 +10,7 @@ import { migrateTrainerStatusRestore } from '../utils/migrateTrainerStatusRestor
 import { clearEmployeeTimetableSchedules } from '../utils/clearEmployeeTimetableSchedules.js';
 import { syncAllTrainerSubjectLinks } from '../utils/syncTrainerSubjectLinks.js';
 import { migrateSubjectCommercialFields } from '../utils/migrateSubjectCommercialFields.js';
+import { migrateSubjectAcademicYear } from '../utils/migrateSubjectAcademicYear.js';
 import { syncLrreVSemesterTimetable } from '../utils/syncLrreVSemesterTimetable.js';
 import { repairMisplacedLrreVSemesterSlots } from '../utils/repairMisplacedLrreVSemesterSlots.js';
 import { migrateClassesFromSchedules } from '../utils/migrateClassesFromSchedules.js';
@@ -25,9 +26,13 @@ const getCache = () => {
 
 const runEssentialStartup = async () => {
   const counts = await ensureReferenceData();
+  const academicYearMigration = await migrateSubjectAcademicYear();
   console.log(
     `Reference data ready: ${counts.schoolCount} schools, ${counts.semesterCount} semesters, ${counts.departmentCount} departments`
   );
+  if (academicYearMigration.updatedCount) {
+    console.log(`Subject academic year migration: ${academicYearMigration.updatedCount} subject(s) set to ${academicYearMigration.academicYear}`);
+  }
   return counts;
 };
 
