@@ -953,11 +953,30 @@ body {
   }
 
   .timetable-grid-wrap {
-    overflow-x: hidden;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: thin;
+  }
+
+  .timetable-grid-wrap::-webkit-scrollbar {
+    display: block;
+    height: 6px;
+  }
+
+  .timetable-grid-wrap::-webkit-scrollbar-thumb {
+    background: rgba(100, 116, 139, 0.45);
+    border-radius: 999px;
+  }
+
+  .timetable-grid {
+    width: max-content;
+    min-width: 100%;
+    table-layout: auto;
+    min-height: 0;
   }
 
   .timetable-slot-col {
-    min-width: 0 !important;
+    min-width: 108px !important;
   }
 
   .timetable-day-col {
@@ -1008,10 +1027,6 @@ body {
 
   .timetable-cell {
     font-size: 0.58rem;
-  }
-
-  .timetable-grid {
-    min-height: 0;
   }
 
   .timetable-all-trainers {
