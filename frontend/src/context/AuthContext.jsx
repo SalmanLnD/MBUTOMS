@@ -14,6 +14,7 @@ import {
   matchesRole,
   canImpersonate,
 } from '../utils/roles.js';
+import { resolveLinkedTrainerId } from '../utils/helpers.js';
 
 const AuthContext = createContext(null);
 
@@ -22,7 +23,7 @@ const buildUserData = (data) => ({
   name: data.name,
   email: data.email,
   role: data.role,
-  trainer: data.trainer,
+  trainer: resolveLinkedTrainerId(data.trainer),
   mustResetPassword: Boolean(data.mustResetPassword),
   requiresPasswordReset: Boolean(data.requiresPasswordReset || data.mustResetPassword),
   impersonating: Boolean(data.impersonating),
@@ -37,7 +38,12 @@ const storeUser = (userData, token) => {
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(() => {
     const stored = localStorage.getItem('toms_user');
-    return stored ? JSON.parse(stored) : null;
+    if (!stored) return null;
+    const parsed = JSON.parse(stored);
+    return {
+      ...parsed,
+      trainer: resolveLinkedTrainerId(parsed.trainer),
+    };
   });
   const [loading, setLoading] = useState(true);
 

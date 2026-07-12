@@ -5,16 +5,17 @@ import AlertMessage from './AlertMessage.jsx';
 import TrainerFormModal from './TrainerFormModal.jsx';
 import { showSuccess } from '../utils/toast.js';
 import { getTrainerById } from '../services/trainerService.js';
-import { formatDate, getErrorMessage } from '../utils/helpers.js';
+import { formatDate, getErrorMessage, resolveLinkedTrainerId } from '../utils/helpers.js';
 
 const TrainerDetailsPanel = ({ trainerId, canEdit = false }) => {
+  const resolvedTrainerId = resolveLinkedTrainerId(trainerId);
   const [trainer, setTrainer] = useState(null);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState('');
   const [showEditModal, setShowEditModal] = useState(false);
 
   const fetchTrainer = useCallback(async () => {
-    if (!trainerId) {
+    if (!resolvedTrainerId) {
       setLoadError('Trainer profile is not linked to this account.');
       setLoading(false);
       return;
@@ -22,7 +23,7 @@ const TrainerDetailsPanel = ({ trainerId, canEdit = false }) => {
 
     setLoading(true);
     try {
-      const data = await getTrainerById(trainerId);
+      const data = await getTrainerById(resolvedTrainerId);
       setTrainer(data);
       setLoadError('');
     } catch (err) {
@@ -30,7 +31,7 @@ const TrainerDetailsPanel = ({ trainerId, canEdit = false }) => {
     } finally {
       setLoading(false);
     }
-  }, [trainerId]);
+  }, [resolvedTrainerId]);
 
   useEffect(() => {
     fetchTrainer();
@@ -159,7 +160,7 @@ const TrainerDetailsPanel = ({ trainerId, canEdit = false }) => {
                   Weekly workload: {trainer.weeklyWorkloadHours} hrs assigned
                 </p>
               </div>
-              <Link to={`/trainers/${trainerId}/schedule`} className="btn btn-primary btn-sm">
+              <Link to={`/trainers/${resolvedTrainerId}/schedule`} className="btn btn-primary btn-sm">
                 View Full Schedule
               </Link>
             </div>

@@ -38,6 +38,13 @@ export const formatStatus = (status) =>
 export const getErrorMessage = (error) =>
   error.response?.data?.message || error.message || 'Something went wrong';
 
+export const resolveLinkedTrainerId = (trainer) => {
+  if (!trainer) return null;
+  if (typeof trainer === 'string') return trainer;
+  if (typeof trainer === 'object' && trainer._id) return trainer._id.toString();
+  return null;
+};
+
 export const toInputDate = (date) => {
   if (!date) return '';
   const d = new Date(date);
