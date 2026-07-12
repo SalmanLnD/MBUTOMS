@@ -951,6 +951,82 @@ body {
     width: auto;
     min-width: 5.5rem;
   }
+
+  .timetable-grid-wrap {
+    overflow-x: hidden;
+  }
+
+  .timetable-slot-col {
+    min-width: 0 !important;
+  }
+
+  .timetable-day-col {
+    width: 2.15rem !important;
+    min-width: 2.15rem !important;
+    max-width: 2.15rem !important;
+    font-size: 0.62rem !important;
+    padding-left: 0.15rem !important;
+    padding-right: 0.15rem !important;
+  }
+
+  .timetable-slot-key {
+    font-size: 0.62rem;
+    line-height: 1.1;
+  }
+
+  .timetable-slot-time {
+    font-size: 0.54rem;
+    white-space: normal;
+    line-height: 1.15;
+    word-break: break-word;
+  }
+
+  .timetable-grid thead th {
+    padding: 0.28rem 0.12rem !important;
+  }
+
+  .timetable-grid tbody td {
+    height: auto;
+    min-height: 2.35rem;
+    padding: 0.22rem 0.12rem !important;
+  }
+
+  .timetable-cell-body {
+    min-height: 2rem;
+    gap: 0.04rem;
+  }
+
+  .timetable-cell-class {
+    font-size: 0.58rem;
+    line-height: 1.15;
+  }
+
+  .timetable-cell-meta {
+    font-size: 0.52rem;
+    line-height: 1.1;
+  }
+
+  .timetable-cell {
+    font-size: 0.58rem;
+  }
+
+  .timetable-grid {
+    min-height: 0;
+  }
+
+  .timetable-all-trainers {
+    padding: 0;
+    gap: 1.25rem;
+  }
+
+  .timetable-trainer-section {
+    padding: 0;
+  }
+
+  .timetable-session-tag {
+    font-size: 0.46rem;
+    padding: 0.1rem 0.22rem;
+  }
 }
 
 /* Attendance grid sticky cols */

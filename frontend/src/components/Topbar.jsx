@@ -1,12 +1,14 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.jsx';
 import { useLoginModal } from '../context/LoginModalContext.jsx';
 import StyledSelect from './StyledSelect.jsx';
 import NotificationBell from './NotificationBell.jsx';
-import { formatRole } from '../utils/helpers.js';
+import { CalendarIcon } from './icons.jsx';
+import { formatRole, getErrorMessage } from '../utils/helpers.js';
 import { showError } from '../utils/toast.js';
-import { getErrorMessage } from '../utils/helpers.js';
+
+const ACADEMIC_CALENDARS_URL = 'https://drive.google.com/drive/u/1/folders/1GvF_2ieWFGKaFfVvPTSaVG1bl87WQD3J';
 
 const Topbar = ({ title }) => {
   const {
@@ -19,6 +21,8 @@ const Topbar = ({ title }) => {
   } = useAuth();
   const { openLoginModal } = useLoginModal();
   const navigate = useNavigate();
+  const location = useLocation();
+  const showAcademicCalendars = location.pathname === '/timetable';
   const [targets, setTargets] = useState([]);
   const [loadingTargets, setLoadingTargets] = useState(false);
   const [switchingView, setSwitchingView] = useState(false);
@@ -106,8 +110,21 @@ const Topbar = ({ title }) => {
         </div>
       )}
 
-      <header className="topbar d-flex justify-content-between align-items-center mb-4">
+      <header className="topbar d-flex justify-content-between align-items-center mb-4 gap-3">
         <h1 className="h4 mb-0 fw-semibold">{title}</h1>
+        {showAcademicCalendars && (
+          <div className="topbar-spacer flex-grow-1 d-flex justify-content-center">
+            <a
+              href={ACADEMIC_CALENDARS_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="btn btn-outline-primary btn-sm topbar-calendars-btn d-inline-flex align-items-center gap-2"
+            >
+              <CalendarIcon size={16} />
+              Academic Calendars
+            </a>
+          </div>
+        )}
         <div className="d-flex align-items-center gap-2 gap-md-3 flex-wrap justify-content-end">
           {user ? (
             <>

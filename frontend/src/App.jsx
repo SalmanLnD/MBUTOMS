@@ -14,7 +14,6 @@ import Venues from './pages/Venues.jsx';
 import Subjects from './pages/Subjects.jsx';
 import Timetable from './pages/Timetable.jsx';
 import TrainerSchedule from './pages/TrainerSchedule.jsx';
-import VenueSchedule from './pages/VenueSchedule.jsx';
 import ClassesStudents from './pages/ClassesStudents.jsx';
 import Leaves from './pages/Leaves.jsx';
 import Replacements from './pages/Replacements.jsx';
@@ -81,14 +80,6 @@ const App = () => (
           element={
             <ProtectedRoute roles={MANAGEMENT_ROLES}>
               <Replacements />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/venue-schedule"
-          element={
-            <ProtectedRoute roles={MANAGEMENT_ROLES}>
-              <VenueSchedule />
             </ProtectedRoute>
           }
         />

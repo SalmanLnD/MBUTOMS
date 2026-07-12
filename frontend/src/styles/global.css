@@ -622,6 +622,10 @@ body {
     flex-shrink: 0;
   }
 
+  .timetable-slot-col {
+    min-width: 0;
+  }
+
   .nav-tabs {
     display: flex;
     flex-wrap: nowrap;

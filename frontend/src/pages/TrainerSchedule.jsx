@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import Topbar from '../components/Topbar.jsx';
 import TrainerTimetableGrid from '../components/TrainerTimetableGrid.jsx';
@@ -6,13 +6,16 @@ import LoadingSpinner from '../components/LoadingSpinner.jsx';
 import { showError } from '../utils/toast.js';
 import { getTrainerById } from '../services/trainerService.js';
 import { getTrainerSchedule } from '../services/scheduleService.js';
+import { getSubjects } from '../services/subjectService.js';
 import { getErrorMessage, toInputDate } from '../utils/helpers.js';
 import { formatTimeRange, formatScheduleClassLabel } from '../utils/scheduleUtils.js';
+import { resolveTrainerTimetableGridOptions } from '../utils/trainerTimetableDisplay.js';
 
 const TrainerSchedule = () => {
   const { id } = useParams();
   const [trainer, setTrainer] = useState(null);
   const [schedules, setSchedules] = useState([]);
+  const [allSubjects, setAllSubjects] = useState([]);
   const [totalHours, setTotalHours] = useState(0);
   const [loading, setLoading] = useState(true);
   const [view, setView] = useState('grid');
@@ -20,13 +23,16 @@ const TrainerSchedule = () => {
   const fetchData = useCallback(async () => {
     setLoading(true);
     try {
-      const [trainerData, scheduleData] = await Promise.all([
+      const referenceDate = toInputDate(new Date());
+      const [trainerData, scheduleData, subjectData] = await Promise.all([
         getTrainerById(id),
-        getTrainerSchedule(id, { referenceDate: toInputDate(new Date()) }),
+        getTrainerSchedule(id, { referenceDate }),
+        getSubjects({ trainer: id, limit: 50 }),
       ]);
       setTrainer(trainerData);
       setSchedules(scheduleData.schedules);
       setTotalHours(scheduleData.totalHours);
+      setAllSubjects(subjectData.subjects || []);
     } catch (err) {
       showError(getErrorMessage(err));
     } finally {
@@ -37,6 +43,15 @@ const TrainerSchedule = () => {
   useEffect(() => {
     fetchData();
   }, [fetchData]);
+
+  const gridOptions = useMemo(
+    () => resolveTrainerTimetableGridOptions({
+      trainer,
+      visibleSchedules: schedules,
+      allSubjects,
+    }),
+    [trainer, schedules, allSubjects]
+  );
 
   if (loading && !trainer) return <LoadingSpinner message="Loading schedule..." />;
 
@@ -93,7 +108,14 @@ const TrainerSchedule = () => {
       </ul>
 
       {view === 'grid' ? (
-        <TrainerTimetableGrid schedules={schedules} trainerCode={trainer?.employeeId} />
+        <TrainerTimetableGrid
+          schedules={schedules}
+          trainerCode={trainer?.employeeId}
+          subjectLabel={gridOptions.subjectLabel}
+          fixedSlots={gridOptions.fixedSlots}
+          showSubjectInCells={gridOptions.showSubjectInCells}
+          showTimingsInCells={gridOptions.showTimingsInCells}
+        />
       ) : (
         <div className="card table-card">
           <div className="card-body">

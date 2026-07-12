@@ -13,14 +13,21 @@ import { useDebounce } from '../hooks/useDebounce.js';
 import { getTrainers, deleteTrainer, resetTrainerPassword } from '../services/trainerService.js';
 import { EditIcon, EyeIcon, KeyIcon, TrashIcon } from '../components/icons.jsx';
 import ActionIconButton from '../components/ActionIconButton.jsx';
+import TrainerDetailsPanel from '../components/TrainerDetailsPanel.jsx';
 import { getErrorMessage } from '../utils/helpers.js';
+import { ROLES } from '../utils/roles.js';
 
 const Trainers = () => {
-  const { hasManagementRole, hasFullAccess } = useAuth();
+  const { user, hasManagementRole, hasFullAccess } = useAuth();
   const canManage = hasManagementRole();
+  const isTrainerUser = user?.role === ROLES.TRAINER;
   const [searchParams, setSearchParams] = useSearchParams();
   const tabParam = searchParams.get('tab');
-  const activeTab = ['attendance', 'logs'].includes(tabParam) ? tabParam : 'directory';
+  const validTabs = isTrainerUser
+    ? ['details', 'attendance', 'logs']
+    : ['directory', 'attendance', 'logs'];
+  const defaultTab = isTrainerUser ? 'details' : 'directory';
+  const activeTab = validTabs.includes(tabParam) ? tabParam : defaultTab;
 
   const [trainers, setTrainers] = useState([]);
   const [pagination, setPagination] = useState(null);
@@ -120,7 +127,7 @@ const Trainers = () => {
   };
 
   const setTab = (tab) => {
-    if (tab === 'directory') {
+    if (tab === defaultTab) {
       setSearchParams({});
     } else {
       setSearchParams({ tab });
@@ -131,18 +138,30 @@ const Trainers = () => {
 
   return (
     <>
-      <Topbar title="Trainer Management" />
+      <Topbar title={isTrainerUser ? 'My Profile' : 'Trainer Management'} />
 
       <ul className="nav nav-tabs mb-3">
-        <li className="nav-item">
-          <button
-            type="button"
-            className={`nav-link ${activeTab === 'directory' ? 'active' : ''}`}
-            onClick={() => setTab('directory')}
-          >
-            Directory
-          </button>
-        </li>
+        {isTrainerUser ? (
+          <li className="nav-item">
+            <button
+              type="button"
+              className={`nav-link ${activeTab === 'details' ? 'active' : ''}`}
+              onClick={() => setTab('details')}
+            >
+              Trainer Details
+            </button>
+          </li>
+        ) : (
+          <li className="nav-item">
+            <button
+              type="button"
+              className={`nav-link ${activeTab === 'directory' ? 'active' : ''}`}
+              onClick={() => setTab('directory')}
+            >
+              Directory
+            </button>
+          </li>
+        )}
         <li className="nav-item">
           <button
             type="button"
@@ -173,6 +192,12 @@ const Trainers = () => {
         <div className="card table-card">
           <div className="card-body">
             <TrainerPunchInLogsTab />
+          </div>
+        </div>
+      ) : activeTab === 'details' ? (
+        <div className="card table-card">
+          <div className="card-body">
+            <TrainerDetailsPanel trainerId={user?.trainer} />
           </div>
         </div>
       ) : (
