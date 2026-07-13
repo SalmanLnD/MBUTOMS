@@ -30,7 +30,7 @@ router
 
 router.patch(
   '/:id/resources',
-  authorize('admin', 'campus_manager', 'subject_coordinator', 'manager'),
+  authorize('admin', 'campus_manager', 'manager'),
   subjectResourceValidation,
   validate,
   asyncHandler(updateSubjectResources)

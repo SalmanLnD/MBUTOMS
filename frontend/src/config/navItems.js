@@ -9,6 +9,7 @@ import {
   ChartIcon,
   ReplacementIcon,
   TicketNavIcon,
+  TopicTrackerIcon,
 } from '../components/icons.jsx';
 import { MANAGEMENT_ROLES, ROLES } from '../utils/roles.js';
 
@@ -23,6 +24,7 @@ export const navItems = [
   { path: '/classes-students', label: 'Classes & Students', Icon: ClassesIcon, roles: [...ALL_STAFF, ROLES.TRAINER] },
   { path: '/leaves', label: 'Leaves', Icon: LeaveNavIcon, roles: [...ALL_STAFF, ROLES.TRAINER] },
   { path: '/tickets', label: 'Tickets', Icon: TicketNavIcon, roles: [...ALL_STAFF, ROLES.TRAINER] },
+  { path: '/topic-tracker', label: 'Topic Tracker', Icon: TopicTrackerIcon, roles: [...ALL_STAFF, ROLES.TRAINER] },
   { path: '/performance', label: 'Performance', Icon: ChartIcon, roles: ALL_STAFF },
   { path: '/replacements', label: 'Replacements', Icon: ReplacementIcon, roles: ALL_STAFF },
 ];

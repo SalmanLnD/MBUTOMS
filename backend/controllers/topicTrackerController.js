@@ -1,0 +1,205 @@
+import TopicTrackerEntry from '../models/TopicTrackerEntry.js';
+import Schedule from '../models/Schedule.js';
+import Trainer from '../models/Trainer.js';
+import { ROLES, isAuthorizedRole, FULL_ACCESS_ROLES } from '../utils/roles.js';
+import { TOPIC_TRACKER_STATUSES } from '../utils/topicTrackerConstants.js';
+import {
+  buildTopicTrackerSessions,
+  buildTopicTrackerOverview,
+  buildTopicTrackerExportRows,
+} from '../utils/topicTrackerSessions.js';
+import { computeHours } from '../utils/trainerClassHours.js';
+import { normalizeDate } from '../utils/scheduleHelpers.js';
+import {
+  coordinatorCanAccessTrainer,
+  getCoordinatorSubjectIds,
+  isSubjectCoordinator,
+} from '../utils/subjectCoordinatorAccess.js';
+
+const MANAGEMENT_VIEW_ROLES = [...FULL_ACCESS_ROLES, ROLES.SUBJECT_COORDINATOR];
+
+const computeAttendancePercent = (allotted, present) => {
+  if (!allotted || allotted <= 0) return null;
+  return Math.round((present / allotted) * 1000) / 10;
+};
+
+const canEditSession = async (user, trainerId, subjectId) => {
+  if (isAuthorizedRole(user?.role, FULL_ACCESS_ROLES)) return true;
+  if (isSubjectCoordinator(user)) {
+    const subjectIds = getCoordinatorSubjectIds(user);
+    if (!subjectIds.includes(subjectId?.toString())) return false;
+    return coordinatorCanAccessTrainer(user, trainerId);
+  }
+  if (user?.role === ROLES.TRAINER) {
+    return user.trainer?.toString() === trainerId?.toString();
+  }
+  return false;
+};
+
+const resolveScheduleContext = async (scheduleId) => {
+  const schedule = await Schedule.findById(scheduleId)
+    .populate('subject', 'name code')
+    .populate('venue', 'name building floor')
+    .lean();
+  if (!schedule) return null;
+
+  const trainer = await Trainer.findOne({ employeeId: schedule.trainerCode }).select('name employeeId');
+  if (!trainer) return null;
+
+  return { schedule, trainer };
+};
+
+export const getTopicTrackerOverview = async (req, res) => {
+  if (!isAuthorizedRole(req.user.role, MANAGEMENT_VIEW_ROLES)) {
+    return res.status(403).json({ message: 'Not authorized to view topic tracker overview' });
+  }
+
+  const date = req.query.date || new Date().toISOString().slice(0, 10);
+  const overview = await buildTopicTrackerOverview({ date, user: req.user });
+  res.json(overview);
+};
+
+export const getTopicTrackerSessions = async (req, res) => {
+  const { date, subjectId, trainerId } = req.query;
+  if (!date) {
+    return res.status(400).json({ message: 'date is required (YYYY-MM-DD)' });
+  }
+
+  const payload = await buildTopicTrackerSessions({
+    date,
+    subjectId,
+    trainerId,
+    user: req.user,
+  });
+
+  res.json(payload);
+};
+
+export const upsertTopicTrackerEntry = async (req, res) => {
+  const {
+    scheduleId,
+    date,
+    topicModuleCovered,
+    sessionStartTime,
+    sessionEndTime,
+    allottedStudents,
+    noPresent,
+    sessionStatus,
+    keyObservationsFeedback,
+    challengesFaced,
+    trackerStatus,
+    branchYearSection,
+    roomNo,
+    courseName,
+    trainerName,
+  } = req.body;
+
+  if (!scheduleId || !date) {
+    return res.status(400).json({ message: 'scheduleId and date are required' });
+  }
+
+  const context = await resolveScheduleContext(scheduleId);
+  if (!context) {
+    return res.status(404).json({ message: 'Schedule or trainer not found' });
+  }
+
+  const { schedule, trainer } = context;
+  const subjectId = schedule.subject?._id || schedule.subject;
+  const allowed = await canEditSession(req.user, trainer._id, subjectId);
+  if (!allowed) {
+    return res.status(403).json({ message: 'Not authorized to update this topic tracker entry' });
+  }
+
+  const refDate = normalizeDate(date);
+  const startTime = sessionStartTime || schedule.startTime;
+  const endTime = sessionEndTime || schedule.endTime;
+  const allotted = allottedStudents ?? 0;
+  const present = noPresent ?? 0;
+
+  let nextStatus = trackerStatus;
+  if (nextStatus && !TOPIC_TRACKER_STATUSES.includes(nextStatus)) {
+    return res.status(400).json({ message: 'Invalid tracker status' });
+  }
+
+  const existing = await TopicTrackerEntry.findOne({ schedule: scheduleId, date: refDate });
+
+  const payload = {
+    date: refDate,
+    schedule: scheduleId,
+    trainer: trainer._id,
+    subject: subjectId,
+    day: schedule.day,
+    slot: schedule.slot || '',
+    trainerName: trainerName || trainer.name,
+    branchYearSection: branchYearSection || `${schedule.department}, Sem ${schedule.semester} - ${schedule.section}`,
+    roomNo: roomNo || schedule.venue?.name || '',
+    courseName: courseName || schedule.subject?.name || schedule.subjectCode || '',
+    topicModuleCovered: topicModuleCovered ?? existing?.topicModuleCovered ?? '',
+    sessionStartTime: startTime,
+    sessionEndTime: endTime,
+    durationHrs: computeHours(startTime, endTime),
+    allottedStudents: allotted,
+    noPresent: present,
+    attendancePercent: computeAttendancePercent(allotted, present),
+    sessionStatus: sessionStatus ?? existing?.sessionStatus ?? '',
+    keyObservationsFeedback: keyObservationsFeedback ?? existing?.keyObservationsFeedback ?? '',
+    challengesFaced: challengesFaced ?? existing?.challengesFaced ?? '',
+    markedBy: req.user._id,
+  };
+
+  if (nextStatus) {
+    payload.trackerStatus = nextStatus;
+    if (nextStatus === 'closed') {
+      payload.closedAt = new Date();
+      payload.closedBy = req.user._id;
+    } else {
+      payload.closedAt = null;
+      payload.closedBy = null;
+    }
+  } else {
+    payload.trackerStatus = existing?.trackerStatus || 'pending';
+  }
+
+  const entry = await TopicTrackerEntry.findOneAndUpdate(
+    { schedule: scheduleId, date: refDate },
+    { $set: payload },
+    { upsert: true, new: true, setDefaultsOnInsert: true }
+  );
+
+  res.json(entry);
+};
+
+export const updateTopicTrackerStatus = async (req, res) => {
+  const { status } = req.body;
+  if (!TOPIC_TRACKER_STATUSES.includes(status)) {
+    return res.status(400).json({ message: 'Invalid tracker status' });
+  }
+
+  const entry = await TopicTrackerEntry.findById(req.params.id);
+  if (!entry) {
+    return res.status(404).json({ message: 'Topic tracker entry not found' });
+  }
+
+  const allowed = await canEditSession(req.user, entry.trainer, entry.subject);
+  if (!allowed) {
+    return res.status(403).json({ message: 'Not authorized to update this entry' });
+  }
+
+  entry.trackerStatus = status;
+  if (status === 'closed') {
+    entry.closedAt = new Date();
+    entry.closedBy = req.user._id;
+  } else {
+    entry.closedAt = null;
+    entry.closedBy = null;
+  }
+  entry.markedBy = req.user._id;
+  await entry.save();
+
+  res.json(entry);
+};
+
+export const exportTopicTrackerForSheets = async (req, res) => {
+  const payload = await buildTopicTrackerExportRows();
+  res.json(payload);
+};

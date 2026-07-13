@@ -19,6 +19,7 @@ import feedbackRoutes from './routes/feedbackRoutes.js';
 import webhookRoutes from './routes/webhookRoutes.js';
 import notificationRoutes from './routes/notificationRoutes.js';
 import ticketRoutes from './routes/ticketRoutes.js';
+import topicTrackerRoutes from './routes/topicTrackerRoutes.js';
 
 dotenv.config();
 const app = express();
@@ -65,6 +66,7 @@ app.use('/api/feedback', feedbackRoutes);
 app.use('/api/webhooks', webhookRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/tickets', ticketRoutes);
+app.use('/api/topic-tracker', topicTrackerRoutes);
 
 app.use(notFound);
 app.use(errorHandler);

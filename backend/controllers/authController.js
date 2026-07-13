@@ -1,10 +1,14 @@
 import jwt from 'jsonwebtoken';
 import User from '../models/User.js';
 import { INITIAL_TRAINER_PASSWORD } from '../constants/trainerAuth.js';
-import { canImpersonate, ROLES } from '../utils/roles.js';
+import { canImpersonate, IMPERSONATION_TARGET_ROLES, ROLES } from '../utils/roles.js';
 
-const generateToken = (id, impersonatedBy = null) => {
-  const payload = impersonatedBy ? { id, impersonatedBy } : { id };
+const generateToken = (user, impersonatedBy = null) => {
+  const payload = {
+    id: user._id,
+    sv: user.sessionVersion ?? 1,
+    ...(impersonatedBy ? { impersonatedBy } : {}),
+  };
   return jwt.sign(payload, process.env.JWT_SECRET, {
     expiresIn: process.env.JWT_EXPIRES_IN || '7d',
   });
@@ -16,6 +20,8 @@ const userResponse = (user, { impersonator = null } = {}) => ({
   email: user.email,
   role: user.role,
   trainer: user.trainer,
+  coordinatorSubjects: user.coordinatorSubjects || [],
+  sessionVersion: user.sessionVersion ?? 1,
   mustResetPassword: Boolean(user.mustResetPassword),
   requiresPasswordReset: Boolean(user.mustResetPassword),
   impersonating: Boolean(impersonator),
@@ -27,14 +33,15 @@ const userResponse = (user, { impersonator = null } = {}) => ({
         role: impersonator.role,
       }
     : null,
-  token: generateToken(user._id, impersonator?._id),
+  token: generateToken(user, impersonator?._id),
 });
 
 export const login = async (req, res) => {
   const { email, password } = req.body;
 
   const user = await User.findOne({ email: email?.trim()?.toLowerCase() })
-    .populate('trainer', 'name employeeId');
+    .populate('trainer', 'name employeeId')
+    .populate('coordinatorSubjects', 'name code');
   if (!user || !(await user.matchPassword(password))) {
     return res.status(401).json({ message: 'Invalid email or password' });
   }
@@ -55,7 +62,8 @@ export const login = async (req, res) => {
 export const getMe = async (req, res) => {
   const user = await User.findById(req.user._id)
     .select('-password')
-    .populate('trainer', 'name employeeId department');
+    .populate('trainer', 'name employeeId department')
+    .populate('coordinatorSubjects', 'name code');
   res.json({
     ...user.toObject(),
     requiresPasswordReset: Boolean(user.mustResetPassword),
@@ -109,12 +117,12 @@ export const getImpersonationTargets = async (req, res) => {
   }
 
   const trainers = await User.find({
-    role: ROLES.TRAINER,
+    role: { $in: IMPERSONATION_TARGET_ROLES },
     isActive: true,
     trainer: { $exists: true, $ne: null },
   })
     .populate('trainer', 'name employeeId showInRoster')
-    .select('name email trainer')
+    .select('name email trainer role')
     .sort({ name: 1 })
     .lean();
 
@@ -124,6 +132,7 @@ export const getImpersonationTargets = async (req, res) => {
       _id: entry._id,
       name: entry.name,
       email: entry.email,
+      role: entry.role,
       trainerId: entry.trainer._id,
       employeeId: entry.trainer.employeeId,
     }));
@@ -141,12 +150,17 @@ export const impersonateUser = async (req, res) => {
     return res.status(400).json({ message: 'userId is required' });
   }
 
-  const targetUser = await User.findById(userId).populate('trainer', 'name employeeId');
+  const targetUser = await User.findById(userId)
+    .populate('trainer', 'name employeeId')
+    .populate('coordinatorSubjects', 'name code');
   if (!targetUser || !targetUser.isActive) {
     return res.status(404).json({ message: 'User not found' });
   }
-  if (targetUser.role !== ROLES.TRAINER) {
-    return res.status(400).json({ message: 'Only trainer accounts can be viewed' });
+  if (!IMPERSONATION_TARGET_ROLES.includes(targetUser.role)) {
+    return res.status(400).json({ message: 'Only trainer or subject coordinator accounts can be viewed' });
+  }
+  if (!targetUser.trainer) {
+    return res.status(400).json({ message: 'User has no linked trainer profile' });
   }
   if (targetUser._id.toString() === req.user._id.toString()) {
     return res.status(400).json({ message: 'Already signed in as this user' });

@@ -6,6 +6,7 @@ import StyledSelect from './StyledSelect.jsx';
 import NotificationBell from './NotificationBell.jsx';
 import { CalendarIcon } from './icons.jsx';
 import { formatRole, getErrorMessage } from '../utils/helpers.js';
+import { ROLES } from '../utils/roles.js';
 import { showError } from '../utils/toast.js';
 
 const ACADEMIC_CALENDARS_URL = 'https://drive.google.com/drive/u/1/folders/1GvF_2ieWFGKaFfVvPTSaVG1bl87WQD3J';
@@ -86,7 +87,9 @@ const Topbar = ({ title }) => {
       { value: '', label: loadingTargets ? 'Loading trainers...' : 'View as trainer...' },
       ...targets.map((target) => ({
         value: target._id,
-        label: `${target.name} (${target.employeeId})`,
+        label: target.role === ROLES.SUBJECT_COORDINATOR
+          ? `${target.name} (${target.employeeId}) · ${formatRole(ROLES.SUBJECT_COORDINATOR)}`
+          : `${target.name} (${target.employeeId})`,
       })),
     ],
     [loadingTargets, targets]

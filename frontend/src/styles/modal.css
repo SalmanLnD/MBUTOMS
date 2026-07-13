@@ -22,6 +22,10 @@
   max-width: 800px;
 }
 
+.toms-modal-dialog.toms-modal-xl {
+  max-width: min(96vw, 1400px);
+}
+
 .toms-modal-content {
   display: flex;
   flex-direction: column;

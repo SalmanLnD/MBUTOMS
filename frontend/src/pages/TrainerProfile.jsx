@@ -6,8 +6,8 @@ import { useAuth } from '../context/AuthContext.jsx';
 
 const TrainerProfile = () => {
   const { id } = useParams();
-  const { hasManagementRole } = useAuth();
-  const canEdit = hasManagementRole();
+  const { hasFullAccess } = useAuth();
+  const canEdit = hasFullAccess();
 
   if (!id) return <AlertMessage message="Trainer not found" />;
 

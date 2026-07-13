@@ -36,8 +36,10 @@ const openExternalLink = (url) => {
 };
 
 const Subjects = () => {
-  const { user, hasManagementRole, hasFullAccess } = useAuth();
-  const canManage = hasManagementRole();
+  const { user, hasRole, hasFullAccess } = useAuth();
+  const canManage = hasFullAccess();
+  const isSubjectCoordinator = hasRole(ROLES.SUBJECT_COORDINATOR);
+  const showFullSubjectDetails = canManage || isSubjectCoordinator;
   const isTrainerUser = user?.role === ROLES.TRAINER;
 
   const [subjects, setSubjects] = useState([]);
@@ -326,7 +328,7 @@ const Subjects = () => {
                 <label className="text-muted small">Academic Year</label>
                 <p className="mb-0">{selectedSubject.academicYear || '2026-27'}</p>
               </div>
-              {canManage && (
+              {showFullSubjectDetails && (
                 <>
                   <div className="col-sm-4">
                     <label className="text-muted small">Semester</label>

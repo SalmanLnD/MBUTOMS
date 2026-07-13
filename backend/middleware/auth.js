@@ -1,6 +1,7 @@
 import jwt from 'jsonwebtoken';
 import User from '../models/User.js';
 import { isAuthorizedRole } from '../utils/roles.js';
+import { SESSION_EXPIRED_CODE, SESSION_EXPIRED_MESSAGE } from '../utils/sessionVersion.js';
 import { attachManagerEditNotifier } from '../utils/managerEditNotifications.js';
 
 export const protect = async (req, res, next) => {
@@ -21,6 +22,22 @@ export const protect = async (req, res, next) => {
       return res.status(401).json({ message: 'User not found' });
     }
 
+    if (!req.user.isActive) {
+      return res.status(401).json({
+        message: SESSION_EXPIRED_MESSAGE,
+        code: SESSION_EXPIRED_CODE,
+      });
+    }
+
+    const tokenSessionVersion = decoded.sv ?? 0;
+    const currentSessionVersion = req.user.sessionVersion ?? 1;
+    if (tokenSessionVersion !== currentSessionVersion) {
+      return res.status(401).json({
+        message: SESSION_EXPIRED_MESSAGE,
+        code: SESSION_EXPIRED_CODE,
+      });
+    }
+
     if (decoded.impersonatedBy) {
       req.impersonator = await User.findById(decoded.impersonatedBy).select('-password');
       if (!req.impersonator) {
@@ -31,7 +48,10 @@ export const protect = async (req, res, next) => {
     attachManagerEditNotifier(req, res);
     next();
   } catch {
-    return res.status(401).json({ message: 'Not authorized, token invalid' });
+    return res.status(401).json({
+      message: SESSION_EXPIRED_MESSAGE,
+      code: SESSION_EXPIRED_CODE,
+    });
   }
 };
 

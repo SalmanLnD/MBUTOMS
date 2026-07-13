@@ -18,14 +18,17 @@ import { getErrorMessage } from '../utils/helpers.js';
 import { ROLES } from '../utils/roles.js';
 
 const Trainers = () => {
-  const { user, hasManagementRole, hasFullAccess } = useAuth();
-  const canManage = hasManagementRole();
+  const { user, hasRole, hasFullAccess } = useAuth();
+  const canManage = hasFullAccess();
   const isTrainerUser = user?.role === ROLES.TRAINER;
+  const isSubjectCoordinator = hasRole(ROLES.SUBJECT_COORDINATOR);
   const [searchParams, setSearchParams] = useSearchParams();
   const tabParam = searchParams.get('tab');
   const validTabs = isTrainerUser
     ? ['details', 'attendance', 'logs']
-    : ['directory', 'attendance', 'logs'];
+    : isSubjectCoordinator
+      ? ['directory']
+      : ['directory', 'attendance', 'logs'];
   const defaultTab = isTrainerUser ? 'details' : 'directory';
   const activeTab = validTabs.includes(tabParam) ? tabParam : defaultTab;
 
@@ -138,7 +141,7 @@ const Trainers = () => {
 
   return (
     <>
-      <Topbar title={isTrainerUser ? 'My Profile' : 'Trainer Management'} />
+      <Topbar title={isTrainerUser ? 'My Profile' : isSubjectCoordinator ? 'Subject Trainers' : 'Trainer Management'} />
 
       <ul className="nav nav-tabs mb-3">
         {isTrainerUser ? (
@@ -162,6 +165,8 @@ const Trainers = () => {
             </button>
           </li>
         )}
+        {!isSubjectCoordinator && (
+          <>
         <li className="nav-item">
           <button
             type="button"
@@ -180,6 +185,8 @@ const Trainers = () => {
             Logs
           </button>
         </li>
+          </>
+        )}
       </ul>
 
       {activeTab === 'attendance' ? (

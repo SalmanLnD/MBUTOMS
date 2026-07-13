@@ -10,6 +10,13 @@ import { clearSubjectStartDateCache } from '../utils/subjectStartDate.js';
 import {
   applySubjectTrainerEligibleChange,
 } from '../utils/syncTrainerSubjectLinks.js';
+import {
+  buildTrainerFilterForCoordinatorSubjects,
+  coordinatorCanAccessSubject,
+  coordinatorCanAccessTrainer,
+  getCoordinatorSubjectIds,
+  isSubjectCoordinator,
+} from '../utils/subjectCoordinatorAccess.js';
 
 const populateSubject = (query) =>
   query
@@ -194,6 +201,13 @@ export const getSubjects = async (req, res) => {
   }
 
   const filter = await buildSubjectQuery(query);
+
+  if (isSubjectCoordinator(req.user)) {
+    const coordinatorSubjectIds = getCoordinatorSubjectIds(req.user);
+    filter._id = coordinatorSubjectIds.length
+      ? { $in: coordinatorSubjectIds }
+      : { $in: [] };
+  }
   const sortField = ['name', 'code', 'hours', 'createdAt'].includes(req.query.sortBy)
     ? req.query.sortBy
     : 'name';
@@ -222,6 +236,10 @@ export const getSubjectById = async (req, res) => {
     if (!allowed) {
       return res.status(403).json({ message: 'Not authorized to view this subject' });
     }
+  }
+
+  if (isSubjectCoordinator(req.user) && !coordinatorCanAccessSubject(req.user, subject._id)) {
+    return res.status(403).json({ message: 'Not authorized to view this subject' });
   }
 
   res.json(subject);

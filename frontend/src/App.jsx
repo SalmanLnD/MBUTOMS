@@ -5,6 +5,7 @@ import { useLoginModal } from './context/LoginModalContext.jsx';
 import ProtectedRoute from './components/ProtectedRoute.jsx';
 import LoadingSpinner from './components/LoadingSpinner.jsx';
 import LoginModal from './components/LoginModal.jsx';
+import SessionExpiredModal from './components/SessionExpiredModal.jsx';
 import MainLayout from './layouts/MainLayout.jsx';
 import OptionalAuthLayout from './layouts/OptionalAuthLayout.jsx';
 import Dashboard from './pages/Dashboard.jsx';
@@ -17,6 +18,7 @@ import TrainerSchedule from './pages/TrainerSchedule.jsx';
 import ClassesStudents from './pages/ClassesStudents.jsx';
 import Leaves from './pages/Leaves.jsx';
 import Tickets from './pages/Tickets.jsx';
+import TopicTracker from './pages/TopicTracker.jsx';
 import Replacements from './pages/Replacements.jsx';
 import Performance from './pages/Performance.jsx';
 import PublicFeedbackForm from './pages/PublicFeedbackForm.jsx';
@@ -77,6 +79,7 @@ const App = () => (
         <Route path="/classes-students" element={<ClassesStudents />} />
         <Route path="/leaves" element={<Leaves />} />
         <Route path="/tickets" element={<Tickets />} />
+        <Route path="/topic-tracker" element={<TopicTracker />} />
         <Route
           path="/replacements"
           element={
@@ -101,6 +104,7 @@ const App = () => (
       <Route path="*" element={<HomeRedirect />} />
     </Routes>
     <LoginModal />
+    <SessionExpiredModal />
   </>
 );
 

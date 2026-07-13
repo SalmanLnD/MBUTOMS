@@ -6,6 +6,12 @@ import { applyTrainerSubjectsChange, toIdStrings } from '../utils/syncTrainerSub
 import { syncTrainerUser, removeTrainerUser } from '../utils/trainerUserSync.js';
 import { INITIAL_TRAINER_PASSWORD } from '../constants/trainerAuth.js';
 import { mergeRosterFilter, shouldApplyRosterFilter } from '../utils/rosterFilter.js';
+import {
+  buildTrainerFilterForCoordinatorSubjects,
+  coordinatorCanAccessTrainer,
+  getCoordinatorSubjectIds,
+  isSubjectCoordinator,
+} from '../utils/subjectCoordinatorAccess.js';
 
 const buildTrainerQuery = async (query) => {
   const clauses = [];
@@ -75,7 +81,15 @@ export const getTrainers = async (req, res) => {
 
   const filter = await buildTrainerQuery(req.query);
   const rosterOnly = shouldApplyRosterFilter(req.query);
-  const finalFilter = await mergeRosterFilter(filter, { rosterOnly });
+  let finalFilter = await mergeRosterFilter(filter, { rosterOnly });
+
+  if (isSubjectCoordinator(req.user)) {
+    const coordinatorSubjectIds = getCoordinatorSubjectIds(req.user);
+    const coordinatorFilter = await buildTrainerFilterForCoordinatorSubjects(coordinatorSubjectIds);
+    finalFilter = Object.keys(finalFilter).length
+      ? { $and: [finalFilter, coordinatorFilter] }
+      : coordinatorFilter;
+  }
   const sort = getSortOption(req.query.sortBy, req.query.sortOrder);
 
   const [trainers, total] = await Promise.all([
@@ -122,6 +136,13 @@ export const getTrainerById = async (req, res) => {
 
   if (!trainer) {
     return res.status(404).json({ message: 'Trainer not found' });
+  }
+
+  if (isSubjectCoordinator(req.user)) {
+    const allowed = await coordinatorCanAccessTrainer(req.user, trainer._id);
+    if (!allowed) {
+      return res.status(403).json({ message: 'Not authorized to view this trainer' });
+    }
   }
 
   res.json(await mergeTrainerSubjects(trainer));

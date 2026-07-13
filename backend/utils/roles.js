@@ -30,6 +30,11 @@ export const ROSTER_HIDDEN_STAFF_ROLES = [
 
 export const IMPERSONATION_ROLES = FULL_ACCESS_ROLES;
 
+export const IMPERSONATION_TARGET_ROLES = [
+  ROLES.TRAINER,
+  ROLES.SUBJECT_COORDINATOR,
+];
+
 const roleMatches = (userRole, allowedRole) => {
   if (userRole === allowedRole) return true;
   if (

@@ -11,6 +11,7 @@ import { syncAllTrainerSubjectLinks } from '../utils/syncTrainerSubjectLinks.js'
 import { migrateSubjectCommercialFields } from '../utils/migrateSubjectCommercialFields.js';
 import { migrateSubjectAcademicYear } from '../utils/migrateSubjectAcademicYear.js';
 import { removeAllPedhData } from '../scripts/remove-all-pedh-data.mjs';
+import { syncSubjectCoordinators } from '../utils/syncSubjectCoordinators.js';
 import { syncLrreVSemesterTimetable } from '../utils/syncLrreVSemesterTimetable.js';
 import { repairMisplacedLrreVSemesterSlots } from '../utils/repairMisplacedLrreVSemesterSlots.js';
 import { migrateClassesFromSchedules } from '../utils/migrateClassesFromSchedules.js';
@@ -28,6 +29,7 @@ const runEssentialStartup = async () => {
   const counts = await ensureReferenceData();
   const academicYearMigration = await migrateSubjectAcademicYear();
   const pedhCleanup = await removeAllPedhData();
+  const coordinatorSync = await syncSubjectCoordinators();
   console.log(
     `Reference data ready: ${counts.schoolCount} schools, ${counts.semesterCount} semesters, ${counts.departmentCount} departments`
   );
@@ -38,6 +40,9 @@ const runEssentialStartup = async () => {
     console.log(
       `PEDH cleanup: ${pedhCleanup.removedSchedules} schedule slot(s), ${pedhCleanup.removedTrainers} placeholder trainer(s), subject removed=${pedhCleanup.removedSubject}`
     );
+  }
+  if (coordinatorSync.updated) {
+    console.log(`Subject coordinator sync: ${coordinatorSync.updated} coordinator account(s) updated`);
   }
   return counts;
 };

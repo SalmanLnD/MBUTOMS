@@ -15,6 +15,10 @@ import {
   canImpersonate,
 } from '../utils/roles.js';
 import { resolveLinkedTrainerId } from '../utils/helpers.js';
+import {
+  notifySessionExpired,
+  resetSessionExpiredState,
+} from '../utils/sessionManager.js';
 
 const AuthContext = createContext(null);
 
@@ -24,6 +28,8 @@ const buildUserData = (data) => ({
   email: data.email,
   role: data.role,
   trainer: resolveLinkedTrainerId(data.trainer),
+  coordinatorSubjects: data.coordinatorSubjects || [],
+  sessionVersion: data.sessionVersion ?? 1,
   mustResetPassword: Boolean(data.mustResetPassword),
   requiresPasswordReset: Boolean(data.requiresPasswordReset || data.mustResetPassword),
   impersonating: Boolean(data.impersonating),
@@ -48,6 +54,7 @@ export const AuthProvider = ({ children }) => {
   const [loading, setLoading] = useState(true);
 
   const applySession = useCallback((data) => {
+    resetSessionExpiredState();
     const userData = buildUserData(data);
     storeUser(userData, data.token);
     setUser(userData);
@@ -76,6 +83,38 @@ export const AuthProvider = ({ children }) => {
   useEffect(() => {
     loadUser();
   }, [loadUser]);
+
+  useEffect(() => {
+    if (!user) return undefined;
+
+    const validateSession = async () => {
+      try {
+        const fresh = await getMe();
+        const freshVersion = fresh.sessionVersion ?? 1;
+        const cachedVersion = user.sessionVersion ?? 1;
+        if (freshVersion !== cachedVersion || fresh.role !== user.role) {
+          notifySessionExpired({
+            code: 'SESSION_EXPIRED',
+            message: 'Your session has expired. Please sign in again to continue with your updated access.',
+          });
+        }
+      } catch {
+        // Handled by the API interceptor when a stored token is invalid.
+      }
+    };
+
+    const onFocus = () => {
+      validateSession();
+    };
+
+    window.addEventListener('focus', onFocus);
+    const intervalId = window.setInterval(validateSession, 5 * 60 * 1000);
+
+    return () => {
+      window.removeEventListener('focus', onFocus);
+      window.clearInterval(intervalId);
+    };
+  }, [user]);
 
   const login = async (email, password) => {
     const data = await loginApi({ email, password });
