@@ -6,6 +6,7 @@ import { useAuth } from '../context/AuthContext.jsx';
 import {
   getTrainerAttendanceGrid,
   upsertTrainerDailyAttendance,
+  invalidateTrainerAttendanceGridCache,
 } from '../services/attendanceService.js';
 import { getErrorMessage } from '../utils/helpers.js';
 import {
@@ -59,7 +60,7 @@ const TrainerAttendanceTab = () => {
   }, [grid?.rows, trainerSearch, canManageAll]);
 
   const fetchGrid = useCallback(async ({ forceRefresh = false } = {}) => {
-    const requestParams = { month: monthKey, semester: 'III' };
+    const requestParams = { month: monthKey };
     const cachedMonth = monthCacheRef.current.get(monthKey);
 
     if (cachedMonth && !forceRefresh) {
@@ -71,6 +72,11 @@ const TrainerAttendanceTab = () => {
       setLoading(true);
     } else {
       setRefreshing(true);
+    }
+
+    if (forceRefresh) {
+      invalidateTrainerAttendanceGridCache();
+      monthCacheRef.current.delete(monthKey);
     }
 
     try {
@@ -256,6 +262,14 @@ const TrainerAttendanceTab = () => {
             onClick={() => setMonthParts(clampMonthParts(getCurrentMonthParts()))}
           >
             This Month
+          </button>
+          <button
+            type="button"
+            className="btn btn-outline-secondary btn-sm"
+            disabled={loading || refreshing}
+            onClick={() => fetchGrid({ forceRefresh: true })}
+          >
+            Refresh
           </button>
         </div>
       </div>

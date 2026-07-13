@@ -10,6 +10,27 @@ export const getVenues = async (params = {}) => {
   return data;
 };
 
+export const getActiveVenuesForSelect = async () => {
+  const venues = [];
+  let page = 1;
+  let totalPages = 1;
+
+  do {
+    const data = await getVenues({
+      limit: 100,
+      page,
+      isActive: 'true',
+      sortBy: 'name',
+      sortOrder: 'asc',
+    });
+    venues.push(...(data.venues || []));
+    totalPages = data.pagination?.pages || 1;
+    page += 1;
+  } while (page <= totalPages);
+
+  return venues;
+};
+
 export const getVenueById = async (id) => {
   const { data } = await api.get(`/venues/${id}`);
   return data;

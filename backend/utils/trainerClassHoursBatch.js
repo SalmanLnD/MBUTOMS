@@ -27,8 +27,10 @@ const resolveStartDate = (schedule, subjectStartMap) => {
 
 const isActiveOnDate = (schedule, referenceDate, subjectStartMap) => {
   const ref = normalizeAttendanceDate(referenceDate);
-  const startDate = resolveStartDate(schedule, subjectStartMap);
-  const effectiveStart = startDate ?? DEFAULT_SUBJECT_START_DATE;
+  const rawStart = resolveStartDate(schedule, subjectStartMap);
+  const effectiveStart = rawStart
+    ? normalizeAttendanceDate(rawStart)
+    : DEFAULT_SUBJECT_START_DATE;
   return ref >= effectiveStart;
 };
 
@@ -47,12 +49,35 @@ const buildTrainerLookup = (trainers) => {
   return { trainerById, codeToTrainerId, allCodes: [...codeToTrainerId.keys()] };
 };
 
+// One trainer can own the same slot under multiple codes (e.g. employeeId and a
+// legacy timetable code); count each physical slot once.
+export const buildSlotIdentityKey = (schedule) =>
+  [
+    schedule.day,
+    schedule.startTime,
+    schedule.endTime,
+    schedule.department || '',
+    schedule.section || '',
+    schedule.subjectCode || '',
+    schedule.semester || '',
+  ].join('|');
+
 const indexSchedulesByTrainerDay = (schedules, codeToTrainerId) => {
   const schedulesByTrainerDay = new Map();
+  const seenSlotKeys = new Map();
 
   schedules.forEach((schedule) => {
     const trainerId = codeToTrainerId.get(schedule.trainerCode);
     if (!trainerId) return;
+
+    let seen = seenSlotKeys.get(trainerId);
+    if (!seen) {
+      seen = new Set();
+      seenSlotKeys.set(trainerId, seen);
+    }
+    const slotKey = buildSlotIdentityKey(schedule);
+    if (seen.has(slotKey)) return;
+    seen.add(slotKey);
 
     let byDay = schedulesByTrainerDay.get(trainerId);
     if (!byDay) {
@@ -74,7 +99,7 @@ const indexSchedulesByTrainerDay = (schedules, codeToTrainerId) => {
 export const computeClassHandlingHoursBatch = async (
   trainerIds,
   dates,
-  semester = 'III',
+  semester = null,
   trainersInput = null
 ) => {
   const result = new Map();

@@ -45,6 +45,13 @@ describe('expandAllowedClassDepartments', () => {
     );
   });
 
+  it('adds B.COM(CA) when BCOM-CA is allowed', () => {
+    assert.deepEqual(
+      expandAllowedClassDepartments(['BCOM-CA', 'BCA']).sort(),
+      ['BCA', 'BCOM-CA', 'B.COM(CA)'].sort()
+    );
+  });
+
   it('leaves unrelated codes unchanged', () => {
     assert.deepEqual(expandAllowedClassDepartments(['CSE', 'AIML']), ['CSE', 'AIML']);
   });

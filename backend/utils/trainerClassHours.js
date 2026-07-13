@@ -13,7 +13,7 @@ export const computeHours = (startTime, endTime) => {
   return Math.max(0, diff / 60);
 };
 
-export const computeClassHandlingHours = async (trainerId, referenceDate, semester = 'III') => {
+export const computeClassHandlingHours = async (trainerId, referenceDate, semester = null) => {
   const schedules = await buildTrainerSchedulesForDate({
     trainerId,
     referenceDate,

@@ -8,11 +8,22 @@ const COMBINED_CLASS_DEPARTMENTS = [
   { classDepartment: 'CE & ME', subjectCodes: ['CE-ME'] },
 ];
 
+/** Class department labels that differ from canonical department codes in reference data. */
+const CLASS_DEPARTMENT_ALIASES = [
+  { classDepartment: 'B.COM(CA)', subjectCodes: ['BCOM-CA'] },
+];
+
 export const expandAllowedClassDepartments = (departmentCodes) => {
   const codes = departmentCodes || [];
   const expanded = new Set(codes);
 
   for (const { classDepartment, subjectCodes } of COMBINED_CLASS_DEPARTMENTS) {
+    if (subjectCodes.some((code) => codes.includes(code))) {
+      expanded.add(classDepartment);
+    }
+  }
+
+  for (const { classDepartment, subjectCodes } of CLASS_DEPARTMENT_ALIASES) {
     if (subjectCodes.some((code) => codes.includes(code))) {
       expanded.add(classDepartment);
     }

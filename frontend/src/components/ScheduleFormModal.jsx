@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { createSchedule, updateSchedule } from '../services/scheduleService.js';
 import { getSubjects, getSemesters } from '../services/subjectService.js';
 import { getTrainers } from '../services/trainerService.js';
-import { getVenues } from '../services/venueService.js';
+import { getActiveVenuesForSelect } from '../services/venueService.js';
 import { getBatches } from '../services/scheduleService.js';
 import { getErrorMessage, toInputDate } from '../utils/helpers.js';
 import Modal from './Modal.jsx';
@@ -37,13 +37,13 @@ const ScheduleFormModal = ({ schedule, defaultDate, onClose }) => {
       const [subjRes, trainerRes, venueRes, batchData, semData] = await Promise.all([
         getSubjects({ limit: 100 }),
         getTrainers({ limit: 100 }),
-        getVenues({ limit: 100, isActive: 'true' }),
+        getActiveVenuesForSelect(),
         getBatches(),
         getSemesters(),
       ]);
       setSubjects(subjRes.subjects || []);
       setTrainers(trainerRes.trainers || []);
-      setVenues(venueRes.venues || []);
+      setVenues(Array.isArray(venueRes) ? venueRes : (venueRes.venues || []));
       setBatches(batchData);
       setSemesters(semData);
     };

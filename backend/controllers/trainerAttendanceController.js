@@ -106,7 +106,9 @@ export const getTrainerAttendanceGrid = async (req, res) => {
         date: { $gte: rangeStart, $lte: monthEnd },
       }).lean()
       : [],
-    computeClassHandlingHoursBatch(trainerIds, dates, semester, trainers),
+    // Pass null semester so class handling hours cover every semester a
+    // trainer teaches (e.g. LRRE runs in semester V while the grid defaults to III).
+    computeClassHandlingHoursBatch(trainerIds, dates, null, trainers),
   ]);
 
   const logMap = buildLogMap(logs);
@@ -235,7 +237,7 @@ export const upsertTrainerDailyAttendance = async (req, res) => {
     const classHoursCache = await computeClassHandlingHoursBatch(
       [trainer],
       [day],
-      'III'
+      null
     );
     classHandlingHours = classHoursCache.get(`${trainer.toString()}|${toAttendanceDateKey(day)}`) ?? 0;
   }

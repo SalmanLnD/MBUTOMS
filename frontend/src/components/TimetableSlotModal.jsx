@@ -4,7 +4,7 @@ import ConfirmModal from './ConfirmModal.jsx';
 import StyledSelect from './StyledSelect.jsx';
 import { createSchedule, updateSchedule, deleteSchedule } from '../services/scheduleService.js';
 import { getClasses } from '../services/classService.js';
-import { getVenues } from '../services/venueService.js';
+import { getActiveVenuesForSelect } from '../services/venueService.js';
 import { getSlotTimesForSubject, getActiveSlotKeys } from '../utils/timetableSlots.js';
 import { getErrorMessage } from '../utils/helpers.js';
 import { subjectHasClassRestrictions } from '../utils/subjectClassEligibility.js';
@@ -51,8 +51,8 @@ const TimetableSlotModal = ({
 
   useEffect(() => {
     setVenuesLoading(true);
-    getVenues({ limit: 50, isActive: 'true' })
-      .then((data) => setVenueOptions(data?.venues || []))
+    getActiveVenuesForSelect()
+      .then((venues) => setVenueOptions(venues))
       .catch(() => setVenueOptions([]))
       .finally(() => setVenuesLoading(false));
   }, []);
@@ -67,6 +67,23 @@ const TimetableSlotModal = ({
       .catch(() => setClassOptions([]))
       .finally(() => setClassesLoading(false));
   }, [subjectSemesterRoman, subjectIdForClasses]);
+
+  const venueSelectOptions = useMemo(() => {
+    const options = [...venueOptions];
+    const assignedVenue = schedule?.venue;
+    const assignedVenueId = schedule?.venue?._id || schedule?.venue || form.venueId;
+
+    if (
+      assignedVenueId
+      && assignedVenue?.name
+      && !options.some((item) => String(item._id) === String(assignedVenueId))
+    ) {
+      options.push(assignedVenue);
+      options.sort((left, right) => String(left.name).localeCompare(String(right.name), undefined, { numeric: true }));
+    }
+
+    return options;
+  }, [venueOptions, schedule, form.venueId]);
 
   const visibleClassOptions = useMemo(() => {
     if (!isEdit || !schedule?.department || !schedule?.section) {
@@ -338,7 +355,7 @@ const TimetableSlotModal = ({
                         placeholder="No venue assigned"
                         options={[
                           { value: '', label: 'No venue assigned' },
-                          ...venueOptions.map((item) => ({
+                          ...venueSelectOptions.map((item) => ({
                             value: item._id,
                             label: `${item.name}${item.building ? ` · ${item.building}` : ''}`,
                           })),
