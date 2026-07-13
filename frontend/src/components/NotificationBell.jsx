@@ -19,10 +19,13 @@ const NotificationBell = () => {
   const [markingAll, setMarkingAll] = useState(false);
   const rootRef = useRef(null);
 
-  const isAdmin = user?.role === ROLES.ADMIN && !user?.impersonating;
+  const canViewNotifications =
+    user
+    && !user.impersonating
+    && (user.role === ROLES.ADMIN || user.role === ROLES.TRAINER);
 
   const loadNotifications = useCallback(async () => {
-    if (!isAdmin) return;
+    if (!canViewNotifications) return;
     setLoading(true);
     try {
       const data = await getNotifications({ limit: 30 });
@@ -33,14 +36,14 @@ const NotificationBell = () => {
     } finally {
       setLoading(false);
     }
-  }, [isAdmin]);
+  }, [canViewNotifications]);
 
   useEffect(() => {
-    if (!isAdmin) return undefined;
+    if (!canViewNotifications) return undefined;
     loadNotifications();
     const intervalId = window.setInterval(loadNotifications, 45000);
     return () => window.clearInterval(intervalId);
-  }, [isAdmin, loadNotifications]);
+  }, [canViewNotifications, loadNotifications]);
 
   useEffect(() => {
     if (!open) return undefined;
@@ -90,7 +93,7 @@ const NotificationBell = () => {
     }
   };
 
-  if (!isAdmin) return null;
+  if (!canViewNotifications) return null;
 
   return (
     <div className="notification-bell" ref={rootRef}>

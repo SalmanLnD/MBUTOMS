@@ -16,6 +16,7 @@ import Timetable from './pages/Timetable.jsx';
 import TrainerSchedule from './pages/TrainerSchedule.jsx';
 import ClassesStudents from './pages/ClassesStudents.jsx';
 import Leaves from './pages/Leaves.jsx';
+import Tickets from './pages/Tickets.jsx';
 import Replacements from './pages/Replacements.jsx';
 import Performance from './pages/Performance.jsx';
 import PublicFeedbackForm from './pages/PublicFeedbackForm.jsx';
@@ -75,6 +76,7 @@ const App = () => (
         <Route path="/attendance" element={<Navigate to="/trainers?tab=attendance" replace />} />
         <Route path="/classes-students" element={<ClassesStudents />} />
         <Route path="/leaves" element={<Leaves />} />
+        <Route path="/tickets" element={<Tickets />} />
         <Route
           path="/replacements"
           element={

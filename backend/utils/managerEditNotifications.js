@@ -29,6 +29,7 @@ const RESOURCE_LABELS = {
   students: 'student',
   feedback: 'feedback form',
   sheets: 'timetable sheet link',
+  tickets: 'support ticket',
 };
 
 const SKIP_PATH_PREFIXES = ['/api/auth', '/api/notifications', '/api/webhooks', '/api/health'];

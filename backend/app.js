@@ -18,6 +18,7 @@ import sheetsRoutes from './routes/sheetsRoutes.js';
 import feedbackRoutes from './routes/feedbackRoutes.js';
 import webhookRoutes from './routes/webhookRoutes.js';
 import notificationRoutes from './routes/notificationRoutes.js';
+import ticketRoutes from './routes/ticketRoutes.js';
 
 dotenv.config();
 const app = express();
@@ -63,6 +64,7 @@ app.use('/api/sheets', sheetsRoutes);
 app.use('/api/feedback', feedbackRoutes);
 app.use('/api/webhooks', webhookRoutes);
 app.use('/api/notifications', notificationRoutes);
+app.use('/api/tickets', ticketRoutes);
 
 app.use(notFound);
 app.use(errorHandler);

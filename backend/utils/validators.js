@@ -1,4 +1,5 @@
 import { body } from 'express-validator';
+import { TICKET_STATUSES, TICKET_TYPES } from './ticketConstants.js';
 
 export const subjectResourceValidation = [
   body('syllabusUrl').optional({ values: 'falsy' }).isString().trim(),
@@ -97,4 +98,18 @@ export const studentCreateValidation = [
     .optional()
     .isIn(['active', 'inactive', 'graduated'])
     .withMessage('Invalid status'),
+];
+
+export const ticketValidation = [
+  body('type')
+    .isIn(TICKET_TYPES)
+    .withMessage('Invalid ticket type'),
+  body('description').trim().notEmpty().withMessage('Detailed comments are required'),
+];
+
+export const ticketStatusValidation = [
+  body('status')
+    .isIn(TICKET_STATUSES)
+    .withMessage('Invalid ticket status'),
+  body('comment').optional({ values: 'falsy' }).trim(),
 ];

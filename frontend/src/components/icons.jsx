@@ -133,6 +133,16 @@ export const LeaveNavIcon = (props) => (
   </IconBase>
 );
 
+export const TicketNavIcon = (props) => (
+  <IconBase {...props}>
+    <path d="M15 5V3" />
+    <path d="M9 5V3" />
+    <path d="M9 3h6a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H9a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2Z" />
+    <line x1="9" y1="11" x2="15" y2="11" />
+    <line x1="9" y1="15" x2="13" y2="15" />
+  </IconBase>
+);
+
 export const SheetIcon = (props) => (
   <IconBase {...props}>
     <rect x="4" y="3" width="16" height="18" rx="2" />
