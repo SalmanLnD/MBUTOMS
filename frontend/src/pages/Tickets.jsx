@@ -6,6 +6,7 @@ import Modal from '../components/Modal.jsx';
 import { showError, showSuccess } from '../utils/toast.js';
 import { useAuth } from '../context/AuthContext.jsx';
 import { getTickets, createTicket, updateTicketStatus } from '../services/ticketService.js';
+import { getTrainers } from '../services/trainerService.js';
 import { formatDateTime, formatStatus, getErrorMessage } from '../utils/helpers.js';
 import {
   TICKET_TYPES,
@@ -22,7 +23,7 @@ const truncateText = (text, max = 80) => {
 };
 
 const Tickets = () => {
-  const { hasRole } = useAuth();
+  const { hasRole, user } = useAuth();
   const isAdmin = hasRole(ROLES.ADMIN);
 
   const [tickets, setTickets] = useState([]);
@@ -34,7 +35,8 @@ const Tickets = () => {
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [selectedTicket, setSelectedTicket] = useState(null);
   const [pendingUpdate, setPendingUpdate] = useState(null);
-  const [createForm, setCreateForm] = useState({ type: '', description: '' });
+  const [trainers, setTrainers] = useState([]);
+  const [createForm, setCreateForm] = useState({ raisedByTrainer: '', type: '', description: '' });
   const [updateForm, setUpdateForm] = useState({ status: '', comment: '' });
 
   const fetchTickets = async () => {
@@ -59,15 +61,29 @@ const Tickets = () => {
     fetchTickets();
   }, [page, statusFilter, typeFilter]);
 
+  useEffect(() => {
+    if (!showCreateForm || !isAdmin) return;
+    getTrainers({ limit: 100, sortBy: 'name', sortOrder: 'asc' })
+      .then((data) => setTrainers(data.trainers || []))
+      .catch(() => setTrainers([]));
+  }, [showCreateForm, isAdmin]);
+
   const openCreateForm = () => {
-    setCreateForm({ type: '', description: '' });
+    setCreateForm({ raisedByTrainer: '', type: '', description: '' });
     setShowCreateForm(true);
   };
 
   const handleCreateSubmit = async (e) => {
     e.preventDefault();
     try {
-      await createTicket(createForm);
+      const payload = {
+        type: createForm.type,
+        description: createForm.description,
+      };
+      if (isAdmin) {
+        payload.raisedByTrainer = createForm.raisedByTrainer;
+      }
+      await createTicket(payload);
       showSuccess('Ticket raised successfully');
       setShowCreateForm(false);
       setPage(1);
@@ -161,11 +177,13 @@ const Tickets = () => {
                     <td className="fw-medium">{ticket.ticketId}</td>
                     {isAdmin && (
                       <td>
-                        <div>{ticket.raisedBy?.name || '-'}</div>
-                        {ticket.trainer?.employeeId && (
-                          <small className="text-muted">{ticket.trainer.employeeId}</small>
-                        )}
-                      </td>
+                      <div>{ticket.trainer?.name || ticket.raisedBy?.name || '-'}</div>
+                      {ticket.trainer?.employeeId ? (
+                        <small className="text-muted">{ticket.trainer.employeeId}</small>
+                      ) : ticket.raisedBy?.role && ticket.raisedBy.role !== ROLES.TRAINER && (
+                        <small className="text-muted">Admin</small>
+                      )}
+                    </td>
                     )}
                     <td>{TICKET_TYPE_LABELS[ticket.type] || formatStatus(ticket.type)}</td>
                     <td>{truncateText(ticket.description)}</td>
@@ -208,6 +226,29 @@ const Tickets = () => {
         <Modal show title="Raise Ticket" onClose={() => setShowCreateForm(false)}>
           <form onSubmit={handleCreateSubmit}>
             <div className="toms-modal-body">
+              {isAdmin && (
+                <div className="mb-3">
+                  <label className="form-label" htmlFor="ticket-raised-by">Raised By</label>
+                  <select
+                    id="ticket-raised-by"
+                    className="form-select"
+                    value={createForm.raisedByTrainer}
+                    onChange={(e) => setCreateForm({ ...createForm, raisedByTrainer: e.target.value })}
+                    required
+                  >
+                    <option value="">Select who this ticket is for</option>
+                    <option value="self">{user?.name || 'Admin'} (Myself)</option>
+                    {trainers.map((trainer) => (
+                      <option key={trainer._id} value={trainer._id}>
+                        {trainer.name} ({trainer.employeeId})
+                      </option>
+                    ))}
+                  </select>
+                  <div className="form-text">
+                    Choose yourself to raise on your behalf, or select a trainer you are representing.
+                  </div>
+                </div>
+              )}
               <div className="mb-3">
                 <label className="form-label" htmlFor="ticket-type">Issue Type</label>
                 <select
@@ -266,7 +307,12 @@ const Tickets = () => {
               {isAdmin && (
                 <>
                   <dt className="col-sm-4">Raised By</dt>
-                  <dd className="col-sm-8">{selectedTicket.raisedBy?.name || '-'}</dd>
+                  <dd className="col-sm-8">
+                    {selectedTicket.trainer?.name || selectedTicket.raisedBy?.name || '-'}
+                    {selectedTicket.trainer?.employeeId && (
+                      <span className="text-muted"> ({selectedTicket.trainer.employeeId})</span>
+                    )}
+                  </dd>
                 </>
               )}
 

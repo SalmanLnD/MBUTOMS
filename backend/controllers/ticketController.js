@@ -1,4 +1,6 @@
 import Ticket from '../models/Ticket.js';
+import Trainer from '../models/Trainer.js';
+import User from '../models/User.js';
 import { ROLES } from '../utils/roles.js';
 import { TICKET_STATUSES } from '../utils/ticketConstants.js';
 import { notifyAdminsOfNewTicket, notifyRaisedByOfTicketStatusUpdate } from '../utils/ticketNotifications.js';
@@ -57,14 +59,49 @@ export const getTicketById = async (req, res) => {
 };
 
 export const createTicket = async (req, res) => {
-  const { type, description } = req.body;
+  const { type, description, raisedByTrainer } = req.body;
+
+  let raisedBy = req.user._id;
+  let trainer;
+
+  if (req.user.role === ROLES.ADMIN) {
+    if (!raisedByTrainer) {
+      return res.status(400).json({ message: 'Raised by is required' });
+    }
+
+    if (raisedByTrainer === 'self') {
+      trainer = undefined;
+    } else {
+      const trainerRecord = await Trainer.findById(raisedByTrainer);
+      if (!trainerRecord) {
+        return res.status(404).json({ message: 'Selected trainer not found' });
+      }
+
+      const trainerUser = await User.findOne({
+        trainer: trainerRecord._id,
+        role: ROLES.TRAINER,
+        isActive: true,
+      });
+
+      if (!trainerUser) {
+        return res.status(400).json({
+          message: 'Selected trainer does not have an active user account',
+        });
+      }
+
+      raisedBy = trainerUser._id;
+      trainer = trainerRecord._id;
+    }
+  } else if (req.user.role === ROLES.TRAINER) {
+    trainer = req.user.trainer;
+  }
 
   const ticket = await Ticket.create({
     ticketId: await generateTicketId(),
     type,
     description: description.trim(),
-    raisedBy: req.user._id,
-    trainer: req.user.role === ROLES.TRAINER ? req.user.trainer : undefined,
+    raisedBy,
+    trainer,
   });
 
   if (req.user.role === ROLES.TRAINER) {
