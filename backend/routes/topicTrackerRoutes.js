@@ -2,6 +2,7 @@ import express from 'express';
 import {
   getTopicTrackerOverview,
   getTopicTrackerSessions,
+  getTopicTrackerTopics,
   upsertTopicTrackerEntry,
   updateTopicTrackerStatus,
   exportTopicTrackerForSheets,
@@ -23,6 +24,7 @@ router.get('/export', requireTopicTrackerExportKey, asyncHandler(exportTopicTrac
 router.use(protect);
 
 router.get('/overview', asyncHandler(getTopicTrackerOverview));
+router.get('/topics', asyncHandler(getTopicTrackerTopics));
 router.get('/sessions', asyncHandler(getTopicTrackerSessions));
 router.put('/entries', asyncHandler(upsertTopicTrackerEntry));
 router.patch('/entries/:id/status', asyncHandler(updateTopicTrackerStatus));

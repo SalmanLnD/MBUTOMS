@@ -42,3 +42,8 @@
   text-overflow: ellipsis;
   vertical-align: middle;
 }
+
+.topic-tracker-topic-select {
+  min-width: 14rem;
+  max-width: 22rem;
+}

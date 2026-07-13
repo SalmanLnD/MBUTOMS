@@ -163,6 +163,33 @@ const TopicTrackerSpreadsheet = ({
       );
     }
 
+    if (column.key === 'topicModuleCovered' && row.topicOptions?.length) {
+      const options = row.topicOptions;
+      const valueNotInList = value && !options.includes(value);
+
+      return (
+        <select
+          className="form-select form-select-sm topic-tracker-cell-input topic-tracker-topic-select"
+          value={value}
+          onChange={(e) => {
+            const newValue = e.target.value;
+            updateRow(index, column.key, newValue);
+            saveRow({ ...row, topicModuleCovered: newValue }, index);
+          }}
+          disabled={savingKey === `${row.scheduleId}-${row.date}`}
+          aria-label="Topic / Module Covered"
+        >
+          <option value="">Select topic...</option>
+          {valueNotInList && (
+            <option value={value}>{value}</option>
+          )}
+          {options.map((topic) => (
+            <option key={topic} value={topic}>{topic}</option>
+          ))}
+        </select>
+      );
+    }
+
     if (column.readOnly) {
       return <span className="topic-tracker-cell-text">{value}</span>;
     }
@@ -224,7 +251,7 @@ const TopicTrackerSpreadsheet = ({
       </div>
       <div className="toms-modal-footer">
         <p className="small text-muted mb-0 me-auto">
-          Changes save when you leave a cell. Click tracker status to mark pending or closed.
+          Changes save when you leave a cell or select a topic. Click tracker status to mark pending or closed.
         </p>
         <button type="button" className="btn btn-secondary" onClick={onClose}>
           Close

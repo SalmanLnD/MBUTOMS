@@ -15,6 +15,10 @@ import {
   getCoordinatorSubjectIds,
   isSubjectCoordinator,
 } from '../utils/subjectCoordinatorAccess.js';
+import {
+  getTopicOptionsForSubject,
+  isAllowedTopicForSubject,
+} from '../utils/topicTrackerTopicCatalog.js';
 
 const MANAGEMENT_VIEW_ROLES = [...FULL_ACCESS_ROLES, ROLES.SUBJECT_COORDINATOR];
 
@@ -75,6 +79,20 @@ export const getTopicTrackerSessions = async (req, res) => {
   res.json(payload);
 };
 
+export const getTopicTrackerTopics = async (req, res) => {
+  const { subjectCode } = req.query;
+  if (!subjectCode) {
+    return res.status(400).json({ message: 'subjectCode is required' });
+  }
+
+  const topics = getTopicOptionsForSubject(subjectCode);
+  if (!topics) {
+    return res.json({ subjectCode, topics: [], restricted: false });
+  }
+
+  res.json({ subjectCode, topics, restricted: true });
+};
+
 export const upsertTopicTrackerEntry = async (req, res) => {
   const {
     scheduleId,
@@ -122,6 +140,14 @@ export const upsertTopicTrackerEntry = async (req, res) => {
   }
 
   const existing = await TopicTrackerEntry.findOne({ schedule: scheduleId, date: refDate });
+  const subjectCode = schedule.subject?.code || schedule.subjectCode || '';
+  const resolvedTopic = topicModuleCovered ?? existing?.topicModuleCovered ?? '';
+
+  if (resolvedTopic && !isAllowedTopicForSubject(subjectCode, resolvedTopic)) {
+    return res.status(400).json({
+      message: 'Select a topic from the approved list for this subject.',
+    });
+  }
 
   const payload = {
     date: refDate,
@@ -134,7 +160,7 @@ export const upsertTopicTrackerEntry = async (req, res) => {
     branchYearSection: branchYearSection || `${schedule.department}, Sem ${schedule.semester} - ${schedule.section}`,
     roomNo: roomNo || schedule.venue?.name || '',
     courseName: courseName || schedule.subject?.name || schedule.subjectCode || '',
-    topicModuleCovered: topicModuleCovered ?? existing?.topicModuleCovered ?? '',
+    topicModuleCovered: resolvedTopic,
     sessionStartTime: startTime,
     sessionEndTime: endTime,
     durationHrs: computeHours(startTime, endTime),

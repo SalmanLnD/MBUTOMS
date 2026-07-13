@@ -14,6 +14,7 @@ import {
   isSubjectCoordinator,
   buildTrainerFilterForCoordinatorSubjects,
 } from './subjectCoordinatorAccess.js';
+import { getTopicOptionsForSubject } from './topicTrackerTopicCatalog.js';
 
 const WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
@@ -110,6 +111,7 @@ const entryToSession = (entry, defaults) => ({
   challengesFaced: entry?.challengesFaced || '',
   trackerStatus: entry?.trackerStatus || 'pending',
   closedAt: entry?.closedAt || null,
+  topicOptions: defaults.topicOptions || null,
 });
 
 export const buildTopicTrackerSessions = async ({
@@ -175,6 +177,8 @@ export const buildTopicTrackerSessions = async ({
       || [schedule.venue?.building, schedule.venue?.floor].filter(Boolean).join(' ')
       || '';
 
+    const subjectCode = schedule.subjectCode || schedule.subject?.code || '';
+
     sessionDefaults.push({
       scheduleId: schedule._id.toString(),
       dateKey,
@@ -183,7 +187,8 @@ export const buildTopicTrackerSessions = async ({
       trainerId: trainer._id.toString(),
       trainerName: trainer.name,
       subjectId: schedule.subject?._id?.toString() || schedule.subject?.toString() || '',
-      subjectCode: schedule.subjectCode || schedule.subject?.code || '',
+      subjectCode,
+      topicOptions: getTopicOptionsForSubject(subjectCode),
       courseName: schedule.subject?.name || schedule.subjectCode || '',
       branchYearSection: buildBranchYearSection(schedule, classGroup),
       roomNo: venueName,
