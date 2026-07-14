@@ -173,8 +173,8 @@ const TopicTracker = () => {
                     <span className="text-muted small ms-2">({subject.subjectCode})</span>
                   </div>
                   <div className="d-flex align-items-center gap-2">
-                    <span className={`badge ${subject.totalPending ? 'bg-warning text-dark' : 'bg-success'}`}>
-                      {subject.totalPending} pending
+                    <span className={`badge ${subject.pendingSlots || subject.totalPending ? 'bg-warning text-dark' : 'bg-success'}`}>
+                      {subject.pendingSlots ?? subject.totalPending ?? 0} pending
                     </span>
                     <button
                       type="button"
@@ -193,40 +193,42 @@ const TopicTracker = () => {
                     <thead>
                       <tr>
                         <th>Trainer</th>
-                        <th>Slots</th>
+                        <th>Allotted slots</th>
                         <th>Pending</th>
-                        <th>Closed</th>
                         <th>Status</th>
                         <th />
                       </tr>
                     </thead>
                     <tbody>
-                      {subject.trainers.map((trainer) => (
-                        <tr key={trainer.trainerId}>
-                          <td>{trainer.trainerName}</td>
-                          <td>{trainer.totalSlots}</td>
-                          <td>{trainer.pendingSlots}</td>
-                          <td>{trainer.closedSlots}</td>
-                          <td>
-                            <span className={`badge ${getTopicTrackerStatusBadgeClass(trainer.pendingSlots ? 'pending' : 'closed')}`}>
-                              {trainer.pendingSlots ? 'Pending' : 'Closed'}
-                            </span>
-                          </td>
-                          <td className="text-end">
-                            <button
-                              type="button"
-                              className="btn btn-sm btn-outline-primary"
-                              onClick={() => openSpreadsheet({
-                                subjectId: subject.subjectId,
-                                trainerId: trainer.trainerId,
-                                title: `${trainer.trainerName} — ${subject.subjectName} — ${selectedDate}`,
-                              })}
-                            >
-                              Open tracker
-                            </button>
-                          </td>
-                        </tr>
-                      ))}
+                      {subject.trainers.map((trainer) => {
+                        const allotted = trainer.allottedSlots ?? trainer.totalSlots ?? 0;
+                        const pending = trainer.pendingSlots ?? 0;
+                        return (
+                          <tr key={trainer.trainerId}>
+                            <td>{trainer.trainerName}</td>
+                            <td>{allotted}</td>
+                            <td>{pending}</td>
+                            <td>
+                              <span className={`badge ${getTopicTrackerStatusBadgeClass(pending ? 'pending' : 'closed')}`}>
+                                {pending ? 'Pending' : 'Closed'}
+                              </span>
+                            </td>
+                            <td className="text-end">
+                              <button
+                                type="button"
+                                className="btn btn-sm btn-outline-primary"
+                                onClick={() => openSpreadsheet({
+                                  subjectId: subject.subjectId,
+                                  trainerId: trainer.trainerId,
+                                  title: `${trainer.trainerName} — ${subject.subjectName} — ${selectedDate}`,
+                                })}
+                              >
+                                Open tracker
+                              </button>
+                            </td>
+                          </tr>
+                        );
+                      })}
                     </tbody>
                   </table>
                 </div>

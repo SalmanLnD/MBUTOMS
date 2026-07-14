@@ -256,39 +256,41 @@ export const buildTopicTrackerOverview = async ({ date, user }) => {
 
   const subjects = await Subject.find(subjectFilter).select('name code').sort({ name: 1 }).lean();
   const overviewMap = new Map();
+  const seenSessionKeys = new Set();
 
   const addSessionsToOverview = (sessions) => {
     sessions.forEach((session) => {
+      const dedupeKey = `${session.subjectId || session.subjectCode}::${session.scheduleId}::${session.date}`;
+      if (seenSessionKeys.has(dedupeKey)) return;
+      seenSessionKeys.add(dedupeKey);
+
       const subjectKey = session.subjectId || session.subjectCode || 'unknown';
       if (!overviewMap.has(subjectKey)) {
         overviewMap.set(subjectKey, {
           subjectId: session.subjectId,
           subjectName: session.courseName || session.subjectCode || 'Subject',
           subjectCode: session.subjectCode || '',
-          totalSlots: 0,
-          totalPending: 0,
+          allottedSlots: 0,
+          pendingSlots: 0,
           trainers: new Map(),
         });
       }
       const subjectRow = overviewMap.get(subjectKey);
-      subjectRow.totalSlots += 1;
-      if (session.trackerStatus !== 'closed') subjectRow.totalPending += 1;
+      subjectRow.allottedSlots += 1;
+      if (session.trackerStatus !== 'closed') subjectRow.pendingSlots += 1;
 
       const trainerKey = session.trainerId;
       if (!subjectRow.trainers.has(trainerKey)) {
         subjectRow.trainers.set(trainerKey, {
           trainerId: session.trainerId,
           trainerName: session.trainerName,
-          totalSlots: 0,
+          allottedSlots: 0,
           pendingSlots: 0,
-          closedSlots: 0,
         });
       }
       const trainerRow = subjectRow.trainers.get(trainerKey);
-      trainerRow.totalSlots += 1;
-      if (session.trackerStatus === 'closed') {
-        trainerRow.closedSlots += 1;
-      } else {
+      trainerRow.allottedSlots += 1;
+      if (session.trackerStatus !== 'closed') {
         trainerRow.pendingSlots += 1;
       }
     });
@@ -326,8 +328,11 @@ export const buildTopicTrackerOverview = async ({ date, user }) => {
       subjectId: subject.subjectId,
       subjectName: subject.subjectName,
       subjectCode: subject.subjectCode,
-      totalSlots: subject.totalSlots,
-      totalPending: subject.totalPending,
+      allottedSlots: subject.allottedSlots,
+      pendingSlots: subject.pendingSlots,
+      // Back-compat for any older UI still reading these keys.
+      totalSlots: subject.allottedSlots,
+      totalPending: subject.pendingSlots,
       trainers: [...subject.trainers.values()].sort((a, b) => a.trainerName.localeCompare(b.trainerName)),
     }))
     .sort((a, b) => a.subjectName.localeCompare(b.subjectName));
