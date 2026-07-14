@@ -9,6 +9,7 @@ import {
   QAVA_TOPIC_TRACKER_TOPICS,
   TOPIC_TRACKER_SPECIAL_TOPICS,
   getTopicOptionsForSubject,
+  getTopicOptionsForSubjectDoc,
   isAllowedTopicForSubject,
 } from '../../utils/topicTrackerTopicCatalog.js';
 import { IDSA_SUBJECT, PSTP_SUBJECT, DSAP_SUBJECT } from '../../utils/trainerMappings.js';
@@ -19,6 +20,16 @@ test('IDSA topic catalog includes revision and class test', () => {
   assert.ok(IDSA_TOPIC_TRACKER_TOPICS.includes('Revision'));
   assert.ok(IDSA_TOPIC_TRACKER_TOPICS.includes('Class Test'));
   assert.deepEqual(TOPIC_TRACKER_SPECIAL_TOPICS, ['Revision', 'Class Test']);
+});
+
+test('subject.topics overrides static catalog for dropdown and validation', () => {
+  const subject = {
+    code: IDSA_SUBJECT.code,
+    topics: ['Custom Topic A', 'Revision'],
+  };
+  assert.deepEqual(getTopicOptionsForSubjectDoc(subject), ['Custom Topic A', 'Revision']);
+  assert.equal(isAllowedTopicForSubject(IDSA_SUBJECT.code, 'Custom Topic A', subject.topics), true);
+  assert.equal(isAllowedTopicForSubject(IDSA_SUBJECT.code, 'Introduction to Data structures', subject.topics), false);
 });
 
 test('IDSA topic catalog is restricted to approved topics only', () => {

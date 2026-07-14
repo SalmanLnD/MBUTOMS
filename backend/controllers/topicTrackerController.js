@@ -7,6 +7,7 @@ import {
   buildTopicTrackerSessions,
   buildTopicTrackerOverview,
   buildTopicTrackerExportRows,
+  buildTopicTrackerClassSummary,
 } from '../utils/topicTrackerSessions.js';
 import { computeHours } from '../utils/trainerClassHours.js';
 import { normalizeDate } from '../utils/scheduleHelpers.js';
@@ -16,10 +17,10 @@ import {
   isSubjectCoordinator,
 } from '../utils/subjectCoordinatorAccess.js';
 import {
-  getTopicOptionsForSubject,
+  getTopicOptionsForSubjectDoc,
   isAllowedTopicForSubject,
 } from '../utils/topicTrackerTopicCatalog.js';
-
+import Subject from '../models/Subject.js';
 const MANAGEMENT_VIEW_ROLES = [...FULL_ACCESS_ROLES, ROLES.SUBJECT_COORDINATOR];
 
 const computeAttendancePercent = (allotted, present) => {
@@ -42,7 +43,7 @@ const canEditSession = async (user, trainerId, subjectId) => {
 
 const resolveScheduleContext = async (scheduleId) => {
   const schedule = await Schedule.findById(scheduleId)
-    .populate('subject', 'name code')
+    .populate('subject', 'name code topics')
     .populate('venue', 'name building floor')
     .lean();
   if (!schedule) return null;
@@ -80,17 +81,42 @@ export const getTopicTrackerSessions = async (req, res) => {
 };
 
 export const getTopicTrackerTopics = async (req, res) => {
-  const { subjectCode } = req.query;
-  if (!subjectCode) {
-    return res.status(400).json({ message: 'subjectCode is required' });
+  const { subjectCode, subjectId } = req.query;
+  if (!subjectCode && !subjectId) {
+    return res.status(400).json({ message: 'subjectCode or subjectId is required' });
   }
 
-  const topics = getTopicOptionsForSubject(subjectCode);
-  if (!topics) {
-    return res.json({ subjectCode, topics: [], restricted: false });
+  const subject = subjectId
+    ? await Subject.findById(subjectId).select('code topics').lean()
+    : await Subject.findOne({ code: subjectCode }).select('code topics').lean();
+
+  const topics = getTopicOptionsForSubjectDoc(subject) || [];
+  const code = subject?.code || subjectCode || '';
+  res.json({
+    subjectCode: code,
+    topics,
+    restricted: topics.length > 0,
+  });
+};
+
+export const getTopicTrackerClassSummary = async (req, res) => {
+  if (!isAuthorizedRole(req.user.role, MANAGEMENT_VIEW_ROLES)) {
+    return res.status(403).json({ message: 'Not authorized to view class-wise summary' });
   }
 
-  res.json({ subjectCode, topics, restricted: true });
+  const { subjectId } = req.query;
+  if (isSubjectCoordinator(req.user) && subjectId) {
+    const allowed = getCoordinatorSubjectIds(req.user);
+    if (!allowed.includes(subjectId.toString())) {
+      return res.status(403).json({ message: 'Not authorized for this subject' });
+    }
+  }
+
+  const summary = await buildTopicTrackerClassSummary({
+    subjectId: subjectId || undefined,
+    user: req.user,
+  });
+  res.json(summary);
 };
 
 export const upsertTopicTrackerEntry = async (req, res) => {
@@ -143,7 +169,7 @@ export const upsertTopicTrackerEntry = async (req, res) => {
   const subjectCode = schedule.subject?.code || schedule.subjectCode || '';
   const resolvedTopic = topicModuleCovered ?? existing?.topicModuleCovered ?? '';
 
-  if (resolvedTopic && !isAllowedTopicForSubject(subjectCode, resolvedTopic)) {
+  if (resolvedTopic && !isAllowedTopicForSubject(subjectCode, resolvedTopic, schedule.subject?.topics)) {
     return res.status(400).json({
       message: 'Select a topic from the approved list for this subject.',
     });

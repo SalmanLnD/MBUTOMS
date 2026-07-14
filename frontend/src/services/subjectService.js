@@ -25,6 +25,11 @@ export const updateSubjectResources = async (id, resourceData) => {
   return data;
 };
 
+export const updateSubjectTopics = async (id, topics) => {
+  const { data } = await api.patch(`/subjects/${id}/topics`, { topics });
+  return data;
+};
+
 export const deleteSubject = async (id) => {
   const { data } = await api.delete(`/subjects/${id}`);
   return data;

@@ -5,6 +5,7 @@ import Pagination from '../components/Pagination.jsx';
 import { showError, showSuccess } from '../utils/toast.js';
 import SubjectFormModal from '../components/SubjectFormModal.jsx';
 import SubjectResourceLinkModal from '../components/SubjectResourceLinkModal.jsx';
+import SubjectTopicsModal from '../components/SubjectTopicsModal.jsx';
 import ConfirmModal from '../components/ConfirmModal.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
 import { useDebounce } from '../hooks/useDebounce.js';
@@ -52,6 +53,7 @@ const Subjects = () => {
   const [editingSubject, setEditingSubject] = useState(null);
   const [pendingDelete, setPendingDelete] = useState(null);
   const [resourceModal, setResourceModal] = useState(null);
+  const [topicsModalOpen, setTopicsModalOpen] = useState(false);
 
   const debouncedSearch = useDebounce(search);
 
@@ -96,6 +98,14 @@ const Subjects = () => {
     }
   };
 
+  const applySubjectUpdate = (updated) => {
+    setSelectedSubject(updated);
+    setEditingSubject((current) => (current?._id === updated._id ? updated : current));
+    setSubjects((current) => current.map((subject) => (
+      subject._id === updated._id ? updated : subject
+    )));
+  };
+
   const handleResourceSave = async (url) => {
     if (!resourceModal || !selectedSubject) return;
     const resourceFieldByType = {
@@ -112,11 +122,7 @@ const Subjects = () => {
     if (!field) return;
 
     const updated = await updateSubjectResources(selectedSubject._id, { [field]: url });
-    setSelectedSubject(updated);
-    setEditingSubject((current) => (current?._id === updated._id ? updated : current));
-    setSubjects((current) => current.map((subject) => (
-      subject._id === updated._id ? updated : subject
-    )));
+    applySubjectUpdate(updated);
     showSuccess(`${resourceLabelByType[resourceModal.type]} link saved`);
   };
 
@@ -234,6 +240,29 @@ const Subjects = () => {
     );
   };
 
+  const renderTopicsSection = () => {
+    if (!selectedSubject || !canManage) return null;
+    const topicCount = selectedSubject.topics?.length || 0;
+
+    return (
+      <div className="mt-4">
+        <h3 className="h6 fw-semibold mb-2">Topic Tracker topics</h3>
+        <p className="text-muted small mb-2">
+          {topicCount
+            ? `${topicCount} topic${topicCount === 1 ? '' : 's'} configured for the tracker dropdown.`
+            : 'No topics configured yet — trainers can enter free text.'}
+        </p>
+        <button
+          type="button"
+          className="btn btn-outline-primary btn-sm"
+          onClick={() => setTopicsModalOpen(true)}
+        >
+          {topicCount ? 'Manage topics' : 'Add topics'}
+        </button>
+      </div>
+    );
+  };
+
   return (
     <>
       <Topbar title={canManage ? 'Subject Management' : 'Subjects'} />
@@ -260,7 +289,7 @@ const Subjects = () => {
           </div>
           <p className="text-muted small mb-3">
             {canManage
-              ? 'Click a subject row to view details, or use Edit to manage syllabus, CHO, and practice portal links.'
+              ? 'Click a subject row to view details, or use Edit to manage syllabus, CHO, practice portal, and topic tracker topics.'
               : 'Click a subject row to view details and open syllabus, CHO, or practice portal links.'}
           </p>
 
@@ -385,6 +414,7 @@ const Subjects = () => {
               )}
             </div>
             {renderResourceButtons()}
+            {renderTopicsSection()}
           </div>
         </div>
       )}
@@ -393,6 +423,12 @@ const Subjects = () => {
         <SubjectFormModal
           subject={editingSubject}
           onManageResource={(type) => handleManageResource(type, editingSubject)}
+          onManageTopics={() => {
+            if (editingSubject) {
+              setSelectedSubject(editingSubject);
+              setTopicsModalOpen(true);
+            }
+          }}
           onClose={(saved) => {
             setShowModal(false);
             setEditingSubject(null);
@@ -438,6 +474,18 @@ const Subjects = () => {
           }
           onClose={() => setResourceModal(null)}
           onSave={handleResourceSave}
+        />
+      )}
+
+      {topicsModalOpen && selectedSubject && canManage && (
+        <SubjectTopicsModal
+          show
+          subject={selectedSubject}
+          onClose={() => setTopicsModalOpen(false)}
+          onSaved={(updated) => {
+            applySubjectUpdate(updated);
+            showSuccess('Subject topics saved');
+          }}
         />
       )}
 

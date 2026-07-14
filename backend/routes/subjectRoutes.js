@@ -5,6 +5,7 @@ import {
   createSubject,
   updateSubject,
   updateSubjectResources,
+  updateSubjectTopics,
   deleteSubject,
   getSemesters,
   getDepartments,
@@ -13,7 +14,7 @@ import {
 import { protect, authorize } from '../middleware/auth.js';
 import { validate } from '../middleware/validate.js';
 import { asyncHandler } from '../middleware/asyncHandler.js';
-import { subjectValidation, subjectResourceValidation } from '../utils/validators.js';
+import { subjectValidation, subjectResourceValidation, subjectTopicsValidation } from '../utils/validators.js';
 
 const router = express.Router();
 
@@ -34,6 +35,14 @@ router.patch(
   subjectResourceValidation,
   validate,
   asyncHandler(updateSubjectResources)
+);
+
+router.patch(
+  '/:id/topics',
+  authorize('admin', 'campus_manager'),
+  subjectTopicsValidation,
+  validate,
+  asyncHandler(updateSubjectTopics)
 );
 
 router

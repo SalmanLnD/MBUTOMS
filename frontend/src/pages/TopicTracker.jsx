@@ -3,6 +3,7 @@ import Topbar from '../components/Topbar.jsx';
 import LoadingSpinner from '../components/LoadingSpinner.jsx';
 import TopicTrackerSpreadsheet from '../components/TopicTrackerSpreadsheet.jsx';
 import TopicTrackerSheetSetupModal from '../components/TopicTrackerSheetSetupModal.jsx';
+import TopicTrackerClassSummaryTab from '../components/TopicTrackerClassSummaryTab.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
 import { getTopicTrackerOverview, getTopicTrackerSheetStatus } from '../services/topicTrackerService.js';
 import { getErrorMessage, toInputDate } from '../utils/helpers.js';
@@ -18,6 +19,7 @@ const TopicTracker = () => {
   const canManageSheets = hasFullAccess();
   const showOverview = canManageSheets || isCoordinator;
 
+  const [activeTab, setActiveTab] = useState('day');
   const [selectedDate, setSelectedDate] = useState(() => toInputDate(new Date()));
   const [overview, setOverview] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -26,7 +28,7 @@ const TopicTracker = () => {
   const [spreadsheet, setSpreadsheet] = useState(null);
 
   const loadOverview = useCallback(async () => {
-    if (!showOverview) {
+    if (!showOverview || activeTab !== 'day') {
       setLoading(false);
       return;
     }
@@ -39,7 +41,7 @@ const TopicTracker = () => {
     } finally {
       setLoading(false);
     }
-  }, [selectedDate, showOverview]);
+  }, [selectedDate, showOverview, activeTab]);
 
   useEffect(() => {
     loadOverview();
@@ -73,52 +75,85 @@ const TopicTracker = () => {
     <>
       <Topbar title="Topic Tracker" />
 
-      <div className="d-flex flex-wrap align-items-end justify-content-between gap-3 mb-4">
-        <div>
-          <label className="form-label mb-1" htmlFor="topic-tracker-date">Date</label>
-          <input
-            id="topic-tracker-date"
-            type="date"
-            className="form-control"
-            value={selectedDate}
-            onChange={(e) => setSelectedDate(e.target.value)}
-          />
-        </div>
-
-        <div className="d-flex flex-wrap gap-2">
-          {isTrainer && (
-            <button type="button" className="btn btn-primary" onClick={handleTrainerOpen}>
-              Open my tracker
-            </button>
-          )}
-
-          {canManageSheets && (
-            <>
-              {sheetStatus?.spreadsheetUrl && (
-                <a
-                  href={sheetStatus.spreadsheetUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="btn btn-outline-primary d-inline-flex align-items-center gap-2"
-                >
-                  <ExternalLinkIcon size={16} />
-                  Open linked sheet
-                </a>
-              )}
-              <button
-                type="button"
-                className="btn btn-outline-secondary d-inline-flex align-items-center gap-2"
-                onClick={() => setSheetModalOpen(true)}
-              >
-                <SheetIcon size={16} />
-                Link Google Sheet
-              </button>
-            </>
-          )}
-        </div>
-      </div>
-
       {showOverview && (
+        <ul className="nav nav-tabs mb-3">
+          <li className="nav-item">
+            <button
+              type="button"
+              className={`nav-link ${activeTab === 'day' ? 'active' : ''}`}
+              onClick={() => setActiveTab('day')}
+            >
+              Day overview
+            </button>
+          </li>
+          <li className="nav-item">
+            <button
+              type="button"
+              className={`nav-link ${activeTab === 'class' ? 'active' : ''}`}
+              onClick={() => setActiveTab('class')}
+            >
+              Class-wise summary
+            </button>
+          </li>
+        </ul>
+      )}
+
+      {activeTab === 'day' && (
+        <div className="d-flex flex-wrap align-items-end justify-content-between gap-3 mb-4">
+          <div>
+            <label className="form-label mb-1" htmlFor="topic-tracker-date">Date</label>
+            <input
+              id="topic-tracker-date"
+              type="date"
+              className="form-control"
+              value={selectedDate}
+              onChange={(e) => setSelectedDate(e.target.value)}
+            />
+          </div>
+
+          <div className="d-flex flex-wrap gap-2">
+            {isTrainer && (
+              <button type="button" className="btn btn-primary" onClick={handleTrainerOpen}>
+                Open my tracker
+              </button>
+            )}
+
+            {canManageSheets && (
+              <>
+                {sheetStatus?.spreadsheetUrl && (
+                  <a
+                    href={sheetStatus.spreadsheetUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="btn btn-outline-primary d-inline-flex align-items-center gap-2"
+                  >
+                    <ExternalLinkIcon size={16} />
+                    Open linked sheet
+                  </a>
+                )}
+                <button
+                  type="button"
+                  className="btn btn-outline-secondary d-inline-flex align-items-center gap-2"
+                  onClick={() => setSheetModalOpen(true)}
+                >
+                  <SheetIcon size={16} />
+                  Link Google Sheet
+                </button>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+
+      {showOverview && activeTab === 'class' && (
+        <div className="card table-card">
+          <div className="card-body">
+            <TopicTrackerClassSummaryTab />
+          </div>
+        </div>
+      )}
+
+      {showOverview && activeTab === 'day' && (
         <>
           <h2 className="h6 fw-semibold mb-3">Day-wise pending by subject</h2>
           {loading ? (
@@ -213,7 +248,7 @@ const TopicTracker = () => {
           canCloseEntries
           onClose={() => {
             setSpreadsheet(null);
-            if (showOverview) loadOverview();
+            if (showOverview && activeTab === 'day') loadOverview();
           }}
         />
       )}

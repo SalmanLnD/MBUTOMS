@@ -313,6 +313,26 @@ export const updateSubjectResources = async (req, res) => {
   res.json(updated);
 };
 
+export const updateSubjectTopics = async (req, res) => {
+  const subject = await Subject.findById(req.params.id);
+  if (!subject) return res.status(404).json({ message: 'Subject not found' });
+
+  const rawTopics = Array.isArray(req.body.topics) ? req.body.topics : [];
+  const seen = new Set();
+  const topics = [];
+  rawTopics.forEach((topic) => {
+    const trimmed = String(topic || '').trim();
+    if (!trimmed || seen.has(trimmed)) return;
+    seen.add(trimmed);
+    topics.push(trimmed);
+  });
+
+  subject.topics = topics;
+  await subject.save();
+  const updated = await populateSubject(Subject.findById(subject._id));
+  res.json(updated);
+};
+
 export const deleteSubject = async (req, res) => {
   const subject = await Subject.findById(req.params.id);
   if (!subject) return res.status(404).json({ message: 'Subject not found' });

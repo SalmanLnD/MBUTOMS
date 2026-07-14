@@ -33,7 +33,7 @@ const emptyForm = {
 
 const toId = (value) => value?._id || value || '';
 
-const SubjectFormModal = ({ subject, onClose, onManageResource }) => {
+const SubjectFormModal = ({ subject, onClose, onManageResource, onManageTopics }) => {
   const [form, setForm] = useState(emptyForm);
   const [schools, setSchools] = useState([]);
   const [semesters, setSemesters] = useState([]);
@@ -475,31 +475,44 @@ const SubjectFormModal = ({ subject, onClose, onManageResource }) => {
                   Current timings: {formatSlotTimingsSummary(form.slotTimings, form.slotCount)}. These are used when adding this subject to a trainer timetable.
                 </small>
               </div>
-              {isEdit && onManageResource && (
+              {isEdit && (onManageResource || onManageTopics) && (
                 <div className="col-12">
-                  <label className="form-label">Resources</label>
+                  <label className="form-label">Resources & topics</label>
                   <div className="d-flex flex-wrap gap-2">
-                    <button
-                      type="button"
-                      className="btn btn-outline-primary btn-sm"
-                      onClick={() => onManageResource('syllabus')}
-                    >
-                      {subject?.syllabusUrl ? 'Update Syllabus' : 'Add Syllabus'}
-                    </button>
-                    <button
-                      type="button"
-                      className="btn btn-outline-primary btn-sm"
-                      onClick={() => onManageResource('cho')}
-                    >
-                      {subject?.choUrl ? 'Update CHO' : 'Add CHO'}
-                    </button>
-                    <button
-                      type="button"
-                      className="btn btn-outline-primary btn-sm"
-                      onClick={() => onManageResource('practicePortal')}
-                    >
-                      {subject?.practicePortalUrl ? 'Update Practice Portal' : 'Add Practice Portal'}
-                    </button>
+                    {onManageResource && (
+                      <>
+                        <button
+                          type="button"
+                          className="btn btn-outline-primary btn-sm"
+                          onClick={() => onManageResource('syllabus')}
+                        >
+                          {subject?.syllabusUrl ? 'Update Syllabus' : 'Add Syllabus'}
+                        </button>
+                        <button
+                          type="button"
+                          className="btn btn-outline-primary btn-sm"
+                          onClick={() => onManageResource('cho')}
+                        >
+                          {subject?.choUrl ? 'Update CHO' : 'Add CHO'}
+                        </button>
+                        <button
+                          type="button"
+                          className="btn btn-outline-primary btn-sm"
+                          onClick={() => onManageResource('practicePortal')}
+                        >
+                          {subject?.practicePortalUrl ? 'Update Practice Portal' : 'Add Practice Portal'}
+                        </button>
+                      </>
+                    )}
+                    {onManageTopics && (
+                      <button
+                        type="button"
+                        className="btn btn-outline-primary btn-sm"
+                        onClick={onManageTopics}
+                      >
+                        {(subject?.topics?.length || 0) ? 'Manage topics' : 'Add topics'}
+                      </button>
+                    )}
                   </div>
                 </div>
               )}

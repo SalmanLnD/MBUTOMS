@@ -424,13 +424,19 @@ export const QAVA_TOPIC_TRACKER_TOPICS = [
   ...TOPIC_TRACKER_SPECIAL_TOPICS,
 ];
 
-const TOPIC_CATALOG_BY_SUBJECT_CODE = {
+export const TOPIC_CATALOG_BY_SUBJECT_CODE = {
   [IDSA_SUBJECT.code]: IDSA_TOPIC_TRACKER_TOPICS,
   [PSTJ_SUBJECT_CODE]: PSTJ_TOPIC_TRACKER_TOPICS,
   [PSTP_SUBJECT.code]: PSTP_TOPIC_TRACKER_TOPICS,
   [DSAP_SUBJECT.code]: DSAP_TOPIC_TRACKER_TOPICS,
   [LRRE_SUBJECT_CODE]: LRRE_TOPIC_TRACKER_TOPICS,
   [QAVA_SUBJECT_CODE]: QAVA_TOPIC_TRACKER_TOPICS,
+};
+
+/** Prefer subject.topics when present; fall back to static catalog for seeding/compat. */
+export const getTopicOptionsFromList = (topics) => {
+  const list = (topics || []).map((topic) => String(topic || '').trim()).filter(Boolean);
+  return list.length ? list : null;
 };
 
 export const subjectUsesTopicCatalog = (subjectCode) =>
@@ -442,8 +448,14 @@ export const getTopicOptionsForSubject = (subjectCode) => {
   return TOPIC_CATALOG_BY_SUBJECT_CODE[code];
 };
 
-export const isAllowedTopicForSubject = (subjectCode, topic) => {
-  const options = getTopicOptionsForSubject(subjectCode);
+export const getTopicOptionsForSubjectDoc = (subject) => {
+  const fromSubject = getTopicOptionsFromList(subject?.topics);
+  if (fromSubject) return fromSubject;
+  return getTopicOptionsForSubject(subject?.code);
+};
+
+export const isAllowedTopicForSubject = (subjectCode, topic, subjectTopics) => {
+  const options = getTopicOptionsFromList(subjectTopics) || getTopicOptionsForSubject(subjectCode);
   if (!options) return true;
   if (!topic?.trim()) return true;
   return options.includes(topic.trim());

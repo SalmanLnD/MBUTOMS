@@ -7,6 +7,18 @@ export const subjectResourceValidation = [
   body('practicePortalUrl').optional({ values: 'falsy' }).isString().trim(),
 ];
 
+export const subjectTopicsValidation = [
+  body('topics')
+    .isArray()
+    .withMessage('topics must be an array'),
+  body('topics.*')
+    .optional({ values: 'falsy' })
+    .isString()
+    .trim()
+    .notEmpty()
+    .withMessage('Topic text cannot be empty'),
+];
+
 export const loginValidation = [
   body('email').isEmail().withMessage('Valid email is required'),
   body('password').notEmpty().withMessage('Password is required'),

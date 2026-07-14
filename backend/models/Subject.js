@@ -48,6 +48,10 @@ const subjectSchema = new mongoose.Schema(
     syllabusUrl: { type: String, trim: true, default: '' },
     choUrl: { type: String, trim: true, default: '' },
     practicePortalUrl: { type: String, trim: true, default: '' },
+    topics: {
+      type: [{ type: String, trim: true }],
+      default: [],
+    },
   },
   { timestamps: true }
 );

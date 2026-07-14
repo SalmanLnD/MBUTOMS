@@ -14,7 +14,7 @@ import {
   isSubjectCoordinator,
   buildTrainerFilterForCoordinatorSubjects,
 } from './subjectCoordinatorAccess.js';
-import { getTopicOptionsForSubject } from './topicTrackerTopicCatalog.js';
+import { getTopicOptionsForSubjectDoc } from './topicTrackerTopicCatalog.js';
 
 const WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
@@ -128,7 +128,7 @@ export const buildTopicTrackerSessions = async ({
   if (subjectId) scheduleFilter.subject = subjectId;
 
   let schedules = await Schedule.find(scheduleFilter)
-    .populate('subject', 'name code')
+    .populate('subject', 'name code topics')
     .populate('venue', 'name building floor')
     .lean();
 
@@ -188,7 +188,7 @@ export const buildTopicTrackerSessions = async ({
       trainerName: trainer.name,
       subjectId: schedule.subject?._id?.toString() || schedule.subject?.toString() || '',
       subjectCode,
-      topicOptions: getTopicOptionsForSubject(subjectCode),
+      topicOptions: getTopicOptionsForSubjectDoc(schedule.subject),
       courseName: schedule.subject?.name || schedule.subjectCode || '',
       branchYearSection: buildBranchYearSection(schedule, classGroup),
       roomNo: venueName,
@@ -340,4 +340,114 @@ export const buildTopicTrackerExportRows = async () => {
   });
 
   return { rows, exportedAt: new Date().toISOString(), count: entries.length };
+};
+
+export const buildTopicTrackerClassSummary = async ({ subjectId, user }) => {
+  let subjectFilter = {};
+  if (subjectId) {
+    subjectFilter = { _id: subjectId };
+  } else if (isSubjectCoordinator(user)) {
+    subjectFilter = { _id: { $in: getCoordinatorSubjectIds(user) } };
+  }
+
+  const subjects = await Subject.find(subjectFilter)
+    .select('name code topics')
+    .sort({ name: 1 })
+    .lean();
+
+  const subjectIds = subjects.map((subject) => subject._id);
+  if (!subjectIds.length) {
+    return { subjects: [] };
+  }
+
+  const entries = await TopicTrackerEntry.find({
+    subject: { $in: subjectIds },
+    trackerStatus: 'closed',
+    topicModuleCovered: { $nin: [null, ''] },
+  })
+    .select('subject branchYearSection topicModuleCovered date sessionStatus allottedStudents noPresent attendancePercent trainerName')
+    .sort({ date: 1 })
+    .lean();
+
+  const entriesBySubject = new Map();
+  entries.forEach((entry) => {
+    const sid = entry.subject?.toString();
+    if (!entriesBySubject.has(sid)) entriesBySubject.set(sid, []);
+    entriesBySubject.get(sid).push(entry);
+  });
+
+  const summarySubjects = subjects.map((subject) => {
+    const syllabusTopics = getTopicOptionsForSubjectDoc(subject) || [];
+    const subjectEntries = entriesBySubject.get(subject._id.toString()) || [];
+    const classMap = new Map();
+
+    subjectEntries.forEach((entry) => {
+      const classKey = entry.branchYearSection || 'Unassigned class';
+      if (!classMap.has(classKey)) {
+        classMap.set(classKey, {
+          branchYearSection: classKey,
+          closedSlots: 0,
+          topicHits: new Map(),
+          attendanceSum: 0,
+          attendanceCount: 0,
+        });
+      }
+      const row = classMap.get(classKey);
+      row.closedSlots += 1;
+      const topic = String(entry.topicModuleCovered || '').trim();
+      if (topic) {
+        const existing = row.topicHits.get(topic) || { topic, count: 0, lastDate: null };
+        existing.count += 1;
+        const entryDate = entry.date ? formatDateKey(entry.date) : null;
+        if (!existing.lastDate || (entryDate && entryDate > existing.lastDate)) {
+          existing.lastDate = entryDate;
+        }
+        row.topicHits.set(topic, existing);
+      }
+      if (entry.attendancePercent != null && Number.isFinite(Number(entry.attendancePercent))) {
+        row.attendanceSum += Number(entry.attendancePercent);
+        row.attendanceCount += 1;
+      }
+    });
+
+    const classes = [...classMap.values()]
+      .map((row) => {
+        const coveredTopics = [...row.topicHits.values()].sort((a, b) => {
+          const aIndex = syllabusTopics.indexOf(a.topic);
+          const bIndex = syllabusTopics.indexOf(b.topic);
+          if (aIndex === -1 && bIndex === -1) return a.topic.localeCompare(b.topic);
+          if (aIndex === -1) return 1;
+          if (bIndex === -1) return -1;
+          return aIndex - bIndex;
+        });
+        const coveredSet = new Set(coveredTopics.map((item) => item.topic));
+        const uncoveredTopics = syllabusTopics.filter((topic) => !coveredSet.has(topic));
+        return {
+          branchYearSection: row.branchYearSection,
+          closedSlots: row.closedSlots,
+          coveredCount: coveredTopics.filter((item) => syllabusTopics.includes(item.topic)).length,
+          totalTopics: syllabusTopics.length,
+          coveragePercent: syllabusTopics.length
+            ? Math.round((coveredTopics.filter((item) => syllabusTopics.includes(item.topic)).length / syllabusTopics.length) * 1000) / 10
+            : null,
+          avgAttendance: row.attendanceCount
+            ? Math.round((row.attendanceSum / row.attendanceCount) * 10) / 10
+            : null,
+          coveredTopics,
+          uncoveredTopics,
+        };
+      })
+      .sort((a, b) => a.branchYearSection.localeCompare(b.branchYearSection));
+
+    return {
+      subjectId: subject._id.toString(),
+      subjectName: subject.name,
+      subjectCode: subject.code,
+      topics: syllabusTopics,
+      topicCount: syllabusTopics.length,
+      classes,
+    };
+  });
+
+  return { subjects: summarySubjects };
 };

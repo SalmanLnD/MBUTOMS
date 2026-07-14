@@ -3,6 +3,7 @@ import {
   getTopicTrackerOverview,
   getTopicTrackerSessions,
   getTopicTrackerTopics,
+  getTopicTrackerClassSummary,
   upsertTopicTrackerEntry,
   updateTopicTrackerStatus,
   exportTopicTrackerForSheets,
@@ -24,6 +25,7 @@ router.get('/export', requireTopicTrackerExportKey, asyncHandler(exportTopicTrac
 router.use(protect);
 
 router.get('/overview', asyncHandler(getTopicTrackerOverview));
+router.get('/class-summary', asyncHandler(getTopicTrackerClassSummary));
 router.get('/topics', asyncHandler(getTopicTrackerTopics));
 router.get('/sessions', asyncHandler(getTopicTrackerSessions));
 router.put('/entries', asyncHandler(upsertTopicTrackerEntry));
