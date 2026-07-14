@@ -107,3 +107,26 @@
     padding: 1rem 0.65rem 2.5rem;
   }
 }
+
+.feedback-responses-table {
+  table-layout: fixed;
+  width: 100%;
+}
+
+.feedback-responses-table th:nth-child(1),
+.feedback-responses-table td:nth-child(1) {
+  width: 11rem;
+}
+
+.feedback-responses-table th:nth-child(5),
+.feedback-responses-table td:nth-child(5) {
+  width: 5rem;
+}
+
+.feedback-response-comments {
+  white-space: pre-wrap;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+  line-height: 1.45;
+  min-width: 14rem;
+}

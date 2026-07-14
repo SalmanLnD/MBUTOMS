@@ -46,3 +46,23 @@ export const submitPublicFeedback = async (slug, answers) => {
   const { data } = await publicApi.post(`/feedback/public/${slug}/submit`, { answers });
   return data;
 };
+
+export const getFeedbackSheetStatus = async () => {
+  const { data } = await api.get('/feedback/sheets/status');
+  return data;
+};
+
+export const getFeedbackAppsScriptSetup = async () => {
+  const { data } = await api.get('/feedback/sheets/apps-script/setup');
+  return data;
+};
+
+export const linkFeedbackSheet = async (spreadsheetUrl) => {
+  const { data } = await api.post('/feedback/sheets/link', { spreadsheetUrl });
+  return data;
+};
+
+export const unlinkFeedbackSheet = async () => {
+  const { data } = await api.delete('/feedback/sheets/link');
+  return data;
+};

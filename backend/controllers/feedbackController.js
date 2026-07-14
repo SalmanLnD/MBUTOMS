@@ -8,6 +8,7 @@ import {
   mergeDefaultFeedbackFields,
 } from '../utils/feedbackDefaults.js';
 import { mergeRosterFilter } from '../utils/rosterFilter.js';
+import { exportFeedbackResponseRows } from '../services/feedbackSheetsService.js';
 
 const extractRating = (answers = []) => {
   const ratingAnswer = answers.find((a) => a.fieldId === 'rating' || a.label?.toLowerCase().includes('rating'));
@@ -145,6 +146,11 @@ export const getFeedbackResponses = async (req, res) => {
       pages: Math.ceil(total / limit) || 0,
     },
   });
+};
+
+export const exportFeedbackResponsesForSheets = async (req, res) => {
+  const payload = await exportFeedbackResponseRows();
+  res.json(payload);
 };
 
 export const getFeedbackForms = async (req, res) => {
