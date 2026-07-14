@@ -201,8 +201,10 @@ const TopicTracker = () => {
                     </thead>
                     <tbody>
                       {subject.trainers.map((trainer) => {
-                        const allotted = trainer.allottedSlots ?? trainer.totalSlots ?? 0;
-                        const pending = trainer.pendingSlots ?? 0;
+                        const allotted = Number(
+                          trainer.allottedSlots ?? trainer.totalSlots ?? 0
+                        );
+                        const pending = Number(trainer.pendingSlots ?? 0);
                         return (
                           <tr key={trainer.trainerId}>
                             <td>{trainer.trainerName}</td>

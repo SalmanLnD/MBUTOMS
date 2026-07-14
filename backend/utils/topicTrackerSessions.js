@@ -286,11 +286,14 @@ export const buildTopicTrackerOverview = async ({ date, user }) => {
           trainerName: session.trainerName,
           allottedSlots: 0,
           pendingSlots: 0,
+          closedSlots: 0,
         });
       }
       const trainerRow = subjectRow.trainers.get(trainerKey);
       trainerRow.allottedSlots += 1;
-      if (session.trackerStatus !== 'closed') {
+      if (session.trackerStatus === 'closed') {
+        trainerRow.closedSlots += 1;
+      } else {
         trainerRow.pendingSlots += 1;
       }
     });
@@ -330,10 +333,18 @@ export const buildTopicTrackerOverview = async ({ date, user }) => {
       subjectCode: subject.subjectCode,
       allottedSlots: subject.allottedSlots,
       pendingSlots: subject.pendingSlots,
-      // Back-compat for any older UI still reading these keys.
       totalSlots: subject.allottedSlots,
       totalPending: subject.pendingSlots,
-      trainers: [...subject.trainers.values()].sort((a, b) => a.trainerName.localeCompare(b.trainerName)),
+      trainers: [...subject.trainers.values()]
+        .map((trainer) => ({
+          ...trainer,
+          // Aliases so UI always has a value for the allotted-slots column.
+          totalSlots: trainer.allottedSlots,
+          allottedSlots: trainer.allottedSlots,
+          pendingSlots: trainer.pendingSlots,
+          closedSlots: trainer.closedSlots,
+        }))
+        .sort((a, b) => a.trainerName.localeCompare(b.trainerName)),
     }))
     .sort((a, b) => a.subjectName.localeCompare(b.subjectName));
 
