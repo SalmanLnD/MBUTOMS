@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { BellIcon, CheckReadIcon } from './icons.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
 import { ROLES } from '../utils/roles.js';
@@ -17,7 +18,9 @@ const NotificationBell = () => {
   const [unreadCount, setUnreadCount] = useState(0);
   const [loading, setLoading] = useState(false);
   const [markingAll, setMarkingAll] = useState(false);
+  const [panelStyle, setPanelStyle] = useState(null);
   const rootRef = useRef(null);
+  const panelRef = useRef(null);
 
   const canViewNotifications =
     user
@@ -45,13 +48,45 @@ const NotificationBell = () => {
     return () => window.clearInterval(intervalId);
   }, [canViewNotifications, loadNotifications]);
 
+  const updatePanelPosition = useCallback(() => {
+    if (!open || !rootRef.current) return;
+    const rect = rootRef.current.getBoundingClientRect();
+    const width = Math.min(22 * 16, window.innerWidth - 24);
+    const right = Math.max(12, window.innerWidth - rect.right);
+    const top = rect.bottom + 8;
+    const maxHeight = Math.max(12 * 16, Math.min(24 * 16, window.innerHeight - top - 16));
+
+    setPanelStyle({
+      position: 'fixed',
+      top: `${top}px`,
+      right: `${right}px`,
+      width: `${width}px`,
+      maxHeight: `${maxHeight}px`,
+      zIndex: 1400,
+    });
+  }, [open]);
+
+  useLayoutEffect(() => {
+    if (!open) {
+      setPanelStyle(null);
+      return undefined;
+    }
+    updatePanelPosition();
+    window.addEventListener('resize', updatePanelPosition);
+    window.addEventListener('scroll', updatePanelPosition, true);
+    return () => {
+      window.removeEventListener('resize', updatePanelPosition);
+      window.removeEventListener('scroll', updatePanelPosition, true);
+    };
+  }, [open, updatePanelPosition]);
+
   useEffect(() => {
     if (!open) return undefined;
 
     const handleClickOutside = (event) => {
-      if (rootRef.current && !rootRef.current.contains(event.target)) {
-        setOpen(false);
-      }
+      const inTrigger = rootRef.current?.contains(event.target);
+      const inPanel = panelRef.current?.contains(event.target);
+      if (!inTrigger && !inPanel) setOpen(false);
     };
 
     document.addEventListener('mousedown', handleClickOutside);
@@ -112,8 +147,14 @@ const NotificationBell = () => {
         )}
       </button>
 
-      {open && (
-        <div className="notification-panel" role="dialog" aria-label="Notifications">
+      {open && panelStyle && createPortal(
+        <div
+          ref={panelRef}
+          className="notification-panel"
+          role="dialog"
+          aria-label="Notifications"
+          style={panelStyle}
+        >
           <div className="notification-panel-header">
             <h2 className="notification-panel-title">Notifications</h2>
             <button
@@ -141,7 +182,9 @@ const NotificationBell = () => {
                       className={`notification-item ${isUnread ? 'notification-item--unread' : ''}`}
                     >
                       <div className="notification-item-content">
-                        <p className="notification-item-message mb-1">{notification.message}</p>
+                        <p className="notification-item-message mb-1">
+                          {notification.message || 'Notification'}
+                        </p>
                         <p className="notification-item-meta text-muted small mb-0">
                           {formatDateTime(notification.createdAt)}
                         </p>
@@ -163,7 +206,8 @@ const NotificationBell = () => {
               </ul>
             )}
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );
