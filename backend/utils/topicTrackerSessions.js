@@ -391,29 +391,70 @@ export const buildTopicTrackerExportRows = async () => {
   return { rows, exportedAt: new Date().toISOString(), count: entries.length };
 };
 
-export const buildTopicTrackerClassSummary = async ({ subjectId, user }) => {
-  let subjectFilter = {};
-  if (subjectId) {
-    subjectFilter = { _id: subjectId };
-  } else if (isSubjectCoordinator(user)) {
-    subjectFilter = { _id: { $in: getCoordinatorSubjectIds(user) } };
+export const buildTopicTrackerClassSummary = async ({ subjectId, user, trainerId } = {}) => {
+  const ownTrainerId = trainerId
+    ? String(trainerId._id || trainerId)
+    : (user?.role === ROLES.TRAINER && user.trainer
+      ? String(user.trainer._id || user.trainer)
+      : '');
+
+  let subjects = [];
+  let entryFilter = {
+    trackerStatus: 'closed',
+    topicModuleCovered: { $nin: [null, ''] },
+  };
+
+  if (ownTrainerId) {
+    entryFilter.trainer = ownTrainerId;
+    if (subjectId) entryFilter.subject = subjectId;
+
+    const [trainer, closedEntries] = await Promise.all([
+      Trainer.findById(ownTrainerId).select('subjects').lean(),
+      TopicTrackerEntry.find(entryFilter).select('subject').lean(),
+    ]);
+
+    const subjectIdSet = new Set([
+      ...(trainer?.subjects || []).map((id) => id.toString()),
+      ...closedEntries.map((entry) => entry.subject?.toString()).filter(Boolean),
+    ]);
+
+    if (subjectId) {
+      const only = subjectId.toString();
+      if (!subjectIdSet.has(only)) {
+        return { subjects: [] };
+      }
+      subjects = await Subject.find({ _id: only }).select('name code topics').lean();
+    } else {
+      subjects = await Subject.find({ _id: { $in: [...subjectIdSet] } })
+        .select('name code topics')
+        .sort({ name: 1 })
+        .lean();
+    }
+  } else {
+    let subjectFilter = {};
+    if (subjectId) {
+      subjectFilter = { _id: subjectId };
+    } else if (isSubjectCoordinator(user)) {
+      subjectFilter = { _id: { $in: getCoordinatorSubjectIds(user) } };
+    }
+
+    subjects = await Subject.find(subjectFilter)
+      .select('name code topics')
+      .sort({ name: 1 })
+      .lean();
+
+    const subjectIds = subjects.map((subject) => subject._id);
+    if (!subjectIds.length) {
+      return { subjects: [] };
+    }
+    entryFilter.subject = { $in: subjectIds };
   }
 
-  const subjects = await Subject.find(subjectFilter)
-    .select('name code topics')
-    .sort({ name: 1 })
-    .lean();
-
-  const subjectIds = subjects.map((subject) => subject._id);
-  if (!subjectIds.length) {
+  if (!subjects.length) {
     return { subjects: [] };
   }
 
-  const entries = await TopicTrackerEntry.find({
-    subject: { $in: subjectIds },
-    trackerStatus: 'closed',
-    topicModuleCovered: { $nin: [null, ''] },
-  })
+  const entries = await TopicTrackerEntry.find(entryFilter)
     .select('subject branchYearSection topicModuleCovered date sessionStatus allottedStudents noPresent attendancePercent trainerName')
     .sort({ date: 1 })
     .lean();

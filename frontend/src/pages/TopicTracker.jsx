@@ -28,6 +28,7 @@ const TopicTracker = () => {
   const [sheetStatus, setSheetStatus] = useState(null);
   const [sheetModalOpen, setSheetModalOpen] = useState(false);
   const [spreadsheet, setSpreadsheet] = useState(null);
+  const [summaryRefreshKey, setSummaryRefreshKey] = useState(0);
 
   const loadOverview = useCallback(async () => {
     if (!showOverview || activeTab !== 'day') {
@@ -150,7 +151,7 @@ const TopicTracker = () => {
       {showOverview && activeTab === 'class' && (
         <div className="card table-card">
           <div className="card-body">
-            <TopicTrackerClassSummaryTab />
+            <TopicTrackerClassSummaryTab refreshKey={summaryRefreshKey} />
           </div>
         </div>
       )}
@@ -235,8 +236,21 @@ const TopicTracker = () => {
       )}
 
       {!showOverview && canOpenOwnTracker && (
-        <div className="alert alert-info">
-          Select a date and click <strong>Open my tracker</strong> to fill slot-wise topic entries for that day.
+        <div className="card table-card">
+          <div className="card-body">
+            <div className="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
+              <h2 className="h6 fw-semibold mb-0">My class-wise summary</h2>
+              <button type="button" className="btn btn-sm btn-primary" onClick={handleTrainerOpen}>
+                Update today&apos;s slots
+              </button>
+            </div>
+            <TopicTrackerClassSummaryTab
+              mine
+              refreshKey={summaryRefreshKey}
+              showSubjectFilter={false}
+              emptyMessage={"No class coverage yet. Use Update today's slots to save closed sessions."}
+            />
+          </div>
         </div>
       )}
 
@@ -250,6 +264,7 @@ const TopicTracker = () => {
           canCloseEntries
           onClose={() => {
             setSpreadsheet(null);
+            setSummaryRefreshKey((key) => key + 1);
             if (showOverview && activeTab === 'day') loadOverview();
           }}
         />

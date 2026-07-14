@@ -4,7 +4,12 @@ import { getTopicTrackerClassSummary } from '../services/topicTrackerService.js'
 import { showError } from '../utils/toast.js';
 import { getErrorMessage } from '../utils/helpers.js';
 
-const TopicTrackerClassSummaryTab = () => {
+const TopicTrackerClassSummaryTab = ({
+  mine = false,
+  refreshKey = 0,
+  showSubjectFilter = true,
+  emptyMessage = 'No class coverage data yet for your subjects.',
+}) => {
   const [loading, setLoading] = useState(true);
   const [subjects, setSubjects] = useState([]);
   const [selectedSubjectId, setSelectedSubjectId] = useState('');
@@ -13,18 +18,18 @@ const TopicTrackerClassSummaryTab = () => {
   const loadSummary = useCallback(async () => {
     setLoading(true);
     try {
-      const data = await getTopicTrackerClassSummary();
+      const data = await getTopicTrackerClassSummary(mine ? { mine: true } : {});
       setSubjects(data.subjects || []);
     } catch (err) {
       showError(getErrorMessage(err));
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [mine]);
 
   useEffect(() => {
     loadSummary();
-  }, [loadSummary]);
+  }, [loadSummary, refreshKey]);
 
   const visibleSubjects = useMemo(() => {
     if (!selectedSubjectId) return subjects;
@@ -33,38 +38,46 @@ const TopicTrackerClassSummaryTab = () => {
 
   return (
     <div>
-      <div className="row g-2 mb-3 align-items-end">
-        <div className="col-md-5">
-          <label className="form-label mb-1" htmlFor="class-summary-subject">Subject</label>
-          <select
-            id="class-summary-subject"
-            className="form-select"
-            value={selectedSubjectId}
-            onChange={(e) => {
-              setSelectedSubjectId(e.target.value);
-              setExpandedClass('');
-            }}
-          >
-            <option value="">All subjects</option>
-            {subjects.map((subject) => (
-              <option key={subject.subjectId} value={subject.subjectId}>
-                {subject.subjectName} ({subject.subjectCode})
-              </option>
-            ))}
-          </select>
+      {showSubjectFilter && (
+        <div className="row g-2 mb-3 align-items-end">
+          <div className="col-md-5">
+            <label className="form-label mb-1" htmlFor="class-summary-subject">Subject</label>
+            <select
+              id="class-summary-subject"
+              className="form-select"
+              value={selectedSubjectId}
+              onChange={(e) => {
+                setSelectedSubjectId(e.target.value);
+                setExpandedClass('');
+              }}
+            >
+              <option value="">All subjects</option>
+              {subjects.map((subject) => (
+                <option key={subject.subjectId} value={subject.subjectId}>
+                  {subject.subjectName} ({subject.subjectCode})
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="col-md-7">
+            <p className="text-muted small mb-0">
+              Coverage is based on your closed topic tracker entries, grouped by class
+              (branch, year and section).
+            </p>
+          </div>
         </div>
-        <div className="col-md-7">
-          <p className="text-muted small mb-0">
-            Coverage is based on closed topic tracker entries, grouped by class
-            (branch, year and section). Syllabus topics come from each subject&apos;s topic list.
-          </p>
-        </div>
-      </div>
+      )}
+
+      {!showSubjectFilter && (
+        <p className="text-muted small mb-3">
+          Your class-wise topic coverage from closed tracker entries.
+        </p>
+      )}
 
       {loading ? (
         <LoadingSpinner message="Loading class-wise summary..." />
       ) : !visibleSubjects.length ? (
-        <div className="alert alert-light border mb-0">No subjects available for this view.</div>
+        <div className="alert alert-light border mb-0">{emptyMessage}</div>
       ) : (
         visibleSubjects.map((subject) => (
           <div key={subject.subjectId} className="card mb-3">

@@ -104,12 +104,33 @@ export const getTopicTrackerTopics = async (req, res) => {
 };
 
 export const getTopicTrackerClassSummary = async (req, res) => {
-  if (!isAuthorizedRole(req.user.role, MANAGEMENT_VIEW_ROLES)) {
+  const isTrainerUser = req.user.role === ROLES.TRAINER;
+  const isManagement = isAuthorizedRole(req.user.role, MANAGEMENT_VIEW_ROLES);
+
+  if (!isTrainerUser && !isManagement) {
     return res.status(403).json({ message: 'Not authorized to view class-wise summary' });
   }
 
-  const { subjectId } = req.query;
-  if (isSubjectCoordinator(req.user) && subjectId) {
+  const { subjectId, mine } = req.query;
+  const ownTrainerId = req.user.trainer
+    ? String(req.user.trainer._id || req.user.trainer)
+    : '';
+
+  // Trainers always see only their classes. Coordinators/admins can pass mine=true for own teaching summary.
+  let trainerId;
+  if (isTrainerUser) {
+    if (!ownTrainerId) {
+      return res.json({ subjects: [] });
+    }
+    trainerId = ownTrainerId;
+  } else if (mine === 'true' || mine === '1') {
+    if (!ownTrainerId) {
+      return res.json({ subjects: [] });
+    }
+    trainerId = ownTrainerId;
+  }
+
+  if (isSubjectCoordinator(req.user) && subjectId && !trainerId) {
     const allowed = getCoordinatorSubjectIds(req.user);
     if (!allowed.includes(subjectId.toString())) {
       return res.status(403).json({ message: 'Not authorized for this subject' });
@@ -119,6 +140,7 @@ export const getTopicTrackerClassSummary = async (req, res) => {
   const summary = await buildTopicTrackerClassSummary({
     subjectId: subjectId || undefined,
     user: req.user,
+    trainerId,
   });
   res.json(summary);
 };
