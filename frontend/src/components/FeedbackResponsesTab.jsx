@@ -3,6 +3,7 @@ import LoadingSpinner from './LoadingSpinner.jsx';
 import Pagination from './Pagination.jsx';
 import FeedbackSheetSetupModal from './FeedbackSheetSetupModal.jsx';
 import { getFeedbackResponses, getFeedbackSheetStatus } from '../services/feedbackService.js';
+import { getTrainers } from '../services/trainerService.js';
 import { showError } from '../utils/toast.js';
 import { getErrorMessage } from '../utils/helpers.js';
 import { SheetIcon, ExternalLinkIcon } from './icons.jsx';
@@ -14,6 +15,8 @@ const FeedbackResponsesTab = () => {
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
   const [monthFilter, setMonthFilter] = useState('');
+  const [trainerFilter, setTrainerFilter] = useState('');
+  const [trainers, setTrainers] = useState([]);
   const [sheetStatus, setSheetStatus] = useState(null);
   const [sheetModalOpen, setSheetModalOpen] = useState(false);
 
@@ -24,6 +27,7 @@ const FeedbackResponsesTab = () => {
         page,
         limit: 20,
         month: monthFilter || undefined,
+        trainer: trainerFilter || undefined,
       });
       setResponses(data.responses || []);
       setPagination(data.pagination);
@@ -32,7 +36,7 @@ const FeedbackResponsesTab = () => {
     } finally {
       setLoading(false);
     }
-  }, [page, monthFilter]);
+  }, [page, monthFilter, trainerFilter]);
 
   const loadSheetStatus = useCallback(async () => {
     try {
@@ -51,19 +55,51 @@ const FeedbackResponsesTab = () => {
     loadSheetStatus();
   }, [loadSheetStatus, sheetModalOpen]);
 
+  useEffect(() => {
+    const loadTrainers = async () => {
+      try {
+        const data = await getTrainers({ limit: 200, sortBy: 'name', sortOrder: 'asc' });
+        setTrainers(data.trainers || data || []);
+      } catch {
+        setTrainers([]);
+      }
+    };
+    loadTrainers();
+  }, []);
+
   return (
     <div>
       <div className="d-flex flex-wrap align-items-end justify-content-between gap-2 mb-3">
-        <div className="flex-grow-1" style={{ minWidth: '200px', maxWidth: '280px' }}>
-          <label className="form-label mb-1" htmlFor="feedback-month-filter">Filter by month</label>
-          <input
-            id="feedback-month-filter"
-            type="month"
-            className="form-control"
-            value={monthFilter}
-            onChange={(e) => { setMonthFilter(e.target.value); setPage(1); }}
-            aria-label="Filter by month"
-          />
+        <div className="d-flex flex-wrap align-items-end gap-2 flex-grow-1">
+          <div style={{ minWidth: '180px', maxWidth: '240px' }}>
+            <label className="form-label mb-1" htmlFor="feedback-month-filter">Filter by month</label>
+            <input
+              id="feedback-month-filter"
+              type="month"
+              className="form-control"
+              value={monthFilter}
+              onChange={(e) => { setMonthFilter(e.target.value); setPage(1); }}
+              aria-label="Filter by month"
+            />
+          </div>
+          <div style={{ minWidth: '200px', maxWidth: '280px' }}>
+            <label className="form-label mb-1" htmlFor="feedback-trainer-filter">Filter by trainer</label>
+            <select
+              id="feedback-trainer-filter"
+              className="form-select"
+              value={trainerFilter}
+              onChange={(e) => { setTrainerFilter(e.target.value); setPage(1); }}
+              aria-label="Filter by trainer"
+            >
+              <option value="">All trainers</option>
+              {trainers.map((trainer) => (
+                <option key={trainer._id} value={trainer._id}>
+                  {trainer.name}
+                  {trainer.employeeId ? ` (${trainer.employeeId})` : ''}
+                </option>
+              ))}
+            </select>
+          </div>
         </div>
 
         <div className="d-flex flex-wrap gap-2">

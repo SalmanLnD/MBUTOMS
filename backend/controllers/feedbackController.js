@@ -1,3 +1,4 @@
+import mongoose from 'mongoose';
 import FeedbackForm from '../models/FeedbackForm.js';
 import FeedbackResponse from '../models/FeedbackResponse.js';
 import Trainer from '../models/Trainer.js';
@@ -112,6 +113,9 @@ export const getFeedbackResponses = async (req, res) => {
 
   const filter = {};
   if (req.query.month) filter.monthKey = req.query.month;
+  if (req.query.trainer && mongoose.Types.ObjectId.isValid(req.query.trainer)) {
+    filter.trainer = req.query.trainer;
+  }
 
   const [responses, total] = await Promise.all([
     FeedbackResponse.find(filter)
