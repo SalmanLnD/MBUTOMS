@@ -139,27 +139,44 @@ export const buildTopicTrackerSessions = async ({
   const classGroupMap = await buildClassGroupMap();
 
   let allowedTrainerIds = null;
+  const ownTrainerId = user?.trainer ? String(user.trainer._id || user.trainer) : '';
+  const viewingOwnClasses = Boolean(
+    ownTrainerId
+    && trainerId
+    && trainerId.toString() === ownTrainerId
+  );
+
   if (user?.role === ROLES.TRAINER && user.trainer) {
-    allowedTrainerIds = new Set([user.trainer.toString()]);
+    allowedTrainerIds = new Set([ownTrainerId || user.trainer.toString()]);
   } else if (isSubjectCoordinator(user)) {
     const subjectIds = getCoordinatorSubjectIds(user);
-    const filter = await buildTrainerFilterForCoordinatorSubjects(subjectIds);
-    allowedTrainerIds = new Set((filter._id?.$in || []).map((id) => id.toString()));
-    if (subjectId && !subjectIds.includes(subjectId.toString())) {
-      return { date: dateKey, day: dayName, sessions: [] };
-    }
-    if (!subjectId) {
-      schedules = schedules.filter((schedule) => {
-        const sid = schedule.subject?._id?.toString() || schedule.subject?.toString();
-        return subjectIds.includes(sid);
-      });
+    if (viewingOwnClasses) {
+      // Own teaching slots for any subject (e.g. Sai Priya / PSTJ).
+      allowedTrainerIds = new Set([ownTrainerId]);
+    } else if (subjectId && !subjectIds.includes(subjectId.toString())) {
+      // Personal teaching subject outside coordinator assignment.
+      if (!ownTrainerId) {
+        return { date: dateKey, day: dayName, sessions: [] };
+      }
+      allowedTrainerIds = new Set([ownTrainerId]);
+    } else {
+      const filter = await buildTrainerFilterForCoordinatorSubjects(subjectIds);
+      allowedTrainerIds = new Set((filter._id?.$in || []).map((id) => id.toString()));
+      if (ownTrainerId) allowedTrainerIds.add(ownTrainerId);
+      if (!subjectId) {
+        schedules = schedules.filter((schedule) => {
+          const sid = schedule.subject?._id?.toString() || schedule.subject?.toString();
+          return subjectIds.includes(sid);
+        });
+      }
     }
   }
 
   if (trainerId) {
+    const targetId = trainerId.toString();
     allowedTrainerIds = allowedTrainerIds
-      ? new Set([...allowedTrainerIds].filter((id) => id === trainerId.toString()))
-      : new Set([trainerId.toString()]);
+      ? new Set([...allowedTrainerIds].filter((id) => id === targetId))
+      : new Set([targetId]);
   }
 
   const sessionDefaults = [];
@@ -238,22 +255,28 @@ export const buildTopicTrackerOverview = async ({ date, user }) => {
   }
 
   const subjects = await Subject.find(subjectFilter).select('name code').sort({ name: 1 }).lean();
-  const overview = [];
+  const overviewMap = new Map();
 
-  for (const subject of subjects) {
-    const { sessions } = await buildTopicTrackerSessions({
-      date: ref,
-      subjectId: subject._id.toString(),
-      user,
-    });
-
-    if (!sessions.length) continue;
-
-    const trainerMap = new Map();
+  const addSessionsToOverview = (sessions) => {
     sessions.forEach((session) => {
-      const key = session.trainerId;
-      if (!trainerMap.has(key)) {
-        trainerMap.set(key, {
+      const subjectKey = session.subjectId || session.subjectCode || 'unknown';
+      if (!overviewMap.has(subjectKey)) {
+        overviewMap.set(subjectKey, {
+          subjectId: session.subjectId,
+          subjectName: session.courseName || session.subjectCode || 'Subject',
+          subjectCode: session.subjectCode || '',
+          totalSlots: 0,
+          totalPending: 0,
+          trainers: new Map(),
+        });
+      }
+      const subjectRow = overviewMap.get(subjectKey);
+      subjectRow.totalSlots += 1;
+      if (session.trackerStatus !== 'closed') subjectRow.totalPending += 1;
+
+      const trainerKey = session.trainerId;
+      if (!subjectRow.trainers.has(trainerKey)) {
+        subjectRow.trainers.set(trainerKey, {
           trainerId: session.trainerId,
           trainerName: session.trainerName,
           totalSlots: 0,
@@ -261,27 +284,53 @@ export const buildTopicTrackerOverview = async ({ date, user }) => {
           closedSlots: 0,
         });
       }
-      const row = trainerMap.get(key);
-      row.totalSlots += 1;
+      const trainerRow = subjectRow.trainers.get(trainerKey);
+      trainerRow.totalSlots += 1;
       if (session.trackerStatus === 'closed') {
-        row.closedSlots += 1;
+        trainerRow.closedSlots += 1;
       } else {
-        row.pendingSlots += 1;
+        trainerRow.pendingSlots += 1;
       }
     });
+  };
 
-    const trainers = [...trainerMap.values()].sort((a, b) => a.trainerName.localeCompare(b.trainerName));
-    const totalPending = trainers.reduce((sum, row) => sum + row.pendingSlots, 0);
-
-    overview.push({
+  for (const subject of subjects) {
+    const { sessions } = await buildTopicTrackerSessions({
+      date: ref,
       subjectId: subject._id.toString(),
-      subjectName: subject.name,
-      subjectCode: subject.code,
-      totalSlots: sessions.length,
-      totalPending,
-      trainers,
+      user,
     });
+    if (!sessions.length) continue;
+    // Prefer subject catalog name/code for coordinated subjects.
+    sessions.forEach((session) => {
+      session.courseName = subject.name;
+      session.subjectCode = subject.code;
+      session.subjectId = subject._id.toString();
+    });
+    addSessionsToOverview(sessions);
   }
+
+  // Coordinators who also teach should see their personal classes (e.g. Sai Priya / PSTJ).
+  if (isSubjectCoordinator(user) && user.trainer) {
+    const ownTrainerId = String(user.trainer._id || user.trainer);
+    const { sessions: ownSessions } = await buildTopicTrackerSessions({
+      date: ref,
+      trainerId: ownTrainerId,
+      user,
+    });
+    addSessionsToOverview(ownSessions);
+  }
+
+  const overview = [...overviewMap.values()]
+    .map((subject) => ({
+      subjectId: subject.subjectId,
+      subjectName: subject.subjectName,
+      subjectCode: subject.subjectCode,
+      totalSlots: subject.totalSlots,
+      totalPending: subject.totalPending,
+      trainers: [...subject.trainers.values()].sort((a, b) => a.trainerName.localeCompare(b.trainerName)),
+    }))
+    .sort((a, b) => a.subjectName.localeCompare(b.subjectName));
 
   return { date: dateKey, subjects: overview };
 };

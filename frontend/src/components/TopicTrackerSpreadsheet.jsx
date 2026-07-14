@@ -10,10 +10,8 @@ import { getErrorMessage } from '../utils/helpers.js';
 import { showError, showSuccess } from '../utils/toast.js';
 import {
   TOPIC_TRACKER_COLUMNS,
-  TOPIC_TRACKER_STATUS_LABELS,
   SESSION_STATUS_VALUES,
   SESSION_STATUS_LABELS,
-  getTopicTrackerStatusBadgeClass,
 } from '../utils/topicTrackerConstants.js';
 
 const computeAttendancePercent = (allotted, present) => {
@@ -171,12 +169,12 @@ const TopicTrackerSpreadsheet = ({
       return (
         <button
           type="button"
-          className={`badge border-0 ${getTopicTrackerStatusBadgeClass(row.trackerStatus)}`}
+          className={`btn btn-sm ${isClosed ? 'btn-outline-secondary' : 'btn-primary'}`}
           onClick={() => toggleStatus(row, index)}
           disabled={!canCloseEntries || isSaving}
           title={canCloseEntries ? (isClosed ? 'Reopen for editing' : 'Save and mark closed') : 'Status'}
         >
-          {isSaving ? 'Saving...' : (TOPIC_TRACKER_STATUS_LABELS[row.trackerStatus] || 'Pending')}
+          {isSaving ? 'Saving...' : (isClosed ? 'Reopen' : 'Save')}
         </button>
       );
     }
@@ -253,6 +251,7 @@ const TopicTrackerSpreadsheet = ({
       onClose={onClose}
       size="toms-modal-xl"
       scrollable
+      dismissible={false}
     >
       <div className="toms-modal-body p-0">
         {loading ? (
@@ -266,7 +265,9 @@ const TopicTrackerSpreadsheet = ({
                 <tr>
                   <th className="topic-tracker-slot-col">Slot</th>
                   {TOPIC_TRACKER_COLUMNS.map((column) => (
-                    <th key={column.key} style={{ minWidth: column.width }}>{column.label}</th>
+                    <th key={column.key} style={{ minWidth: column.width }}>
+                      {column.key === 'trackerStatus' ? 'Action' : column.label}
+                    </th>
                   ))}
                 </tr>
               </thead>
@@ -288,7 +289,8 @@ const TopicTrackerSpreadsheet = ({
       </div>
       <div className="toms-modal-footer">
         <p className="small text-muted mb-0 me-auto">
-          Fill the row, then click tracker status to save and mark closed. Reopen to edit again.
+          Fill the row, then click Save to store and mark closed. Use Reopen to edit again.
+          Unsaved changes are kept until you click Close.
         </p>
         <button type="button" className="btn btn-secondary" onClick={onClose}>
           Close

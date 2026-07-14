@@ -18,6 +18,8 @@ const TopicTracker = () => {
   const isCoordinator = hasRole(ROLES.SUBJECT_COORDINATOR);
   const canManageSheets = hasFullAccess();
   const showOverview = canManageSheets || isCoordinator;
+  const hasLinkedTrainer = Boolean(user?.trainer);
+  const canOpenOwnTracker = isTrainer || (isCoordinator && hasLinkedTrainer);
 
   const [activeTab, setActiveTab] = useState('day');
   const [selectedDate, setSelectedDate] = useState(() => toInputDate(new Date()));
@@ -112,7 +114,7 @@ const TopicTracker = () => {
           </div>
 
           <div className="d-flex flex-wrap gap-2">
-            {isTrainer && (
+            {canOpenOwnTracker && (
               <button type="button" className="btn btn-primary" onClick={handleTrainerOpen}>
                 Open my tracker
               </button>
@@ -232,7 +234,7 @@ const TopicTracker = () => {
         </>
       )}
 
-      {!showOverview && isTrainer && (
+      {!showOverview && canOpenOwnTracker && (
         <div className="alert alert-info">
           Select a date and click <strong>Open my tracker</strong> to fill slot-wise topic entries for that day.
         </div>

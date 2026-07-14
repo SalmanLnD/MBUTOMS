@@ -19,6 +19,7 @@ import {
   notifySessionExpired,
   resetSessionExpiredState,
 } from '../utils/sessionManager.js';
+import { resetAllModalArtifacts } from '../utils/modalCleanup.js';
 
 const AuthContext = createContext(null);
 
@@ -131,6 +132,8 @@ export const AuthProvider = ({ children }) => {
   };
 
   const logout = () => {
+    resetAllModalArtifacts();
+    resetSessionExpiredState();
     localStorage.removeItem('toms_token');
     localStorage.removeItem('toms_user');
     localStorage.removeItem('toms_admin_token');

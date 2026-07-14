@@ -11,6 +11,7 @@ import {
 } from '../utils/topicTrackerSessions.js';
 import { computeHours } from '../utils/trainerClassHours.js';
 import { normalizeDate } from '../utils/scheduleHelpers.js';
+import { findTrainerByScheduleCode } from '../utils/trainerMappings.js';
 import {
   coordinatorCanAccessTrainer,
   getCoordinatorSubjectIds,
@@ -21,6 +22,7 @@ import {
   isAllowedTopicForSubject,
 } from '../utils/topicTrackerTopicCatalog.js';
 import Subject from '../models/Subject.js';
+
 const MANAGEMENT_VIEW_ROLES = [...FULL_ACCESS_ROLES, ROLES.SUBJECT_COORDINATOR];
 
 const computeAttendancePercent = (allotted, present) => {
@@ -30,6 +32,8 @@ const computeAttendancePercent = (allotted, present) => {
 
 const canEditSession = async (user, trainerId, subjectId) => {
   if (isAuthorizedRole(user?.role, FULL_ACCESS_ROLES)) return true;
+  // Coordinators who also teach (e.g. Sai Priya / PSTJ) can edit their own classes.
+  if (user?.trainer && user.trainer.toString() === trainerId?.toString()) return true;
   if (isSubjectCoordinator(user)) {
     const subjectIds = getCoordinatorSubjectIds(user);
     if (!subjectIds.includes(subjectId?.toString())) return false;
@@ -48,7 +52,7 @@ const resolveScheduleContext = async (scheduleId) => {
     .lean();
   if (!schedule) return null;
 
-  const trainer = await Trainer.findOne({ employeeId: schedule.trainerCode }).select('name employeeId');
+  const trainer = await findTrainerByScheduleCode(Trainer, schedule.trainerCode);
   if (!trainer) return null;
 
   return { schedule, trainer };
