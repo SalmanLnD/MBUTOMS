@@ -1,5 +1,9 @@
 import User from '../models/User.js';
 import { INITIAL_TRAINER_PASSWORD } from '../constants/trainerAuth.js';
+import { ROLES } from './roles.js';
+
+/** Roles that log in through a linked trainer profile and can use the initial OTP. */
+const TRAINER_LINKED_LOGIN_ROLES = [ROLES.TRAINER, ROLES.SUBJECT_COORDINATOR];
 
 export const syncTrainerUser = async (trainer, { resetPassword = false } = {}) => {
   const email = trainer.email?.trim()?.toLowerCase();
@@ -10,7 +14,7 @@ export const syncTrainerUser = async (trainer, { resetPassword = false } = {}) =
     user = await User.findOne({ email });
   }
 
-  if (user && user.role !== 'trainer') {
+  if (user && !TRAINER_LINKED_LOGIN_ROLES.includes(user.role)) {
     return null;
   }
 
@@ -19,7 +23,7 @@ export const syncTrainerUser = async (trainer, { resetPassword = false } = {}) =
       name: trainer.name,
       email,
       password: INITIAL_TRAINER_PASSWORD,
-      role: 'trainer',
+      role: ROLES.TRAINER,
       trainer: trainer._id,
       mustResetPassword: true,
     });
@@ -34,6 +38,7 @@ export const syncTrainerUser = async (trainer, { resetPassword = false } = {}) =
   if (resetPassword) {
     user.password = INITIAL_TRAINER_PASSWORD;
     user.mustResetPassword = true;
+    user.sessionVersion = (user.sessionVersion || 1) + 1;
   }
 
   await user.save();
@@ -41,5 +46,5 @@ export const syncTrainerUser = async (trainer, { resetPassword = false } = {}) =
 };
 
 export const removeTrainerUser = async (trainerId) => {
-  await User.deleteOne({ trainer: trainerId, role: 'trainer' });
+  await User.deleteOne({ trainer: trainerId, role: ROLES.TRAINER });
 };

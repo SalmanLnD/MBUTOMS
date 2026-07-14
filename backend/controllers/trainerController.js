@@ -291,10 +291,15 @@ export const resetTrainerPassword = async (req, res) => {
     return res.status(400).json({ message: 'Trainer does not have an email address for login' });
   }
 
-  await syncTrainerUser(trainer, { resetPassword: true });
+  const user = await syncTrainerUser(trainer, { resetPassword: true });
+  if (!user) {
+    return res.status(400).json({
+      message: 'Could not reset password for this account. It may not be a trainer or subject coordinator login.',
+    });
+  }
 
   res.json({
-    message: `Password reset to initial OTP (${INITIAL_TRAINER_PASSWORD}). Trainer must set a new password on next login.`,
+    message: `Password reset to initial OTP (${INITIAL_TRAINER_PASSWORD}). User must set a new password on next login.`,
     email: trainer.email.trim().toLowerCase(),
   });
 };
