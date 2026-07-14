@@ -69,3 +69,19 @@ export const authorize = (...roles) => (req, res, next) => {
   }
   next();
 };
+
+/** Same as authorize, but without campus_manager ↔ subject_coordinator role aliasing. */
+export const authorizeExact = (...roles) => (req, res, next) => {
+  if (req.impersonator) {
+    return res.status(403).json({
+      message: 'Exit trainer view before using admin features.',
+    });
+  }
+
+  if (!roles.includes(req.user?.role)) {
+    return res.status(403).json({
+      message: `Role '${req.user?.role}' is not authorized for this action`,
+    });
+  }
+  next();
+};

@@ -14,7 +14,7 @@ import {
   linkTopicTrackerSheet,
   unlinkTopicTrackerSheet,
 } from '../controllers/topicTrackerSheetsController.js';
-import { protect, authorize } from '../middleware/auth.js';
+import { protect, authorizeExact } from '../middleware/auth.js';
 import { asyncHandler } from '../middleware/asyncHandler.js';
 import { requireTopicTrackerExportKey } from '../middleware/topicTrackerExportAuth.js';
 
@@ -31,20 +31,24 @@ router.get('/sessions', asyncHandler(getTopicTrackerSessions));
 router.put('/entries', asyncHandler(upsertTopicTrackerEntry));
 router.patch('/entries/:id/status', asyncHandler(updateTopicTrackerStatus));
 
-router.get('/sheets/status', asyncHandler(getTopicTrackerSheetStatus));
+router.get(
+  '/sheets/status',
+  authorizeExact('admin', 'manager', 'campus_manager'),
+  asyncHandler(getTopicTrackerSheetStatus)
+);
 router.get(
   '/sheets/apps-script/setup',
-  authorize('admin', 'campus_manager'),
+  authorizeExact('admin', 'manager', 'campus_manager'),
   asyncHandler(getTopicTrackerAppsScriptSetup)
 );
 router.post(
   '/sheets/link',
-  authorize('admin', 'campus_manager'),
+  authorizeExact('admin', 'manager', 'campus_manager'),
   asyncHandler(linkTopicTrackerSheet)
 );
 router.delete(
   '/sheets/link',
-  authorize('admin', 'campus_manager'),
+  authorizeExact('admin', 'manager', 'campus_manager'),
   asyncHandler(unlinkTopicTrackerSheet)
 );
 

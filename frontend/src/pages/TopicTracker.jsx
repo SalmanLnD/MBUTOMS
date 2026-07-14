@@ -13,10 +13,11 @@ import { ROLES } from '../utils/roles.js';
 import { SheetIcon, ExternalLinkIcon } from '../components/icons.jsx';
 
 const TopicTracker = () => {
-  const { hasRole, hasFullAccess, user } = useAuth();
+  const { hasRole, user } = useAuth();
   const isTrainer = hasRole(ROLES.TRAINER);
-  const isCoordinator = hasRole(ROLES.SUBJECT_COORDINATOR);
-  const canManageSheets = hasFullAccess();
+  const isCoordinator = user?.role === ROLES.SUBJECT_COORDINATOR;
+  // Exact role check — subject coordinators must not get campus_manager sheet parity here.
+  const canManageSheets = [ROLES.ADMIN, ROLES.MANAGER, ROLES.CAMPUS_MANAGER].includes(user?.role);
   const showOverview = canManageSheets || isCoordinator;
   const hasLinkedTrainer = Boolean(user?.trainer);
   const canOpenOwnTracker = isTrainer || (isCoordinator && hasLinkedTrainer);
