@@ -6,6 +6,9 @@ const SubjectResourceLinkModal = ({
   show,
   title,
   initialUrl = '',
+  urlLabel = 'Google Drive open link',
+  urlPlaceholder = 'https://drive.google.com/...',
+  emptyError = 'Paste a Google Drive open link.',
   onClose,
   onSave,
 }) => {
@@ -23,7 +26,7 @@ const SubjectResourceLinkModal = ({
     event.preventDefault();
     const trimmed = url.trim();
     if (!trimmed) {
-      setError('Paste a Google Drive open link.');
+      setError(emptyError);
       return;
     }
 
@@ -45,13 +48,13 @@ const SubjectResourceLinkModal = ({
         <div className="toms-modal-body">
           {error && <div className="alert alert-danger">{error}</div>}
           <label className="form-label" htmlFor="subject-resource-url">
-            Google Drive open link
+            {urlLabel}
           </label>
           <input
             id="subject-resource-url"
             type="url"
             className="form-control"
-            placeholder="https://drive.google.com/..."
+            placeholder={urlPlaceholder}
             value={url}
             onChange={(event) => setUrl(event.target.value)}
             required

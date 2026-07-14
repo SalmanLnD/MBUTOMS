@@ -5,6 +5,14 @@ export const TOPIC_TRACKER_STATUS_LABELS = {
   closed: 'Closed',
 };
 
+export const SESSION_STATUS_VALUES = ['completed', 'cancelled', 'postponed'];
+
+export const SESSION_STATUS_LABELS = {
+  completed: 'Completed',
+  cancelled: 'Cancelled',
+  postponed: 'Postponed',
+};
+
 export const getTopicTrackerStatusBadgeClass = (status) => {
   if (status === 'closed') return 'bg-success';
   return 'bg-warning text-dark';

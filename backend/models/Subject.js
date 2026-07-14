@@ -47,6 +47,7 @@ const subjectSchema = new mongoose.Schema(
     academicYear: { type: String, trim: true, default: '2026-27' },
     syllabusUrl: { type: String, trim: true, default: '' },
     choUrl: { type: String, trim: true, default: '' },
+    practicePortalUrl: { type: String, trim: true, default: '' },
   },
   { timestamps: true }
 );

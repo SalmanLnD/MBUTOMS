@@ -4,6 +4,7 @@ import { TICKET_STATUSES, TICKET_TYPES } from './ticketConstants.js';
 export const subjectResourceValidation = [
   body('syllabusUrl').optional({ values: 'falsy' }).isString().trim(),
   body('choUrl').optional({ values: 'falsy' }).isString().trim(),
+  body('practicePortalUrl').optional({ values: 'falsy' }).isString().trim(),
 ];
 
 export const loginValidation = [

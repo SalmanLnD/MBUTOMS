@@ -493,6 +493,13 @@ const SubjectFormModal = ({ subject, onClose, onManageResource }) => {
                     >
                       {subject?.choUrl ? 'Update CHO' : 'Add CHO'}
                     </button>
+                    <button
+                      type="button"
+                      className="btn btn-outline-primary btn-sm"
+                      onClick={() => onManageResource('practicePortal')}
+                    >
+                      {subject?.practicePortalUrl ? 'Update Practice Portal' : 'Add Practice Portal'}
+                    </button>
                   </div>
                 </div>
               )}

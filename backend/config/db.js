@@ -10,6 +10,7 @@ import { clearEmployeeTimetableSchedules } from '../utils/clearEmployeeTimetable
 import { syncAllTrainerSubjectLinks } from '../utils/syncTrainerSubjectLinks.js';
 import { migrateSubjectCommercialFields } from '../utils/migrateSubjectCommercialFields.js';
 import { migrateSubjectAcademicYear } from '../utils/migrateSubjectAcademicYear.js';
+import { migrateSubjectPracticePortalUrls } from '../utils/migrateSubjectPracticePortalUrls.js';
 import { removeAllPedhData } from '../scripts/remove-all-pedh-data.mjs';
 import { syncSubjectCoordinators } from '../utils/syncSubjectCoordinators.js';
 import { syncLrreVSemesterTimetable } from '../utils/syncLrreVSemesterTimetable.js';
@@ -28,6 +29,7 @@ const getCache = () => {
 const runEssentialStartup = async () => {
   const counts = await ensureReferenceData();
   const academicYearMigration = await migrateSubjectAcademicYear();
+  const practicePortalMigration = await migrateSubjectPracticePortalUrls();
   const pedhCleanup = await removeAllPedhData();
   const coordinatorSync = await syncSubjectCoordinators();
   console.log(
@@ -35,6 +37,9 @@ const runEssentialStartup = async () => {
   );
   if (academicYearMigration.updatedCount) {
     console.log(`Subject academic year migration: ${academicYearMigration.updatedCount} subject(s) set to ${academicYearMigration.academicYear}`);
+  }
+  if (practicePortalMigration.updatedCount) {
+    console.log(`Subject practice portal migration: ${practicePortalMigration.updatedCount} subject(s) updated`);
   }
   if (pedhCleanup.removedSchedules || pedhCleanup.removedTrainers || pedhCleanup.removedSubject) {
     console.log(

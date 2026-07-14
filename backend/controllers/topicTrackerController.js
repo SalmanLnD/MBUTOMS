@@ -2,7 +2,7 @@ import TopicTrackerEntry from '../models/TopicTrackerEntry.js';
 import Schedule from '../models/Schedule.js';
 import Trainer from '../models/Trainer.js';
 import { ROLES, isAuthorizedRole, FULL_ACCESS_ROLES } from '../utils/roles.js';
-import { TOPIC_TRACKER_STATUSES } from '../utils/topicTrackerConstants.js';
+import { TOPIC_TRACKER_STATUSES, SESSION_STATUS_VALUES } from '../utils/topicTrackerConstants.js';
 import {
   buildTopicTrackerSessions,
   buildTopicTrackerOverview,
@@ -149,6 +149,19 @@ export const upsertTopicTrackerEntry = async (req, res) => {
     });
   }
 
+  const resolvedSessionStatus = sessionStatus ?? existing?.sessionStatus ?? '';
+  if (resolvedSessionStatus && !SESSION_STATUS_VALUES.includes(resolvedSessionStatus)) {
+    return res.status(400).json({
+      message: 'Session status must be completed, cancelled, or postponed.',
+    });
+  }
+
+  if (nextStatus === 'closed' && !resolvedSessionStatus) {
+    return res.status(400).json({
+      message: 'Select a session status before marking this slot as closed.',
+    });
+  }
+
   const payload = {
     date: refDate,
     schedule: scheduleId,
@@ -167,7 +180,7 @@ export const upsertTopicTrackerEntry = async (req, res) => {
     allottedStudents: allotted,
     noPresent: present,
     attendancePercent: computeAttendancePercent(allotted, present),
-    sessionStatus: sessionStatus ?? existing?.sessionStatus ?? '',
+    sessionStatus: resolvedSessionStatus,
     keyObservationsFeedback: keyObservationsFeedback ?? existing?.keyObservationsFeedback ?? '',
     challengesFaced: challengesFaced ?? existing?.challengesFaced ?? '',
     markedBy: req.user._id,

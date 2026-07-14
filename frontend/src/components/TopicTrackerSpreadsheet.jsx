@@ -11,6 +11,8 @@ import { showError, showSuccess } from '../utils/toast.js';
 import {
   TOPIC_TRACKER_COLUMNS,
   TOPIC_TRACKER_STATUS_LABELS,
+  SESSION_STATUS_VALUES,
+  SESSION_STATUS_LABELS,
   getTopicTrackerStatusBadgeClass,
 } from '../utils/topicTrackerConstants.js';
 
@@ -27,6 +29,24 @@ const computeDuration = (start, end) => {
   if (diff <= 0) return '';
   return String(Math.round((diff / 60) * 10) / 10);
 };
+
+const buildEntryPayload = (row, trackerStatus) => ({
+  scheduleId: row.scheduleId,
+  date: row.date,
+  trainerName: row.trainerName,
+  branchYearSection: row.branchYearSection,
+  roomNo: row.roomNo,
+  courseName: row.courseName,
+  topicModuleCovered: row.topicModuleCovered,
+  sessionStartTime: row.sessionStartTime,
+  sessionEndTime: row.sessionEndTime,
+  allottedStudents: Number(row.allottedStudents) || 0,
+  noPresent: Number(row.noPresent) || 0,
+  sessionStatus: row.sessionStatus,
+  keyObservationsFeedback: row.keyObservationsFeedback,
+  challengesFaced: row.challengesFaced,
+  trackerStatus,
+});
 
 const TopicTrackerSpreadsheet = ({
   show,
@@ -79,34 +99,20 @@ const TopicTrackerSpreadsheet = ({
     }));
   };
 
-  const saveRow = async (row, index) => {
+  const saveClosedRow = async (row, index) => {
     const key = `${row.scheduleId}-${row.date}`;
     setSavingKey(key);
     try {
-      const saved = await upsertTopicTrackerEntry({
-        scheduleId: row.scheduleId,
-        date: row.date,
-        trainerName: row.trainerName,
-        branchYearSection: row.branchYearSection,
-        roomNo: row.roomNo,
-        courseName: row.courseName,
-        topicModuleCovered: row.topicModuleCovered,
-        sessionStartTime: row.sessionStartTime,
-        sessionEndTime: row.sessionEndTime,
-        allottedStudents: Number(row.allottedStudents) || 0,
-        noPresent: Number(row.noPresent) || 0,
-        sessionStatus: row.sessionStatus,
-        keyObservationsFeedback: row.keyObservationsFeedback,
-        challengesFaced: row.challengesFaced,
-      });
+      const saved = await upsertTopicTrackerEntry(buildEntryPayload(row, 'closed'));
       setSessions((prev) => prev.map((item, i) => (i === index ? {
         ...item,
+        ...row,
         entryId: saved._id,
         durationHrs: saved.durationHrs,
         attendancePercent: saved.attendancePercent,
         trackerStatus: saved.trackerStatus,
       } : item)));
-      showSuccess('Entry saved');
+      showSuccess('Slot saved and marked closed');
     } catch (err) {
       showError(getErrorMessage(err));
     } finally {
@@ -116,38 +122,50 @@ const TopicTrackerSpreadsheet = ({
 
   const toggleStatus = async (row, index) => {
     if (!canCloseEntries) return;
-    const nextStatus = row.trackerStatus === 'closed' ? 'pending' : 'closed';
-    setSavingKey(`${row.scheduleId}-${row.date}`);
-    try {
-      if (row.entryId) {
-        const saved = await updateTopicTrackerStatus(row.entryId, nextStatus);
+
+    if (row.trackerStatus === 'closed') {
+      if (!row.entryId) {
         setSessions((prev) => prev.map((item, i) => (i === index ? {
           ...item,
-          trackerStatus: saved.trackerStatus,
+          trackerStatus: 'pending',
         } : item)));
-      } else {
-        const saved = await upsertTopicTrackerEntry({
-          scheduleId: row.scheduleId,
-          date: row.date,
-          topicModuleCovered: row.topicModuleCovered,
-          trackerStatus: nextStatus,
-        });
-        setSessions((prev) => prev.map((item, i) => (i === index ? {
-          ...item,
-          entryId: saved._id,
-          trackerStatus: saved.trackerStatus,
-        } : item)));
+        return;
       }
-      showSuccess(`Marked as ${TOPIC_TRACKER_STATUS_LABELS[nextStatus]}`);
-    } catch (err) {
-      showError(getErrorMessage(err));
-    } finally {
-      setSavingKey('');
+
+      const key = `${row.scheduleId}-${row.date}`;
+      setSavingKey(key);
+      try {
+        const saved = await updateTopicTrackerStatus(row.entryId, 'pending');
+        setSessions((prev) => prev.map((item, i) => (i === index ? {
+          ...item,
+          trackerStatus: saved.trackerStatus,
+        } : item)));
+      } catch (err) {
+        showError(getErrorMessage(err));
+      } finally {
+        setSavingKey('');
+      }
+      return;
     }
+
+    if (!row.topicModuleCovered?.trim()) {
+      showError('Select a topic before marking this slot as closed.');
+      return;
+    }
+
+    if (!row.sessionStatus?.trim()) {
+      showError('Select a session status before marking this slot as closed.');
+      return;
+    }
+
+    await saveClosedRow(row, index);
   };
 
   const renderCell = (row, column, index) => {
     const value = row[column.key] ?? '';
+    const rowKey = `${row.scheduleId}-${row.date}`;
+    const isClosed = row.trackerStatus === 'closed';
+    const isSaving = savingKey === rowKey;
 
     if (column.key === 'trackerStatus') {
       return (
@@ -155,11 +173,35 @@ const TopicTrackerSpreadsheet = ({
           type="button"
           className={`badge border-0 ${getTopicTrackerStatusBadgeClass(row.trackerStatus)}`}
           onClick={() => toggleStatus(row, index)}
-          disabled={!canCloseEntries || savingKey === `${row.scheduleId}-${row.date}`}
-          title={canCloseEntries ? 'Click to toggle pending/closed' : 'Status'}
+          disabled={!canCloseEntries || isSaving}
+          title={canCloseEntries ? (isClosed ? 'Reopen for editing' : 'Save and mark closed') : 'Status'}
         >
-          {TOPIC_TRACKER_STATUS_LABELS[row.trackerStatus] || 'Pending'}
+          {isSaving ? 'Saving...' : (TOPIC_TRACKER_STATUS_LABELS[row.trackerStatus] || 'Pending')}
         </button>
+      );
+    }
+
+    if (column.key === 'sessionStatus') {
+      const valueNotInList = value && !SESSION_STATUS_VALUES.includes(value);
+
+      return (
+        <select
+          className="form-select form-select-sm topic-tracker-cell-input"
+          value={value}
+          onChange={(e) => updateRow(index, column.key, e.target.value)}
+          disabled={isClosed || isSaving}
+          aria-label="Session Status"
+        >
+          <option value="">Select status...</option>
+          {valueNotInList && (
+            <option value={value}>{value}</option>
+          )}
+          {SESSION_STATUS_VALUES.map((status) => (
+            <option key={status} value={status}>
+              {SESSION_STATUS_LABELS[status]}
+            </option>
+          ))}
+        </select>
       );
     }
 
@@ -171,12 +213,8 @@ const TopicTrackerSpreadsheet = ({
         <select
           className="form-select form-select-sm topic-tracker-cell-input topic-tracker-topic-select"
           value={value}
-          onChange={(e) => {
-            const newValue = e.target.value;
-            updateRow(index, column.key, newValue);
-            saveRow({ ...row, topicModuleCovered: newValue }, index);
-          }}
-          disabled={savingKey === `${row.scheduleId}-${row.date}`}
+          onChange={(e) => updateRow(index, column.key, e.target.value)}
+          disabled={isClosed || isSaving}
           aria-label="Topic / Module Covered"
         >
           <option value="">Select topic...</option>
@@ -203,8 +241,7 @@ const TopicTrackerSpreadsheet = ({
         value={value}
         min={inputType === 'number' ? 0 : undefined}
         onChange={(e) => updateRow(index, column.key, e.target.value)}
-        onBlur={() => saveRow(row, index)}
-        disabled={savingKey === `${row.scheduleId}-${row.date}`}
+        disabled={isClosed || isSaving}
       />
     );
   };
@@ -251,7 +288,7 @@ const TopicTrackerSpreadsheet = ({
       </div>
       <div className="toms-modal-footer">
         <p className="small text-muted mb-0 me-auto">
-          Changes save when you leave a cell or select a topic. Click tracker status to mark pending or closed.
+          Fill the row, then click tracker status to save and mark closed. Reopen to edit again.
         </p>
         <button type="button" className="btn btn-secondary" onClick={onClose}>
           Close

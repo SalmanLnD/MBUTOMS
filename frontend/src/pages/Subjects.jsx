@@ -98,16 +98,26 @@ const Subjects = () => {
 
   const handleResourceSave = async (url) => {
     if (!resourceModal || !selectedSubject) return;
-    const payload = resourceModal.type === 'syllabus'
-      ? { syllabusUrl: url }
-      : { choUrl: url };
-    const updated = await updateSubjectResources(selectedSubject._id, payload);
+    const resourceFieldByType = {
+      syllabus: 'syllabusUrl',
+      cho: 'choUrl',
+      practicePortal: 'practicePortalUrl',
+    };
+    const resourceLabelByType = {
+      syllabus: 'Syllabus',
+      cho: 'CHO',
+      practicePortal: 'Practice Portal',
+    };
+    const field = resourceFieldByType[resourceModal.type];
+    if (!field) return;
+
+    const updated = await updateSubjectResources(selectedSubject._id, { [field]: url });
     setSelectedSubject(updated);
     setEditingSubject((current) => (current?._id === updated._id ? updated : current));
     setSubjects((current) => current.map((subject) => (
       subject._id === updated._id ? updated : subject
     )));
-    showSuccess(`${resourceModal.type === 'syllabus' ? 'Syllabus' : 'CHO'} link saved`);
+    showSuccess(`${resourceLabelByType[resourceModal.type]} link saved`);
   };
 
   const handleRowSelect = (subject) => {
@@ -131,6 +141,7 @@ const Subjects = () => {
 
     const hasSyllabus = Boolean(selectedSubject.syllabusUrl?.trim());
     const hasCho = Boolean(selectedSubject.choUrl?.trim());
+    const hasPracticePortal = Boolean(selectedSubject.practicePortalUrl?.trim());
 
     if (canManage) {
       return (
@@ -151,6 +162,13 @@ const Subjects = () => {
           >
             {hasCho ? 'Update CHO' : 'Add CHO'}
           </button>
+          <button
+            type="button"
+            className="btn btn-outline-primary btn-sm"
+            onClick={() => setResourceModal({ type: 'practicePortal' })}
+          >
+            {hasPracticePortal ? 'Update Practice Portal' : 'Add Practice Portal'}
+          </button>
           {hasSyllabus && (
             <button
               type="button"
@@ -167,6 +185,15 @@ const Subjects = () => {
               onClick={() => openExternalLink(selectedSubject.choUrl)}
             >
               Open CHO
+            </button>
+          )}
+          {hasPracticePortal && (
+            <button
+              type="button"
+              className="btn btn-primary btn-sm"
+              onClick={() => openExternalLink(selectedSubject.practicePortalUrl)}
+            >
+              Open Practice Portal
             </button>
           )}
           </div>
@@ -193,6 +220,14 @@ const Subjects = () => {
           onClick={() => hasCho && openExternalLink(selectedSubject.choUrl)}
         >
           CHO
+        </button>
+        <button
+          type="button"
+          className="btn btn-primary btn-sm"
+          disabled={!hasPracticePortal}
+          onClick={() => hasPracticePortal && openExternalLink(selectedSubject.practicePortalUrl)}
+        >
+          Practice Portal
         </button>
         </div>
       </div>
@@ -225,8 +260,8 @@ const Subjects = () => {
           </div>
           <p className="text-muted small mb-3">
             {canManage
-              ? 'Click a subject row to view details, or use Edit to manage syllabus and CHO links.'
-              : 'Click a subject row to view details and open syllabus or CHO files.'}
+              ? 'Click a subject row to view details, or use Edit to manage syllabus, CHO, and practice portal links.'
+              : 'Click a subject row to view details and open syllabus, CHO, or practice portal links.'}
           </p>
 
           {loading ? (
@@ -372,8 +407,35 @@ const Subjects = () => {
       {resourceModal && selectedSubject && canManage && (
         <SubjectResourceLinkModal
           show
-          title={resourceModal.type === 'syllabus' ? 'Add Syllabus Link' : 'Add CHO Link'}
-          initialUrl={resourceModal.type === 'syllabus' ? selectedSubject.syllabusUrl : selectedSubject.choUrl}
+          title={
+            resourceModal.type === 'syllabus'
+              ? 'Add Syllabus Link'
+              : resourceModal.type === 'cho'
+                ? 'Add CHO Link'
+                : 'Add Practice Portal Link'
+          }
+          initialUrl={
+            resourceModal.type === 'syllabus'
+              ? selectedSubject.syllabusUrl
+              : resourceModal.type === 'cho'
+                ? selectedSubject.choUrl
+                : selectedSubject.practicePortalUrl
+          }
+          urlLabel={
+            resourceModal.type === 'practicePortal'
+              ? 'Practice portal URL'
+              : 'Google Drive open link'
+          }
+          urlPlaceholder={
+            resourceModal.type === 'practicePortal'
+              ? 'https://www.hackerrank.com/...'
+              : 'https://drive.google.com/...'
+          }
+          emptyError={
+            resourceModal.type === 'practicePortal'
+              ? 'Paste a practice portal URL.'
+              : 'Paste a Google Drive open link.'
+          }
           onClose={() => setResourceModal(null)}
           onSave={handleResourceSave}
         />

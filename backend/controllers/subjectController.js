@@ -90,6 +90,10 @@ const normalizeSubjectPayload = (body) => {
     payload.choUrl = trimOptionalUrl(payload.choUrl);
   }
 
+  if (payload.practicePortalUrl !== undefined) {
+    payload.practicePortalUrl = trimOptionalUrl(payload.practicePortalUrl);
+  }
+
   return payload;
 };
 
@@ -293,12 +297,15 @@ export const updateSubjectResources = async (req, res) => {
   const subject = await Subject.findById(req.params.id);
   if (!subject) return res.status(404).json({ message: 'Subject not found' });
 
-  const { syllabusUrl, choUrl } = req.body;
+  const { syllabusUrl, choUrl, practicePortalUrl } = req.body;
   if (syllabusUrl !== undefined) {
     subject.syllabusUrl = trimOptionalUrl(syllabusUrl);
   }
   if (choUrl !== undefined) {
     subject.choUrl = trimOptionalUrl(choUrl);
+  }
+  if (practicePortalUrl !== undefined) {
+    subject.practicePortalUrl = trimOptionalUrl(practicePortalUrl);
   }
 
   await subject.save();
