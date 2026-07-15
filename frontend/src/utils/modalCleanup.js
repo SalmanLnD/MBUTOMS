@@ -7,17 +7,24 @@ export const cleanupBootstrapArtifacts = () => {
   document.querySelectorAll('.modal-backdrop').forEach((el) => el.remove());
 };
 
-/** Remove leftover modal artifacts when no custom modal is open. */
+/**
+ * Clear body lock when no TOMS modal is tracked as open.
+ * Does not remove React portal overlays — those unmount via React.
+ */
 export const cleanupModalArtifacts = () => {
   cleanupBootstrapArtifacts();
 
   if (getOpenModalCount() === 0) {
     document.body.style.removeProperty('overflow');
-    document.querySelectorAll('.toms-modal-overlay').forEach((el) => el.remove());
   }
 };
 
-/** Hard reset when navigation or recovery is needed. */
+/** Reset scroll lock / Bootstrap state. Safe during logout and route changes. */
 export const resetAllModalArtifacts = () => {
   forceResetModalState();
+};
+
+/** Boot/HMR only: purge orphan overlays before React owns the tree. */
+export const purgeModalOverlaysOnBoot = () => {
+  forceResetModalState({ purgeOverlays: true });
 };

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useLayoutEffect, useState } from 'react';
+import { useCallback, useLayoutEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Modal from './Modal.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
@@ -7,7 +7,6 @@ import {
   registerSessionExpiredHandler,
   resetSessionExpiredState,
 } from '../utils/sessionManager.js';
-import { resetAllModalArtifacts } from '../utils/modalCleanup.js';
 
 const SessionExpiredModal = () => {
   const [expired, setExpired] = useState(null);
@@ -23,10 +22,10 @@ const SessionExpiredModal = () => {
 
   const handleSignInAgain = useCallback(() => {
     const message = expired?.message;
-    logout();
-    resetSessionExpiredState();
+    // Unmount this modal via React first; logout only resets body scroll (not portals).
     setExpired(null);
-    resetAllModalArtifacts();
+    resetSessionExpiredState();
+    logout();
     navigate('/timetable', { replace: true });
     openLoginModal({
       message: message || 'Your session has expired. Please sign in again to continue with your updated access.',
