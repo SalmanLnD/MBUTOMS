@@ -1,0 +1,9 @@
+{
+  "commands": [
+    "date -u",
+    "echo NODE=$(pgrep -c -f 'node /opt/MBUTOMS/whatsapp-bridge/index.js' || echo 0)",
+    "sudo -u ubuntu bash -lc 'pm2 jlist' | node -e \"let d='';process.stdin.on('data',c=>d+=c);process.stdin.on('end',()=>{const j=JSON.parse(d||'[]');const p=j.find(x=>x.name==='mbutoms-whatsapp-bridge');console.log('status='+(p&&p.pm2_env&&p.pm2_env.status));console.log('uptime='+(p?Math.floor((Date.now()-p.pm2_env.pm_uptime)/1000):-1));});\"",
+    "python3 - <<'PY'\nfrom pathlib import Path\np=Path('/home/ubuntu/.pm2/logs/mbutoms-whatsapp-bridge-out-0.log')\nlines=p.read_text(errors='ignore').splitlines()\nprint('N', len(lines))\nfor ln in lines[-25:]:\n    print(ln.encode('ascii','ignore').decode())\nPY",
+    "free -m | head -2 | tr -cd '\\11\\12\\15\\40-\\176'"
+  ]
+}

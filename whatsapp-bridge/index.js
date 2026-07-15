@@ -136,6 +136,7 @@ let bridgeReady = false;
 let reconnecting = false;
 let reconnectTimer = null;
 let watchdogTimer = null;
+let punchPollTimer = null;
 let readyTimeout = null;
 let reconnectAttempt = 0;
 let lastTargetGroupActivityAt = null;
@@ -143,7 +144,7 @@ let lastReadyAt = 0;
 let bridgeStartedAt = Date.now();
 let shuttingDown = false;
 
-const READY_TIMEOUT_MS = Number(process.env.READY_TIMEOUT_MS) || 120000;
+const READY_TIMEOUT_MS = Number(process.env.READY_TIMEOUT_MS) || 180000;
 
 const clearReadyTimeout = () => {
   if (readyTimeout) {
@@ -292,6 +293,8 @@ const shutdownBridge = async () => {
   shuttingDown = true;
   if (reconnectTimer) clearTimeout(reconnectTimer);
   if (watchdogTimer) clearInterval(watchdogTimer);
+  if (punchPollTimer) clearInterval(punchPollTimer);
+  clearReadyTimeout();
   if (client) {
     try {
       await client.destroy();
@@ -490,8 +493,11 @@ const wireClient = (activeClient) => {
     if (processedMessageIds.has(messageId) || inFlightMessageIds.has(messageId)) return;
 
     try {
-      const chat = await message.getChat();
-      if (!isTargetGroup(chat)) return;
+      let inTargetGroup = isTargetGroupMessage(message);
+      if (!inTargetGroup && GROUP_NAME && !GROUP_ID) {
+        inTargetGroup = await resolveTargetChatName(message);
+      }
+      if (!inTargetGroup) return;
 
       touchTargetGroupActivity();
 
@@ -540,113 +546,311 @@ const wireClient = (activeClient) => {
     }
   };
 
-  const catchUpRecentGroupMessages = async () => {
-    if (!GROUP_ID) return;
+  const patchWhatsAppStoreApis = async () => {
+    if (!activeClient.pupPage) return;
     try {
-      // WhatsApp store is often not fully warm immediately after ready.
-      await sleep(12000);
-      try {
-        const state = await activeClient.getState();
-        log(`Catch-up: WhatsApp state=${state}`);
-      } catch (error) {
-        log(`Catch-up: getState failed: ${error?.message || error}`);
-      }
+      const result = await activeClient.pupPage.evaluate(() => {
+        const collections = window.require?.('WAWebCollections');
+        if (!collections) return 'no-collections';
 
-      // Opening the punch group forces the message store to hydrate.
-      if (typeof activeClient.interface?.openChatWindow === 'function') {
-        try {
-          await activeClient.interface.openChatWindow(GROUP_ID);
-          await sleep(5000);
-          log('Catch-up: opened punch group chat window');
-        } catch (error) {
-          log(`Catch-up: openChatWindow failed: ${error?.message || error}`);
+        const ensureUpdateSafe = (bucketName, altName) => {
+          const bucket = collections[bucketName] || collections[altName];
+          if (!bucket) {
+            collections[bucketName] = { update: async () => null };
+            return `${bucketName}:stubbed`;
+          }
+          if (typeof bucket.update !== 'function') {
+            bucket.update = async () => null;
+            return `${bucketName}:added-update`;
+          }
+          const original = bucket.update.bind(bucket);
+          bucket.update = async (...args) => {
+            try {
+              return await original(...args);
+            } catch {
+              return null;
+            }
+          };
+          return `${bucketName}:wrapped`;
+        };
+
+        const parts = [
+          ensureUpdateSafe('GroupMetadata', 'WAWebGroupMetadataCollection'),
+          ensureUpdateSafe('NewsletterMetadataCollection', 'WAWebNewsletterMetadataCollection'),
+        ];
+
+        // Harden library helper if it already injected.
+        if (window.WWebJS?.getChatModel) {
+          const originalGetChatModel = window.WWebJS.getChatModel.bind(window.WWebJS);
+          window.WWebJS.getChatModel = async (chat, opts = {}) => {
+            try {
+              return await originalGetChatModel(chat, opts);
+            } catch (error) {
+              if (!chat) return null;
+              try {
+                const model = chat.serialize();
+                model.isGroup = Boolean(chat.groupMetadata);
+                model.formattedTitle = chat.formattedTitle;
+                model.groupMetadata = chat.groupMetadata?.serialize?.() || null;
+                model.lastMessage = null;
+                delete model.msgs;
+                return model;
+              } catch {
+                throw error;
+              }
+            }
+          };
+          parts.push('getChatModel:wrapped');
         }
-      }
+
+        return parts.join(',');
+      });
+      log(`Store API patch: ${result}`);
+    } catch (error) {
+      log(`Store API patch failed: ${error?.message || error}`);
+    }
+  };
+
+  const scrapeGroupMediaMessages = async (cutoffMs) => {
+    if (!activeClient.pupPage || !GROUP_ID) {
+      return { error: 'no-page-or-group', messages: [] };
+    }
+
+    return activeClient.pupPage.evaluate(async (groupId, cutoffSec, limit) => {
+      const tryUser = (widLike) => {
+        if (!widLike) return '';
+        if (typeof widLike === 'object' && widLike.user) return String(widLike.user);
+        if (typeof widLike === 'string') return widLike.split('@')[0];
+        return '';
+      };
+
+      const collections = window.require('WAWebCollections');
+      const widFactory = window.require('WAWebWidFactory');
+      const toPn = window.require('WAWebLidMigrationUtils')?.toPn;
+      const wid = widFactory.createWid(groupId);
 
       let chat = null;
       try {
-        chat = await withRetries('catchup-getChatById', () => activeClient.getChatById(GROUP_ID), {
-          attempts: 4,
-          delayMs: 8000,
-        });
-      } catch (error) {
-        log(`catchup-getChatById failed: ${error?.message || error}. Falling back to getChats.`);
+        chat = collections.Chat?.get?.(wid) || collections.Chat?.get?.(groupId) || null;
+      } catch {
+        chat = null;
+      }
+
+      if (!chat) {
+        const models = collections.Chat?.getModelsArray?.()
+          || Object.values(collections.Chat?._models || {})
+          || [];
+        chat = models.find((item) => item?.id?._serialized === groupId) || null;
       }
 
       if (!chat) {
         try {
-          const chats = await withRetries('catchup-getChats', () => activeClient.getChats(), {
-            attempts: 3,
-            delayMs: 8000,
-          });
-          chat = chats.find((item) => item.id?._serialized === GROUP_ID) || null;
-        } catch (error) {
-          log(`catchup-getChats failed: ${error?.message || error}`);
-        }
-      }
-
-      if (!chat && activeClient.pupPage) {
-        log('Catch-up: trying Store.Chat via puppeteer evaluate');
-        const serialized = await activeClient.pupPage.evaluate(async (groupId, limit) => {
-          const chat = window.Store?.Chat?.get(groupId) || window.Store?.Chat?.find?.((c) => c.id?._serialized === groupId);
-          if (!chat) return { error: 'chat-not-in-store' };
-          const msgs = chat.msgs?.getModelsArray?.() || [];
-          return {
-            count: msgs.length,
-            messages: msgs.slice(-limit).map((msg) => ({
-              id: msg.id?._serialized,
-              timestamp: msg.t,
-              hasMedia: Boolean(msg.mediaData || msg.type === 'image' || msg.type === 'document' || msg.type === 'video'),
-              body: msg.body || msg.caption || '',
-              author: msg.author?._serialized || msg.author || '',
-              from: msg.from?._serialized || msg.from || '',
-              type: msg.type,
-            })),
-          };
-        }, GROUP_ID, catchupMessageLimit);
-
-        if (serialized?.error) {
-          log(`Catch-up Store lookup failed: ${serialized.error}`);
-        } else if (serialized?.messages?.length) {
-          log(`Catch-up: Store returned ${serialized.messages.length} messages (raw=${serialized.count})`);
-          const cutoffMs = Date.now() - catchupLookbackMs;
-          for (const raw of serialized.messages) {
-            if ((raw.timestamp || 0) * 1000 < cutoffMs) continue;
-            if (!raw.hasMedia) continue;
-            // Re-fetch as a real Message model when possible.
-            try {
-              const message = await activeClient.getMessageById(raw.id);
-              if (message) {
-                await handleMessage(message, { fromCatchUp: true });
-              }
-            } catch (error) {
-              log(`Catch-up getMessageById failed for ${raw.id}: ${error?.message || error}`);
-            }
-          }
-          log('Catch-up complete via Store fallback');
-          return;
+          const findChat = window.require('WAWebFindChatAction')?.findChat;
+          if (findChat) chat = await findChat(wid);
+        } catch {
+          // ignore
         }
       }
 
       if (!chat) {
-        log(`Catch-up aborted: group ${GROUP_ID} not found`);
+        try {
+          const query = window.require('WAWebChatGetters');
+          // no-op probe; keep for future WA builds
+          void query;
+        } catch {
+          // ignore
+        }
+      }
+
+      if (!chat) {
+        const sampleIds = (collections.Chat?.getModelsArray?.() || [])
+          .slice(0, 40)
+          .map((item) => item?.id?._serialized)
+          .filter(Boolean);
+        return {
+          error: 'not-found',
+          sampleIds,
+          chatCount: sampleIds.length,
+          messages: [],
+        };
+      }
+
+      try {
+        const Cmd = window.require('WAWebCmd')?.Cmd;
+        if (Cmd?.openChatBottom) await Cmd.openChatBottom(chat);
+        else if (Cmd?.openChatAt) await Cmd.openChatAt({ chat, msgContext: null });
+      } catch {
+        // ignore open failures
+      }
+
+      try {
+        const loader = window.require('WAWebChatLoadMessagesMsgAction')
+          || window.require('WAWebChatLoadMessages')
+          || window.Store?.ConversationMsgs;
+        for (let i = 0; i < 6; i += 1) {
+          if (loader?.loadEarlierMsgs) {
+            // eslint-disable-next-line no-await-in-loop
+            await loader.loadEarlierMsgs(chat);
+          } else if (typeof chat.loadEarlierMsgs === 'function') {
+            // eslint-disable-next-line no-await-in-loop
+            await chat.loadEarlierMsgs();
+          } else {
+            break;
+          }
+        }
+      } catch {
+        // ignore history load failures
+      }
+
+      const mediaTypes = new Set(['image', 'video', 'document', 'sticker', 'ptt', 'audio']);
+      const msgs = chat.msgs?.getModelsArray?.() || [];
+      const ownUser = window.Store?.Conn?.wid?.user
+        || window.require?.('WAWebUserPrefsMeUser')?.getMaybeMePnUser?.()?.user
+        || '';
+
+      const rows = [];
+      for (const msg of msgs) {
+        if (!msg?.t || msg.t < cutoffSec) continue;
+        const type = msg.type || '';
+        const hasMedia = mediaTypes.has(type) || Boolean(msg.mediaData);
+        const body = msg.caption || msg.body || '';
+        let author = '';
+        if (msg.author) author = msg.author._serialized || String(msg.author);
+        else if (msg.id?.fromMe) author = 'fromMe';
+        else if (msg.sender) author = msg.sender._serialized || String(msg.sender);
+
+        let phone = '';
+        try {
+          if (author === 'fromMe') {
+            phone = ownUser;
+          } else if (author) {
+            const authorWid = widFactory.createWid(author);
+            const contact = await collections.Contact.find(authorWid);
+            phone = tryUser(contact?.phoneNumber)
+              || tryUser(contact?.id)
+              || tryUser(toPn?.(authorWid));
+          }
+        } catch {
+          // ignore contact resolution failures
+        }
+
+        rows.push({
+          id: msg.id?._serialized || '',
+          timestamp: msg.t,
+          hasMedia,
+          body,
+          author,
+          phone: String(phone || '').replace(/\D/g, ''),
+          type,
+        });
+      }
+
+      rows.sort((a, b) => a.timestamp - b.timestamp);
+      return {
+        chatId: chat.id?._serialized || groupId,
+        msgCount: msgs.length,
+        messages: rows.slice(-limit),
+      };
+    }, GROUP_ID, Math.floor(cutoffMs / 1000), catchupMessageLimit);
+  };
+
+  const processScrapedPunch = async (raw, { fromCatchUp = false } = {}) => {
+    if (!raw?.id || processedMessageIds.has(raw.id) || inFlightMessageIds.has(raw.id)) return false;
+    if (!raw.hasMedia) return false;
+
+    inFlightMessageIds.add(raw.id);
+    try {
+      let phone = digitsOnly(raw.phone || '');
+      if (!isLikelyPhoneUserId(phone) && raw.author && raw.author !== 'fromMe') {
+        phone = await resolvePhoneFromLid(raw.author);
+      }
+      if (!isLikelyPhoneUserId(phone) && raw.author === 'fromMe') {
+        phone = digitsOnly(activeClient.info?.wid?.user || '');
+      }
+      if (!isLikelyPhoneUserId(phone)) {
+        log(`Could not resolve sender phone (author=${raw.author || 'unknown'}), skipping`);
+        return false;
+      }
+
+      const oifNumber = extractOifFromText(raw.body);
+      if (!oifNumber) {
+        log(`No OIF found in message from ${phone}, skipping`);
+        return false;
+      }
+
+      const punchInAt = new Date((raw.timestamp || 0) * 1000).toISOString();
+      log(`${fromCatchUp ? 'Catch-up forwarding' : 'Poll forwarding'} punch-in from ${phone}, OIF ${oifNumber}`);
+      const data = await forwardPunchIn({ phone, oifNumber, punchInAt });
+      rememberProcessedMessageId(raw.id);
+      touchTargetGroupActivity();
+      log(`Recorded: ${data?.trainer?.name || phone} | OIF ${oifNumber} | ${punchInAt}`);
+      return true;
+    } catch (error) {
+      const status = error.response?.status;
+      const detail = error.response?.data?.message || error.message;
+      log(`Failed to forward punch-in (${status || 'no response'}): ${detail}`);
+      return false;
+    } finally {
+      inFlightMessageIds.delete(raw.id);
+    }
+  };
+
+  const syncGroupPunches = async (label = 'Sync') => {
+    if (!GROUP_ID || !bridgeReady || !activeClient?.pupPage) return;
+    const cutoffMs = Date.now() - catchupLookbackMs;
+    try {
+      const scraped = await scrapeGroupMediaMessages(cutoffMs);
+      if (scraped?.error) {
+        log(`${label}: store scrape error=${scraped.error} chats=${scraped.chatCount || 0}`);
+        if (scraped.sampleIds?.length) {
+          log(`${label}: sample chat ids: ${scraped.sampleIds.slice(0, 8).join(', ')}`);
+        }
         return;
       }
 
-      const messages = await chat.fetchMessages({ limit: catchupMessageLimit });
-      const cutoffMs = Date.now() - catchupLookbackMs;
-      const recent = messages.filter((message) => (message.timestamp || 0) * 1000 >= cutoffMs);
-      log(`Catch-up: scanning ${recent.length}/${messages.length} recent group messages (last ${CATCHUP_LOOKBACK_HOURS}h)`);
+      const recent = (scraped.messages || []).filter((row) => (row.timestamp || 0) * 1000 >= cutoffMs);
+      log(`${label}: scanned ${recent.length}/${scraped.msgCount || 0} group messages`);
       let forwarded = 0;
-      for (const message of recent) {
-        const before = processedMessageIds.size;
-        await handleMessage(message, { fromCatchUp: true });
-        if (processedMessageIds.size > before) forwarded += 1;
+      for (const row of recent) {
+        // eslint-disable-next-line no-await-in-loop
+        if (await processScrapedPunch(row, { fromCatchUp: true })) forwarded += 1;
       }
-      log(`Catch-up complete (recorded/updated ${forwarded} media punch messages)`);
+      log(`${label}: recorded/updated ${forwarded} media punch messages`);
     } catch (error) {
-      log('Catch-up failed:', error?.message || String(error));
+      log(`${label} failed: ${error?.message || error}`);
     }
+  };
+
+  let punchPollTimer = null;
+  const startPunchPoller = () => {
+    if (punchPollTimer) clearInterval(punchPollTimer);
+    punchPollTimer = setInterval(() => {
+      if (!bridgeReady || reconnecting || shuttingDown) return;
+      syncGroupPunches('Poll').catch((error) => log('Poll error:', error.message));
+    }, 45000);
+  };
+
+  const catchUpRecentGroupMessages = async () => {
+    if (!GROUP_ID) return;
+    await sleep(8000);
+    try {
+      const state = await activeClient.getState();
+      log(`Catch-up: WhatsApp state=${state}`);
+    } catch (error) {
+      log(`Catch-up: getState failed: ${error?.message || error}`);
+    }
+
+    if (typeof activeClient.interface?.openChatWindow === 'function') {
+      try {
+        await activeClient.interface.openChatWindow(GROUP_ID);
+        await sleep(4000);
+        log('Catch-up: opened punch group chat window');
+      } catch (error) {
+        log(`Catch-up: openChatWindow failed: ${error?.message || error}`);
+      }
+    }
+
+    await syncGroupPunches('Catch-up');
   };
 
   activeClient.on('ready', async () => {
@@ -661,6 +865,7 @@ const wireClient = (activeClient) => {
       try {
         log('Fetching groups (this can take up to a minute on first connect)...');
         await sleep(8000);
+        await patchWhatsAppStoreApis();
 
         if (VERIFY_GROUP_ID) {
           const chat = await withRetries('getChatById', () => activeClient.getChatById(VERIFY_GROUP_ID), {
@@ -718,16 +923,22 @@ const wireClient = (activeClient) => {
       log(`Linked WhatsApp number: ${linkedPhone}`);
     }
 
+    await patchWhatsAppStoreApis();
+    startPunchPoller();
     await catchUpRecentGroupMessages();
   });
 
   activeClient.on('message', (message) => {
+    if (GROUP_ID && (message.from === GROUP_ID || message.to === GROUP_ID)) {
+      log(`Live group event media=${Boolean(message.hasMedia)} from=${message.from} author=${message.author || ''}`);
+    }
     handleMessage(message).catch((error) => log('Message handler error:', error.message));
   });
   activeClient.on('message_create', (message) => {
-    if (message.fromMe) {
-      handleMessage(message).catch((error) => log('Message handler error:', error.message));
+    if (GROUP_ID && (message.from === GROUP_ID || message.to === GROUP_ID)) {
+      log(`Live create event media=${Boolean(message.hasMedia)} fromMe=${Boolean(message.fromMe)} author=${message.author || ''}`);
     }
+    handleMessage(message).catch((error) => log('Message handler error:', error.message));
   });
 };
 
