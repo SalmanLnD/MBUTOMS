@@ -324,11 +324,25 @@ const wireClient = (activeClient) => {
     scheduleReconnect(`disconnected:${reason}`);
   });
 
-  const isTargetGroup = (chat) => {
-    if (!chat?.isGroup) return false;
-    if (GROUP_ID) return chat.id._serialized === GROUP_ID;
-    if (GROUP_NAME) return chat.name === GROUP_NAME;
+  const isTargetGroupMessage = (message) => {
+    if (!GROUP_ID && !GROUP_NAME) return false;
+    const chatId = message.from?.endsWith?.('@g.us')
+      ? message.from
+      : message.to?.endsWith?.('@g.us')
+        ? message.to
+        : '';
+    if (GROUP_ID) return chatId === GROUP_ID;
     return false;
+  };
+
+  const resolveTargetChatName = async (message) => {
+    if (!GROUP_NAME) return false;
+    try {
+      const chat = await message.getChat();
+      return Boolean(chat?.isGroup && chat.name === GROUP_NAME);
+    } catch {
+      return false;
+    }
   };
 
   const extractOifFromText = (text) => {
