@@ -158,10 +158,48 @@ const armReadyTimeout = () => {
   readyTimeout = setTimeout(() => {
     readyTimeout = null;
     if (!bridgeReady && !shuttingDown && !reconnecting) {
-      log(`Ready timeout after ${Math.round(READY_TIMEOUT_MS / 1000)}s — forcing reconnect`);
-      scheduleReconnect('ready-timeout');
+      log(`Ready timeout after ${Math.round(READY_TIMEOUT_MS / 1000)}s — checking if Store is usable`);
+      forceActivateIfStoreReady('ready-timeout-store-check')
+        .then((activated) => {
+          if (!activated && !bridgeReady && !shuttingDown && !reconnecting) {
+            log('Store not ready either — forcing reconnect');
+            scheduleReconnect('ready-timeout');
+          }
+        })
+        .catch((error) => {
+          log(`Store check failed: ${error.message}`);
+          scheduleReconnect('ready-timeout');
+        });
     }
   }, READY_TIMEOUT_MS);
+};
+
+let activateBridgeFn = null;
+const forceActivateIfStoreReady = async (reason) => {
+  if (bridgeReady || shuttingDown || !client?.pupPage || typeof activateBridgeFn !== 'function') {
+    return false;
+  }
+  const probe = await client.pupPage.evaluate(() => {
+    try {
+      const collections = window.require?.('WAWebCollections');
+      const chatCount = collections?.Chat?.getModelsArray?.()?.length || 0;
+      return {
+        hasRequire: typeof window.require === 'function',
+        hasCollections: Boolean(collections),
+        chatCount,
+        hasWWebJS: Boolean(window.WWebJS),
+      };
+    } catch (error) {
+      return { error: String(error?.message || error) };
+    }
+  });
+  log(`Store probe (${reason}): ${JSON.stringify(probe)}`);
+  if (probe?.hasCollections || probe?.hasWWebJS || (probe?.chatCount || 0) > 0) {
+    log(`Forcing bridge activation (${reason})`);
+    await activateBridgeFn(reason);
+    return true;
+  }
+  return false;
 };
 
 const touchTargetGroupActivity = () => {
@@ -313,6 +351,12 @@ const wireClient = (activeClient) => {
   activeClient.on('authenticated', () => {
     log('WhatsApp authenticated');
     armReadyTimeout();
+  });
+  activeClient.on('loading_screen', (percent, message) => {
+    log(`Loading screen ${percent}% ${message || ''}`.trim());
+  });
+  activeClient.on('change_state', (state) => {
+    log(`WhatsApp state changed: ${state}`);
   });
   activeClient.on('auth_failure', (msg) => {
     log('Auth failure:', msg);
@@ -821,13 +865,15 @@ const wireClient = (activeClient) => {
     }
   };
 
-  let punchPollTimer = null;
+  let localPunchPollTimer = null;
   const startPunchPoller = () => {
     if (punchPollTimer) clearInterval(punchPollTimer);
+    if (localPunchPollTimer) clearInterval(localPunchPollTimer);
     punchPollTimer = setInterval(() => {
       if (!bridgeReady || reconnecting || shuttingDown) return;
       syncGroupPunches('Poll').catch((error) => log('Poll error:', error.message));
     }, 45000);
+    localPunchPollTimer = punchPollTimer;
   };
 
   const catchUpRecentGroupMessages = async () => {
@@ -853,15 +899,44 @@ const wireClient = (activeClient) => {
     await syncGroupPunches('Catch-up');
   };
 
-  activeClient.on('ready', async () => {
+  const activateBridge = async (reason = 'ready') => {
+    if (ONE_SHOT_MODE) return;
+    if (bridgeReady) {
+      log(`Bridge already active, skip (${reason})`);
+      return;
+    }
+
     clearReadyTimeout();
-    log('Bridge is ready');
+    log(`Bridge is ready (${reason})`);
     bridgeReady = true;
     reconnectAttempt = 0;
     lastReadyAt = Date.now();
     touchTargetGroupActivity();
 
+    if (GROUP_ID) {
+      log(`Listening to group id: ${GROUP_ID}`);
+    } else if (GROUP_NAME) {
+      log(`Listening to group name: ${GROUP_NAME}`);
+    } else {
+      log('WARNING: No GROUP_ID or GROUP_NAME set. Run "npm run list-groups" to find it. Ignoring all messages until set.');
+    }
+
+    const linkedPhone = activeClient.info?.wid?.user;
+    if (linkedPhone) {
+      log(`Linked WhatsApp number: ${linkedPhone}`);
+    }
+
+    await patchWhatsAppStoreApis();
+    startPunchPoller();
+    await catchUpRecentGroupMessages();
+  };
+  activateBridgeFn = activateBridge;
+
+  activeClient.on('ready', async () => {
     if (ONE_SHOT_MODE) {
+      clearReadyTimeout();
+      log('Bridge is ready');
+      bridgeReady = true;
       try {
         log('Fetching groups (this can take up to a minute on first connect)...');
         await sleep(8000);
@@ -910,22 +985,7 @@ const wireClient = (activeClient) => {
       return;
     }
 
-    if (GROUP_ID) {
-      log(`Listening to group id: ${GROUP_ID}`);
-    } else if (GROUP_NAME) {
-      log(`Listening to group name: ${GROUP_NAME}`);
-    } else {
-      log('WARNING: No GROUP_ID or GROUP_NAME set. Run "npm run list-groups" to find it. Ignoring all messages until set.');
-    }
-
-    const linkedPhone = activeClient.info?.wid?.user;
-    if (linkedPhone) {
-      log(`Linked WhatsApp number: ${linkedPhone}`);
-    }
-
-    await patchWhatsAppStoreApis();
-    startPunchPoller();
-    await catchUpRecentGroupMessages();
+    await activateBridge('ready-event');
   });
 
   activeClient.on('message', (message) => {

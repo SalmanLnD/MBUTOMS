@@ -2,7 +2,7 @@
   "commands": [
     "date -u",
     "sudo -u ubuntu bash -lc 'cd /opt/MBUTOMS && git fetch origin main && git reset --hard origin/main'",
-    "grep -n 'whatsapp-web.js' /opt/MBUTOMS/whatsapp-bridge/package.json | tr -cd '\\11\\12\\15\\40-\\176'",
+    "grep -n 'github:wwebjs/whatsapp-web.js#main\\|forceActivateIfStoreReady\\|scrapeGroupMediaMessages' /opt/MBUTOMS/whatsapp-bridge/package.json /opt/MBUTOMS/whatsapp-bridge/index.js | head -10 | tr -cd '\\11\\12\\15\\40-\\176'",
     "sudo -u ubuntu bash -lc 'pm2 kill' || true",
     "sudo pkill -9 -f 'PM2' || true",
     "sudo pkill -9 -f '/opt/MBUTOMS/whatsapp-bridge/index.js' || true",
@@ -10,13 +10,13 @@
     "sudo pkill -9 -f 'chrome-linux64/chrome' || true",
     "sleep 5",
     "rm -f /opt/MBUTOMS/whatsapp-bridge/.wwebjs_auth/session/SingletonLock /opt/MBUTOMS/whatsapp-bridge/.wwebjs_auth/session/DevToolsActivePort /opt/MBUTOMS/whatsapp-bridge/.bridge-instance.lock",
-    "sudo -u ubuntu bash -lc 'cd /opt/MBUTOMS/whatsapp-bridge && npm install --omit=dev'",
-    "node -e \"console.log('wwjs='+require('/opt/MBUTOMS/whatsapp-bridge/node_modules/whatsapp-web.js/package.json').version)\"",
+    "sudo -u ubuntu bash -lc 'cd /opt/MBUTOMS/whatsapp-bridge && rm -rf node_modules/whatsapp-web.js && npm install --omit=dev'",
+    "node -e \"const p=require('/opt/MBUTOMS/whatsapp-bridge/node_modules/whatsapp-web.js/package.json'); console.log('wwjs='+p.version+' repo='+(p.repository&&p.repository.url));\"",
     "sudo -u ubuntu bash -lc 'cd /opt/MBUTOMS/whatsapp-bridge && pm2 start ecosystem.config.cjs && pm2 save'",
-    "sleep 20",
+    "sleep 25",
     "echo NODE=$(pgrep -c -f 'node /opt/MBUTOMS/whatsapp-bridge/index.js' || echo 0)",
-    "sleep 150",
-    "python3 - <<'PY'\nfrom pathlib import Path\np=Path('/home/ubuntu/.pm2/logs/mbutoms-whatsapp-bridge-out-0.log')\nlines=p.read_text(errors='ignore').splitlines()\nprint('N', len(lines))\nfor ln in lines[-40:]:\n    print(ln.encode('ascii','ignore').decode())\nPY",
+    "sleep 200",
+    "python3 - <<'PY'\nfrom pathlib import Path\np=Path('/home/ubuntu/.pm2/logs/mbutoms-whatsapp-bridge-out-0.log')\nlines=p.read_text(errors='ignore').splitlines()\nprint('N', len(lines))\nfor ln in lines[-50:]:\n    print(ln.encode('ascii','ignore').decode())\nPY",
     "echo FINAL_NODE=$(pgrep -c -f 'node /opt/MBUTOMS/whatsapp-bridge/index.js' || echo 0)"
   ]
 }

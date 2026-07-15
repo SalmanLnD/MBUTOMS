@@ -1,0 +1,8 @@
+{
+  "commands": [
+    "date -u",
+    "echo NODE=$(pgrep -c -f 'node /opt/MBUTOMS/whatsapp-bridge/index.js' || echo 0)",
+    "grep -n 'scrapeGroupMediaMessages\\|Store API patch\\|syncGroupPunches\\|Poll forwarding\\|Catch-up forwarding' /opt/MBUTOMS/whatsapp-bridge/index.js | head -8 | tr -cd '\\11\\12\\15\\40-\\176'",
+    "python3 - <<'PY'\nfrom pathlib import Path\np=Path('/home/ubuntu/.pm2/logs/mbutoms-whatsapp-bridge-out-0.log')\nlines=p.read_text(errors='ignore').splitlines()\nprint('N', len(lines))\nkeys=('Bridge is ready','Store API patch','Catch-up','Poll','Forwarding','Recorded','Live group','Live create','sample chat','scrape error','Listening')\nfor ln in lines[-60:]:\n    if any(k in ln for k in keys) or ln.startswith('2026-07-15T04:5') or ln.startswith('2026-07-15T05:'):\n        print(ln.encode('ascii','ignore').decode())\nprint('--- last 25 ---')\nfor ln in lines[-25:]:\n    print(ln.encode('ascii','ignore').decode())\nPY"
+  ]
+}
