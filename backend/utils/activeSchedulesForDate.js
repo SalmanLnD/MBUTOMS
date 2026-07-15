@@ -21,7 +21,7 @@ export async function filterSchedulesActiveOnDate(schedules, referenceDate = new
 }
 
 export async function getActiveSchedulesForDay(dayName, referenceDate = new Date()) {
-  const schedules = await Schedule.find({ day: dayName });
+  const schedules = await Schedule.find({ day: dayName }).lean();
   const active = await filterSchedulesActiveOnDate(schedules, referenceDate);
   return { schedules: active, count: active.length };
 }

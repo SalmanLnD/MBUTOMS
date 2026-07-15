@@ -297,7 +297,9 @@ export const getTrainerPunchInLogs = async (req, res) => {
           { name: { $regex: search, $options: 'i' } },
           { employeeId: { $regex: search, $options: 'i' } },
         ],
-      }).select('_id');
+      })
+        .select('_id')
+        .lean();
       const trainerIds = matchingTrainers.map((t) => t._id);
       if (trainerIds.length === 0) {
         return res.json({
@@ -321,11 +323,15 @@ export const getTrainerPunchInLogs = async (req, res) => {
 
   const [records, total] = await Promise.all([
     TrainerDailyAttendance.find(filter)
-      .populate('trainer', 'name employeeId department')
-      .populate('trainer.department', 'name code')
+      .populate({
+        path: 'trainer',
+        select: 'name employeeId department',
+        populate: { path: 'department', select: 'name code' },
+      })
       .sort({ punchInAt: -1 })
       .skip(skip)
-      .limit(limit),
+      .limit(limit)
+      .lean(),
     TrainerDailyAttendance.countDocuments(filter),
   ]);
 

@@ -30,52 +30,54 @@ export const getDashboardStats = async (req, res) => {
 
 
 
+  // Everything except the schedule enrichment is independent — run the whole
+  // set in one parallel batch instead of four sequential round trips.
+  const upcomingClassesPromise = getActiveSchedulesForDay(todayName, today).then(
+    (activeToday) =>
+      enrichSchedulesWithReplacementFor(
+        [...activeToday.schedules]
+          .sort((a, b) => a.startTime.localeCompare(b.startTime))
+          .slice(0, 5),
+        new Date()
+      ).then((upcomingClasses) => ({ activeToday, upcomingClasses }))
+  );
+
   const [
-
     totalTrainers,
-
     totalStudents,
-
     activeVenues,
-
     todaysLeaves,
-
     replacementLeaves,
-
-    activeToday,
-
+    attendanceAgg,
+    trainerPerformance,
+    { activeToday, upcomingClasses },
   ] = await Promise.all([
-
     Trainer.countDocuments(),
-
     Student.countDocuments({ status: 'active' }),
-
     Venue.countDocuments({ isActive: true }),
-
     Leave.countDocuments({
-
       status: 'approved',
-
       startDate: { $lte: tomorrow },
-
       endDate: { $gte: today },
-
     }),
-
     Leave.find({
-
       status: 'approved',
-
       replacementNeeded: true,
-
       endDate: { $gte: today },
-
       affectedSchedules: { $exists: true, $not: { $size: 0 } },
-
-    }).select('affectedSchedules replacements'),
-
-    getActiveSchedulesForDay(todayName, today),
-
+    })
+      .select('affectedSchedules replacements')
+      .lean(),
+    Attendance.aggregate([
+      { $match: { date: { $gte: today, $lt: tomorrow } } },
+      { $group: { _id: '$status', count: { $sum: 1 } } },
+    ]),
+    Trainer.find()
+      .select('name employeeId performanceScore weeklyWorkloadHours')
+      .sort({ performanceScore: -1 })
+      .limit(5)
+      .lean(),
+    upcomingClassesPromise,
   ]);
 
   const todaysClasses = activeToday.count;
@@ -92,48 +94,13 @@ export const getDashboardStats = async (req, res) => {
     return count + unassigned.length;
   }, 0);
 
-
-
-  const attendanceAgg = await Attendance.aggregate([
-
-    { $match: { date: { $gte: today, $lt: tomorrow } } },
-
-    { $group: { _id: '$status', count: { $sum: 1 } } },
-
-  ]);
-
-
-
   const attendanceSummary = { present: 0, absent: 0, late: 0, leave: 0, od: 0, holiday: 0 };
 
   attendanceAgg.forEach((s) => {
-
     if (s._id && attendanceSummary[s._id] !== undefined) {
-
       attendanceSummary[s._id] = s.count;
-
     }
-
   });
-
-
-
-  const trainerPerformance = await Trainer.find()
-
-    .select('name employeeId performanceScore weeklyWorkloadHours')
-
-    .sort({ performanceScore: -1 })
-
-    .limit(5);
-
-
-
-  const upcomingClasses = await enrichSchedulesWithReplacementFor(
-    [...activeToday.schedules]
-      .sort((a, b) => a.startTime.localeCompare(b.startTime))
-      .slice(0, 5),
-    new Date()
-  );
 
 
 

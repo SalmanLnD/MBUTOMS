@@ -67,7 +67,7 @@ const buildClassGroupMap = async () => {
 };
 
 const buildTrainerLookup = async () => {
-  const trainers = await Trainer.find().select('name employeeId scheduleTrainerCodes subjects');
+  const trainers = await Trainer.find().select('name employeeId scheduleTrainerCodes subjects').lean();
   const byCode = new Map();
   const byId = new Map();
   trainers.forEach((trainer) => {

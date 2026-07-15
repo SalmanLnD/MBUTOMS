@@ -26,6 +26,9 @@ const userSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
+// Roster filtering and notification fan-out query users by role + trainer.
+userSchema.index({ role: 1, trainer: 1 });
+
 userSchema.pre('save', async function (next) {
   if (!this.isModified('password')) return next();
   this.password = await bcrypt.hash(this.password, 10);

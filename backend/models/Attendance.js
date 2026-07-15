@@ -24,6 +24,8 @@ const attendanceSchema = new mongoose.Schema(
 
 attendanceSchema.index({ type: 1, date: 1, trainer: 1 });
 attendanceSchema.index({ type: 1, date: 1, student: 1 });
+// Dashboard and summary aggregate by date without a type prefix.
+attendanceSchema.index({ date: 1, status: 1 });
 
 const Attendance = mongoose.model('Attendance', attendanceSchema);
 export default Attendance;

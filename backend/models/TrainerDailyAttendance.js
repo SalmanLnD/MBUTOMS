@@ -27,6 +27,8 @@ const trainerDailyAttendanceSchema = new mongoose.Schema(
 trainerDailyAttendanceSchema.index({ trainer: 1, date: 1 }, { unique: true });
 trainerDailyAttendanceSchema.index({ date: 1 });
 trainerDailyAttendanceSchema.index({ punchInAt: -1 });
+// Per-trainer punch log view filters by trainer and sorts by punch time.
+trainerDailyAttendanceSchema.index({ trainer: 1, punchInAt: -1 });
 trainerDailyAttendanceSchema.index({ whatsappMessageIds: 1 });
 
 const TrainerDailyAttendance = mongoose.model('TrainerDailyAttendance', trainerDailyAttendanceSchema);

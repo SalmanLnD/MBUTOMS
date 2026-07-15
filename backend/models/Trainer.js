@@ -1,4 +1,5 @@
 import mongoose from 'mongoose';
+import { normalizePhone } from '../utils/phone.js';
 
 const trainerSchema = new mongoose.Schema(
   {
@@ -6,6 +7,9 @@ const trainerSchema = new mongoose.Schema(
     name: { type: String, required: true, trim: true },
     email: { type: String, unique: true, sparse: true, lowercase: true, trim: true },
     phone: { type: String, trim: true, default: '' },
+    // Derived 10-digit lookup key so WhatsApp punch-ins resolve with an
+    // indexed query instead of scanning every trainer.
+    phoneKey: { type: String, default: '' },
     camuErpId: { type: String, trim: true, default: '' },
     camuPassword: { type: String, trim: true, default: '' },
     department: {
@@ -32,6 +36,23 @@ const trainerSchema = new mongoose.Schema(
 trainerSchema.index({ department: 1, name: 1 });
 trainerSchema.index({ subjects: 1 });
 trainerSchema.index({ scheduleTrainerCodes: 1 });
+trainerSchema.index({ phoneKey: 1 });
+
+trainerSchema.pre('save', function deriveTrainerPhoneKey(next) {
+  if (this.isModified('phone') || this.isNew) {
+    this.phoneKey = normalizePhone(this.phone);
+  }
+  next();
+});
+
+trainerSchema.pre('findOneAndUpdate', function deriveTrainerPhoneKeyOnUpdate(next) {
+  const update = this.getUpdate() || {};
+  const phone = update.phone ?? update.$set?.phone;
+  if (phone !== undefined) {
+    this.set({ phoneKey: normalizePhone(phone) });
+  }
+  next();
+});
 
 const Trainer = mongoose.model('Trainer', trainerSchema);
 export default Trainer;

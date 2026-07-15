@@ -69,34 +69,80 @@ export const getReplacementSuggestions = async (req, res) => {
   const trainers = await Trainer.find({
     _id: { $ne: leave.trainer },
     status: 'active',
-  });
+  })
+    .select('name employeeId email performanceScore status scheduleTrainerCodes')
+    .lean();
+
+  // Batch everything the per-trainer loop needs into two queries instead of
+  // ~3 queries per trainer (leave check + day conflicts + weekly hours).
+  const leaveStart = normalizeDate(leave.startDate);
+  const leaveEnd = normalizeDate(leave.endDate);
+  const scheduleDayDates = [];
+  for (const d = new Date(leaveStart); d <= leaveEnd; d.setDate(d.getDate() + 1)) {
+    if (WEEKDAYS[d.getDay()] === schedule.day) scheduleDayDates.push(new Date(d));
+  }
+
+  const codesByTrainer = new Map(
+    trainers.map((trainer) => [trainer._id.toString(), resolveTrainerScheduleCodes(trainer)])
+  );
+  const allCodes = [...new Set([...codesByTrainer.values()].flat())];
+
+  const [overlappingLeaves, allSchedules] = await Promise.all([
+    scheduleDayDates.length
+      ? Leave.find({
+          status: 'approved',
+          trainer: { $in: trainers.map((trainer) => trainer._id) },
+          startDate: { $lte: leaveEnd },
+          endDate: { $gte: leaveStart },
+        })
+          .select('trainer startDate endDate')
+          .lean()
+      : [],
+    Schedule.find({ trainerCode: { $in: allCodes } })
+      .select('trainerCode day startTime endTime')
+      .lean(),
+  ]);
+
+  const leavesByTrainer = new Map();
+  for (const activeLeave of overlappingLeaves) {
+    const key = activeLeave.trainer.toString();
+    if (!leavesByTrainer.has(key)) leavesByTrainer.set(key, []);
+    leavesByTrainer.get(key).push(activeLeave);
+  }
+
+  const schedulesByCode = new Map();
+  for (const slot of allSchedules) {
+    if (!schedulesByCode.has(slot.trainerCode)) schedulesByCode.set(slot.trainerCode, []);
+    schedulesByCode.get(slot.trainerCode).push(slot);
+  }
+
+  const isOnLeaveForScheduleDay = (trainerId) => {
+    const trainerLeaves = leavesByTrainer.get(trainerId) || [];
+    if (!trainerLeaves.length) return false;
+    return scheduleDayDates.some((day) =>
+      trainerLeaves.some(
+        (entry) => normalizeDate(entry.startDate) <= day && normalizeDate(entry.endDate) >= day
+      )
+    );
+  };
 
   const eligibleSuggestions = [];
   const otherSuggestions = [];
 
   for (const trainer of trainers) {
-    const available = await isTrainerAvailableForReplacement({
-      trainerId: trainer._id,
-      scheduleDay: schedule.day,
-      leaveStart: leave.startDate,
-      leaveEnd: leave.endDate,
-      status: trainer.status,
-    });
-    if (!available) continue;
+    if (isOnLeaveForScheduleDay(trainer._id.toString())) continue;
 
-    const scheduleCodes = resolveTrainerScheduleCodes(trainer);
+    const scheduleCodes = codesByTrainer.get(trainer._id.toString()) || [];
+    const trainerSchedules = scheduleCodes.flatMap((code) => schedulesByCode.get(code) || []);
 
-    const daySchedules = await Schedule.find({
-      trainerCode: { $in: scheduleCodes },
-      day: schedule.day,
-    });
-    const hasConflict = daySchedules.some((s) =>
-      timesOverlap(schedule.startTime, schedule.endTime, s.startTime, s.endTime)
+    const hasConflict = trainerSchedules.some(
+      (s) =>
+        s.day === schedule.day &&
+        timesOverlap(schedule.startTime, schedule.endTime, s.startTime, s.endTime)
     );
     if (hasConflict) continue;
 
-    const weekSchedules = await Schedule.find({ trainerCode: { $in: scheduleCodes } });
-    const weeklyHours = weekSchedules.reduce((sum, s) => {
+    const weeklyHours = trainerSchedules.reduce((sum, s) => {
       const diff = parseTimeToMinutes(s.endTime) - parseTimeToMinutes(s.startTime);
       return sum + diff / 60;
     }, 0);
@@ -155,7 +201,8 @@ export const getAllReplacements = async (req, res) => {
       path: 'replacements.replacementTrainer',
       select: 'name employeeId',
     })
-    .sort({ startDate: -1, createdAt: -1 });
+    .sort({ startDate: -1, createdAt: -1 })
+    .lean();
 
   const replacements = [];
   for (const leave of leaves) {

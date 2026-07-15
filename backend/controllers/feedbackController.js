@@ -44,11 +44,19 @@ export const getFeedbackSummary = async (req, res) => {
 
   const trainerRosterFilter = await mergeRosterFilter({}, { rosterOnly: true });
 
-  const [allResponses, monthResponses, publishedForms, trainers, overallByTrainer, monthByTrainer] =
+  const [overallStats, monthStats, publishedForms, trainers, overallByTrainer, monthByTrainer] =
     await Promise.all([
-      FeedbackResponse.find({ rating: { $gte: 1, $lte: 5 } }).select('rating monthKey createdAt'),
-      FeedbackResponse.find({ monthKey, rating: { $gte: 1, $lte: 5 } }).select('rating createdAt'),
-      FeedbackForm.find({ status: 'published' }).sort({ monthKey: -1 }).limit(6).select('monthKey title publishedAt'),
+      // Aggregate the averages in the database instead of loading every
+      // rated response document into memory.
+      FeedbackResponse.aggregate([
+        { $match: { rating: { $gte: 1, $lte: 5 } } },
+        { $group: { _id: null, average: { $avg: '$rating' }, count: { $sum: 1 } } },
+      ]),
+      FeedbackResponse.aggregate([
+        { $match: { monthKey, rating: { $gte: 1, $lte: 5 } } },
+        { $group: { _id: null, average: { $avg: '$rating' }, count: { $sum: 1 } } },
+      ]),
+      FeedbackForm.find({ status: 'published' }).sort({ monthKey: -1 }).limit(6).select('monthKey title publishedAt').lean(),
       Trainer.find(trainerRosterFilter).select('name employeeId status').sort({ name: 1 }).lean(),
       FeedbackResponse.aggregate([
         { $match: { trainer: { $ne: null }, rating: { $gte: 1, $lte: 5 } } },
@@ -59,12 +67,6 @@ export const getFeedbackSummary = async (req, res) => {
         { $group: { _id: '$trainer', average: { $avg: '$rating' }, count: { $sum: 1 } } },
       ]),
     ]);
-
-  const avg = (items) => {
-    if (!items.length) return null;
-    const sum = items.reduce((acc, item) => acc + item.rating, 0);
-    return Math.round((sum / items.length) * 10) / 10;
-  };
 
   const roundAvg = (value) => (value != null ? Math.round(value * 10) / 10 : null);
 
@@ -88,13 +90,13 @@ export const getFeedbackSummary = async (req, res) => {
   });
 
   res.json({
-    overallAverage: avg(allResponses),
-    overallCount: allResponses.length,
+    overallAverage: roundAvg(overallStats[0]?.average ?? null),
+    overallCount: overallStats[0]?.count || 0,
     currentMonth: {
       key: monthKey,
       label: formatMonthLabel(monthKey),
-      average: avg(monthResponses),
-      count: monthResponses.length,
+      average: roundAvg(monthStats[0]?.average ?? null),
+      count: monthStats[0]?.count || 0,
     },
     recentMonths: publishedForms.map((form) => ({
       monthKey: form.monthKey,
@@ -123,7 +125,8 @@ export const getFeedbackResponses = async (req, res) => {
       .populate('trainer', 'name employeeId')
       .sort({ createdAt: -1 })
       .skip(skip)
-      .limit(limit),
+      .limit(limit)
+      .lean(),
     FeedbackResponse.countDocuments(filter),
   ]);
 

@@ -98,7 +98,8 @@ export const getTrainers = async (req, res) => {
       .populate('subjects', 'name code slotCount slotTimings')
       .sort(sort)
       .skip(skip)
-      .limit(limit),
+      .limit(limit)
+      .lean(),
     Trainer.countDocuments(finalFilter),
   ]);
 

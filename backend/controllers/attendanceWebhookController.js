@@ -17,8 +17,29 @@ const findTrainerByPhone = async (phone) => {
   const target = normalizePhone(phone);
   if (!isValidMobileKey(target)) return null;
 
+  // Fast path: indexed lookup on the derived phone key.
+  const byKey = await Trainer.findOne({ phoneKey: target })
+    .select('name employeeId phone')
+    .lean();
+  if (byKey) return byKey;
+
+  // Legacy path for trainers created before phoneKey existed: scan once,
+  // then backfill every key so the next lookup is indexed.
   const trainers = await Trainer.find({ phone: { $nin: ['', null] } })
-    .select('name employeeId phone');
+    .select('name employeeId phone phoneKey')
+    .lean();
+
+  const backfill = trainers
+    .filter((trainer) => (trainer.phoneKey || '') !== normalizePhone(trainer.phone))
+    .map((trainer) => ({
+      updateOne: {
+        filter: { _id: trainer._id },
+        update: { $set: { phoneKey: normalizePhone(trainer.phone) } },
+      },
+    }));
+  if (backfill.length) {
+    await Trainer.bulkWrite(backfill, { ordered: false });
+  }
 
   return trainers.find(
     (trainer) => isValidMobileKey(trainer.phone) && normalizePhone(trainer.phone) === target
