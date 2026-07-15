@@ -15,6 +15,11 @@ import { protect, authorize } from '../middleware/auth.js';
 import { validate } from '../middleware/validate.js';
 import { asyncHandler } from '../middleware/asyncHandler.js';
 import { scheduleValidation } from '../utils/validators.js';
+import {
+  createClassCancellation,
+  deleteClassCancellation,
+  getClassCancellationOptions,
+} from '../controllers/classCancellationController.js';
 
 const router = express.Router();
 
@@ -24,6 +29,21 @@ router.use(protect);
 
 router.get('/timetable-board', asyncHandler(getTimetableBoard));
 router.get('/batches/list', asyncHandler(getBatches));
+router.get(
+  '/class-cancellations/options',
+  authorize('admin'),
+  asyncHandler(getClassCancellationOptions)
+);
+router.post(
+  '/class-cancellations',
+  authorize('admin'),
+  asyncHandler(createClassCancellation)
+);
+router.delete(
+  '/class-cancellations/:id',
+  authorize('admin'),
+  asyncHandler(deleteClassCancellation)
+);
 router.get('/trainer/:id', asyncHandler(getTrainerSchedule));
 router.get('/trainer-code/:code', asyncHandler(getTrainerScheduleByCode));
 

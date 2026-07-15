@@ -14,6 +14,7 @@ import {
   getLeaveOverlapFilter,
   isDateWithinLeave,
 } from './leaveDateRange.js';
+import { getCancellationMapForRange } from './leaveAffectedClasses.js';
 
 const SCHEDULE_FIELDS = 'day startTime endTime trainerCode semester subject subjectCode';
 
@@ -124,7 +125,12 @@ export const computeClassHandlingHoursBatch = async (
   const ownedFilter = { trainerCode: { $in: allCodes } };
   if (semester) ownedFilter.semester = semester;
 
-  const [ownedSchedules, subjectStartMap, leaves] = await Promise.all([
+  const [
+    ownedSchedules,
+    subjectStartMap,
+    leaves,
+    canceledIdsByDate,
+  ] = await Promise.all([
     Schedule.find(ownedFilter).select(SCHEDULE_FIELDS).lean(),
     buildSubjectStartDateMap(),
     Leave.find({
@@ -134,6 +140,7 @@ export const computeClassHandlingHoursBatch = async (
     })
       .select('startDate endDate replacements')
       .lean(),
+    getCancellationMapForRange(rangeStart, rangeEnd),
   ]);
 
   const schedulesByTrainerDay = indexSchedulesByTrainerDay(ownedSchedules, codeToTrainerId);
@@ -167,6 +174,7 @@ export const computeClassHandlingHoursBatch = async (
   dates.forEach((date) => {
     const dateKey = toAttendanceDateKey(date);
     const dayName = getAttendanceWeekdayName(date);
+    const canceledIds = canceledIdsByDate.get(dateKey) || new Set();
 
     leaves.forEach((leave) => {
       if (!isDateWithinLeave(date, leave)) return;
@@ -179,6 +187,7 @@ export const computeClassHandlingHoursBatch = async (
 
         const schedule = scheduleById.get(entry.schedule?.toString());
         if (!schedule || schedule.day !== dayName) return;
+        if (canceledIds.has(schedule._id.toString())) return;
         if (semester && schedule.semester !== semester) return;
         if (!isActiveOnDate(schedule, date, subjectStartMap)) return;
 
@@ -207,6 +216,7 @@ export const computeClassHandlingHoursBatch = async (
   dates.forEach((date) => {
     const dateKey = toAttendanceDateKey(date);
     const dayName = getAttendanceWeekdayName(date);
+    const canceledIds = canceledIdsByDate.get(dateKey) || new Set();
 
     trainers.forEach((trainer) => {
       const trainerId = trainer._id.toString();
@@ -215,6 +225,7 @@ export const computeClassHandlingHoursBatch = async (
       const owned = (schedulesByTrainerDay.get(trainerId)?.get(dayName) || []).filter(
         (schedule) =>
           !replacedOwnedIds.has(schedule._id.toString())
+          && !canceledIds.has(schedule._id.toString())
           && isActiveOnDate(schedule, date, subjectStartMap)
       );
       const replacements = replacementByTrainerDate.get(`${trainerId}|${dateKey}`) || [];

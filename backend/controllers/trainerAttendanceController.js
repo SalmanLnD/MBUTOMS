@@ -1,5 +1,6 @@
 import Trainer from '../models/Trainer.js';
 import TrainerDailyAttendance from '../models/TrainerDailyAttendance.js';
+import Leave from '../models/Leave.js';
 import {
   clampAttendanceMonthToTrackingStart,
   formatAttendanceMonthKey,
@@ -21,10 +22,25 @@ import {
 } from '../utils/attendanceGridCache.js';
 import {
   applyItOifAttendanceRules,
+  countsAsOifDay,
   isItOif,
   resolveMockPrepHoursForOif,
 } from '../utils/attendanceOifRules.js';
 import { mergeRosterFilter } from '../utils/rosterFilter.js';
+import { getLeaveOverlapFilter, isDateWithinLeave } from '../utils/leaveDateRange.js';
+import {
+  getLeaveWeekdayScheduleIds,
+  isFullDayLeave,
+} from '../utils/leaveScope.js';
+import Schedule from '../models/Schedule.js';
+import { resolveTrainerScheduleCodes } from '../utils/trainerMappings.js';
+import {
+  attendanceTypeUsesOifNumber,
+  canEditFutureLeaveAttendance,
+  formatTrainerAttendanceOifDisplay,
+  isLeaveAttendanceType,
+  TRAINER_ATTENDANCE_TYPES,
+} from '../utils/trainerAttendanceTypes.js';
 
 const buildLogMap = (logs) => {
   const map = new Map();
@@ -44,7 +60,7 @@ const buildRowTotals = (days, dateKeys) => {
     if (!cell) return;
     mockPrepHours += Number(cell.mockPrepHours || 0);
     classHandlingHours += Number(cell.classHandlingHours || 0);
-    if (String(cell.oifNumber || '').trim()) oifDays += 1;
+    if (countsAsOifDay(cell.oifNumber)) oifDays += 1;
   });
 
   return {
@@ -98,8 +114,12 @@ export const getTrainerAttendanceGrid = async (req, res) => {
 
   const trainerIds = trainers.map((trainer) => trainer._id);
   const dateKeys = dates.map(toAttendanceDateKey);
+  const codesByTrainer = new Map(
+    trainers.map((trainer) => [trainer._id.toString(), resolveTrainerScheduleCodes(trainer)])
+  );
+  const allScheduleCodes = [...new Set([...codesByTrainer.values()].flat())];
 
-  const [logs, classHoursCache] = await Promise.all([
+  const [logs, classHoursCache, approvedLeaves, schedules] = await Promise.all([
     trainerIds.length
       ? TrainerDailyAttendance.find({
         trainer: { $in: trainerIds },
@@ -109,9 +129,54 @@ export const getTrainerAttendanceGrid = async (req, res) => {
     // Pass null semester so class handling hours cover every semester a
     // trainer teaches (e.g. LRRE runs in semester V while the grid defaults to III).
     computeClassHandlingHoursBatch(trainerIds, dates, null, trainers),
+    trainerIds.length
+      ? Leave.find({
+        trainer: { $in: trainerIds },
+        status: 'approved',
+        ...getLeaveOverlapFilter(rangeStart, rangeEnd),
+      })
+        .select('trainer startDate endDate reason scope affectedSchedules')
+        .lean()
+      : [],
+    allScheduleCodes.length
+      ? Schedule.find({ trainerCode: { $in: allScheduleCodes } })
+        .select('_id trainerCode day')
+        .lean()
+      : [],
   ]);
 
+  const schedulesByCode = new Map();
+  schedules.forEach((schedule) => {
+    if (!schedulesByCode.has(schedule.trainerCode)) {
+      schedulesByCode.set(schedule.trainerCode, []);
+    }
+    schedulesByCode.get(schedule.trainerCode).push(schedule);
+  });
+
+  const schedulesByTrainer = new Map();
+  trainers.forEach((trainer) => {
+    const trainerId = trainer._id.toString();
+    const trainerSchedules = (codesByTrainer.get(trainerId) || [])
+      .flatMap((code) => schedulesByCode.get(code) || []);
+    schedulesByTrainer.set(trainerId, trainerSchedules);
+  });
+
   const logMap = buildLogMap(logs);
+  const fullDayLeaveKeys = new Set();
+  approvedLeaves.forEach((leave) => {
+    const trainerId = leave.trainer.toString();
+    const dayScheduleIds = getLeaveWeekdayScheduleIds(
+      leave,
+      schedulesByTrainer.get(trainerId) || []
+    );
+    if (!isFullDayLeave(leave, { dayScheduleIds })) return;
+
+    dates.forEach((date) => {
+      if (isDateWithinLeave(date, leave)) {
+        fullDayLeaveKeys.add(`${trainerId}|${toAttendanceDateKey(date)}`);
+      }
+    });
+  });
 
   const rows = trainers.map((trainer) => {
     const days = {};
@@ -120,17 +185,41 @@ export const getTrainerAttendanceGrid = async (req, res) => {
       const dateKey = toAttendanceDateKey(date);
       const cacheKey = `${trainer._id}|${dateKey}`;
       const log = logMap.get(cacheKey);
+      const isOnLeave = fullDayLeaveKeys.has(cacheKey);
+      if (isOnLeave) {
+        const attendanceType = isLeaveAttendanceType(log?.attendanceType)
+          ? log.attendanceType
+          : TRAINER_ATTENDANCE_TYPES.LEAVE;
+        const leaveOifNumber = attendanceTypeUsesOifNumber(attendanceType)
+          ? (log?.oifNumber || '')
+          : '';
+        days[dateKey] = {
+          id: log?._id || null,
+          attendanceType,
+          oifNumber: leaveOifNumber,
+          oifDisplay: formatTrainerAttendanceOifDisplay(attendanceType, leaveOifNumber),
+          mockPrepHours: 0,
+          classHandlingHours: 0,
+          isOnLeave: true,
+          isFuture: date > today,
+        };
+        return;
+      }
       const oifNumber = log?.oifNumber || '';
       const { mockPrepHours, classHandlingHours } = applyItOifAttendanceRules({
         oifNumber,
         mockPrepHours: log?.mockPrepHours ?? 0,
         classHandlingHours: classHoursCache.get(cacheKey) ?? 0,
       });
+      const attendanceType = log?.attendanceType || TRAINER_ATTENDANCE_TYPES.OIF;
       days[dateKey] = {
         id: log?._id || null,
+        attendanceType,
         oifNumber,
+        oifDisplay: formatTrainerAttendanceOifDisplay(attendanceType, oifNumber),
         mockPrepHours,
         classHandlingHours,
+        isOnLeave: false,
         isFuture: date > today,
       };
     });
@@ -175,7 +264,13 @@ export const getTrainerAttendanceGrid = async (req, res) => {
 };
 
 export const upsertTrainerDailyAttendance = async (req, res) => {
-  const { trainer, date, oifNumber, mockPrepHours } = req.body;
+  const {
+    trainer,
+    date,
+    attendanceType,
+    oifNumber,
+    mockPrepHours,
+  } = req.body;
 
   if (!trainer || !date) {
     return res.status(400).json({ message: 'Trainer and date are required' });
@@ -199,8 +294,41 @@ export const upsertTrainerDailyAttendance = async (req, res) => {
     });
   }
 
-  if (day > today) {
-    return res.status(400).json({ message: 'Future dates cannot be marked.' });
+  const approvedLeaves = await Leave.find({
+    trainer,
+    status: 'approved',
+    ...getLeaveOverlapFilter(day),
+  })
+    .select('startDate endDate reason scope affectedSchedules')
+    .lean();
+
+  let isOnFullDayLeave = false;
+  if (approvedLeaves.length) {
+    const trainerDoc = await Trainer.findById(trainer)
+      .select('employeeId scheduleTrainerCodes')
+      .lean();
+    const trainerSchedules = trainerDoc
+      ? await Schedule.find({
+        trainerCode: { $in: resolveTrainerScheduleCodes(trainerDoc) },
+      })
+        .select('_id day')
+        .lean()
+      : [];
+
+    isOnFullDayLeave = approvedLeaves.some((leave) => {
+      if (!isDateWithinLeave(day, leave)) return false;
+      const dayScheduleIds = getLeaveWeekdayScheduleIds(leave, trainerSchedules);
+      return isFullDayLeave(leave, { dayScheduleIds });
+    });
+  }
+
+  if (day > today && !canEditFutureLeaveAttendance({
+    role: req.user.role,
+    isOnFullDayLeave,
+  })) {
+    return res.status(400).json({
+      message: 'Only admins can set leave types for future approved full-day leave.',
+    });
   }
 
   const parsedMockHours = mockPrepHours === '' || mockPrepHours === null || mockPrepHours === undefined
@@ -216,7 +344,19 @@ export const upsertTrainerDailyAttendance = async (req, res) => {
     return res.status(400).json({ message: 'OIF number must be 12 characters or fewer' });
   }
 
-  const finalMockHours = resolveMockPrepHoursForOif(trimmedOif, parsedMockHours);
+  const resolvedAttendanceType = isOnFullDayLeave
+    ? String(attendanceType || TRAINER_ATTENDANCE_TYPES.LEAVE).trim()
+    : TRAINER_ATTENDANCE_TYPES.OIF;
+  if (isOnFullDayLeave && !isLeaveAttendanceType(resolvedAttendanceType)) {
+    return res.status(400).json({ message: 'Select a valid leave type.' });
+  }
+
+  const finalOifNumber = attendanceTypeUsesOifNumber(resolvedAttendanceType)
+    ? trimmedOif
+    : '';
+  const finalMockHours = isOnFullDayLeave
+    ? 0
+    : resolveMockPrepHoursForOif(finalOifNumber, parsedMockHours);
 
   const record = await TrainerDailyAttendance.findOneAndUpdate(
     { trainer, date: day },
@@ -224,7 +364,8 @@ export const upsertTrainerDailyAttendance = async (req, res) => {
       $set: {
         trainer,
         date: day,
-        oifNumber: trimmedOif,
+        attendanceType: resolvedAttendanceType,
+        oifNumber: finalOifNumber,
         mockPrepHours: finalMockHours,
         markedBy: req.user._id,
       },
@@ -233,7 +374,7 @@ export const upsertTrainerDailyAttendance = async (req, res) => {
   );
 
   let classHandlingHours = 0;
-  if (!isItOif(trimmedOif)) {
+  if (!isOnFullDayLeave && !isItOif(finalOifNumber)) {
     const classHoursCache = await computeClassHandlingHoursBatch(
       [trainer],
       [day],
@@ -244,19 +385,24 @@ export const upsertTrainerDailyAttendance = async (req, res) => {
 
   clearAttendanceGridCache();
 
-  const resolved = applyItOifAttendanceRules({
-    oifNumber: record.oifNumber,
-    mockPrepHours: record.mockPrepHours,
-    classHandlingHours,
-  });
+  const resolved = isOnFullDayLeave
+    ? { mockPrepHours: 0, classHandlingHours: 0 }
+    : applyItOifAttendanceRules({
+      oifNumber: record.oifNumber,
+      mockPrepHours: record.mockPrepHours,
+      classHandlingHours,
+    });
 
   res.json({
     id: record._id,
     trainer,
     date: toAttendanceDateKey(day),
+    attendanceType: record.attendanceType,
     oifNumber: record.oifNumber,
+    oifDisplay: formatTrainerAttendanceOifDisplay(record.attendanceType, record.oifNumber),
     mockPrepHours: resolved.mockPrepHours,
     classHandlingHours: resolved.classHandlingHours,
+    isOnLeave: isOnFullDayLeave,
   });
 };
 

@@ -11,6 +11,7 @@ import {
   getLeaveOverlapFilter,
   isDateWithinLeave,
 } from './leaveDateRange.js';
+import { getCancellationMapForRange } from './leaveAffectedClasses.js';
 
 const WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
@@ -243,7 +244,13 @@ export const buildTrainerAvailabilityForRange = async ({
   const ownedFilter = { trainerCode: { $in: allCodes } };
   if (semester) ownedFilter.semester = semester;
 
-  const [ownedSchedules, subjectStartMap, replacementLeaves, activeLeaves] = await Promise.all([
+  const [
+    ownedSchedules,
+    subjectStartMap,
+    replacementLeaves,
+    activeLeaves,
+    cancellationMap,
+  ] = await Promise.all([
     Schedule.find(ownedFilter).lean(),
     buildSubjectStartDateMap(),
     Leave.find({
@@ -261,6 +268,7 @@ export const buildTrainerAvailabilityForRange = async ({
     })
       .select('trainer startDate endDate')
       .lean(),
+    getCancellationMapForRange(rangeStart, rangeEnd),
   ]);
 
   const leaveDatesByTrainer = new Map();
@@ -318,6 +326,7 @@ export const buildTrainerAvailabilityForRange = async ({
 
         const schedule = scheduleById.get(entry.schedule?.toString());
         if (!schedule) return;
+        if (cancellationMap.get(dateKey)?.has(schedule._id.toString())) return;
         if (semester && schedule.semester !== semester) return;
         if (schedule.day !== dayName) return;
         if (!isScheduleDayInLeaveRange(schedule.day, leave)) return;
@@ -359,6 +368,7 @@ export const buildTrainerAvailabilityForRange = async ({
 
       (schedulesByTrainer.get(trainerId) || []).forEach((schedule) => {
         if (schedule.day !== dayName) return;
+        if (cancellationMap.get(dateKey)?.has(schedule._id.toString())) return;
         if (!isActiveOnDate(schedule, date, subjectStartMap)) return;
         busyIntervals.push(toBusyInterval(schedule.startTime, schedule.endTime, dayEndMinutes));
       });

@@ -21,10 +21,13 @@ import {
   toInputDate,
   TRAINER_ATTENDANCE_TRACKING_START,
 } from '../utils/monthDates.js';
+import { countsAsOifDay } from '../utils/trainerAttendanceTypes.js';
+import { ROLES } from '../utils/roles.js';
 
 const TrainerAttendanceTab = () => {
   const { user, hasManagementRole } = useAuth();
   const canManageAll = hasManagementRole();
+  const canEditFutureLeave = user?.role === ROLES.ADMIN;
 
   const [monthParts, setMonthParts] = useState(() =>
     clampMonthParts(getCurrentMonthParts())
@@ -151,7 +154,7 @@ const TrainerAttendanceTab = () => {
               return {
                 mockPrepHours: acc.mockPrepHours + Number(cell.mockPrepHours || 0),
                 classHandlingHours: acc.classHandlingHours + Number(cell.classHandlingHours || 0),
-                oifDays: acc.oifDays + (String(cell.oifNumber || '').trim() ? 1 : 0),
+                oifDays: acc.oifDays + (countsAsOifDay(cell.oifNumber) ? 1 : 0),
                 workingDays: acc.workingDays,
               };
             },
@@ -175,7 +178,9 @@ const TrainerAttendanceTab = () => {
     const currentGrid = gridDataRef.current;
     const row = currentGrid?.rows.find((entry) => entry.trainer._id === trainerId);
     const cell = row?.days[dateKey];
-    if (!cell || cell.isFuture || isFutureDateKey(dateKey)) return;
+    if (!cell) return;
+    const isFuture = cell.isFuture || isFutureDateKey(dateKey);
+    if (isFuture && !(cell.isOnLeave && canEditFutureLeave)) return;
 
     const saveKey = `${trainerId}|${dateKey}`;
     setSavingKey(saveKey);
@@ -184,6 +189,7 @@ const TrainerAttendanceTab = () => {
       const saved = await upsertTrainerDailyAttendance({
         trainer: trainerId,
         date: dateKey,
+        attendanceType: cell.attendanceType,
         oifNumber: cell.oifNumber,
         mockPrepHours: cell.mockPrepHours,
       });
@@ -201,8 +207,12 @@ const TrainerAttendanceTab = () => {
                 [dateKey]: {
                   ...entry.days[dateKey],
                   id: saved.id,
+                  attendanceType: saved.attendanceType,
+                  oifNumber: saved.oifNumber,
+                  oifDisplay: saved.oifDisplay,
                   mockPrepHours: saved.mockPrepHours,
                   classHandlingHours: saved.classHandlingHours,
+                  isOnLeave: saved.isOnLeave,
                 },
               },
             };
@@ -218,7 +228,7 @@ const TrainerAttendanceTab = () => {
     } finally {
       setSavingKey('');
     }
-  }, [fetchGrid]);
+  }, [canEditFutureLeave, fetchGrid]);
 
   const monthLabel = grid?.monthLabel || formatMonthLabel(monthParts.year, monthParts.month);
 
@@ -391,6 +401,7 @@ const TrainerAttendanceTab = () => {
                   row={row}
                   dates={grid.dates}
                   canEditTrainer={canEditTrainer}
+                  canEditFutureLeave={canEditFutureLeave}
                   savingKey={savingKey}
                   onUpdateCell={updateCell}
                   onSave={handleSave}

@@ -318,7 +318,7 @@ body {
 }
 
 .trainer-attendance-month-table col.trainer-attendance-oif-col {
-  width: 6.5rem;
+  width: 10rem;
 }
 
 .trainer-attendance-month-table col.trainer-attendance-mock-col,
@@ -415,6 +415,50 @@ body {
 
 .trainer-attendance-grid .trainer-attendance-oif-input {
   text-align: left;
+}
+
+.trainer-attendance-leave-controls {
+  display: grid;
+  gap: 0.25rem;
+  min-width: 9rem;
+}
+
+.trainer-attendance-oif-sheet-value {
+  color: var(--bs-body-color);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  line-height: 1.2;
+  word-break: break-all;
+}
+
+.class-cancellation-schedule-list {
+  max-height: 20rem;
+  overflow-y: auto;
+}
+
+.class-cancellation-schedule-option {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.65rem;
+  padding: 0.55rem 0.65rem;
+  border-radius: 0.35rem;
+  cursor: pointer;
+}
+
+.class-cancellation-schedule-option:hover {
+  background: var(--bs-tertiary-bg);
+}
+
+.class-cancellation-schedule-option .form-check-input {
+  flex: 0 0 auto;
+  margin-top: 0.2rem;
+}
+
+.trainer-attendance-grid .trainer-attendance-leave-select {
+  width: 100%;
+  min-width: 0;
+  height: 1.85rem;
+  padding: 0.2rem 1.6rem 0.2rem 0.35rem;
+  font-size: 0.7rem;
 }
 
 .trainer-attendance-grid .trainer-attendance-mock-input::-webkit-outer-spin-button,

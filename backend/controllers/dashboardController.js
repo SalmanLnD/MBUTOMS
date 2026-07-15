@@ -9,6 +9,10 @@ import Leave from '../models/Leave.js';
 import Attendance from '../models/Attendance.js';
 import { enrichSchedulesWithReplacementFor } from '../utils/scheduleReplacement.js';
 import { getActiveSchedulesForDay } from '../utils/activeSchedulesForDate.js';
+import {
+  getCancellationMapForRange,
+  getEffectiveAffectedSchedules,
+} from '../utils/leaveAffectedClasses.js';
 
 
 
@@ -62,11 +66,11 @@ export const getDashboardStats = async (req, res) => {
     }),
     Leave.find({
       status: 'approved',
-      replacementNeeded: true,
       endDate: { $gte: today },
       affectedSchedules: { $exists: true, $not: { $size: 0 } },
     })
-      .select('affectedSchedules replacements')
+      .select('startDate endDate affectedSchedules replacements')
+      .populate('affectedSchedules', 'day')
       .lean(),
     Attendance.aggregate([
       { $match: { date: { $gte: today, $lt: tomorrow } } },
@@ -82,14 +86,32 @@ export const getDashboardStats = async (req, res) => {
 
   const todaysClasses = activeToday.count;
 
+  const cancellationMap = replacementLeaves.length
+    ? await getCancellationMapForRange(
+      replacementLeaves.reduce(
+        (earliest, leave) => (leave.startDate < earliest ? leave.startDate : earliest),
+        replacementLeaves[0].startDate
+      ),
+      replacementLeaves.reduce(
+        (latest, leave) => (leave.endDate > latest ? leave.endDate : latest),
+        replacementLeaves[0].endDate
+      )
+    )
+    : new Map();
+
   const pendingReplacements = replacementLeaves.reduce((count, leave) => {
     const assignedScheduleIds = new Set(
       (leave.replacements || [])
         .map((entry) => entry.schedule?.toString())
         .filter(Boolean)
     );
-    const unassigned = (leave.affectedSchedules || []).filter(
-      (scheduleId) => !assignedScheduleIds.has(scheduleId.toString())
+    const effectiveSchedules = getEffectiveAffectedSchedules(
+      leave,
+      leave.affectedSchedules,
+      cancellationMap
+    );
+    const unassigned = effectiveSchedules.filter(
+      (schedule) => !assignedScheduleIds.has(schedule._id.toString())
     );
     return count + unassigned.length;
   }, 0);

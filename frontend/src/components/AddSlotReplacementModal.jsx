@@ -163,7 +163,7 @@ const AddSlotReplacementModal = ({ show, onClose, onCreated }) => {
                         ? 'Select a trainer first'
                         : slots.length
                           ? 'Select class slot'
-                          : `No classes on ${slotDay || 'this day'}`}
+                          : `No available classes on ${slotDay || 'this day'}`}
                     </option>
                     {slots.map((schedule) => (
                       <option key={schedule._id} value={schedule._id}>

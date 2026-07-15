@@ -4,6 +4,7 @@ import Trainer from '../models/Trainer.js';
 import { normalizeDate } from './scheduleHelpers.js';
 import { resolveTrainerScheduleCodes } from './trainerMappings.js';
 import { isScheduleDayInLeaveRange } from './trainerScheduleView.js';
+import { getCanceledScheduleIdsForDate } from './classCancellations.js';
 
 const buildTrainerCodeIndex = (trainers) => {
   const codeToTrainers = new Map();
@@ -42,7 +43,7 @@ export const buildTimetableBoardForDate = async ({
   const ref = normalizeDate(referenceDate);
   const trainerById = new Map(trainers.map((trainer) => [trainer._id.toString(), trainer]));
 
-  const [ownedSchedules, leaves] = await Promise.all([
+  const [ownedSchedules, leaves, canceledScheduleIds] = await Promise.all([
     Schedule.find(ownedFilter).populate('venue', 'name building floor type').lean(),
     Leave.find({
       status: 'approved',
@@ -52,11 +53,13 @@ export const buildTimetableBoardForDate = async ({
     })
       .populate('trainer', 'name employeeId')
       .lean(),
+    getCanceledScheduleIdsForDate(ref),
   ]);
 
   const ownedIds = new Set();
 
   ownedSchedules.forEach((schedule) => {
+    if (canceledScheduleIds.has(schedule._id.toString())) return;
     const matches = codeToTrainers.get(schedule.trainerCode) || [];
     matches.forEach((trainer) => {
       ownedIds.add(schedule._id.toString());
@@ -90,6 +93,7 @@ export const buildTimetableBoardForDate = async ({
 
         const schedule = scheduleById.get(entry.schedule?.toString());
         if (!schedule) return;
+        if (canceledScheduleIds.has(schedule._id.toString())) return;
         if (semester && schedule.semester !== semester) return;
         if (!isScheduleDayInLeaveRange(schedule.day, leave)) return;
         if (ownedIds.has(schedule._id.toString())) return;

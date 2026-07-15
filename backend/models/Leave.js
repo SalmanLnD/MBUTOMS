@@ -1,4 +1,5 @@
 import mongoose from 'mongoose';
+import { LEAVE_SCOPES } from '../utils/leaveScope.js';
 
 const leaveSchema = new mongoose.Schema(
   {
@@ -10,6 +11,11 @@ const leaveSchema = new mongoose.Schema(
     startDate: { type: Date, required: true },
     endDate: { type: Date, required: true },
     reason: { type: String, required: true, trim: true },
+    scope: {
+      type: String,
+      enum: Object.values(LEAVE_SCOPES),
+      default: LEAVE_SCOPES.FULL_DAY,
+    },
     status: {
       type: String,
       enum: ['pending', 'approved', 'rejected', 'cancelled'],

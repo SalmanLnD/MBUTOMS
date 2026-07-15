@@ -6,6 +6,7 @@ import ClassGroup from '../models/ClassGroup.js';
 import TopicTrackerEntry from '../models/TopicTrackerEntry.js';
 import Leave from '../models/Leave.js';
 import { filterSchedulesActiveOnDate } from './activeSchedulesForDate.js';
+import { getCanceledScheduleIdsForDate } from './classCancellations.js';
 import { computeHours } from './trainerClassHours.js';
 import { resolveTrainerScheduleCodes } from './trainerMappings.js';
 import { ROLES } from './roles.js';
@@ -119,6 +120,25 @@ const computeAttendancePercent = (allotted, present) => {
   return Number.isFinite(value) ? value : null;
 };
 
+export const mergeOverviewTrainerNames = (currentNames = [], session = {}) => {
+  const names = session.replacementTrainerName
+    ? [session.originalTrainerName, session.replacementTrainerName]
+    : [session.originalTrainerName || session.trainerName];
+
+  return names.filter(Boolean).reduce((result, name) => {
+    const trimmed = String(name).trim();
+    if (
+      trimmed
+      && !result.some((existing) =>
+        existing.localeCompare(trimmed, undefined, { sensitivity: 'base' }) === 0
+      )
+    ) {
+      result.push(trimmed);
+    }
+    return result;
+  }, [...currentNames]);
+};
+
 const entryToSession = (entry, defaults) => ({
   entryId: entry?._id?.toString() || null,
   scheduleId: defaults.scheduleId,
@@ -129,6 +149,10 @@ const entryToSession = (entry, defaults) => ({
   trainerName: defaults.isReplacementAssignment
     ? defaults.trainerName
     : (entry?.trainerName || defaults.trainerName),
+  originalTrainerId: defaults.originalTrainerId,
+  originalTrainerName: defaults.originalTrainerName,
+  replacementTrainerId: defaults.replacementTrainerId,
+  replacementTrainerName: defaults.replacementTrainerName,
   subjectId: defaults.subjectId,
   subjectCode: defaults.subjectCode,
   courseName: entry?.courseName || defaults.courseName,
@@ -177,16 +201,20 @@ export const buildTopicTrackerSessions = async ({
 
   const [
     activeSchedules,
+    canceledScheduleIds,
     trainerLookup,
     studentCountMap,
     classGroupMap,
   ] = await Promise.all([
     filterSchedulesActiveOnDate(schedules, ref),
+    getCanceledScheduleIdsForDate(ref),
     buildTrainerLookup(),
     buildStudentCountMap(),
     buildClassGroupMap(),
   ]);
-  schedules = activeSchedules;
+  schedules = activeSchedules.filter(
+    (schedule) => !canceledScheduleIds.has(schedule._id.toString())
+  );
   const replacementBySchedule = await buildReplacementMap(
     schedules.map((schedule) => schedule._id),
     ref
@@ -280,6 +308,9 @@ export const buildTopicTrackerSessions = async ({
       trainerName: displayTrainer.name,
       isReplacementAssignment: Boolean(replacementTrainer),
       originalTrainerId,
+      originalTrainerName: originalTrainer.name,
+      replacementTrainerId: replacementTrainer?._id?.toString() || '',
+      replacementTrainerName: replacementTrainer?.name || '',
       subjectId: schedule.subject?._id?.toString() || schedule.subject?.toString() || '',
       subjectCode,
       topicOptions: getTopicOptionsForSubjectDoc(schedule.subject),
@@ -357,17 +388,21 @@ export const buildTopicTrackerOverview = async ({ date, user }) => {
       subjectRow.allottedSlots += 1;
       if (session.trackerStatus !== 'closed') subjectRow.pendingSlots += 1;
 
-      const trainerKey = session.trainerId;
+      const trainerKey = session.originalTrainerId || session.trainerId;
       if (!subjectRow.trainers.has(trainerKey)) {
+        const trainerNames = mergeOverviewTrainerNames([], session);
         subjectRow.trainers.set(trainerKey, {
-          trainerId: session.trainerId,
-          trainerName: session.trainerName,
+          trainerId: trainerKey,
+          trainerName: trainerNames.join(' / '),
+          trainerNames,
           allottedSlots: 0,
           pendingSlots: 0,
           closedSlots: 0,
         });
       }
       const trainerRow = subjectRow.trainers.get(trainerKey);
+      trainerRow.trainerNames = mergeOverviewTrainerNames(trainerRow.trainerNames, session);
+      trainerRow.trainerName = trainerRow.trainerNames.join(' / ');
       trainerRow.allottedSlots += 1;
       if (session.trackerStatus === 'closed') {
         trainerRow.closedSlots += 1;

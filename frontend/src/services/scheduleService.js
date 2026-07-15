@@ -15,6 +15,23 @@ export const getTimetableBoard = async (params = {}) => {
   return data;
 };
 
+export const getClassCancellationOptions = async (date) => {
+  const { data } = await api.get('/schedules/class-cancellations/options', {
+    params: { date },
+  });
+  return data;
+};
+
+export const createClassCancellation = async (payload) => {
+  const { data } = await api.post('/schedules/class-cancellations', payload);
+  return data;
+};
+
+export const deleteClassCancellation = async (id) => {
+  const { data } = await api.delete(`/schedules/class-cancellations/${id}`);
+  return data;
+};
+
 export const getScheduleById = async (id) => {
   const { data } = await api.get(`/schedules/${id}`);
   return data;

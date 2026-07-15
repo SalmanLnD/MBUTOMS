@@ -1,4 +1,5 @@
 import mongoose from 'mongoose';
+import { TRAINER_ATTENDANCE_TYPES } from '../utils/trainerAttendanceTypes.js';
 
 const trainerDailyAttendanceSchema = new mongoose.Schema(
   {
@@ -8,6 +9,11 @@ const trainerDailyAttendanceSchema = new mongoose.Schema(
       required: true,
     },
     date: { type: Date, required: true },
+    attendanceType: {
+      type: String,
+      enum: Object.values(TRAINER_ATTENDANCE_TYPES),
+      default: TRAINER_ATTENDANCE_TYPES.OIF,
+    },
     oifNumber: { type: String, trim: true, maxlength: 12, default: '' },
     mockPrepHours: { type: Number, min: 0, default: 0 },
     punchInAt: { type: Date },

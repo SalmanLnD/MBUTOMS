@@ -1,9 +1,15 @@
 import { memo, Fragment } from 'react';
+import {
+  attendanceTypeUsesOifNumber,
+  formatTrainerAttendanceOifDisplay,
+  LEAVE_TYPE_OPTIONS,
+} from '../utils/trainerAttendanceTypes.js';
 
 const TrainerAttendanceRow = memo(({
   row,
   dates,
   canEditTrainer,
+  canEditFutureLeave,
   savingKey,
   onUpdateCell,
   onSave,
@@ -19,7 +25,15 @@ const TrainerAttendanceRow = memo(({
         mockPrepHours: 0,
         classHandlingHours: 0,
       };
-      const editable = canEditTrainer(row.trainer._id) && !date.isFuture;
+      const canEditCell = canEditTrainer(row.trainer._id) && (
+        !date.isFuture || (cell.isOnLeave && canEditFutureLeave)
+      );
+      const editable = canEditCell && !cell.isOnLeave;
+      const leaveTypeUsesOif = attendanceTypeUsesOifNumber(cell.attendanceType);
+      const oifSheetValue = formatTrainerAttendanceOifDisplay(
+        cell.attendanceType,
+        cell.oifNumber
+      );
       const saveKey = `${row.trainer._id}|${date.key}`;
       const isSaving = savingKey === saveKey;
       const futureClass = date.isFuture ? 'trainer-attendance-future' : '';
@@ -29,17 +43,80 @@ const TrainerAttendanceRow = memo(({
       return (
         <Fragment key={`${row.trainer._id}-${date.key}`}>
           <td className={`trainer-attendance-oif-cell ${cellClass}`}>
-            <input
-              type="text"
-              className="form-control form-control-sm trainer-attendance-oif-input"
-              value={cell.oifNumber}
-              maxLength={12}
-              disabled={!editable || isSaving}
-              onChange={(e) => onUpdateCell(row.trainer._id, date.key, 'oifNumber', e.target.value)}
-              onBlur={() => editable && onSave(row.trainer._id, date.key)}
-              placeholder="—"
-              title="Up to 12 characters"
-            />
+            {cell.isOnLeave ? (
+              <div className="trainer-attendance-leave-controls">
+                <select
+                  className="form-select form-select-sm trainer-attendance-leave-select"
+                  value={cell.attendanceType || ''}
+                  disabled={!canEditCell || isSaving}
+                  onChange={(e) => {
+                    const nextType = e.target.value;
+                    onUpdateCell(row.trainer._id, date.key, 'attendanceType', nextType);
+                    if (!attendanceTypeUsesOifNumber(nextType)) {
+                      onUpdateCell(row.trainer._id, date.key, 'oifNumber', '');
+                    }
+                    window.setTimeout(() => onSave(row.trainer._id, date.key), 0);
+                  }}
+                  aria-label="Leave type"
+                  title="Select leave type"
+                >
+                  <option value="">Leave type...</option>
+                  {LEAVE_TYPE_OPTIONS.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+                {leaveTypeUsesOif && (
+                  <>
+                    {oifSheetValue && (
+                      <div
+                        className="trainer-attendance-oif-sheet-value small fw-semibold"
+                        title="Value for Google Sheet OIF column"
+                      >
+                        {oifSheetValue}
+                      </div>
+                    )}
+                    <input
+                      type="text"
+                      className="form-control form-control-sm trainer-attendance-oif-input"
+                      value={cell.oifNumber || ''}
+                      maxLength={12}
+                      disabled={!canEditCell || isSaving}
+                      onChange={(e) => onUpdateCell(
+                        row.trainer._id,
+                        date.key,
+                        'oifNumber',
+                        e.target.value
+                      )}
+                      onBlur={() => canEditCell && onSave(row.trainer._id, date.key)}
+                      placeholder="OIF number"
+                      aria-label="OIF number"
+                    />
+                  </>
+                )}
+                {!leaveTypeUsesOif && cell.attendanceType && oifSheetValue && (
+                  <div
+                    className="trainer-attendance-oif-sheet-value small fw-semibold"
+                    title="Value for Google Sheet OIF column"
+                  >
+                    {oifSheetValue}
+                  </div>
+                )}
+              </div>
+            ) : (
+              <input
+                type="text"
+                className="form-control form-control-sm trainer-attendance-oif-input"
+                value={cell.oifNumber}
+                maxLength={12}
+                disabled={!editable || isSaving}
+                onChange={(e) => onUpdateCell(row.trainer._id, date.key, 'oifNumber', e.target.value)}
+                onBlur={() => editable && onSave(row.trainer._id, date.key)}
+                placeholder="—"
+                title="Up to 12 characters"
+              />
+            )}
           </td>
           <td className={`trainer-attendance-mock-cell ${cellClass}`}>
             <input

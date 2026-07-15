@@ -8,6 +8,13 @@ import { isTrainerAvailableForReplacement } from '../utils/leaveStatus.js';
 import { buildTrainerAvailabilityForRange } from '../utils/trainerAvailability.js';
 import { clearAttendanceGridCache } from '../utils/attendanceGridCache.js';
 import { notifyReplacementAssignment } from '../utils/replacementNotifications.js';
+import { LEAVE_SCOPES } from '../utils/leaveScope.js';
+import {
+  getCancellationMapForRange,
+  getUncancelledScheduleDateKeys,
+} from '../utils/leaveAffectedClasses.js';
+import { toLeaveDateKey } from '../utils/leaveDateRange.js';
+import { getCanceledScheduleIdsForDate } from '../utils/classCancellations.js';
 
 const timeToMinutes = (time) => {
   const [h, m] = time.split(':').map(Number);
@@ -56,6 +63,20 @@ export const getReplacementSuggestions = async (req, res) => {
   if (!leave) {
     return res.status(400).json({ message: 'No approved leave found for this schedule' });
   }
+  const cancellationMap = await getCancellationMapForRange(
+    leave.startDate,
+    leave.endDate
+  );
+  const affectedDateKeys = getUncancelledScheduleDateKeys(
+    leave,
+    schedule,
+    cancellationMap
+  );
+  if (!affectedDateKeys.length) {
+    return res.status(400).json({
+      message: 'This class is canceled for the leave date, so no replacement is needed.',
+    });
+  }
 
   let subject = null;
   if (schedule.subject) {
@@ -79,10 +100,7 @@ export const getReplacementSuggestions = async (req, res) => {
   // ~3 queries per trainer (leave check + day conflicts + weekly hours).
   const leaveStart = normalizeDate(leave.startDate);
   const leaveEnd = normalizeDate(leave.endDate);
-  const scheduleDayDates = [];
-  for (const d = new Date(leaveStart); d <= leaveEnd; d.setDate(d.getDate() + 1)) {
-    if (WEEKDAYS[d.getDay()] === schedule.day) scheduleDayDates.push(new Date(d));
-  }
+  const scheduleDayDates = affectedDateKeys.map((dateKey) => normalizeDate(dateKey));
 
   const codesByTrainer = new Map(
     trainers.map((trainer) => [trainer._id.toString(), resolveTrainerScheduleCodes(trainer)])
@@ -137,11 +155,15 @@ export const getReplacementSuggestions = async (req, res) => {
     const scheduleCodes = codesByTrainer.get(trainer._id.toString()) || [];
     const trainerSchedules = scheduleCodes.flatMap((code) => schedulesByCode.get(code) || []);
 
-    const hasConflict = trainerSchedules.some(
-      (s) =>
-        s.day === schedule.day &&
-        timesOverlap(schedule.startTime, schedule.endTime, s.startTime, s.endTime)
-    );
+    const hasConflict = scheduleDayDates.some((date) => {
+      const dateKey = toLeaveDateKey(date);
+      return trainerSchedules.some(
+        (s) =>
+          s.day === schedule.day
+          && !cancellationMap.get(dateKey)?.has(s._id.toString())
+          && timesOverlap(schedule.startTime, schedule.endTime, s.startTime, s.endTime)
+      );
+    });
     if (hasConflict) continue;
 
     const weeklyHours = trainerSchedules.reduce((sum, s) => {
@@ -183,6 +205,7 @@ export const getReplacementSuggestions = async (req, res) => {
     subject: subject ? { name: subject.name, code: subject.code } : null,
     suggestions: eligibleSuggestions,
     otherSuggestions,
+    affectedDates: affectedDateKeys,
   });
 };
 
@@ -207,6 +230,19 @@ export const getAllReplacements = async (req, res) => {
     .lean();
 
   const replacements = [];
+  const cancellationMap = leaves.length
+    ? await getCancellationMapForRange(
+      leaves.reduce(
+        (earliest, leave) => (leave.startDate < earliest ? leave.startDate : earliest),
+        leaves[0].startDate
+      ),
+      leaves.reduce(
+        (latest, leave) => (leave.endDate > latest ? leave.endDate : latest),
+        leaves[0].endDate
+      )
+    )
+    : new Map();
+  const todayKey = toLeaveDateKey(today);
   for (const leave of leaves) {
     const startDate = normalizeDate(leave.startDate);
     const endDate = normalizeDate(leave.endDate);
@@ -219,6 +255,12 @@ export const getAllReplacements = async (req, res) => {
 
     for (const schedule of leave.affectedSchedules) {
       if (!schedule) continue;
+      const affectedDates = getUncancelledScheduleDateKeys(
+        leave,
+        schedule,
+        cancellationMap
+      );
+      if (!affectedDates.length) continue;
       const replacement = resolveReplacementTrainer(leave, schedule, new Map());
       replacements.push({
         leave: {
@@ -233,8 +275,11 @@ export const getAllReplacements = async (req, res) => {
         schedule,
         replacement,
         timelineStatus,
-        canAssign: leave.status === 'approved' && endDate >= today,
-        replacementDate: leave.startDate,
+        canAssign:
+          leave.status === 'approved'
+          && affectedDates.some((dateKey) => dateKey >= todayKey),
+        replacementDate: affectedDates[0],
+        affectedDates,
         isSlotReplacement:
           normalizeDate(leave.startDate).getTime() === normalizeDate(leave.endDate).getTime(),
       });
@@ -291,6 +336,20 @@ export const assignReplacement = async (req, res) => {
   const leave = await Leave.findOne(leaveFilter).populate('trainer', 'name employeeId');
   if (!leave) {
     return res.status(400).json({ message: 'No approved leave found for this schedule' });
+  }
+  const cancellationMap = await getCancellationMapForRange(
+    leave.startDate,
+    leave.endDate
+  );
+  const affectedDateKeys = getUncancelledScheduleDateKeys(
+    leave,
+    schedule,
+    cancellationMap
+  );
+  if (!affectedDateKeys.length) {
+    return res.status(400).json({
+      message: 'This class is canceled for the leave date, so no replacement is needed.',
+    });
   }
   if (normalizeDate(leave.endDate) < normalizeDate(new Date())) {
     return res.status(400).json({ message: 'Previous replacement records cannot be changed' });
@@ -353,6 +412,7 @@ export const assignReplacement = async (req, res) => {
         originalTrainer: leave.trainer,
         replacementTrainer: trainer,
         previousReplacementTrainer,
+        affectedDateKeys,
       });
     } catch (error) {
       // Assignment is already durable; notification failure must not roll it back.
@@ -415,10 +475,16 @@ export const getTrainerSlotsForReplacement = async (req, res) => {
   const slotDate = normalizeDate(date);
   const dayName = WEEKDAYS[slotDate.getDay()];
 
-  const schedules = await Schedule.find({
+  const [scheduledClasses, canceledScheduleIds] = await Promise.all([
+    Schedule.find({
     trainerCode: { $in: resolveTrainerScheduleCodes(trainer) },
     day: dayName,
-  }).sort({ startTime: 1, department: 1, section: 1 });
+    }).sort({ startTime: 1, department: 1, section: 1 }),
+    getCanceledScheduleIdsForDate(slotDate),
+  ]);
+  const schedules = scheduledClasses.filter(
+    (schedule) => !canceledScheduleIds.has(schedule._id.toString())
+  );
 
   res.json({
     trainer: {
@@ -464,6 +530,12 @@ export const createSlotReplacementRequest = async (req, res) => {
   if (schedule.day !== dayName) {
     return res.status(400).json({ message: 'Selected slot does not occur on the chosen date' });
   }
+  const canceledScheduleIds = await getCanceledScheduleIdsForDate(slotDate);
+  if (canceledScheduleIds.has(schedule._id.toString())) {
+    return res.status(400).json({
+      message: 'This class is canceled on the selected date, so no replacement is needed.',
+    });
+  }
 
   const existing = await Leave.findOne({
     trainer: trainerId,
@@ -484,6 +556,7 @@ export const createSlotReplacementRequest = async (req, res) => {
     startDate: slotDate,
     endDate: slotDate,
     reason: reason?.trim() || 'Ad-hoc slot replacement',
+    scope: LEAVE_SCOPES.SLOT,
     status: 'approved',
     affectedSchedules: [scheduleId],
     replacementNeeded: true,

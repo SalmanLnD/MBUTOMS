@@ -185,7 +185,7 @@ const Leaves = () => {
                     <td>{formatDate(leave.startDate)}</td>
                     <td>{formatDate(leave.endDate)}</td>
                     <td>{leave.reason}</td>
-                    <td>{leave.affectedSchedules?.length || 0}</td>
+                    <td>{leave.affectedClassCount ?? leave.affectedSchedules?.length ?? 0}</td>
                     <td><span className={`badge bg-${getLeaveStatusBadgeClass(leave.status)}`}>{formatStatus(leave.status)}</span></td>
                     <td>
                       <div className="d-flex align-items-center gap-2">
@@ -257,10 +257,15 @@ const Leaves = () => {
                 <textarea className="form-control" rows="3" value={form.reason} onChange={(e) => setForm({ ...form, reason: e.target.value })} required />
               </div>
               {preview && (
-                <div className="alert alert-info mb-0">
+                <div className={`alert ${preview.count ? 'alert-info' : 'alert-success'} mb-0`}>
                   <strong>{preview.count}</strong> class(es) will be affected.
+                  {!preview.count && (
+                    <div className="small mt-1">
+                      No replacement is needed because there are no working classes in this leave period.
+                    </div>
+                  )}
                   {preview.schedules?.map((s) => (
-                    <div key={s._id} className="small mt-1">
+                    <div key={`${s._id}-${s.date}`} className="small mt-1">
                       {formatDate(s.date)} {formatTimeRange(s.startTime, s.endTime)} — {s.department} {s.section}
                     </div>
                   ))}

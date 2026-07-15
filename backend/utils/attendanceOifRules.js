@@ -1,8 +1,15 @@
 export const IT_OIF_CODE = 'IT';
 export const IT_MOCK_PREP_HOURS = 7;
 
-export const isItOif = (oifNumber) =>
-  String(oifNumber || '').trim().toUpperCase() === IT_OIF_CODE;
+export const isItOif = (oifNumber) => {
+  const value = String(oifNumber || '').trim().toUpperCase();
+  return value.startsWith(IT_OIF_CODE);
+};
+
+export const countsAsOifDay = (oifNumber) => {
+  const value = String(oifNumber || '').trim();
+  return Boolean(value) && !isItOif(value);
+};
 
 export const resolveMockPrepHoursForOif = (oifNumber, mockPrepHours) =>
   (isItOif(oifNumber) ? IT_MOCK_PREP_HOURS : Number(mockPrepHours ?? 0));

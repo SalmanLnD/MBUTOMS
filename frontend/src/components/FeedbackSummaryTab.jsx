@@ -1,6 +1,10 @@
 import LoadingSpinner from './LoadingSpinner.jsx';
 
-const formatAverage = (value) => (value != null ? `${value}/5` : '-');
+const formatAverage = (value) => (
+  value != null && Number.isFinite(Number(value))
+    ? `${Number(value).toFixed(2)}/5`
+    : '-'
+);
 
 const FeedbackSummaryTab = ({ summary, loading }) => {
   if (loading) return <LoadingSpinner />;

@@ -8,6 +8,7 @@ import {
   isDateWithinLeave,
   toLeaveDateKey,
 } from './leaveDateRange.js';
+import { getCanceledScheduleIdsForDate } from './classCancellations.js';
 
 const WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
@@ -51,16 +52,22 @@ export const buildTrainerSchedulesForDate = async ({
   const ownedFilter = { trainerCode: { $in: scheduleCodes } };
   if (semester) ownedFilter.semester = semester;
 
-  const owned = await Schedule.find(ownedFilter).populate('venue', 'name building floor type');
   const ref = normalizeDate(referenceDate);
 
-  const leaves = await Leave.find({
-    status: 'approved',
-    ...getLeaveOverlapFilter(ref),
-    'replacements.replacementTrainer': trainer._id,
-  })
-    .populate('trainer', 'name employeeId')
-    .populate('affectedSchedules');
+  const [ownedSchedules, leaves, canceledScheduleIds] = await Promise.all([
+    Schedule.find(ownedFilter).populate('venue', 'name building floor type'),
+    Leave.find({
+      status: 'approved',
+      ...getLeaveOverlapFilter(ref),
+      'replacements.replacementTrainer': trainer._id,
+    })
+      .populate('trainer', 'name employeeId')
+      .populate('affectedSchedules'),
+    getCanceledScheduleIdsForDate(ref),
+  ]);
+  const owned = ownedSchedules.filter(
+    (schedule) => !canceledScheduleIds.has(schedule._id.toString())
+  );
 
   const ownedIds = new Set(owned.map((schedule) => schedule._id.toString()));
   const replacementSchedules = [];
@@ -76,6 +83,7 @@ export const buildTrainerSchedulesForDate = async ({
         (item) => item && item._id.toString() === entry.schedule.toString()
       );
       if (!schedule) return;
+      if (canceledScheduleIds.has(schedule._id.toString())) return;
       if (semester && schedule.semester !== semester) return;
       if (!isScheduleDayInLeaveRange(schedule.day, leave)) return;
       if (ownedIds.has(schedule._id.toString())) return;

@@ -12,6 +12,7 @@ import {
   isItOif,
   IT_MOCK_PREP_HOURS,
 } from '../utils/attendanceOifRules.js';
+import { TRAINER_ATTENDANCE_TYPES } from '../utils/trainerAttendanceTypes.js';
 
 const findTrainerByPhone = async (phone) => {
   const target = normalizePhone(phone);
@@ -113,6 +114,7 @@ export const recordWhatsappPunchIn = async (req, res) => {
   const update = {
     trainer: trainer._id,
     date: day,
+    attendanceType: TRAINER_ATTENDANCE_TYPES.OIF,
     oifNumber: trimmedOif,
     punchInSource: 'whatsapp',
     punchInRawPhone: String(phone),

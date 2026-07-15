@@ -5,13 +5,60 @@ import { normalizeDate } from '../utils/scheduleHelpers.js';
 import { resolveTrainerScheduleCodes } from '../utils/trainerMappings.js';
 import { isAuthorizedRole, MANAGEMENT_ROLES } from '../utils/roles.js';
 import { notifyReplacementCancellation } from '../utils/replacementNotifications.js';
+import { clearAttendanceGridCache } from '../utils/attendanceGridCache.js';
+import { LEAVE_SCOPES } from '../utils/leaveScope.js';
+import {
+  buildAffectedClassOccurrences,
+  getCancellationMapForRange,
+  getEffectiveAffectedSchedules,
+} from '../utils/leaveAffectedClasses.js';
 
 const WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
 const populateLeave = [
   { path: 'trainer', select: 'name employeeId email department' },
   { path: 'approvedBy', select: 'name email' },
+  {
+    path: 'affectedSchedules',
+    select: 'trainerCode day startTime endTime department section subjectCode slot semester',
+  },
 ];
+
+const addEffectiveAffectedData = (leave, cancellationMap) => {
+  const plain = leave.toObject ? leave.toObject() : { ...leave };
+  const occurrences = buildAffectedClassOccurrences(
+    plain,
+    plain.affectedSchedules,
+    cancellationMap
+  );
+  const effectiveSchedules = getEffectiveAffectedSchedules(
+    plain,
+    plain.affectedSchedules,
+    cancellationMap
+  );
+  return {
+    ...plain,
+    affectedClassCount: occurrences.length,
+    replacementNeeded:
+      plain.status !== 'rejected'
+      && plain.status !== 'cancelled'
+      && effectiveSchedules.length > 0,
+  };
+};
+
+const addEffectiveAffectedDataToLeaves = async (leaves) => {
+  if (!leaves.length) return [];
+  const startDate = leaves.reduce(
+    (earliest, leave) => (leave.startDate < earliest ? leave.startDate : earliest),
+    leaves[0].startDate
+  );
+  const endDate = leaves.reduce(
+    (latest, leave) => (leave.endDate > latest ? leave.endDate : latest),
+    leaves[0].endDate
+  );
+  const cancellationMap = await getCancellationMapForRange(startDate, endDate);
+  return leaves.map((leave) => addEffectiveAffectedData(leave, cancellationMap));
+};
 
 const getDaysInRange = (startDate, endDate) => {
   const days = [];
@@ -51,10 +98,11 @@ export const getLeaves = async (req, res) => {
     filter.trainer = req.user.trainer;
   }
 
-  const [leaves, total] = await Promise.all([
+  const [leaveDocs, total] = await Promise.all([
     Leave.find(filter).populate(populateLeave).sort({ createdAt: -1 }).skip(skip).limit(limit),
     Leave.countDocuments(filter),
   ]);
+  const leaves = await addEffectiveAffectedDataToLeaves(leaveDocs);
 
   res.json({ leaves, pagination: { page, limit, total, pages: Math.ceil(total / limit) } });
 };
@@ -67,7 +115,8 @@ export const getLeaveById = async (req, res) => {
     return res.status(403).json({ message: 'Not authorized' });
   }
 
-  res.json(leave);
+  const cancellationMap = await getCancellationMapForRange(leave.startDate, leave.endDate);
+  res.json(addEffectiveAffectedData(leave, cancellationMap));
 };
 
 export const createLeave = async (req, res) => {
@@ -84,18 +133,25 @@ export const createLeave = async (req, res) => {
 
   const affectedSchedules = await findAffectedSchedules(trainerId, startDate, endDate);
   const affectedIds = affectedSchedules.map((s) => s._id);
+  const cancellationMap = await getCancellationMapForRange(startDate, endDate);
+  const effectiveSchedules = getEffectiveAffectedSchedules(
+    { startDate, endDate },
+    affectedSchedules,
+    cancellationMap
+  );
 
   const leave = await Leave.create({
     trainer: trainerId,
     startDate,
     endDate,
     reason: req.body.reason,
+    scope: LEAVE_SCOPES.FULL_DAY,
     affectedSchedules: affectedIds,
-    replacementNeeded: affectedIds.length > 0,
+    replacementNeeded: effectiveSchedules.length > 0,
   });
 
   const populated = await Leave.findById(leave._id).populate(populateLeave);
-  res.status(201).json(populated);
+  res.status(201).json(addEffectiveAffectedData(populated, cancellationMap));
 };
 
 export const updateLeave = async (req, res) => {
@@ -123,34 +179,13 @@ export const updateLeave = async (req, res) => {
   }
 
   await leave.save();
+  clearAttendanceGridCache();
   const updated = await Leave.findById(leave._id).populate(populateLeave);
-  res.json(updated);
-};
-
-const restoreSchedulesForCancelledLeave = async (leave, originalTrainerCode) => {
-  if (!originalTrainerCode) return;
-
-  const scheduleIds = (leave.affectedSchedules || []).map((schedule) =>
-    schedule._id ? schedule._id : schedule
+  const cancellationMap = await getCancellationMapForRange(
+    updated.startDate,
+    updated.endDate
   );
-  if (!scheduleIds.length) return;
-
-  const schedules = await Schedule.find({ _id: { $in: scheduleIds } });
-  await Promise.all(
-    schedules.map(async (schedule) => {
-      if (
-        schedule.trainerCode === originalTrainerCode &&
-        !schedule.replacementFor?.trainerName &&
-        !schedule.replacementFor?.trainerCode
-      ) {
-        return;
-      }
-
-      schedule.trainerCode = originalTrainerCode;
-      schedule.replacementFor = { trainerCode: '', trainerName: '' };
-      await schedule.save();
-    })
-  );
+  res.json(addEffectiveAffectedData(updated, cancellationMap));
 };
 
 export const deleteLeave = async (req, res) => {
@@ -183,13 +218,12 @@ export const deleteLeave = async (req, res) => {
   const hadReplacements = Array.isArray(leave.replacements) && leave.replacements.length > 0;
   const revokedReplacements = hadReplacements ? [...leave.replacements] : [];
 
-  await restoreSchedulesForCancelledLeave(leave, leave.trainer?.employeeId);
-
   leave.replacements = [];
   leave.replacementNeeded = false;
   leave.status = 'cancelled';
   leave.markModified('replacements');
   await leave.save();
+  clearAttendanceGridCache();
 
   if (hadReplacements) {
     try {
@@ -224,5 +258,24 @@ export const previewAffectedSchedules = async (req, res) => {
   }
 
   const schedules = await findAffectedSchedules(trainerId, req.query.startDate, req.query.endDate);
-  res.json({ schedules, count: schedules.length });
+  const leaveRange = {
+    startDate: req.query.startDate,
+    endDate: req.query.endDate,
+  };
+  const cancellationMap = await getCancellationMapForRange(
+    req.query.startDate,
+    req.query.endDate
+  );
+  const occurrences = buildAffectedClassOccurrences(
+    leaveRange,
+    schedules,
+    cancellationMap
+  );
+  res.json({
+    schedules: occurrences.map(({ schedule, date }) => ({
+      ...(schedule.toObject ? schedule.toObject() : schedule),
+      date,
+    })),
+    count: occurrences.length,
+  });
 };

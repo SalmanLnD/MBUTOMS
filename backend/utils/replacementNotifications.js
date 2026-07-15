@@ -26,8 +26,9 @@ const buildClassLabel = (schedule) => {
   return [className, time].filter(Boolean).join(', ');
 };
 
-export const buildAssignmentDateLabel = (leave, schedule) => {
-  const dateKeys = getLeaveDateKeysForWeekday(leave, schedule?.day);
+export const buildAssignmentDateLabel = (leave, schedule, affectedDateKeys) => {
+  const dateKeys = affectedDateKeys
+    || getLeaveDateKeysForWeekday(leave, schedule?.day);
   const labels = dateKeys.map((key) => formatDateLabel(key));
   if (!labels.length) return buildDateRangeLabel(leave);
 
@@ -36,8 +37,8 @@ export const buildAssignmentDateLabel = (leave, schedule) => {
   return `${labels.join(', ')}${daySuffix}`;
 };
 
-export const buildAssignmentDetail = (leave, schedule) => {
-  const dateLabel = buildAssignmentDateLabel(leave, schedule);
+export const buildAssignmentDetail = (leave, schedule, affectedDateKeys) => {
+  const dateLabel = buildAssignmentDateLabel(leave, schedule, affectedDateKeys);
   const classLabel = buildClassLabel(schedule);
   return [dateLabel, classLabel].filter(Boolean).join(' — ');
 };
@@ -197,6 +198,7 @@ export const notifyReplacementAssignment = async ({
   originalTrainer,
   replacementTrainer,
   previousReplacementTrainer = null,
+  affectedDateKeys,
 }) => {
   if (!actor?._id || !originalTrainer?._id || !replacementTrainer?._id) return;
 
@@ -210,8 +212,8 @@ export const notifyReplacementAssignment = async ({
     previousReplacementTrainer?._id,
   ]);
 
-  const detail = buildAssignmentDetail(leave, schedule);
-  const dateKey = getAssignmentTopicTrackerDateKey(leave, schedule);
+  const detail = buildAssignmentDetail(leave, schedule, affectedDateKeys);
+  const dateKey = affectedDateKeys?.[0] || getAssignmentTopicTrackerDateKey(leave, schedule);
   const commonPath = `/topic-tracker?date=${encodeURIComponent(dateKey)}&schedule=${schedule._id}`;
   const base = notificationBase(actor);
   const notifications = [];

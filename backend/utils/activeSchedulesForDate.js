@@ -4,6 +4,7 @@ import {
   DEFAULT_SUBJECT_START_DATE,
 } from './subjectStartDate.js';
 import { normalizeDate } from './scheduleHelpers.js';
+import { getCanceledScheduleIdsForDate } from './classCancellations.js';
 
 export async function filterSchedulesActiveOnDate(schedules, referenceDate = new Date()) {
   if (!schedules.length) return [];
@@ -21,7 +22,13 @@ export async function filterSchedulesActiveOnDate(schedules, referenceDate = new
 }
 
 export async function getActiveSchedulesForDay(dayName, referenceDate = new Date()) {
-  const schedules = await Schedule.find({ day: dayName }).lean();
-  const active = await filterSchedulesActiveOnDate(schedules, referenceDate);
+  const [schedules, canceledScheduleIds] = await Promise.all([
+    Schedule.find({ day: dayName }).lean(),
+    getCanceledScheduleIdsForDate(referenceDate),
+  ]);
+  const started = await filterSchedulesActiveOnDate(schedules, referenceDate);
+  const active = started.filter(
+    (schedule) => !canceledScheduleIds.has(schedule._id.toString())
+  );
   return { schedules: active, count: active.length };
 }

@@ -13,7 +13,8 @@ import {
   getTimetableSheetStatus,
 } from '../services/sheetsService.js';
 import TimetableSheetSetupModal from '../components/TimetableSheetSetupModal.jsx';
-import { SheetIcon, ExternalLinkIcon } from '../components/icons.jsx';
+import ClassCancellationModal from '../components/ClassCancellationModal.jsx';
+import { CalendarIcon, SheetIcon, ExternalLinkIcon } from '../components/icons.jsx';
 import { getErrorMessage, toInputDate } from '../utils/helpers.js';
 import { scheduleMatchesSubject, resolveScheduleTrainerCode } from '../utils/scheduleSubject.js';
 import { getSubjectSemesterRoman } from '../utils/classPy.js';
@@ -33,6 +34,7 @@ const Timetable = () => {
   const { user, hasManagementRole } = useAuth();
   const isViewOnly = !user;
   const canEdit = Boolean(user) && hasManagementRole();
+  const canCancelClasses = user?.role === 'admin';
 
   const [trainers, setTrainers] = useState([]);
   const [schedulesByTrainer, setSchedulesByTrainer] = useState({});
@@ -43,6 +45,8 @@ const Timetable = () => {
   const [selectedSubjectId, setSelectedSubjectId] = useState('');
   const [editMode, setEditMode] = useState(false);
   const [slotModal, setSlotModal] = useState(null);
+  const [referenceDate, setReferenceDate] = useState(() => toInputDate(new Date()));
+  const [showCancellation, setShowCancellation] = useState(false);
 
   const [sheetStatus, setSheetStatus] = useState(null);
   const [showSheetSetup, setShowSheetSetup] = useState(false);
@@ -54,14 +58,13 @@ const Timetable = () => {
     setEditMode(false);
     setSlotModal(null);
     setShowSheetSetup(false);
+    setShowCancellation(false);
     setSheetStatus(null);
   }, [isViewOnly]);
 
   const loadData = useCallback(async () => {
     setLoading(true);
     try {
-      const referenceDate = toInputDate(new Date());
-
       if (isViewOnly) {
         const data = await getPublicTimetable({ referenceDate });
         setTrainers(data.trainers || []);
@@ -84,7 +87,7 @@ const Timetable = () => {
     } finally {
       setLoading(false);
     }
-  }, [isViewOnly]);
+  }, [isViewOnly, referenceDate]);
 
   useEffect(() => {
     loadData();
@@ -231,7 +234,7 @@ const Timetable = () => {
       )}
 
       <div className={`row g-3 mb-3 align-items-end timetable-controls${isViewOnly ? ' timetable-controls--view-only' : ''}`}>
-        <div className="col-md-4">
+        <div className="col-md-3">
           <label htmlFor="trainer-search" className="form-label fw-semibold">
             Search Trainers
           </label>
@@ -245,7 +248,7 @@ const Timetable = () => {
           />
         </div>
 
-        <div className="col-md-4">
+        <div className="col-md-3">
           <label htmlFor="subject-filter" className="form-label fw-semibold">
             Subject
           </label>
@@ -264,8 +267,21 @@ const Timetable = () => {
           </select>
         </div>
 
+        <div className="col-md-3">
+          <label htmlFor="timetable-reference-date" className="form-label fw-semibold">
+            Schedule Date
+          </label>
+          <input
+            id="timetable-reference-date"
+            type="date"
+            className="form-control"
+            value={referenceDate}
+            onChange={(event) => setReferenceDate(event.target.value)}
+          />
+        </div>
+
         {canEdit && (
-          <div className="col-md-4 d-flex flex-wrap gap-2">
+          <div className="col-md-3 d-flex flex-wrap gap-2">
             <button
               type="button"
               className={`btn ${editMode ? 'btn-success' : 'btn-outline-success'}`}
@@ -279,6 +295,16 @@ const Timetable = () => {
 
       {canEdit && (
         <div className="d-flex flex-wrap align-items-center gap-2 mb-3">
+          {canCancelClasses && (
+            <button
+              type="button"
+              className="btn btn-outline-danger d-inline-flex align-items-center gap-2"
+              onClick={() => setShowCancellation(true)}
+            >
+              <CalendarIcon size={16} aria-hidden="true" />
+              Cancel classes
+            </button>
+          )}
           {sheetStatus?.linked ? (
             <>
               <a
@@ -398,6 +424,21 @@ const Timetable = () => {
           initialUrl={sheetStatus?.spreadsheetUrl || ''}
           onClose={() => setShowSheetSetup(false)}
           onLinked={handleSheetLinked}
+        />
+      )}
+
+      {showCancellation && canCancelClasses && (
+        <ClassCancellationModal
+          show
+          initialDate={referenceDate}
+          onClose={() => setShowCancellation(false)}
+          onChanged={async (changedDate) => {
+            if (changedDate === referenceDate) {
+              await loadData();
+            } else {
+              setReferenceDate(changedDate);
+            }
+          }}
         />
       )}
     </>

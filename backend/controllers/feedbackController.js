@@ -68,7 +68,7 @@ export const getFeedbackSummary = async (req, res) => {
       ]),
     ]);
 
-  const roundAvg = (value) => (value != null ? Math.round(value * 10) / 10 : null);
+  const roundAvg = (value) => (value != null ? Math.round(value * 100) / 100 : null);
 
   const overallMap = new Map(overallByTrainer.map((row) => [row._id.toString(), row]));
   const monthMap = new Map(monthByTrainer.map((row) => [row._id.toString(), row]));

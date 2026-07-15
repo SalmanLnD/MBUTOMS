@@ -139,7 +139,10 @@ const Replacements = () => {
   const visibleOtherSuggestions = otherSuggestions.filter(matchesSuggestion);
   const hasVisibleSuggestions = visibleSuggestions.length > 0 || visibleOtherSuggestions.length > 0;
 
-  const formatReplacementDate = (leave, schedule) => {
+  const formatReplacementDate = (leave, schedule, affectedDates = []) => {
+    if (affectedDates.length) {
+      return affectedDates.map((date) => formatDate(date)).join(', ');
+    }
     const start = new Date(leave.startDate);
     const end = new Date(leave.endDate);
     start.setHours(0, 0, 0, 0);
@@ -213,10 +216,11 @@ const Replacements = () => {
                     replacement,
                     timelineStatus,
                     canAssign,
+                    affectedDates,
                   }) => (
                     <tr key={`${leave._id}-${schedule._id}`}>
                       <td>{leave.trainer?.name}</td>
-                      <td>{formatReplacementDate(leave, schedule)}</td>
+                      <td>{formatReplacementDate(leave, schedule, affectedDates)}</td>
                       <td>{formatTimeRange(schedule.startTime, schedule.endTime)}</td>
                       <td>{schedule.department} {schedule.section}</td>
                       <td>{schedule.subject?.name || schedule.subjectCode || '—'}</td>
