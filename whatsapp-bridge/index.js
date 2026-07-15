@@ -784,7 +784,9 @@ const wireClient = (activeClient) => {
         }
 
         rows.push({
-          id: msg.id?._serialized || '',
+          id: msg.id?._serialized
+            || (msg.id?.id && msg.id?.remote ? `${msg.id.remote}_${msg.id.fromMe ? 1 : 0}_${msg.id.id}` : '')
+            || `fallback-${msg.t}-${author || 'unknown'}`,
           timestamp: msg.t,
           hasMedia,
           body,
@@ -807,7 +809,8 @@ const wireClient = (activeClient) => {
   };
 
   const processScrapedPunch = async (raw, { fromCatchUp = false } = {}) => {
-    if (!raw?.id || processedMessageIds.has(raw.id) || inFlightMessageIds.has(raw.id)) return 'skip-dup';
+    if (!raw?.id) return 'skip-no-id';
+    if (processedMessageIds.has(raw.id) || inFlightMessageIds.has(raw.id)) return 'skip-dup';
     // Prefer media punches; still accept captioned media-like types.
     if (!raw.hasMedia && !['image', 'video', 'document', 'album', 'gif'].includes(raw.type)) {
       return 'skip-non-media';
