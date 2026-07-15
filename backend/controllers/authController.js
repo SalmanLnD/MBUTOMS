@@ -2,11 +2,13 @@ import jwt from 'jsonwebtoken';
 import User from '../models/User.js';
 import { INITIAL_TRAINER_PASSWORD } from '../constants/trainerAuth.js';
 import { canImpersonate, IMPERSONATION_TARGET_ROLES, ROLES } from '../utils/roles.js';
+import { APP_VERSION } from '../utils/sessionVersion.js';
 
 const generateToken = (user, impersonatedBy = null) => {
   const payload = {
     id: user._id,
     sv: user.sessionVersion ?? 1,
+    av: APP_VERSION,
     ...(impersonatedBy ? { impersonatedBy } : {}),
   };
   return jwt.sign(payload, process.env.JWT_SECRET, {

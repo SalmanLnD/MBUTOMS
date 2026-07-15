@@ -1,7 +1,13 @@
 import jwt from 'jsonwebtoken';
 import User from '../models/User.js';
 import { isAuthorizedRole } from '../utils/roles.js';
-import { SESSION_EXPIRED_CODE, SESSION_EXPIRED_MESSAGE } from '../utils/sessionVersion.js';
+import {
+  APP_VERSION,
+  APP_VERSION_UPDATED_CODE,
+  APP_VERSION_UPDATED_MESSAGE,
+  SESSION_EXPIRED_CODE,
+  SESSION_EXPIRED_MESSAGE,
+} from '../utils/sessionVersion.js';
 import { attachManagerEditNotifier } from '../utils/managerEditNotifications.js';
 
 export const protect = async (req, res, next) => {
@@ -17,6 +23,14 @@ export const protect = async (req, res, next) => {
 
   try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    if (decoded.av !== APP_VERSION) {
+      return res.status(401).json({
+        message: APP_VERSION_UPDATED_MESSAGE,
+        code: APP_VERSION_UPDATED_CODE,
+        version: APP_VERSION,
+      });
+    }
+
     req.user = await User.findById(decoded.id).select('-password');
     if (!req.user) {
       return res.status(401).json({ message: 'User not found' });
