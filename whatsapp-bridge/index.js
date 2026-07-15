@@ -82,6 +82,29 @@ const rememberProcessedMessageId = (messageId) => {
 const ensureSingleBridgeInstance = async () => {
   const lockPath = './.bridge-instance.lock';
   const fs = await import('node:fs/promises');
+  const { execSync } = await import('node:child_process');
+
+  // Hard-stop any other bridge node processes left behind by crashed PM2 restarts.
+  try {
+    const raw = execSync("pgrep -af 'node .*whatsapp-bridge/index.js' || true", {
+      encoding: 'utf8',
+    });
+    for (const line of raw.split('\n')) {
+      const match = line.trim().match(/^(\d+)\s/);
+      if (!match) continue;
+      const pid = Number(match[1]);
+      if (!pid || pid === process.pid) continue;
+      try {
+        process.kill(pid, 'SIGKILL');
+        log(`Killed stale bridge process pid ${pid}`);
+      } catch {
+        // already gone
+      }
+    }
+  } catch {
+    // pgrep unavailable
+  }
+
   try {
     const existing = await fs.readFile(lockPath, 'utf8');
     const [pid, startedAt] = existing.trim().split('|');
@@ -135,11 +158,32 @@ let bridgeReady = false;
 let reconnecting = false;
 let reconnectTimer = null;
 let watchdogTimer = null;
+let readyTimeout = null;
 let reconnectAttempt = 0;
 let lastTargetGroupActivityAt = null;
 let lastReadyAt = 0;
 let bridgeStartedAt = Date.now();
 let shuttingDown = false;
+
+const READY_TIMEOUT_MS = Number(process.env.READY_TIMEOUT_MS) || 120000;
+
+const clearReadyTimeout = () => {
+  if (readyTimeout) {
+    clearTimeout(readyTimeout);
+    readyTimeout = null;
+  }
+};
+
+const armReadyTimeout = () => {
+  clearReadyTimeout();
+  readyTimeout = setTimeout(() => {
+    readyTimeout = null;
+    if (!bridgeReady && !shuttingDown && !reconnecting) {
+      log(`Ready timeout after ${Math.round(READY_TIMEOUT_MS / 1000)}s — forcing reconnect`);
+      scheduleReconnect('ready-timeout');
+    }
+  }, READY_TIMEOUT_MS);
+};
 
 const touchTargetGroupActivity = () => {
   lastTargetGroupActivityAt = Date.now();
@@ -289,15 +333,20 @@ const wireClient = (activeClient) => {
     qrcode.generate(qr, { small: true });
   });
 
-  activeClient.on('authenticated', () => log('WhatsApp authenticated'));
+  activeClient.on('authenticated', () => {
+    log('WhatsApp authenticated');
+    armReadyTimeout();
+  });
   activeClient.on('auth_failure', (msg) => {
     log('Auth failure:', msg);
+    clearReadyTimeout();
     scheduleReconnect(`auth_failure:${msg}`);
   });
 
   activeClient.on('disconnected', (reason) => {
     log('Disconnected:', reason);
     bridgeReady = false;
+    clearReadyTimeout();
     scheduleReconnect(`disconnected:${reason}`);
   });
 
@@ -524,6 +573,7 @@ const wireClient = (activeClient) => {
   };
 
   activeClient.on('ready', async () => {
+    clearReadyTimeout();
     log('Bridge is ready');
     bridgeReady = true;
     reconnectAttempt = 0;

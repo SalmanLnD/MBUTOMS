@@ -1,0 +1,9 @@
+{
+  "commands": [
+    "date -u",
+    "ls -la /home/ubuntu/.pm2/logs/ | tr -cd '\\11\\12\\15\\40-\\176'",
+    "python3 - <<'PY'\nfrom pathlib import Path\nbase = Path('/home/ubuntu/.pm2/logs')\nfor name in sorted(base.glob('mbutoms-whatsapp-bridge*.log')):\n    lines = name.read_text(errors='ignore').splitlines()\n    print('=== ' + name.name + ' lines=' + str(len(lines)) + ' ===')\n    for ln in lines[-20:]:\n        print(ln.encode('ascii','ignore').decode())\n    print('')\nPY",
+    "grep -n 'Catch-up\\|watchdog:not-ready' /opt/MBUTOMS/whatsapp-bridge/index.js | head -5 | tr -cd '\\11\\12\\15\\40-\\176'",
+    "sudo -u ubuntu bash -lc 'pm2 jlist' | node -e \"let d='';process.stdin.on('data',c=>d+=c);process.stdin.on('end',()=>{const j=JSON.parse(d||'[]');const p=j.find(x=>x.name==='mbutoms-whatsapp-bridge');console.log('status='+p?.pm2_env?.status);console.log('uptime_sec='+Math.floor((Date.now()-p?.pm2_env?.pm_uptime)/1000));console.log('out='+p?.pm2_env?.pm_out_log_path);console.log('err='+p?.pm2_env?.pm_err_log_path);});\""
+  ]
+}

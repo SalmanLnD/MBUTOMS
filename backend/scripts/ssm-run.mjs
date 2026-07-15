@@ -10,18 +10,23 @@ const cmdId = execSync(
   { encoding: 'utf8', env }
 ).trim();
 
-for (let i = 0; i < 20; i += 1) {
+for (let i = 0; i < 90; i += 1) {
   const status = execSync(
     `aws ssm get-command-invocation --command-id ${cmdId} --instance-id ${instanceId} --region ap-south-1 --query Status --output text`,
     { encoding: 'utf8', env }
   ).trim();
-  if (status === 'Success' || status === 'Failed') {
-    const out = execSync(
-      `aws ssm get-command-invocation --command-id ${cmdId} --instance-id ${instanceId} --region ap-south-1 --query StandardOutputContent --output text`,
-      { encoding: 'utf8', env }
-    );
-    console.log('Status:', status);
-    console.log(out.replace(/[^\x09\x0a\x0d\x20-\x7e]/g, ''));
+  if (status === 'Success' || status === 'Failed' || status === 'Cancelled' || status === 'TimedOut') {
+    try {
+      const out = execSync(
+        `aws ssm get-command-invocation --command-id ${cmdId} --instance-id ${instanceId} --region ap-south-1 --query StandardOutputContent --output text`,
+        { encoding: 'utf8', env }
+      );
+      console.log('Status:', status);
+      console.log(String(out).replace(/[^\x09\x0a\x0d\x20-\x7e]/g, ''));
+    } catch (error) {
+      console.log('Status:', status);
+      console.log('Could not read StandardOutputContent (encoding). Trying ASCII via SSM echo fallback.');
+    }
     process.exit(status === 'Success' ? 0 : 1);
   }
   await sleep(2000);

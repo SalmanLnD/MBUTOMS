@@ -1,0 +1,11 @@
+{
+  "commands": [
+    "date -u",
+    "pgrep -af chrome | head -10 | tr -cd '\\11\\12\\15\\40-\\176'",
+    "pgrep -af 'whatsapp-bridge/index' | tr -cd '\\11\\12\\15\\40-\\176'",
+    "python3 - <<'PY'\nfrom pathlib import Path\np = Path('/home/ubuntu/.pm2/logs/mbutoms-whatsapp-bridge-out-0.log')\nlines = p.read_text(errors='ignore').splitlines()\nprint('lines=' + str(len(lines)))\nfor ln in lines[-40:]:\n    print(ln.encode('ascii','ignore').decode())\nPY",
+    "python3 - <<'PY'\nfrom pathlib import Path\np = Path('/home/ubuntu/.pm2/logs/mbutoms-whatsapp-bridge-error-0.log')\nlines = p.read_text(errors='ignore').splitlines() if p.exists() else []\nprint('err_lines=' + str(len(lines)))\nfor ln in lines[-30:]:\n    print(ln.encode('ascii','ignore').decode())\nPY",
+    "free -m | tr -cd '\\11\\12\\15\\40-\\176'",
+    "df -h / | tr -cd '\\11\\12\\15\\40-\\176'"
+  ]
+}

@@ -1,0 +1,20 @@
+{
+  "commands": [
+    "sudo -u ubuntu bash -lc 'cd /opt/MBUTOMS && git fetch origin main && git reset --hard origin/main'",
+    "sudo -u ubuntu bash -lc 'cd /opt/MBUTOMS/whatsapp-bridge && npm install --omit=dev'",
+    "grep -n 'Catch-up\\|watchdog:not-ready\\|wait-lock' /opt/MBUTOMS/whatsapp-bridge/index.js | head -5 | tr -cd '\\11\\12\\15\\40-\\176'",
+    "sudo pkill -9 -f '/opt/MBUTOMS/whatsapp-bridge/index.js' || true",
+    "sudo pkill -9 -f 'wwebjs_auth' || true",
+    "sudo pkill -9 -f chrome || true",
+    "sleep 4",
+    "rm -f /opt/MBUTOMS/whatsapp-bridge/.wwebjs_auth/session/SingletonLock",
+    "rm -f /opt/MBUTOMS/whatsapp-bridge/.wwebjs_auth/session/DevToolsActivePort",
+    "rm -f /opt/MBUTOMS/whatsapp-bridge/.bridge-instance.lock",
+    "sudo -u ubuntu bash -lc 'pm2 delete all 2>/dev/null || true'",
+    "sleep 2",
+    "sudo -u ubuntu bash -lc 'cd /opt/MBUTOMS/whatsapp-bridge && pm2 start ecosystem.config.cjs && pm2 save'",
+    "sleep 70",
+    "sudo -u ubuntu bash -lc 'pm2 jlist' | node -e \"let d='';process.stdin.on('data',c=>d+=c);process.stdin.on('end',()=>{const j=JSON.parse(d||'[]');const p=j.find(x=>x.name==='mbutoms-whatsapp-bridge');console.log('status='+p?.pm2_env?.status);console.log('restarts='+p?.pm2_env?.restart_time);console.log('uptime_sec='+Math.floor((Date.now()-p?.pm2_env?.pm_uptime)/1000));});\"",
+    "python3 - <<'PY'\nfrom pathlib import Path\np = Path('/home/ubuntu/.pm2/logs/mbutoms-whatsapp-bridge-out.log')\nlines = p.read_text(errors='ignore').splitlines() if p.exists() else []\nkeys = ('Bridge is ready','Listening to group','Catch-up','Forwarding','Recorded','Failed','Scheduling reconnect','QR code','authenticated')\nmatched = [ln for ln in lines if any(k in ln for k in keys)]\nprint('--- recent bridge events ---')\nfor ln in matched[-30:]:\n    print(ln.encode('ascii','ignore').decode())\nprint('--- last 8 raw ---')\nfor ln in lines[-8:]:\n    print(ln.encode('ascii','ignore').decode())\nPY"
+  ]
+}

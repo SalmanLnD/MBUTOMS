@@ -1,0 +1,21 @@
+{
+  "commands": [
+    "date -u",
+    "sudo pkill -9 -f '/opt/MBUTOMS/whatsapp-bridge/index.js' || true",
+    "sudo pkill -9 -f 'wwebjs_auth' || true",
+    "sudo pkill -9 -f chrome || true",
+    "sleep 5",
+    "pgrep -af 'whatsapp-bridge/index|chrome-linux64/chrome --' | tr -cd '\\11\\12\\15\\40-\\176' || echo 'CLEAN'",
+    "rm -f /opt/MBUTOMS/whatsapp-bridge/.wwebjs_auth/session/SingletonLock",
+    "rm -f /opt/MBUTOMS/whatsapp-bridge/.wwebjs_auth/session/DevToolsActivePort",
+    "rm -f /opt/MBUTOMS/whatsapp-bridge/.bridge-instance.lock",
+    "sudo -u ubuntu bash -lc 'pm2 delete all 2>/dev/null || true'",
+    "sleep 2",
+    "sudo -u ubuntu bash -lc 'pm2 flush || true'",
+    "sudo -u ubuntu bash -lc 'cd /opt/MBUTOMS/whatsapp-bridge && pm2 start ecosystem.config.cjs --update-env && pm2 save'",
+    "sleep 90",
+    "pgrep -c -f 'node /opt/MBUTOMS/whatsapp-bridge/index.js' || true",
+    "python3 - <<'PY'\nfrom pathlib import Path\nfor name in ('mbutoms-whatsapp-bridge-out-0.log','mbutoms-whatsapp-bridge-out.log','mbutoms-whatsapp-bridge-error-0.log'):\n    p = Path('/home/ubuntu/.pm2/logs') / name\n    if not p.exists():\n        print(name + ': missing')\n        continue\n    lines = p.read_text(errors='ignore').splitlines()\n    print('=== ' + name + ' lines=' + str(len(lines)) + ' ===')\n    for ln in lines[-25:]:\n        print(ln.encode('ascii','ignore').decode())\n    print('')\nPY",
+    "free -m | head -2 | tr -cd '\\11\\12\\15\\40-\\176'"
+  ]
+}
