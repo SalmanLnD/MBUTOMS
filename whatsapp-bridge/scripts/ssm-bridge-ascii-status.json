@@ -1,0 +1,10 @@
+{
+  "commands": [
+    "date -u",
+    "echo NODE=$(pgrep -c -f 'node /opt/MBUTOMS/whatsapp-bridge/index.js' || echo 0)",
+    "pgrep -af 'node /opt/MBUTOMS/whatsapp-bridge/index.js' | tr -cd '\\11\\12\\15\\40-\\176'",
+    "python3 - <<'PY'\nfrom pathlib import Path\nfor p in sorted(Path('/home/ubuntu/.pm2/logs').glob('mbutoms-whatsapp-bridge-out*.log')):\n    lines=p.read_text(errors='ignore').splitlines()\n    print('FILE', p.name, 'N', len(lines))\n    for ln in lines[-25:]:\n        print(ln.encode('ascii','ignore').decode())\nPY",
+    "grep -c 'Ready timeout' /opt/MBUTOMS/whatsapp-bridge/index.js || true",
+    "sudo -u ubuntu bash -lc 'pm2 jlist' | node -e \"let d='';process.stdin.on('data',c=>d+=c);process.stdin.on('end',()=>{const j=JSON.parse(d||'[]');const p=j.find(x=>x.name==='mbutoms-whatsapp-bridge');console.log('status='+(p&&p.pm2_env&&p.pm2_env.status));console.log('uptime='+(p?Math.floor((Date.now()-p.pm2_env.pm_uptime)/1000): -1));});\""
+  ]
+}

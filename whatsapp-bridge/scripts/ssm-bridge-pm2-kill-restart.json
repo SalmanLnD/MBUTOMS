@@ -1,6 +1,8 @@
 {
   "commands": [
     "date -u",
+    "sudo -u ubuntu bash -lc 'cd /opt/MBUTOMS && git fetch origin main && git reset --hard origin/main'",
+    "grep -n 'Ready timeout\\|Killed stale bridge\\|armReadyTimeout' /opt/MBUTOMS/whatsapp-bridge/index.js | head -5 | tr -cd '\\11\\12\\15\\40-\\176'",
     "sudo -u ubuntu bash -lc 'pm2 kill' || true",
     "sleep 2",
     "sudo pkill -9 -f '/opt/MBUTOMS/whatsapp-bridge/index.js' || true",
@@ -8,15 +10,13 @@
     "sudo pkill -9 -f 'chrome-linux64/chrome' || true",
     "sleep 5",
     "echo NODE_COUNT=$(pgrep -c -f 'node /opt/MBUTOMS/whatsapp-bridge/index.js' || echo 0)",
-    "echo CHROME_COUNT=$(pgrep -c -f 'chrome-linux64/chrome' || echo 0)",
     "rm -f /opt/MBUTOMS/whatsapp-bridge/.wwebjs_auth/session/SingletonLock /opt/MBUTOMS/whatsapp-bridge/.wwebjs_auth/session/DevToolsActivePort /opt/MBUTOMS/whatsapp-bridge/.bridge-instance.lock",
-    "systemctl list-units --type=service --all | grep -i 'mbutoms\\|whatsapp\\|pm2' | tr -cd '\\11\\12\\15\\40-\\176' || true",
     "sudo -u ubuntu bash -lc 'cd /opt/MBUTOMS/whatsapp-bridge && pm2 start ecosystem.config.cjs && pm2 save'",
     "sleep 20",
     "echo AFTER_NODE=$(pgrep -c -f 'node /opt/MBUTOMS/whatsapp-bridge/index.js' || echo 0)",
     "pgrep -af 'node /opt/MBUTOMS/whatsapp-bridge/index.js' | tr -cd '\\11\\12\\15\\40-\\176'",
-    "sleep 100",
-    "python3 - <<'PY'\nfrom pathlib import Path\npaths = list(Path('/home/ubuntu/.pm2/logs').glob('mbutoms-whatsapp-bridge-out*.log'))\nfor p in sorted(paths):\n    lines = p.read_text(errors='ignore').splitlines()\n    print('FILE=' + p.name + ' TOTAL=' + str(len(lines)))\n    for ln in lines[-15:]:\n        print(ln.encode('ascii','ignore').decode())\n    print('---')\nPY",
+    "sleep 130",
+    "python3 - <<'PY'\nfrom pathlib import Path\npaths = list(Path('/home/ubuntu/.pm2/logs').glob('mbutoms-whatsapp-bridge-out*.log'))\nfor p in sorted(paths):\n    lines = p.read_text(errors='ignore').splitlines()\n    print('FILE=' + p.name + ' TOTAL=' + str(len(lines)))\n    for ln in lines[-20:]:\n        print(ln.encode('ascii','ignore').decode())\n    print('---')\nPY",
     "echo FINAL_NODE=$(pgrep -c -f 'node /opt/MBUTOMS/whatsapp-bridge/index.js' || echo 0)",
     "free -m | head -2 | tr -cd '\\11\\12\\15\\40-\\176'"
   ]

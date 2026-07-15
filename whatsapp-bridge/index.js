@@ -82,28 +82,6 @@ const rememberProcessedMessageId = (messageId) => {
 const ensureSingleBridgeInstance = async () => {
   const lockPath = './.bridge-instance.lock';
   const fs = await import('node:fs/promises');
-  const { execSync } = await import('node:child_process');
-
-  // Hard-stop any other bridge node processes left behind by crashed PM2 restarts.
-  try {
-    const raw = execSync("pgrep -af 'node .*whatsapp-bridge/index.js' || true", {
-      encoding: 'utf8',
-    });
-    for (const line of raw.split('\n')) {
-      const match = line.trim().match(/^(\d+)\s/);
-      if (!match) continue;
-      const pid = Number(match[1]);
-      if (!pid || pid === process.pid) continue;
-      try {
-        process.kill(pid, 'SIGKILL');
-        log(`Killed stale bridge process pid ${pid}`);
-      } catch {
-        // already gone
-      }
-    }
-  } catch {
-    // pgrep unavailable
-  }
 
   try {
     const existing = await fs.readFile(lockPath, 'utf8');
@@ -555,20 +533,44 @@ const wireClient = (activeClient) => {
   const catchUpRecentGroupMessages = async () => {
     if (!GROUP_ID) return;
     try {
-      const chat = await withRetries('catchup-getChatById', () => activeClient.getChatById(GROUP_ID), {
-        attempts: 3,
-        delayMs: 5000,
-      });
+      // WhatsApp store is often not fully warm immediately after ready.
+      await sleep(10000);
+      let chat = null;
+      try {
+        chat = await withRetries('catchup-getChatById', () => activeClient.getChatById(GROUP_ID), {
+          attempts: 3,
+          delayMs: 8000,
+        });
+      } catch (error) {
+        log(`catchup-getChatById failed: ${error?.message || error}. Falling back to getChats.`);
+      }
+
+      if (!chat) {
+        const chats = await withRetries('catchup-getChats', () => activeClient.getChats(), {
+          attempts: 2,
+          delayMs: 8000,
+        });
+        chat = chats.find((item) => item.id?._serialized === GROUP_ID) || null;
+      }
+
+      if (!chat) {
+        log(`Catch-up aborted: group ${GROUP_ID} not found`);
+        return;
+      }
+
       const messages = await chat.fetchMessages({ limit: catchupMessageLimit });
       const cutoffMs = Date.now() - catchupLookbackMs;
       const recent = messages.filter((message) => (message.timestamp || 0) * 1000 >= cutoffMs);
       log(`Catch-up: scanning ${recent.length}/${messages.length} recent group messages (last ${CATCHUP_LOOKBACK_HOURS}h)`);
+      let forwarded = 0;
       for (const message of recent) {
+        const before = processedMessageIds.size;
         await handleMessage(message, { fromCatchUp: true });
+        if (processedMessageIds.size > before) forwarded += 1;
       }
-      log('Catch-up complete');
+      log(`Catch-up complete (recorded/updated ${forwarded} media punch messages)`);
     } catch (error) {
-      log('Catch-up failed:', error.message);
+      log('Catch-up failed:', error?.message || String(error));
     }
   };
 
