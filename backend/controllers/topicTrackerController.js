@@ -24,6 +24,7 @@ import {
   isAllowedTopicForSubject,
 } from '../utils/topicTrackerTopicCatalog.js';
 import Subject from '../models/Subject.js';
+import { getLeaveOverlapFilter } from '../utils/leaveDateRange.js';
 
 const MANAGEMENT_VIEW_ROLES = [...FULL_ACCESS_ROLES, ROLES.SUBJECT_COORDINATOR];
 
@@ -34,11 +35,9 @@ const computeAttendancePercent = (allotted, present) => {
 
 const isAssignedReplacementForDate = async (user, scheduleId, date) => {
   if (!user?.trainer || !scheduleId || !date) return false;
-  const ref = normalizeDate(date);
   return Boolean(await Leave.exists({
     status: 'approved',
-    startDate: { $lte: ref },
-    endDate: { $gte: ref },
+    ...getLeaveOverlapFilter(date),
     replacements: {
       $elemMatch: {
         schedule: scheduleId,

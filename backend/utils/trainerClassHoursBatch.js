@@ -10,6 +10,10 @@ import {
   DEFAULT_SUBJECT_START_DATE,
 } from './subjectStartDate.js';
 import { getWeekdaysInLeaveRange } from './trainerScheduleView.js';
+import {
+  getLeaveOverlapFilter,
+  isDateWithinLeave,
+} from './leaveDateRange.js';
 
 const SCHEDULE_FIELDS = 'day startTime endTime trainerCode semester subject subjectCode';
 
@@ -125,8 +129,7 @@ export const computeClassHandlingHoursBatch = async (
     buildSubjectStartDateMap(),
     Leave.find({
       status: 'approved',
-      startDate: { $lte: rangeEnd },
-      endDate: { $gte: rangeStart },
+      ...getLeaveOverlapFilter(rangeStart, rangeEnd),
       'replacements.replacementTrainer': { $in: trainerIds },
     })
       .select('startDate endDate replacements')
@@ -159,12 +162,14 @@ export const computeClassHandlingHoursBatch = async (
   );
 
   const replacementByTrainerDate = new Map();
+  const replacedOwnedScheduleIdsByTrainerDate = new Map();
 
   dates.forEach((date) => {
     const dateKey = toAttendanceDateKey(date);
     const dayName = getAttendanceWeekdayName(date);
 
     leaves.forEach((leave) => {
+      if (!isDateWithinLeave(date, leave)) return;
       const leaveDays = leaveWeekdays.get(leave._id.toString());
       if (!leaveDays?.has(dayName)) return;
 
@@ -176,6 +181,17 @@ export const computeClassHandlingHoursBatch = async (
         if (!schedule || schedule.day !== dayName) return;
         if (semester && schedule.semester !== semester) return;
         if (!isActiveOnDate(schedule, date, subjectStartMap)) return;
+
+        const originalTrainerId = codeToTrainerId.get(schedule.trainerCode);
+        if (originalTrainerId) {
+          const originalKey = `${originalTrainerId}|${dateKey}`;
+          let replacedIds = replacedOwnedScheduleIdsByTrainerDate.get(originalKey);
+          if (!replacedIds) {
+            replacedIds = new Set();
+            replacedOwnedScheduleIdsByTrainerDate.set(originalKey, replacedIds);
+          }
+          replacedIds.add(schedule._id.toString());
+        }
 
         const key = `${replacementTrainerId}|${dateKey}`;
         let entries = replacementByTrainerDate.get(key);
@@ -194,8 +210,12 @@ export const computeClassHandlingHoursBatch = async (
 
     trainers.forEach((trainer) => {
       const trainerId = trainer._id.toString();
-      const owned = (schedulesByTrainerDay.get(trainerId)?.get(dayName) || []).filter((schedule) =>
-        isActiveOnDate(schedule, date, subjectStartMap)
+      const replacedOwnedIds =
+        replacedOwnedScheduleIdsByTrainerDate.get(`${trainerId}|${dateKey}`) || new Set();
+      const owned = (schedulesByTrainerDay.get(trainerId)?.get(dayName) || []).filter(
+        (schedule) =>
+          !replacedOwnedIds.has(schedule._id.toString())
+          && isActiveOnDate(schedule, date, subjectStartMap)
       );
       const replacements = replacementByTrainerDate.get(`${trainerId}|${dateKey}`) || [];
 

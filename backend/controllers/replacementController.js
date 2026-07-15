@@ -6,6 +6,8 @@ import { normalizeDate } from '../utils/scheduleHelpers.js';
 import { resolveTrainerScheduleCodes } from '../utils/trainerMappings.js';
 import { isTrainerAvailableForReplacement } from '../utils/leaveStatus.js';
 import { buildTrainerAvailabilityForRange } from '../utils/trainerAvailability.js';
+import { clearAttendanceGridCache } from '../utils/attendanceGridCache.js';
+import { notifyReplacementAssignment } from '../utils/replacementNotifications.js';
 
 const timeToMinutes = (time) => {
   const [h, m] = time.split(':').map(Number);
@@ -322,6 +324,14 @@ export const assignReplacement = async (req, res) => {
   const existingIndex = leave.replacements.findIndex(
     (entry) => entry.schedule.toString() === scheduleId.toString()
   );
+  const previousReplacementId = existingIndex >= 0
+    ? leave.replacements[existingIndex].replacementTrainer?.toString()
+    : '';
+  const assignmentChanged = previousReplacementId !== replacementTrainerId.toString();
+  const previousReplacementTrainer = assignmentChanged && previousReplacementId
+    ? await Trainer.findById(previousReplacementId).select('name employeeId')
+    : null;
+
   if (existingIndex >= 0) {
     leave.replacements[existingIndex].replacementTrainer = replacementTrainerId;
     leave.replacements[existingIndex].assignedAt = new Date();
@@ -332,6 +342,23 @@ export const assignReplacement = async (req, res) => {
 
   leave.markModified('replacements');
   await leave.save();
+  clearAttendanceGridCache();
+
+  if (assignmentChanged) {
+    try {
+      await notifyReplacementAssignment({
+        actor: req.user,
+        leave,
+        schedule,
+        originalTrainer: leave.trainer,
+        replacementTrainer: trainer,
+        previousReplacementTrainer,
+      });
+    } catch (error) {
+      // Assignment is already durable; notification failure must not roll it back.
+      console.error('Failed to send replacement assignment notifications:', error.message);
+    }
+  }
 
   res.json({
     schedule,

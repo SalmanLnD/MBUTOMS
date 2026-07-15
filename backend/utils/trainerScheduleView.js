@@ -3,18 +3,28 @@ import Leave from '../models/Leave.js';
 import Trainer from '../models/Trainer.js';
 import { normalizeDate } from './scheduleHelpers.js';
 import { resolveTrainerScheduleCodes } from './trainerMappings.js';
+import {
+  getLeaveOverlapFilter,
+  isDateWithinLeave,
+  toLeaveDateKey,
+} from './leaveDateRange.js';
 
 const WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
 export const getWeekdaysInLeaveRange = (startDate, endDate) => {
   const days = [];
-  const start = normalizeDate(startDate);
-  const end = normalizeDate(endDate);
-  const cursor = new Date(start);
+  const startKey = toLeaveDateKey(startDate);
+  const endKey = toLeaveDateKey(endDate);
+  if (!startKey || !endKey) return days;
+
+  const [startYear, startMonth, startDay] = startKey.split('-').map(Number);
+  const [endYear, endMonth, endDay] = endKey.split('-').map(Number);
+  const cursor = new Date(Date.UTC(startYear, startMonth - 1, startDay, 12));
+  const end = new Date(Date.UTC(endYear, endMonth - 1, endDay, 12));
 
   while (cursor <= end) {
-    days.push(WEEKDAYS[cursor.getDay()]);
-    cursor.setDate(cursor.getDate() + 1);
+    days.push(WEEKDAYS[cursor.getUTCDay()]);
+    cursor.setUTCDate(cursor.getUTCDate() + 1);
   }
 
   return [...new Set(days)];
@@ -46,8 +56,7 @@ export const buildTrainerSchedulesForDate = async ({
 
   const leaves = await Leave.find({
     status: 'approved',
-    startDate: { $lte: ref },
-    endDate: { $gte: ref },
+    ...getLeaveOverlapFilter(ref),
     'replacements.replacementTrainer': trainer._id,
   })
     .populate('trainer', 'name employeeId')
@@ -57,6 +66,7 @@ export const buildTrainerSchedulesForDate = async ({
   const replacementSchedules = [];
 
   leaves.forEach((leave) => {
+    if (!isDateWithinLeave(ref, leave)) return;
     leave.replacements?.forEach((entry) => {
       const replacementTrainerId =
         entry.replacementTrainer?._id?.toString() || entry.replacementTrainer?.toString();

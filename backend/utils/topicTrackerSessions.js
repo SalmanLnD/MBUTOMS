@@ -16,6 +16,7 @@ import {
   buildTrainerFilterForCoordinatorSubjects,
 } from './subjectCoordinatorAccess.js';
 import { getTopicOptionsForSubjectDoc } from './topicTrackerTopicCatalog.js';
+import { getLeaveOverlapFilter } from './leaveDateRange.js';
 
 const WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
@@ -84,8 +85,7 @@ const buildReplacementMap = async (scheduleIds, ref) => {
   if (!scheduleIds.length) return new Map();
   const leaves = await Leave.find({
     status: 'approved',
-    startDate: { $lte: ref },
-    endDate: { $gte: ref },
+    ...getLeaveOverlapFilter(ref),
     'replacements.schedule': { $in: scheduleIds },
   }).select('replacements.schedule replacements.replacementTrainer').lean();
 
