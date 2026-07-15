@@ -280,14 +280,12 @@ export const getTrainerPunchInLogs = async (req, res) => {
   }
 
   if (req.query.from || req.query.to) {
-    filter.punchInAt = { ...filter.punchInAt };
+    // Filter by attendance calendar day (IST), not punchInAt UTC walls.
     if (req.query.from) {
-      filter.punchInAt.$gte = normalizeAttendanceDate(req.query.from);
+      filter.date = { ...filter.date, $gte: normalizeAttendanceDate(req.query.from) };
     }
     if (req.query.to) {
-      const end = normalizeAttendanceDate(req.query.to);
-      end.setUTCHours(23, 59, 59, 999);
-      filter.punchInAt.$lte = end;
+      filter.date = { ...filter.date, $lte: normalizeAttendanceDate(req.query.to) };
     }
   }
 

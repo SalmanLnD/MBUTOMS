@@ -16,11 +16,13 @@ const {
   RECONNECT_MIN_MS = '15000',
   RECONNECT_MAX_MS = '300000',
   WATCHDOG_INTERVAL_MS = '300000',
-  WATCHDOG_PUNCH_IDLE_MS = '7200000',
+  WATCHDOG_PUNCH_IDLE_MS = '1800000',
   PUNCH_WATCH_TZ = 'Asia/Kolkata',
   PUNCH_WATCH_START = '06:30',
   PUNCH_WATCH_END = '11:00',
   PROCESSED_IDS_MAX = '5000',
+  CATCHUP_MESSAGE_LIMIT = '150',
+  CATCHUP_LOOKBACK_HOURS = '36',
 } = process.env;
 
 const LIST_GROUPS = process.argv.includes('--list-groups');
@@ -36,12 +38,16 @@ if (!ONE_SHOT_MODE && (!WEBHOOK_URL || !WEBHOOK_SECRET)) {
 const reconnectMinMs = Number(RECONNECT_MIN_MS) || 15000;
 const reconnectMaxMs = Number(RECONNECT_MAX_MS) || 300000;
 const watchdogIntervalMs = Number(WATCHDOG_INTERVAL_MS) || 300000;
-const watchdogPunchIdleMs = Number(WATCHDOG_PUNCH_IDLE_MS) || 7200000;
+const watchdogPunchIdleMs = Number(WATCHDOG_PUNCH_IDLE_MS) || 1800000;
 const processedIdsMax = Number(PROCESSED_IDS_MAX) || 5000;
+const catchupMessageLimit = Number(CATCHUP_MESSAGE_LIMIT) || 150;
+const catchupLookbackMs = (Number(CATCHUP_LOOKBACK_HOURS) || 36) * 60 * 60 * 1000;
+const notReadyGraceMs = Math.max(watchdogIntervalMs, 120000);
 
 const oifPattern = new RegExp(OIF_REGEX, 'i');
 const processedMessageIds = new Set();
 const processedMessageIdOrder = [];
+const inFlightMessageIds = new Set();
 
 const log = (...args) => console.log(new Date().toISOString(), ...args);
 
@@ -131,6 +137,8 @@ let reconnectTimer = null;
 let watchdogTimer = null;
 let reconnectAttempt = 0;
 let lastTargetGroupActivityAt = null;
+let lastReadyAt = 0;
+let bridgeStartedAt = Date.now();
 let shuttingDown = false;
 
 const touchTargetGroupActivity = () => {
@@ -160,13 +168,18 @@ const isPunchWatchWindow = () => {
 };
 
 const scheduleReconnect = (reason) => {
-  if (ONE_SHOT_MODE || shuttingDown || reconnecting) return;
+  if (ONE_SHOT_MODE || shuttingDown) return;
   if (reconnectTimer) clearTimeout(reconnectTimer);
   const delay = Math.min(reconnectMinMs * 2 ** reconnectAttempt, reconnectMaxMs);
   reconnectAttempt += 1;
   log(`Scheduling reconnect in ${Math.round(delay / 1000)}s (reason: ${reason}, attempt ${reconnectAttempt})`);
   reconnectTimer = setTimeout(() => {
     reconnectTimer = null;
+    if (shuttingDown) return;
+    if (reconnecting) {
+      scheduleReconnect(`wait-lock:${reason}`);
+      return;
+    }
     reconnectBridge(reason).catch((error) => {
       log('Reconnect task failed:', error.message);
       scheduleReconnect(`reconnect-task:${error.message}`);
@@ -178,7 +191,9 @@ const reconnectBridge = async (reason) => {
   if (ONE_SHOT_MODE || shuttingDown || reconnecting) return;
   reconnecting = true;
   bridgeReady = false;
+  bridgeStartedAt = Date.now();
   log(`Reconnecting bridge (${reason})...`);
+  let failedReason = null;
   try {
     if (client) {
       try {
@@ -195,14 +210,29 @@ const reconnectBridge = async (reason) => {
     await client.initialize();
   } catch (error) {
     log('Reconnect initialize failed:', error.message);
-    scheduleReconnect(`init-failed:${error.message}`);
+    failedReason = `init-failed:${error.message}`;
   } finally {
     reconnecting = false;
+  }
+
+  // Schedule only after clearing the reconnecting lock (previous bug dropped retries).
+  if (failedReason && !shuttingDown && !bridgeReady) {
+    scheduleReconnect(failedReason);
   }
 };
 
 const runWatchdog = async () => {
-  if (ONE_SHOT_MODE || shuttingDown || reconnecting || !client || !bridgeReady) return;
+  if (ONE_SHOT_MODE || shuttingDown || reconnecting) return;
+
+  if (!client || !bridgeReady) {
+    const baseline = lastReadyAt || bridgeStartedAt;
+    if (Date.now() - baseline > notReadyGraceMs) {
+      log('Watchdog: bridge not ready — scheduling reconnect');
+      scheduleReconnect('watchdog:not-ready');
+    }
+    return;
+  }
+
   try {
     const state = await client.getState();
     if (state !== 'CONNECTED') {
@@ -269,74 +299,6 @@ const wireClient = (activeClient) => {
     log('Disconnected:', reason);
     bridgeReady = false;
     scheduleReconnect(`disconnected:${reason}`);
-  });
-
-  activeClient.on('ready', async () => {
-    log('Bridge is ready');
-    bridgeReady = true;
-    reconnectAttempt = 0;
-    touchTargetGroupActivity();
-
-    if (ONE_SHOT_MODE) {
-      try {
-        log('Fetching groups (this can take up to a minute on first connect)...');
-        await sleep(8000);
-
-        if (VERIFY_GROUP_ID) {
-          const chat = await withRetries('getChatById', () => activeClient.getChatById(VERIFY_GROUP_ID), {
-            attempts: 3,
-            delayMs: 10000,
-          });
-          console.log('\nGroup lookup:\n');
-          if (!chat?.isGroup) {
-            console.log(`  ${VERIFY_GROUP_ID} is not a group this account can access.`);
-          } else {
-            console.log(`  ${chat.name}  ->  ${chat.id._serialized}`);
-          }
-          console.log('');
-        } else {
-          const chats = await withRetries('getChats', () => activeClient.getChats(), {
-            attempts: 3,
-            delayMs: 10000,
-          });
-          const groups = chats.filter((chat) => chat.isGroup);
-          console.log('\nGroups this account can see:\n');
-          if (!groups.length) {
-            console.log('  (no groups found — make sure this WhatsApp account is in the punch-in group)');
-          } else {
-            groups.forEach((group) => {
-              console.log(`  ${group.name}  ->  ${group.id._serialized}`);
-            });
-          }
-          console.log('\nCopy the id of your punch-in group into GROUP_ID in .env, then restart.\n');
-        }
-      } catch (error) {
-        console.error(`\nFailed to ${VERIFY_GROUP_ID ? 'verify group' : 'list groups'}:`, error.message);
-        console.error('Try running "npm run list-groups" again after WhatsApp Web finishes loading.');
-        process.exitCode = 1;
-      } finally {
-        try {
-          await activeClient.destroy();
-        } catch {
-          // ignore shutdown errors
-        }
-        process.exit(process.exitCode || 0);
-      }
-      return;
-    }
-
-    if (GROUP_ID) {
-      log(`Listening to group id: ${GROUP_ID}`);
-    } else if (GROUP_NAME) {
-      log(`Listening to group name: ${GROUP_NAME}`);
-    } else {
-      log('WARNING: No GROUP_ID or GROUP_NAME set. Run "npm run list-groups" to find it. Ignoring all messages until set.');
-    }
-
-    const linkedPhone = activeClient.info?.wid?.user;
-    if (linkedPhone) {
-      log(`Linked WhatsApp number: ${linkedPhone}`);
-    }
   });
 
   const isTargetGroup = (chat) => {
@@ -472,11 +434,25 @@ const wireClient = (activeClient) => {
     }
   };
 
-  const handleMessage = async (message) => {
-    try {
-      const messageId = message.id._serialized;
-      if (processedMessageIds.has(messageId)) return;
+  const forwardPunchIn = async (payload) => {
+    const { data } = await withRetries(
+      'webhook',
+      () =>
+        axios.post(WEBHOOK_URL, payload, {
+          headers: { 'x-webhook-secret': WEBHOOK_SECRET },
+          timeout: 15000,
+        }),
+      { attempts: 3, delayMs: 5000 }
+    );
+    return data;
+  };
 
+  const handleMessage = async (message, { fromCatchUp = false } = {}) => {
+    const messageId = message.id?._serialized;
+    if (!messageId) return;
+    if (processedMessageIds.has(messageId) || inFlightMessageIds.has(messageId)) return;
+
+    try {
       const chat = await message.getChat();
       if (!isTargetGroup(chat)) return;
 
@@ -484,11 +460,13 @@ const wireClient = (activeClient) => {
 
       const phonePreview = message.author || message.from || 'unknown';
       if (!message.hasMedia) {
-        log(`Ignored non-media message in punch group from ${phonePreview}`);
+        if (!fromCatchUp) {
+          log(`Ignored non-media message in punch group from ${phonePreview}`);
+        }
         return;
       }
 
-      rememberProcessedMessageId(messageId);
+      inFlightMessageIds.add(messageId);
 
       const phone = await resolveSenderPhone(message);
       if (!phone) {
@@ -508,13 +486,10 @@ const wireClient = (activeClient) => {
 
       const punchInAt = new Date(message.timestamp * 1000).toISOString();
       const payload = { phone, oifNumber, punchInAt };
-      log(`Forwarding punch-in from ${phone}, OIF ${oifNumber}`);
+      log(`${fromCatchUp ? 'Catch-up forwarding' : 'Forwarding'} punch-in from ${phone}, OIF ${oifNumber}`);
 
-      const { data } = await axios.post(WEBHOOK_URL, payload, {
-        headers: { 'x-webhook-secret': WEBHOOK_SECRET },
-        timeout: 15000,
-      });
-
+      const data = await forwardPunchIn(payload);
+      rememberProcessedMessageId(messageId);
       touchTargetGroupActivity();
       log(`Recorded: ${data?.trainer?.name || phone} | OIF ${oifNumber} | ${punchInAt}`);
     } catch (error) {
@@ -522,12 +497,110 @@ const wireClient = (activeClient) => {
       const detail = error.response?.data?.message || error.message;
       const phoneHint = error.response?.data?.phone ? ` (normalized phone: ${error.response.data.phone})` : '';
       log(`Failed to forward punch-in (${status || 'no response'}): ${detail}${phoneHint}`);
+      // Do not mark processed — allow later catch-up / retry of the same message id.
+    } finally {
+      inFlightMessageIds.delete(messageId);
     }
   };
 
-  activeClient.on('message', handleMessage);
+  const catchUpRecentGroupMessages = async () => {
+    if (!GROUP_ID) return;
+    try {
+      const chat = await withRetries('catchup-getChatById', () => activeClient.getChatById(GROUP_ID), {
+        attempts: 3,
+        delayMs: 5000,
+      });
+      const messages = await chat.fetchMessages({ limit: catchupMessageLimit });
+      const cutoffMs = Date.now() - catchupLookbackMs;
+      const recent = messages.filter((message) => (message.timestamp || 0) * 1000 >= cutoffMs);
+      log(`Catch-up: scanning ${recent.length}/${messages.length} recent group messages (last ${CATCHUP_LOOKBACK_HOURS}h)`);
+      for (const message of recent) {
+        await handleMessage(message, { fromCatchUp: true });
+      }
+      log('Catch-up complete');
+    } catch (error) {
+      log('Catch-up failed:', error.message);
+    }
+  };
+
+  activeClient.on('ready', async () => {
+    log('Bridge is ready');
+    bridgeReady = true;
+    reconnectAttempt = 0;
+    lastReadyAt = Date.now();
+    touchTargetGroupActivity();
+
+    if (ONE_SHOT_MODE) {
+      try {
+        log('Fetching groups (this can take up to a minute on first connect)...');
+        await sleep(8000);
+
+        if (VERIFY_GROUP_ID) {
+          const chat = await withRetries('getChatById', () => activeClient.getChatById(VERIFY_GROUP_ID), {
+            attempts: 3,
+            delayMs: 10000,
+          });
+          console.log('\nGroup lookup:\n');
+          if (!chat?.isGroup) {
+            console.log(`  ${VERIFY_GROUP_ID} is not a group this account can access.`);
+          } else {
+            console.log(`  ${chat.name}  ->  ${chat.id._serialized}`);
+          }
+          console.log('');
+        } else {
+          const chats = await withRetries('getChats', () => activeClient.getChats(), {
+            attempts: 3,
+            delayMs: 10000,
+          });
+          const groups = chats.filter((chat) => chat.isGroup);
+          console.log('\nGroups this account can see:\n');
+          if (!groups.length) {
+            console.log('  (no groups found — make sure this WhatsApp account is in the punch-in group)');
+          } else {
+            groups.forEach((group) => {
+              console.log(`  ${group.name}  ->  ${group.id._serialized}`);
+            });
+          }
+          console.log('\nCopy the id of your punch-in group into GROUP_ID in .env, then restart.\n');
+        }
+      } catch (error) {
+        console.error(`\nFailed to ${VERIFY_GROUP_ID ? 'verify group' : 'list groups'}:`, error.message);
+        console.error('Try running "npm run list-groups" again after WhatsApp Web finishes loading.');
+        process.exitCode = 1;
+      } finally {
+        try {
+          await activeClient.destroy();
+        } catch {
+          // ignore shutdown errors
+        }
+        process.exit(process.exitCode || 0);
+      }
+      return;
+    }
+
+    if (GROUP_ID) {
+      log(`Listening to group id: ${GROUP_ID}`);
+    } else if (GROUP_NAME) {
+      log(`Listening to group name: ${GROUP_NAME}`);
+    } else {
+      log('WARNING: No GROUP_ID or GROUP_NAME set. Run "npm run list-groups" to find it. Ignoring all messages until set.');
+    }
+
+    const linkedPhone = activeClient.info?.wid?.user;
+    if (linkedPhone) {
+      log(`Linked WhatsApp number: ${linkedPhone}`);
+    }
+
+    await catchUpRecentGroupMessages();
+  });
+
+  activeClient.on('message', (message) => {
+    handleMessage(message).catch((error) => log('Message handler error:', error.message));
+  });
   activeClient.on('message_create', (message) => {
-    if (message.fromMe) handleMessage(message);
+    if (message.fromMe) {
+      handleMessage(message).catch((error) => log('Message handler error:', error.message));
+    }
   });
 };
 

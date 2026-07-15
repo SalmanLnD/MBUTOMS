@@ -126,7 +126,7 @@ The bridge writes to PM2 log files on the EC2 instance:
 ### Option A — AWS Console (recommended if SSH is blocked)
 
 1. Open [AWS EC2 Console](https://ap-south-1.console.aws.amazon.com/ec2/home?region=ap-south-1#Instances:)
-2. Select instance `mbutoms-whatsapp-bridge` (`i-04219aaf606896599`)
+2. Select instance `mbutoms-whatsapp-bridge` (`i-0c1d0870a388d973f`)
 3. Click **Connect** → **Session Manager** → **Connect**
 4. Run:
 
@@ -139,14 +139,14 @@ tail -50 /home/ubuntu/.pm2/logs/mbutoms-whatsapp-bridge-out.log
 ### Option B — SSH (if your network allows port 22)
 
 ```powershell
-ssh -i .aws\mbutoms-whatsapp-bridge.pem ubuntu@43.204.141.175
+ssh -i .aws\mbutoms-whatsapp-bridge.pem ubuntu@<PUBLIC_IP>
 pm2 logs mbutoms-whatsapp-bridge
 ```
 
 ### Option C — AWS CLI from your PC
 
 ```powershell
-aws ssm start-session --target i-04219aaf606896599 --region ap-south-1
+aws ssm start-session --target i-0c1d0870a388d973f --region ap-south-1
 # then: pm2 logs mbutoms-whatsapp-bridge
 ```
 

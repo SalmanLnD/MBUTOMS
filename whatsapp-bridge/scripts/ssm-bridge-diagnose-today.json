@@ -1,0 +1,8 @@
+{
+  "commands": [
+    "date -u",
+    "sudo -u ubuntu bash -lc 'pm2 describe mbutoms-whatsapp-bridge' | tr -cd '\\11\\12\\15\\40-\\176' | sed -n '1,80p'",
+    "python3 - <<'PY'\nfrom pathlib import Path\np = Path('/home/ubuntu/.pm2/logs/mbutoms-whatsapp-bridge-out.log')\nlines = p.read_text(errors='ignore').splitlines() if p.exists() else []\nprint('total_lines=' + str(len(lines)))\nkeys = ('Bridge is ready','Listening to group','Disconnected','Scheduling reconnect','Reconnecting','Watchdog','Auth failure','authenticated','Failed','Forwarding','Recorded','Could not resolve','No OIF','Ignored non-media','startup','QR code')\nmatched = [ln for ln in lines if any(k in ln for k in keys)]\nprint('matched=' + str(len(matched)))\nfor ln in matched[-60:]:\n    print(ln.encode('ascii','ignore').decode())\nprint('--- last 15 raw ---')\nfor ln in lines[-15:]:\n    print(ln.encode('ascii','ignore').decode())\nPY",
+    "python3 - <<'PY'\nfrom pathlib import Path\np = Path('/home/ubuntu/.pm2/logs/mbutoms-whatsapp-bridge-error.log')\nlines = p.read_text(errors='ignore').splitlines() if p.exists() else []\nprint('error_total=' + str(len(lines)))\nfor ln in lines[-40:]:\n    print(ln.encode('ascii','ignore').decode())\nPY"
+  ]
+}
