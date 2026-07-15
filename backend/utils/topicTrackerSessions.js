@@ -298,9 +298,9 @@ export const buildTopicTrackerSessions = async ({
 
   sessionDefaults.sort((a, b) => {
     const slotOrder = ['S1', 'S2', 'S3', 'S4', ''];
-    const slotDiff = slotOrder.indexOf(a.slot) - slotOrder.indexOf(b.slot);
+    const slotDiff = slotOrder.indexOf(a.slot || '') - slotOrder.indexOf(b.slot || '');
     if (slotDiff !== 0) return slotDiff;
-    return a.sessionStartTime.localeCompare(b.sessionStartTime);
+    return String(a.sessionStartTime || '').localeCompare(String(b.sessionStartTime || ''));
   });
 
   const scheduleIds = sessionDefaults.map((item) => item.scheduleRef);
@@ -411,9 +411,9 @@ export const buildTopicTrackerOverview = async ({ date, user }) => {
           pendingSlots: trainer.pendingSlots,
           closedSlots: trainer.closedSlots,
         }))
-        .sort((a, b) => a.trainerName.localeCompare(b.trainerName)),
+        .sort((a, b) => String(a.trainerName || '').localeCompare(String(b.trainerName || ''))),
     }))
-    .sort((a, b) => a.subjectName.localeCompare(b.subjectName));
+    .sort((a, b) => String(a.subjectName || '').localeCompare(String(b.subjectName || '')));
 
   return { date: dateKey, subjects: overview };
 };
@@ -597,7 +597,9 @@ export const buildTopicTrackerClassSummary = async ({ subjectId, user, trainerId
         const coveredTopics = [...row.topicHits.values()].sort((a, b) => {
           const aIndex = syllabusTopics.indexOf(a.topic);
           const bIndex = syllabusTopics.indexOf(b.topic);
-          if (aIndex === -1 && bIndex === -1) return a.topic.localeCompare(b.topic);
+          if (aIndex === -1 && bIndex === -1) {
+            return String(a.topic || '').localeCompare(String(b.topic || ''));
+          }
           if (aIndex === -1) return 1;
           if (bIndex === -1) return -1;
           return aIndex - bIndex;
@@ -605,6 +607,9 @@ export const buildTopicTrackerClassSummary = async ({ subjectId, user, trainerId
         const coveredSet = new Set(coveredTopics.map((item) => item.topic));
         const uncoveredTopics = syllabusTopics.filter((topic) => !coveredSet.has(topic));
         return {
+          trainerKey: row.trainerKey,
+          trainerId: row.trainerId,
+          trainerName: row.trainerName,
           branchYearSection: row.branchYearSection,
           closedSlots: row.closedSlots,
           coveredCount: coveredTopics.filter((item) => syllabusTopics.includes(item.topic)).length,
@@ -620,8 +625,8 @@ export const buildTopicTrackerClassSummary = async ({ subjectId, user, trainerId
         };
       })
       .sort((a, b) =>
-        a.trainerName.localeCompare(b.trainerName)
-        || a.branchYearSection.localeCompare(b.branchYearSection)
+        String(a.trainerName || '').localeCompare(String(b.trainerName || ''))
+        || String(a.branchYearSection || '').localeCompare(String(b.branchYearSection || ''))
       );
 
     return {

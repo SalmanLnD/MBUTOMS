@@ -47,7 +47,7 @@ const TopicTrackerClassSummaryTab = ({
     });
     return [...trainers.entries()]
       .map(([key, name]) => ({ key, name }))
-      .sort((a, b) => a.name.localeCompare(b.name));
+      .sort((a, b) => String(a.name || '').localeCompare(String(b.name || '')));
   }, [visibleSubjects]);
 
   return (
