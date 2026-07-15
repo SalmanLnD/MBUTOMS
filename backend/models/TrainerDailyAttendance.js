@@ -1,5 +1,6 @@
 import mongoose from 'mongoose';
 import { TRAINER_ATTENDANCE_TYPES } from '../utils/trainerAttendanceTypes.js';
+import { FOOD_ALLOWANCE_TYPES } from '../utils/foodAllowanceTypes.js';
 
 const trainerDailyAttendanceSchema = new mongoose.Schema(
   {
@@ -16,6 +17,11 @@ const trainerDailyAttendanceSchema = new mongoose.Schema(
     },
     oifNumber: { type: String, trim: true, maxlength: 12, default: '' },
     mockPrepHours: { type: Number, min: 0, default: 0 },
+    foodAllowance: {
+      type: String,
+      enum: ['', ...Object.values(FOOD_ALLOWANCE_TYPES)],
+      default: '',
+    },
     punchInAt: { type: Date },
     punchInSource: {
       type: String,

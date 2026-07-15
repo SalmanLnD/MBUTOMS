@@ -326,6 +326,10 @@ body {
   width: 3.75rem;
 }
 
+.trainer-attendance-month-table col.trainer-attendance-food-col {
+  width: 8.5rem;
+}
+
 .trainer-attendance-month-table col.trainer-attendance-sticky-col {
   width: 10.5rem;
 }
@@ -391,10 +395,20 @@ body {
 .trainer-attendance-grid th.trainer-attendance-mock-header,
 .trainer-attendance-grid td.trainer-attendance-mock-cell,
 .trainer-attendance-grid th.trainer-attendance-class-header,
-.trainer-attendance-grid td.trainer-attendance-class-cell {
+.trainer-attendance-grid td.trainer-attendance-class-cell,
+.trainer-attendance-grid th.trainer-attendance-food-header,
+.trainer-attendance-grid td.trainer-attendance-food-cell {
   padding: 0.3rem 0.35rem;
   text-align: center;
   vertical-align: middle;
+}
+
+.trainer-attendance-grid .trainer-attendance-food-select {
+  width: 100%;
+  min-width: 0;
+  height: 1.85rem;
+  padding: 0.2rem 1.6rem 0.2rem 0.35rem;
+  font-size: 0.7rem;
 }
 
 .trainer-attendance-grid .trainer-attendance-oif-input,

@@ -41,6 +41,7 @@ import {
   isLeaveAttendanceType,
   TRAINER_ATTENDANCE_TYPES,
 } from '../utils/trainerAttendanceTypes.js';
+import { isValidFoodAllowance } from '../utils/foodAllowanceTypes.js';
 
 const buildLogMap = (logs) => {
   const map = new Map();
@@ -54,6 +55,7 @@ const buildRowTotals = (days, dateKeys) => {
   let mockPrepHours = 0;
   let classHandlingHours = 0;
   let oifDays = 0;
+  let foodAllowanceDays = 0;
 
   dateKeys.forEach((dateKey) => {
     const cell = days[dateKey];
@@ -61,33 +63,40 @@ const buildRowTotals = (days, dateKeys) => {
     mockPrepHours += Number(cell.mockPrepHours || 0);
     classHandlingHours += Number(cell.classHandlingHours || 0);
     if (countsAsOifDay(cell.oifNumber)) oifDays += 1;
+    if (cell.foodAllowance) foodAllowanceDays += 1;
   });
 
   return {
     mockPrepHours,
     classHandlingHours,
     oifDays,
+    foodAllowanceDays,
     workingDays: dateKeys.length,
   };
 };
 
-export const getTrainerAttendanceGrid = async (req, res) => {
+export const buildTrainerAttendanceGridPayload = async ({
+  month: requestedMonth,
+  referenceDate = new Date(),
+  semester = 'III',
+  user,
+  refresh = false,
+} = {}) => {
   const today = getAttendanceToday();
   let { year, month } = parseAttendanceMonthParam(
-    req.query.month,
-    req.query.referenceDate || new Date()
+    requestedMonth,
+    referenceDate
   );
   ({ year, month } = clampAttendanceMonthToTrackingStart({ year, month }));
 
   const monthKey = formatAttendanceMonthKey(year, month);
-  const semester = req.query.semester || 'III';
-  const cacheKey = buildAttendanceGridCacheKey(monthKey, semester, req.user);
-  const bypassCache = req.query.refresh === '1' || req.query.refresh === 'true';
+  const cacheKey = buildAttendanceGridCacheKey(monthKey, semester, user);
+  const bypassCache = refresh === true || refresh === '1' || refresh === 'true';
 
   if (!bypassCache) {
     const cached = getCachedAttendanceGrid(cacheKey);
     if (cached) {
-      return res.json(cached);
+      return cached;
     }
   }
 
@@ -101,8 +110,8 @@ export const getTrainerAttendanceGrid = async (req, res) => {
   const editableDays = dates.filter((date) => date <= today).length;
 
   const trainerFilter = {};
-  if (req.user.role === 'trainer' && req.user.trainer) {
-    trainerFilter._id = req.user.trainer;
+  if (user?.role === 'trainer' && user.trainer) {
+    trainerFilter._id = user.trainer;
   }
 
   const finalTrainerFilter = await mergeRosterFilter(trainerFilter, { rosterOnly: true });
@@ -198,6 +207,7 @@ export const getTrainerAttendanceGrid = async (req, res) => {
           attendanceType,
           oifNumber: leaveOifNumber,
           oifDisplay: formatTrainerAttendanceOifDisplay(attendanceType, leaveOifNumber),
+          foodAllowance: log?.foodAllowance || '',
           mockPrepHours: 0,
           classHandlingHours: 0,
           isOnLeave: true,
@@ -217,6 +227,7 @@ export const getTrainerAttendanceGrid = async (req, res) => {
         attendanceType,
         oifNumber,
         oifDisplay: formatTrainerAttendanceOifDisplay(attendanceType, oifNumber),
+        foodAllowance: log?.foodAllowance || '',
         mockPrepHours,
         classHandlingHours,
         isOnLeave: false,
@@ -260,6 +271,17 @@ export const getTrainerAttendanceGrid = async (req, res) => {
   };
 
   setCachedAttendanceGrid(cacheKey, payload);
+  return payload;
+};
+
+export const getTrainerAttendanceGrid = async (req, res) => {
+  const payload = await buildTrainerAttendanceGridPayload({
+    month: req.query.month,
+    referenceDate: req.query.referenceDate,
+    semester: req.query.semester || 'III',
+    user: req.user,
+    refresh: req.query.refresh,
+  });
   res.json(payload);
 };
 
@@ -270,6 +292,7 @@ export const upsertTrainerDailyAttendance = async (req, res) => {
     attendanceType,
     oifNumber,
     mockPrepHours,
+    foodAllowance,
   } = req.body;
 
   if (!trainer || !date) {
@@ -339,6 +362,11 @@ export const upsertTrainerDailyAttendance = async (req, res) => {
     return res.status(400).json({ message: 'Mock or preparation hours must be a valid number' });
   }
 
+  const resolvedFoodAllowance = String(foodAllowance || '').trim();
+  if (!isValidFoodAllowance(resolvedFoodAllowance)) {
+    return res.status(400).json({ message: 'Select a valid food allowance.' });
+  }
+
   const trimmedOif = oifNumber?.trim() || '';
   if (trimmedOif.length > 12) {
     return res.status(400).json({ message: 'OIF number must be 12 characters or fewer' });
@@ -367,6 +395,7 @@ export const upsertTrainerDailyAttendance = async (req, res) => {
         attendanceType: resolvedAttendanceType,
         oifNumber: finalOifNumber,
         mockPrepHours: finalMockHours,
+        foodAllowance: resolvedFoodAllowance,
         markedBy: req.user._id,
       },
     },
@@ -400,6 +429,7 @@ export const upsertTrainerDailyAttendance = async (req, res) => {
     attendanceType: record.attendanceType,
     oifNumber: record.oifNumber,
     oifDisplay: formatTrainerAttendanceOifDisplay(record.attendanceType, record.oifNumber),
+    foodAllowance: record.foodAllowance || '',
     mockPrepHours: resolved.mockPrepHours,
     classHandlingHours: resolved.classHandlingHours,
     isOnLeave: isOnFullDayLeave,

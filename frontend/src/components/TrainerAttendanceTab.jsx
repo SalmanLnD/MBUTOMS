@@ -1,10 +1,11 @@
 import { useState, useEffect, useLayoutEffect, useCallback, Fragment, useMemo, useRef } from 'react';
 import LoadingSpinner from '../components/LoadingSpinner.jsx';
 import TrainerAttendanceRow from '../components/TrainerAttendanceRow.jsx';
-import { showError } from '../utils/toast.js';
+import { showError, showSuccess } from '../utils/toast.js';
 import { useAuth } from '../context/AuthContext.jsx';
 import {
   getTrainerAttendanceGrid,
+  getTrainerAttendanceSheetStatus,
   upsertTrainerDailyAttendance,
   invalidateTrainerAttendanceGridCache,
 } from '../services/attendanceService.js';
@@ -15,6 +16,7 @@ import {
   formatMonthKey,
   formatMonthLabel,
   getCurrentMonthParts,
+  getLatestAttendanceMonthParts,
   isFutureDateKey,
   parseMonthKey,
   shiftMonth,
@@ -23,6 +25,8 @@ import {
 } from '../utils/monthDates.js';
 import { countsAsOifDay } from '../utils/trainerAttendanceTypes.js';
 import { ROLES } from '../utils/roles.js';
+import TrainerAttendanceSheetSetupModal from './TrainerAttendanceSheetSetupModal.jsx';
+import { ExternalLinkIcon, SheetIcon } from './icons.jsx';
 
 const TrainerAttendanceTab = () => {
   const { user, hasManagementRole } = useAuth();
@@ -37,19 +41,21 @@ const TrainerAttendanceTab = () => {
   const [refreshing, setRefreshing] = useState(false);
   const [savingKey, setSavingKey] = useState('');
   const [trainerSearch, setTrainerSearch] = useState('');
+  const [sheetStatus, setSheetStatus] = useState(null);
+  const [showSheetSetup, setShowSheetSetup] = useState(false);
   const scrollContainerRef = useRef(null);
   const gridDataRef = useRef(null);
   const monthCacheRef = useRef(new Map());
 
   const monthKey = formatMonthKey(monthParts.year, monthParts.month);
   const monthOptions = useMemo(() => buildMonthOptions(), []);
-  const currentMonth = useMemo(() => getCurrentMonthParts(), []);
+  const latestMonth = useMemo(() => getLatestAttendanceMonthParts(), []);
   const trackingMonth = parseMonthKey(TRAINER_ATTENDANCE_TRACKING_START.slice(0, 7));
 
   const atEarliestMonth =
     monthParts.year === trackingMonth.year && monthParts.month === trackingMonth.month;
   const atLatestMonth =
-    monthParts.year === currentMonth.year && monthParts.month === currentMonth.month;
+    monthParts.year === latestMonth.year && monthParts.month === latestMonth.month;
 
   const filteredRows = useMemo(() => {
     if (!grid?.rows) return [];
@@ -101,6 +107,19 @@ const TrainerAttendanceTab = () => {
   useEffect(() => {
     fetchGrid();
   }, [fetchGrid]);
+
+  const loadSheetStatus = useCallback(async () => {
+    if (!canManageAll) return;
+    try {
+      setSheetStatus(await getTrainerAttendanceSheetStatus());
+    } catch {
+      setSheetStatus(null);
+    }
+  }, [canManageAll]);
+
+  useEffect(() => {
+    loadSheetStatus();
+  }, [loadSheetStatus]);
 
   const scrollToTodayColumn = useCallback(() => {
     const container = scrollContainerRef.current;
@@ -155,6 +174,7 @@ const TrainerAttendanceTab = () => {
                 mockPrepHours: acc.mockPrepHours + Number(cell.mockPrepHours || 0),
                 classHandlingHours: acc.classHandlingHours + Number(cell.classHandlingHours || 0),
                 oifDays: acc.oifDays + (countsAsOifDay(cell.oifNumber) ? 1 : 0),
+                foodAllowanceDays: acc.foodAllowanceDays + (cell.foodAllowance ? 1 : 0),
                 workingDays: acc.workingDays,
               };
             },
@@ -162,6 +182,7 @@ const TrainerAttendanceTab = () => {
               mockPrepHours: 0,
               classHandlingHours: 0,
               oifDays: 0,
+              foodAllowanceDays: 0,
               workingDays: dateKeys.length,
             }
           );
@@ -192,6 +213,7 @@ const TrainerAttendanceTab = () => {
         attendanceType: cell.attendanceType,
         oifNumber: cell.oifNumber,
         mockPrepHours: cell.mockPrepHours,
+        foodAllowance: cell.foodAllowance,
       });
 
       setGrid((prev) => {
@@ -210,6 +232,7 @@ const TrainerAttendanceTab = () => {
                   attendanceType: saved.attendanceType,
                   oifNumber: saved.oifNumber,
                   oifDisplay: saved.oifDisplay,
+                  foodAllowance: saved.foodAllowance,
                   mockPrepHours: saved.mockPrepHours,
                   classHandlingHours: saved.classHandlingHours,
                   isOnLeave: saved.isOnLeave,
@@ -284,6 +307,44 @@ const TrainerAttendanceTab = () => {
         </div>
       </div>
 
+      {canManageAll && (
+        <div className="d-flex flex-wrap align-items-center gap-2 mb-3">
+          {sheetStatus?.linked ? (
+            <>
+              <a
+                className="btn btn-outline-primary btn-sm d-inline-flex align-items-center gap-2"
+                href={sheetStatus.spreadsheetUrl}
+                target="_blank"
+                rel="noreferrer"
+              >
+                <ExternalLinkIcon size={16} aria-hidden="true" />
+                Open attendance sheet
+              </a>
+              <button
+                type="button"
+                className="btn btn-outline-secondary btn-sm d-inline-flex align-items-center gap-2"
+                onClick={() => setShowSheetSetup(true)}
+              >
+                <SheetIcon size={16} aria-hidden="true" />
+                Sheet setup
+              </button>
+              <span className="text-muted small">
+                Continuous attendance timeline refreshes every 5 minutes
+              </span>
+            </>
+          ) : (
+            <button
+              type="button"
+              className="btn btn-outline-primary btn-sm d-inline-flex align-items-center gap-2"
+              onClick={() => setShowSheetSetup(true)}
+            >
+              <SheetIcon size={16} aria-hidden="true" />
+              Link attendance sheet
+            </button>
+          )}
+        </div>
+      )}
+
       {!loading && grid && (
         <div className="trainer-attendance-summary mb-3">
           <span className="trainer-attendance-pill">{monthLabel}</span>
@@ -342,6 +403,7 @@ const TrainerAttendanceTab = () => {
                   <col className="trainer-attendance-oif-col" />
                   <col className="trainer-attendance-mock-col" />
                   <col className="trainer-attendance-class-col" />
+                  <col className="trainer-attendance-food-col" />
                 </Fragment>
               ))}
               <col className="trainer-attendance-totals-col" />
@@ -356,7 +418,7 @@ const TrainerAttendanceTab = () => {
                     className={`text-center small trainer-attendance-day-header ${
                       date.isFuture ? 'trainer-attendance-future' : ''
                     } ${date.isWeekend ? 'trainer-attendance-weekend' : ''}`}
-                    colSpan="3"
+                    colSpan="4"
                     title={date.key}
                   >
                     {date.label}
@@ -390,6 +452,13 @@ const TrainerAttendanceTab = () => {
                     >
                       Class
                     </th>
+                    <th
+                      className={`text-center small trainer-attendance-subheader trainer-attendance-food-header ${
+                        date.isFuture ? 'trainer-attendance-future' : ''
+                      } ${date.isWeekend ? 'trainer-attendance-weekend' : ''}`}
+                    >
+                      Food
+                    </th>
                   </Fragment>
                 ))}
               </tr>
@@ -410,6 +479,19 @@ const TrainerAttendanceTab = () => {
             </tbody>
           </table>
         </div>
+      )}
+
+      {showSheetSetup && canManageAll && (
+        <TrainerAttendanceSheetSetupModal
+          show
+          initialUrl={sheetStatus?.spreadsheetUrl || ''}
+          onClose={() => setShowSheetSetup(false)}
+          onLinked={() => {
+            setShowSheetSetup(false);
+            loadSheetStatus();
+            showSuccess('Trainer attendance Google Sheet linked.');
+          }}
+        />
       )}
     </>
   );

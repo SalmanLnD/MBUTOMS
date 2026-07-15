@@ -4,6 +4,7 @@ import {
   formatTrainerAttendanceOifDisplay,
   LEAVE_TYPE_OPTIONS,
 } from '../utils/trainerAttendanceTypes.js';
+import { FOOD_ALLOWANCE_OPTIONS } from '../utils/foodAllowanceTypes.js';
 
 const TrainerAttendanceRow = memo(({
   row,
@@ -24,6 +25,7 @@ const TrainerAttendanceRow = memo(({
         oifNumber: '',
         mockPrepHours: 0,
         classHandlingHours: 0,
+        foodAllowance: '',
       };
       const canEditCell = canEditTrainer(row.trainer._id) && (
         !date.isFuture || (cell.isOnLeave && canEditFutureLeave)
@@ -135,6 +137,31 @@ const TrainerAttendanceRow = memo(({
               {Number(cell.classHandlingHours || 0).toFixed(1)}
             </span>
           </td>
+          <td className={`trainer-attendance-food-cell ${cellClass}`}>
+            <select
+              className="form-select form-select-sm trainer-attendance-food-select"
+              value={cell.foodAllowance || ''}
+              disabled={!canEditCell || isSaving}
+              onChange={(e) => {
+                onUpdateCell(
+                  row.trainer._id,
+                  date.key,
+                  'foodAllowance',
+                  e.target.value
+                );
+                window.setTimeout(() => onSave(row.trainer._id, date.key), 0);
+              }}
+              aria-label={`Food allowance for ${date.label}`}
+              title="Food allowance"
+            >
+              <option value="">None</option>
+              {FOOD_ALLOWANCE_OPTIONS.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </td>
         </Fragment>
       );
     })}
@@ -151,6 +178,10 @@ const TrainerAttendanceRow = memo(({
         <div>
           <span className="text-muted">OIF days</span>
           <strong>{row.totals?.oifDays || 0}</strong>
+        </div>
+        <div>
+          <span className="text-muted">Food days</span>
+          <strong>{row.totals?.foodAllowanceDays || 0}</strong>
         </div>
       </div>
     </td>

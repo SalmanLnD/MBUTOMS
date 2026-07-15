@@ -54,6 +54,26 @@ export const upsertTrainerDailyAttendance = async (payload) => {
   return data;
 };
 
+export const getTrainerAttendanceSheetStatus = async () => {
+  const { data } = await api.get('/attendance/sheets/status');
+  return data;
+};
+
+export const getTrainerAttendanceAppsScriptSetup = async () => {
+  const { data } = await api.get('/attendance/sheets/apps-script/setup');
+  return data;
+};
+
+export const linkTrainerAttendanceSheet = async (spreadsheetUrl) => {
+  const { data } = await api.post('/attendance/sheets/link', { spreadsheetUrl });
+  return data;
+};
+
+export const unlinkTrainerAttendanceSheet = async () => {
+  const { data } = await api.delete('/attendance/sheets/link');
+  return data;
+};
+
 export const getTrainerPunchInLogs = async (params = {}) => {
   const { data } = await api.get('/attendance/trainer-punch-logs', { params });
   return data;
