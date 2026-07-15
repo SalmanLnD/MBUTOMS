@@ -746,7 +746,7 @@ const wireClient = (activeClient) => {
         // ignore history load failures
       }
 
-      const mediaTypes = new Set(['image', 'video', 'document', 'sticker', 'ptt', 'audio']);
+      const mediaTypes = new Set(['image', 'video', 'document', 'sticker', 'ptt', 'audio', 'album', 'gif']);
       const msgs = chat.msgs?.getModelsArray?.() || [];
       const ownUser = window.Store?.Conn?.wid?.user
         || window.require?.('WAWebUserPrefsMeUser')?.getMaybeMePnUser?.()?.user
@@ -756,8 +756,12 @@ const wireClient = (activeClient) => {
       for (const msg of msgs) {
         if (!msg?.t || msg.t < cutoffSec) continue;
         const type = msg.type || '';
-        const hasMedia = mediaTypes.has(type) || Boolean(msg.mediaData);
-        const body = msg.caption || msg.body || '';
+        const hasMedia = mediaTypes.has(type)
+          || Boolean(msg.mediaData)
+          || Boolean(msg.deprecatedMms3Url)
+          || Boolean(msg.directPath)
+          || Boolean(msg.mimetype);
+        const body = msg.caption || msg.body || msg.text || msg.captionText || '';
         let author = '';
         if (msg.author) author = msg.author._serialized || String(msg.author);
         else if (msg.id?.fromMe) author = 'fromMe';
@@ -773,6 +777,7 @@ const wireClient = (activeClient) => {
             phone = tryUser(contact?.phoneNumber)
               || tryUser(contact?.id)
               || tryUser(toPn?.(authorWid));
+            if (!phone && contact?.phoneNumber?.user) phone = String(contact.phoneNumber.user);
           }
         } catch {
           // ignore contact resolution failures
@@ -793,14 +798,20 @@ const wireClient = (activeClient) => {
       return {
         chatId: chat.id?._serialized || groupId,
         msgCount: msgs.length,
+        oldestTs: rows[0]?.timestamp || 0,
+        newestTs: rows[rows.length - 1]?.timestamp || 0,
+        mediaCount: rows.filter((row) => row.hasMedia).length,
         messages: rows.slice(-limit),
       };
     }, GROUP_ID, Math.floor(cutoffMs / 1000), catchupMessageLimit);
   };
 
   const processScrapedPunch = async (raw, { fromCatchUp = false } = {}) => {
-    if (!raw?.id || processedMessageIds.has(raw.id) || inFlightMessageIds.has(raw.id)) return false;
-    if (!raw.hasMedia) return false;
+    if (!raw?.id || processedMessageIds.has(raw.id) || inFlightMessageIds.has(raw.id)) return 'skip-dup';
+    // Prefer media punches; still accept captioned media-like types.
+    if (!raw.hasMedia && !['image', 'video', 'document', 'album', 'gif'].includes(raw.type)) {
+      return 'skip-non-media';
+    }
 
     inFlightMessageIds.add(raw.id);
     try {
@@ -813,13 +824,13 @@ const wireClient = (activeClient) => {
       }
       if (!isLikelyPhoneUserId(phone)) {
         log(`Could not resolve sender phone (author=${raw.author || 'unknown'}), skipping`);
-        return false;
+        return 'skip-phone';
       }
 
       const oifNumber = extractOifFromText(raw.body);
       if (!oifNumber) {
-        log(`No OIF found in message from ${phone}, skipping`);
-        return false;
+        log(`No OIF found in message from ${phone} type=${raw.type} body="${String(raw.body || '').slice(0, 40)}", skipping`);
+        return 'skip-oif';
       }
 
       const punchInAt = new Date((raw.timestamp || 0) * 1000).toISOString();
@@ -828,12 +839,12 @@ const wireClient = (activeClient) => {
       rememberProcessedMessageId(raw.id);
       touchTargetGroupActivity();
       log(`Recorded: ${data?.trainer?.name || phone} | OIF ${oifNumber} | ${punchInAt}`);
-      return true;
+      return 'recorded';
     } catch (error) {
       const status = error.response?.status;
       const detail = error.response?.data?.message || error.message;
       log(`Failed to forward punch-in (${status || 'no response'}): ${detail}`);
-      return false;
+      return 'error';
     } finally {
       inFlightMessageIds.delete(raw.id);
     }
@@ -853,13 +864,33 @@ const wireClient = (activeClient) => {
       }
 
       const recent = (scraped.messages || []).filter((row) => (row.timestamp || 0) * 1000 >= cutoffMs);
-      log(`${label}: scanned ${recent.length}/${scraped.msgCount || 0} group messages`);
-      let forwarded = 0;
+      const oldest = scraped.oldestTs ? new Date(scraped.oldestTs * 1000).toISOString() : '-';
+      const newest = scraped.newestTs ? new Date(scraped.newestTs * 1000).toISOString() : '-';
+      log(`${label}: scanned ${recent.length}/${scraped.msgCount || 0} msgs media=${scraped.mediaCount || 0} range=${oldest}..${newest}`);
+
+      const sample = recent.slice(-8).map((row) => ({
+        t: new Date((row.timestamp || 0) * 1000).toISOString().slice(11, 19),
+        type: row.type,
+        media: row.hasMedia,
+        phone: row.phone || '-',
+        body: String(row.body || '').slice(0, 28),
+      }));
+      if (sample.length) log(`${label}: sample ${JSON.stringify(sample)}`);
+
+      const counts = {
+        recorded: 0,
+        'skip-dup': 0,
+        'skip-non-media': 0,
+        'skip-phone': 0,
+        'skip-oif': 0,
+        error: 0,
+      };
       for (const row of recent) {
         // eslint-disable-next-line no-await-in-loop
-        if (await processScrapedPunch(row, { fromCatchUp: true })) forwarded += 1;
+        const result = await processScrapedPunch(row, { fromCatchUp: true });
+        if (counts[result] !== undefined) counts[result] += 1;
       }
-      log(`${label}: recorded/updated ${forwarded} media punch messages`);
+      log(`${label}: results ${JSON.stringify(counts)}`);
     } catch (error) {
       log(`${label} failed: ${error?.message || error}`);
     }
