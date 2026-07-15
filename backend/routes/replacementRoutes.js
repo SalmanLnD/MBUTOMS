@@ -1,7 +1,7 @@
 import express from 'express';
 import {
   getReplacementSuggestions,
-  getPendingReplacements,
+  getAllReplacements,
   assignReplacement,
   getTrainerAvailability,
   getTrainerSlotsForReplacement,
@@ -15,7 +15,8 @@ const router = express.Router();
 router.use(protect);
 router.use(authorize('admin', 'campus_manager'));
 
-router.get('/pending', asyncHandler(getPendingReplacements));
+router.get('/all', asyncHandler(getAllReplacements));
+router.get('/pending', asyncHandler(getAllReplacements));
 router.get('/availability', asyncHandler(getTrainerAvailability));
 router.get('/trainer-slots', asyncHandler(getTrainerSlotsForReplacement));
 router.get('/suggestions/:scheduleId', asyncHandler(getReplacementSuggestions));

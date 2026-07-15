@@ -1,12 +1,14 @@
 import api from './api.js';
 
-export const getPendingReplacements = async () => {
-  const { data } = await api.get('/replacements/pending');
+export const getAllReplacements = async (params = {}) => {
+  const { data } = await api.get('/replacements/all', { params });
   return data;
 };
 
-export const getReplacementSuggestions = async (scheduleId) => {
-  const { data } = await api.get(`/replacements/suggestions/${scheduleId}`);
+export const getReplacementSuggestions = async (scheduleId, leaveId) => {
+  const { data } = await api.get(`/replacements/suggestions/${scheduleId}`, {
+    params: { leaveId },
+  });
   return data;
 };
 
@@ -15,8 +17,12 @@ export const getTrainerAvailability = async (params = {}) => {
   return data;
 };
 
-export const assignReplacement = async (scheduleId, replacementTrainerId) => {
-  const { data } = await api.post('/replacements/assign', { scheduleId, replacementTrainerId });
+export const assignReplacement = async (leaveId, scheduleId, replacementTrainerId) => {
+  const { data } = await api.post('/replacements/assign', {
+    leaveId,
+    scheduleId,
+    replacementTrainerId,
+  });
   return data;
 };
 

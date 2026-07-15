@@ -45,10 +45,12 @@ export const getReplacementSuggestions = async (req, res) => {
   const schedule = await Schedule.findById(req.params.scheduleId);
   if (!schedule) return res.status(404).json({ message: 'Schedule not found' });
 
-  const leave = await Leave.findOne({
+  const leaveFilter = {
     affectedSchedules: schedule._id,
     status: 'approved',
-  });
+  };
+  if (req.query.leaveId) leaveFilter._id = req.query.leaveId;
+  const leave = await Leave.findOne(leaveFilter);
   if (!leave) {
     return res.status(400).json({ message: 'No approved leave found for this schedule' });
   }
@@ -136,50 +138,53 @@ export const getReplacementSuggestions = async (req, res) => {
   });
 };
 
-export const getPendingReplacements = async (req, res) => {
+export const getAllReplacements = async (req, res) => {
   const today = normalizeDate(new Date());
-  const approvedLeaves = await Leave.find({
-    status: 'approved',
-    replacementNeeded: true,
-    endDate: { $gte: today },
+  const leaves = await Leave.find({
     affectedSchedules: { $exists: true, $not: { $size: 0 } },
   })
     .populate('trainer', 'name employeeId')
-    .populate('affectedSchedules')
+    .populate({
+      path: 'affectedSchedules',
+      populate: [
+        { path: 'subject', select: 'name code' },
+        { path: 'venue', select: 'name building floor' },
+      ],
+    })
     .populate({
       path: 'replacements.replacementTrainer',
       select: 'name employeeId',
-    });
+    })
+    .sort({ startDate: -1, createdAt: -1 });
 
-  const pending = [];
-  const replacementTrainerIds = new Set();
+  const replacements = [];
+  for (const leave of leaves) {
+    const startDate = normalizeDate(leave.startDate);
+    const endDate = normalizeDate(leave.endDate);
+    let timelineStatus = 'upcoming';
+    if (leave.status === 'pending') timelineStatus = 'pending_approval';
+    else if (leave.status === 'rejected') timelineStatus = 'rejected';
+    else if (leave.status === 'cancelled') timelineStatus = 'cancelled';
+    else if (endDate < today) timelineStatus = 'previous';
+    else if (startDate <= today && endDate >= today) timelineStatus = 'current';
 
-  for (const leave of approvedLeaves) {
-    leave.replacements?.forEach((entry) => {
-      const trainerId = entry.replacementTrainer?._id?.toString() || entry.replacementTrainer?.toString();
-      if (trainerId) replacementTrainerIds.add(trainerId);
-    });
-  }
-
-  const replacementTrainers = replacementTrainerIds.size
-    ? await Trainer.find({ _id: { $in: [...replacementTrainerIds] } }).select('name employeeId')
-    : [];
-  const trainersById = new Map(replacementTrainers.map((trainer) => [trainer._id.toString(), trainer]));
-
-  for (const leave of approvedLeaves) {
     for (const schedule of leave.affectedSchedules) {
       if (!schedule) continue;
-      const replacement = resolveReplacementTrainer(leave, schedule, trainersById);
-      pending.push({
+      const replacement = resolveReplacementTrainer(leave, schedule, new Map());
+      replacements.push({
         leave: {
           _id: leave._id,
           trainer: leave.trainer,
           startDate: leave.startDate,
           endDate: leave.endDate,
           reason: leave.reason,
+          status: leave.status,
+          replacementNeeded: leave.replacementNeeded,
         },
         schedule,
         replacement,
+        timelineStatus,
+        canAssign: leave.status === 'approved' && endDate >= today,
         replacementDate: leave.startDate,
         isSlotReplacement:
           normalizeDate(leave.startDate).getTime() === normalizeDate(leave.endDate).getTime(),
@@ -187,11 +192,39 @@ export const getPendingReplacements = async (req, res) => {
     }
   }
 
-  res.json({ pending, count: pending.length });
+  const rank = {
+    current: 0,
+    upcoming: 1,
+    pending_approval: 2,
+    previous: 3,
+    rejected: 4,
+    cancelled: 5,
+  };
+  replacements.sort((a, b) => {
+    const rankDiff = (rank[a.timelineStatus] ?? 9) - (rank[b.timelineStatus] ?? 9);
+    if (rankDiff) return rankDiff;
+    return new Date(b.leave.startDate) - new Date(a.leave.startDate);
+  });
+
+  const page = Math.max(1, parseInt(req.query.page, 10) || 1);
+  const limit = Math.min(50, Math.max(1, parseInt(req.query.limit, 10) || 10));
+  const total = replacements.length;
+  const paged = replacements.slice((page - 1) * limit, page * limit);
+
+  res.json({
+    replacements: paged,
+    count: total,
+    pagination: {
+      page,
+      limit,
+      total,
+      pages: Math.ceil(total / limit) || 0,
+    },
+  });
 };
 
 export const assignReplacement = async (req, res) => {
-  const { scheduleId, replacementTrainerId } = req.body;
+  const { leaveId, scheduleId, replacementTrainerId } = req.body;
 
   const schedule = await Schedule.findById(scheduleId);
   if (!schedule) return res.status(404).json({ message: 'Schedule not found' });
@@ -201,12 +234,20 @@ export const assignReplacement = async (req, res) => {
     return res.status(400).json({ message: 'Replacement trainer is not available' });
   }
 
-  const leave = await Leave.findOne({
+  const leaveFilter = {
     affectedSchedules: scheduleId,
     status: 'approved',
-  }).populate('trainer', 'name employeeId');
+  };
+  if (leaveId) leaveFilter._id = leaveId;
+  const leave = await Leave.findOne(leaveFilter).populate('trainer', 'name employeeId');
   if (!leave) {
     return res.status(400).json({ message: 'No approved leave found for this schedule' });
+  }
+  if (normalizeDate(leave.endDate) < normalizeDate(new Date())) {
+    return res.status(400).json({ message: 'Previous replacement records cannot be changed' });
+  }
+  if (leave.trainer?._id?.toString() === trainer._id.toString()) {
+    return res.status(400).json({ message: 'The original trainer cannot replace their own class' });
   }
 
   const available = await isTrainerAvailableForReplacement({
