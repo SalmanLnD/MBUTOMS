@@ -18,6 +18,7 @@ const trainerDailyAttendanceSchema = new mongoose.Schema(
     },
     punchInImageUrl: { type: String, trim: true, default: '' },
     punchInRawPhone: { type: String, trim: true, default: '' },
+    whatsappMessageIds: { type: [String], default: [] },
     markedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
   },
   { timestamps: true }
@@ -26,6 +27,7 @@ const trainerDailyAttendanceSchema = new mongoose.Schema(
 trainerDailyAttendanceSchema.index({ trainer: 1, date: 1 }, { unique: true });
 trainerDailyAttendanceSchema.index({ date: 1 });
 trainerDailyAttendanceSchema.index({ punchInAt: -1 });
+trainerDailyAttendanceSchema.index({ whatsappMessageIds: 1 });
 
 const TrainerDailyAttendance = mongoose.model('TrainerDailyAttendance', trainerDailyAttendanceSchema);
 export default TrainerDailyAttendance;

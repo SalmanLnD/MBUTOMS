@@ -21,8 +21,11 @@ const {
   PUNCH_WATCH_START = '06:30',
   PUNCH_WATCH_END = '11:00',
   PROCESSED_IDS_MAX = '5000',
-  CATCHUP_MESSAGE_LIMIT = '150',
+  CATCHUP_MESSAGE_LIMIT = '400',
   CATCHUP_LOOKBACK_HOURS = '36',
+  PUNCH_POLL_MS = '45000',
+  SYNC_FAIL_RECONNECT_AFTER = '3',
+  HISTORY_LOAD_ROUNDS = '12',
 } = process.env;
 
 const LIST_GROUPS = process.argv.includes('--list-groups');
@@ -40,9 +43,13 @@ const reconnectMaxMs = Number(RECONNECT_MAX_MS) || 300000;
 const watchdogIntervalMs = Number(WATCHDOG_INTERVAL_MS) || 300000;
 const watchdogPunchIdleMs = Number(WATCHDOG_PUNCH_IDLE_MS) || 1800000;
 const processedIdsMax = Number(PROCESSED_IDS_MAX) || 5000;
-const catchupMessageLimit = Number(CATCHUP_MESSAGE_LIMIT) || 150;
+const catchupMessageLimit = Number(CATCHUP_MESSAGE_LIMIT) || 400;
 const catchupLookbackMs = (Number(CATCHUP_LOOKBACK_HOURS) || 36) * 60 * 60 * 1000;
+const punchPollMs = Number(PUNCH_POLL_MS) || 45000;
+const syncFailReconnectAfter = Number(SYNC_FAIL_RECONNECT_AFTER) || 3;
+const historyLoadRounds = Number(HISTORY_LOAD_ROUNDS) || 12;
 const notReadyGraceMs = Math.max(watchdogIntervalMs, 120000);
+const PROCESSED_IDS_PATH = './.processed-message-ids.json';
 
 const oifPattern = new RegExp(OIF_REGEX, 'i');
 const processedMessageIds = new Set();
@@ -69,6 +76,68 @@ const withRetries = async (label, fn, { attempts = 3, delayMs = 5000 } = {}) => 
   throw lastError;
 };
 
+/** Stable id for live wwebjs Message objects and scraped Store rows. */
+const resolveStableMessageId = (source) => {
+  if (!source) return '';
+  if (typeof source === 'string' && source.trim()) return source.trim();
+
+  const id = source.id;
+  if (typeof id === 'string' && id.trim()) return id.trim();
+  if (id?._serialized && String(id._serialized).trim()) return String(id._serialized).trim();
+  if (id?.id) {
+    const remote = id.remote || source.from || source.to || source.chatId || 'unknown';
+    return `${remote}_${id.fromMe ? 1 : 0}_${id.id}`;
+  }
+
+  const timestamp = source.timestamp || source.t || 0;
+  const author = source.author || source.from || source.phone || 'unknown';
+  if (timestamp) return `fallback-${timestamp}-${author}`;
+  return '';
+};
+
+let processedIdsPersistTimer = null;
+const persistProcessedMessageIds = async () => {
+  try {
+    const fs = await import('node:fs/promises');
+    const payload = {
+      savedAt: new Date().toISOString(),
+      ids: processedMessageIdOrder.slice(-processedIdsMax),
+    };
+    await fs.writeFile(PROCESSED_IDS_PATH, `${JSON.stringify(payload)}\n`);
+  } catch (error) {
+    log(`Failed to persist processed ids: ${error.message}`);
+  }
+};
+
+const schedulePersistProcessedMessageIds = () => {
+  if (processedIdsPersistTimer) return;
+  processedIdsPersistTimer = setTimeout(() => {
+    processedIdsPersistTimer = null;
+    persistProcessedMessageIds().catch(() => {});
+  }, 2000);
+};
+
+const loadProcessedMessageIds = async () => {
+  try {
+    const fs = await import('node:fs/promises');
+    const raw = await fs.readFile(PROCESSED_IDS_PATH, 'utf8');
+    const parsed = JSON.parse(raw);
+    const ids = Array.isArray(parsed?.ids) ? parsed.ids : [];
+    for (const id of ids) {
+      if (!id || processedMessageIds.has(id)) continue;
+      processedMessageIds.add(id);
+      processedMessageIdOrder.push(id);
+    }
+    while (processedMessageIdOrder.length > processedIdsMax) {
+      const oldest = processedMessageIdOrder.shift();
+      if (oldest) processedMessageIds.delete(oldest);
+    }
+    log(`Loaded ${processedMessageIds.size} processed message ids from disk`);
+  } catch {
+    // first run or corrupt file — start empty
+  }
+};
+
 const rememberProcessedMessageId = (messageId) => {
   if (!messageId || processedMessageIds.has(messageId)) return;
   processedMessageIds.add(messageId);
@@ -77,6 +146,7 @@ const rememberProcessedMessageId = (messageId) => {
     const oldest = processedMessageIdOrder.shift();
     if (oldest) processedMessageIds.delete(oldest);
   }
+  schedulePersistProcessedMessageIds();
 };
 
 const ensureSingleBridgeInstance = async () => {
@@ -140,6 +210,9 @@ let punchPollTimer = null;
 let readyTimeout = null;
 let reconnectAttempt = 0;
 let lastTargetGroupActivityAt = null;
+let lastSuccessfulSyncAt = 0;
+let consecutiveSyncFailures = 0;
+let syncInFlight = false;
 let lastReadyAt = 0;
 let bridgeStartedAt = Date.now();
 let shuttingDown = false;
@@ -302,11 +375,18 @@ const runWatchdog = async () => {
       return;
     }
 
-    if (GROUP_ID && isPunchWatchWindow() && lastTargetGroupActivityAt) {
-      const idleMs = Date.now() - lastTargetGroupActivityAt;
-      if (idleMs > watchdogPunchIdleMs) {
-        log(`Watchdog: no punch-group activity for ${Math.round(idleMs / 60000)} minutes during punch window`);
-        await reconnectBridge('watchdog:punch-idle');
+    // Prefer sync health over "no new punches". Quiet mornings after the rush
+    // used to trigger punch-idle reconnects and drop the live session.
+    if (GROUP_ID && isPunchWatchWindow()) {
+      const syncStaleMs = Date.now() - (lastSuccessfulSyncAt || lastReadyAt || bridgeStartedAt);
+      if (lastSuccessfulSyncAt && syncStaleMs > Math.max(watchdogPunchIdleMs, punchPollMs * 4)) {
+        log(`Watchdog: punch sync stale for ${Math.round(syncStaleMs / 60000)} minutes during punch window`);
+        await reconnectBridge('watchdog:sync-stale');
+        return;
+      }
+      if (consecutiveSyncFailures >= syncFailReconnectAfter) {
+        log(`Watchdog: ${consecutiveSyncFailures} consecutive punch sync failures`);
+        await reconnectBridge('watchdog:sync-failures');
         return;
       }
     }
@@ -332,7 +412,12 @@ const shutdownBridge = async () => {
   if (reconnectTimer) clearTimeout(reconnectTimer);
   if (watchdogTimer) clearInterval(watchdogTimer);
   if (punchPollTimer) clearInterval(punchPollTimer);
+  if (processedIdsPersistTimer) {
+    clearTimeout(processedIdsPersistTimer);
+    processedIdsPersistTimer = null;
+  }
   clearReadyTimeout();
+  await persistProcessedMessageIds();
   if (client) {
     try {
       await client.destroy();
@@ -532,8 +617,11 @@ const wireClient = (activeClient) => {
   };
 
   const handleMessage = async (message, { fromCatchUp = false } = {}) => {
-    const messageId = message.id?._serialized;
-    if (!messageId) return;
+    const messageId = resolveStableMessageId(message);
+    if (!messageId) {
+      log('Live message missing stable id — leaving for poller/catch-up');
+      return;
+    }
     if (processedMessageIds.has(messageId) || inFlightMessageIds.has(messageId)) return;
 
     try {
@@ -572,7 +660,7 @@ const wireClient = (activeClient) => {
       }
 
       const punchInAt = new Date(message.timestamp * 1000).toISOString();
-      const payload = { phone, oifNumber, punchInAt };
+      const payload = { phone, oifNumber, punchInAt, whatsappMessageId: messageId };
       log(`${fromCatchUp ? 'Catch-up forwarding' : 'Forwarding'} punch-in from ${phone}, OIF ${oifNumber}`);
 
       const data = await forwardPunchIn(payload);
@@ -584,7 +672,11 @@ const wireClient = (activeClient) => {
       const detail = error.response?.data?.message || error.message;
       const phoneHint = error.response?.data?.phone ? ` (normalized phone: ${error.response.data.phone})` : '';
       log(`Failed to forward punch-in (${status || 'no response'}): ${detail}${phoneHint}`);
-      // Do not mark processed — allow later catch-up / retry of the same message id.
+      // Permanent client errors will not succeed on retry — avoid infinite loops.
+      if (status === 400 || status === 404) {
+        rememberProcessedMessageId(messageId);
+      }
+      // Do not mark processed for 5xx / network — allow later catch-up / retry.
     } finally {
       inFlightMessageIds.delete(messageId);
     }
@@ -660,7 +752,7 @@ const wireClient = (activeClient) => {
       return { error: 'no-page-or-group', messages: [] };
     }
 
-    return activeClient.pupPage.evaluate(async (groupId, cutoffSec, limit) => {
+    return activeClient.pupPage.evaluate(async (groupId, cutoffSec, limit, historyRounds) => {
       const tryUser = (widLike) => {
         if (!widLike) return '';
         if (typeof widLike === 'object' && widLike.user) return String(widLike.user);
@@ -731,7 +823,15 @@ const wireClient = (activeClient) => {
         const loader = window.require('WAWebChatLoadMessagesMsgAction')
           || window.require('WAWebChatLoadMessages')
           || window.Store?.ConversationMsgs;
-        for (let i = 0; i < 6; i += 1) {
+        for (let i = 0; i < historyRounds; i += 1) {
+          const current = chat.msgs?.getModelsArray?.() || [];
+          const oldest = current.reduce((min, msg) => {
+            const t = Number(msg?.t) || 0;
+            if (!t) return min;
+            return min === 0 ? t : Math.min(min, t);
+          }, 0);
+          if (oldest && oldest <= cutoffSec) break;
+
           if (loader?.loadEarlierMsgs) {
             // eslint-disable-next-line no-await-in-loop
             await loader.loadEarlierMsgs(chat);
@@ -783,10 +883,14 @@ const wireClient = (activeClient) => {
           // ignore contact resolution failures
         }
 
+        const stableId = (msg.id?._serialized && String(msg.id._serialized).trim())
+          || (msg.id?.id
+            ? `${msg.id.remote || groupId}_${msg.id.fromMe ? 1 : 0}_${msg.id.id}`
+            : '')
+          || `fallback-${msg.t}-${author || 'unknown'}`;
+
         rows.push({
-          id: msg.id?._serialized
-            || (msg.id?.id && msg.id?.remote ? `${msg.id.remote}_${msg.id.fromMe ? 1 : 0}_${msg.id.id}` : '')
-            || `fallback-${msg.t}-${author || 'unknown'}`,
+          id: stableId,
           timestamp: msg.t,
           hasMedia,
           body,
@@ -797,26 +901,43 @@ const wireClient = (activeClient) => {
       }
 
       rows.sort((a, b) => a.timestamp - b.timestamp);
+
+      // Never drop older in-window media punches when the chat is busy.
+      // Keep all media in the lookback window, then fill remaining slots with
+      // newest non-media rows only if we still have budget.
+      const mediaRows = rows.filter((row) => row.hasMedia
+        || ['image', 'video', 'document', 'album', 'gif'].includes(row.type));
+      let selected = mediaRows;
+      if (selected.length > limit) {
+        selected = mediaRows.slice(-limit);
+      } else {
+        const mediaIds = new Set(mediaRows.map((row) => row.id));
+        const extras = rows.filter((row) => !mediaIds.has(row.id)).slice(-(limit - mediaRows.length));
+        selected = [...mediaRows, ...extras].sort((a, b) => a.timestamp - b.timestamp);
+      }
+
       return {
         chatId: chat.id?._serialized || groupId,
         msgCount: msgs.length,
-        oldestTs: rows[0]?.timestamp || 0,
-        newestTs: rows[rows.length - 1]?.timestamp || 0,
-        mediaCount: rows.filter((row) => row.hasMedia).length,
-        messages: rows.slice(-limit),
+        oldestTs: selected[0]?.timestamp || rows[0]?.timestamp || 0,
+        newestTs: selected[selected.length - 1]?.timestamp || rows[rows.length - 1]?.timestamp || 0,
+        mediaCount: mediaRows.length,
+        truncated: mediaRows.length > limit,
+        messages: selected,
       };
-    }, GROUP_ID, Math.floor(cutoffMs / 1000), catchupMessageLimit);
+    }, GROUP_ID, Math.floor(cutoffMs / 1000), catchupMessageLimit, historyLoadRounds);
   };
 
   const processScrapedPunch = async (raw, { fromCatchUp = false } = {}) => {
-    if (!raw?.id) return 'skip-no-id';
-    if (processedMessageIds.has(raw.id) || inFlightMessageIds.has(raw.id)) return 'skip-dup';
+    const messageId = resolveStableMessageId(raw);
+    if (!messageId) return 'skip-no-id';
+    if (processedMessageIds.has(messageId) || inFlightMessageIds.has(messageId)) return 'skip-dup';
     // Prefer media punches; still accept captioned media-like types.
     if (!raw.hasMedia && !['image', 'video', 'document', 'album', 'gif'].includes(raw.type)) {
       return 'skip-non-media';
     }
 
-    inFlightMessageIds.add(raw.id);
+    inFlightMessageIds.add(messageId);
     try {
       let phone = digitsOnly(raw.phone || '');
       if (!isLikelyPhoneUserId(phone) && raw.author && raw.author !== 'fromMe') {
@@ -838,8 +959,13 @@ const wireClient = (activeClient) => {
 
       const punchInAt = new Date((raw.timestamp || 0) * 1000).toISOString();
       log(`${fromCatchUp ? 'Catch-up forwarding' : 'Poll forwarding'} punch-in from ${phone}, OIF ${oifNumber}`);
-      const data = await forwardPunchIn({ phone, oifNumber, punchInAt });
-      rememberProcessedMessageId(raw.id);
+      const data = await forwardPunchIn({
+        phone,
+        oifNumber,
+        punchInAt,
+        whatsappMessageId: messageId,
+      });
+      rememberProcessedMessageId(messageId);
       touchTargetGroupActivity();
       log(`Recorded: ${data?.trainer?.name || phone} | OIF ${oifNumber} | ${punchInAt}`);
       return 'recorded';
@@ -847,19 +973,29 @@ const wireClient = (activeClient) => {
       const status = error.response?.status;
       const detail = error.response?.data?.message || error.message;
       log(`Failed to forward punch-in (${status || 'no response'}): ${detail}`);
+      if (status === 400 || status === 404) {
+        rememberProcessedMessageId(messageId);
+        return 'skip-client-error';
+      }
       return 'error';
     } finally {
-      inFlightMessageIds.delete(raw.id);
+      inFlightMessageIds.delete(messageId);
     }
   };
 
   const syncGroupPunches = async (label = 'Sync') => {
     if (!GROUP_ID || !bridgeReady || !activeClient?.pupPage) return;
+    if (syncInFlight) {
+      log(`${label}: skipped overlapping sync`);
+      return;
+    }
+    syncInFlight = true;
     const cutoffMs = Date.now() - catchupLookbackMs;
     try {
       const scraped = await scrapeGroupMediaMessages(cutoffMs);
       if (scraped?.error) {
-        log(`${label}: store scrape error=${scraped.error} chats=${scraped.chatCount || 0}`);
+        consecutiveSyncFailures += 1;
+        log(`${label}: store scrape error=${scraped.error} chats=${scraped.chatCount || 0} fails=${consecutiveSyncFailures}`);
         if (scraped.sampleIds?.length) {
           log(`${label}: sample chat ids: ${scraped.sampleIds.slice(0, 8).join(', ')}`);
         }
@@ -869,7 +1005,7 @@ const wireClient = (activeClient) => {
       const recent = (scraped.messages || []).filter((row) => (row.timestamp || 0) * 1000 >= cutoffMs);
       const oldest = scraped.oldestTs ? new Date(scraped.oldestTs * 1000).toISOString() : '-';
       const newest = scraped.newestTs ? new Date(scraped.newestTs * 1000).toISOString() : '-';
-      log(`${label}: scanned ${recent.length}/${scraped.msgCount || 0} msgs media=${scraped.mediaCount || 0} range=${oldest}..${newest}`);
+      log(`${label}: scanned ${recent.length}/${scraped.msgCount || 0} msgs media=${scraped.mediaCount || 0} truncated=${Boolean(scraped.truncated)} range=${oldest}..${newest}`);
 
       const sample = recent.slice(-8).map((row) => ({
         t: new Date((row.timestamp || 0) * 1000).toISOString().slice(11, 19),
@@ -883,9 +1019,11 @@ const wireClient = (activeClient) => {
       const counts = {
         recorded: 0,
         'skip-dup': 0,
+        'skip-no-id': 0,
         'skip-non-media': 0,
         'skip-phone': 0,
         'skip-oif': 0,
+        'skip-client-error': 0,
         error: 0,
       };
       for (const row of recent) {
@@ -894,8 +1032,17 @@ const wireClient = (activeClient) => {
         if (counts[result] !== undefined) counts[result] += 1;
       }
       log(`${label}: results ${JSON.stringify(counts)}`);
+
+      lastSuccessfulSyncAt = Date.now();
+      consecutiveSyncFailures = 0;
+      if (counts['skip-no-id'] > 0) {
+        log(`${label}: WARNING ${counts['skip-no-id']} messages still lacked stable ids`);
+      }
     } catch (error) {
-      log(`${label} failed: ${error?.message || error}`);
+      consecutiveSyncFailures += 1;
+      log(`${label} failed: ${error?.message || error} fails=${consecutiveSyncFailures}`);
+    } finally {
+      syncInFlight = false;
     }
   };
 
@@ -906,7 +1053,7 @@ const wireClient = (activeClient) => {
     punchPollTimer = setInterval(() => {
       if (!bridgeReady || reconnecting || shuttingDown) return;
       syncGroupPunches('Poll').catch((error) => log('Poll error:', error.message));
-    }, 45000);
+    }, punchPollMs);
     localPunchPollTimer = punchPollTimer;
   };
 
@@ -963,6 +1110,7 @@ const wireClient = (activeClient) => {
     await patchWhatsAppStoreApis();
     startPunchPoller();
     await catchUpRecentGroupMessages();
+    lastSuccessfulSyncAt = Date.now();
   };
   activateBridgeFn = activateBridge;
 
@@ -1038,6 +1186,7 @@ const wireClient = (activeClient) => {
 
 const startBridge = async () => {
   if (!ONE_SHOT_MODE) {
+    await loadProcessedMessageIds();
     await ensureSingleBridgeInstance();
     startWatchdog();
     process.once('SIGINT', () => {

@@ -39,7 +39,7 @@ export const recordWhatsappPunchIn = async (req, res) => {
     return res.status(401).json({ message: 'Invalid webhook secret' });
   }
 
-  const { phone, oifNumber, punchInAt, imageUrl } = req.body || {};
+  const { phone, oifNumber, punchInAt, imageUrl, whatsappMessageId } = req.body || {};
 
   if (!phone) {
     return res.status(400).json({ message: 'phone is required' });
@@ -51,6 +51,22 @@ export const recordWhatsappPunchIn = async (req, res) => {
   const trimmedOif = String(oifNumber).trim();
   if (trimmedOif.length > 12) {
     return res.status(400).json({ message: 'OIF number must be 12 characters or fewer' });
+  }
+
+  const messageId = whatsappMessageId ? String(whatsappMessageId).trim() : '';
+  if (messageId) {
+    const alreadyByMessage = await TrainerDailyAttendance.findOne({
+      whatsappMessageIds: messageId,
+    }).select('_id trainer date oifNumber punchInAt');
+    if (alreadyByMessage) {
+      return res.status(200).json({
+        status: 'already_recorded',
+        trainer: { _id: alreadyByMessage.trainer },
+        date: toAttendanceDateKey(alreadyByMessage.date),
+        oifNumber: alreadyByMessage.oifNumber,
+        punchInAt: alreadyByMessage.punchInAt,
+      });
+    }
   }
 
   const trainer = await findTrainerByPhone(phone);
@@ -90,9 +106,14 @@ export const recordWhatsappPunchIn = async (req, res) => {
     update.punchInAt = punchDate;
   }
 
+  const updateOps = { $set: update };
+  if (messageId) {
+    updateOps.$addToSet = { whatsappMessageIds: messageId };
+  }
+
   const record = await TrainerDailyAttendance.findOneAndUpdate(
     { trainer: trainer._id, date: day },
-    { $set: update },
+    updateOps,
     { upsert: true, new: true, setDefaultsOnInsert: true }
   );
 

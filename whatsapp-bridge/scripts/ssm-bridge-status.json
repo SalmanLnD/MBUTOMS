@@ -2,7 +2,7 @@
   "commands": [
     "date -u",
     "pgrep -af 'node /opt/MBUTOMS/whatsapp-bridge/index.js' | wc -l",
-    "python3 - <<'PY'\nfrom pathlib import Path\nfor name in ('mbutoms-whatsapp-bridge-out.log', 'mbutoms-whatsapp-bridge-error.log'):\n    p = Path('/home/ubuntu/.pm2/logs') / name\n    print('--- ' + name + ' (last 25 lines) ---')\n    if not p.exists():\n        print('missing')\n        continue\n    lines = p.read_text(errors='ignore').splitlines()\n    print('lines=' + str(len(lines)))\n    for line in lines[-25:]:\n        print(line.encode('ascii', 'ignore').decode())\nPY",
+    "python3 - <<'PY'\nfrom pathlib import Path\nlog_dir = Path('/home/ubuntu/.pm2/logs')\nfor name in ('mbutoms-whatsapp-bridge-out-0.log', 'mbutoms-whatsapp-bridge-out.log', 'mbutoms-whatsapp-bridge-error-0.log', 'mbutoms-whatsapp-bridge-error.log'):\n    p = log_dir / name\n    if not p.exists():\n        continue\n    print('--- ' + name + ' (last 25 lines) ---')\n    lines = p.read_text(errors='ignore').splitlines()\n    print('lines=' + str(len(lines)))\n    for line in lines[-25:]:\n        print(line.encode('ascii', 'ignore').decode())\nPY",
     "test -d /opt/MBUTOMS/whatsapp-bridge/.wwebjs_auth/session && echo 'SESSION_EXISTS=yes' || echo 'SESSION_EXISTS=no'",
     "ls -la /home/ubuntu/.cache/puppeteer/chrome 2>/dev/null | head -3 || echo 'no puppeteer chrome cache'"
   ]
