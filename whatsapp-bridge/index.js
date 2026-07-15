@@ -272,12 +272,8 @@ const runWatchdog = async () => {
       }
     }
 
-    if (GROUP_ID) {
-      await withRetries('watchdog-getChatById', () => client.getChatById(GROUP_ID), {
-        attempts: 2,
-        delayMs: 5000,
-      });
-    }
+    // Intentionally do not call getChatById here — recent WhatsApp Web builds
+    // throw opaque errors from that API even while the live message listener works.
   } catch (error) {
     log('Watchdog health check failed:', error.message);
     await reconnectBridge(`watchdog:${error.message}`);
@@ -564,11 +560,15 @@ const wireClient = (activeClient) => {
       }
 
       if (!chat) {
-        const chats = await withRetries('catchup-getChats', () => activeClient.getChats(), {
-          attempts: 3,
-          delayMs: 8000,
-        });
-        chat = chats.find((item) => item.id?._serialized === GROUP_ID) || null;
+        try {
+          const chats = await withRetries('catchup-getChats', () => activeClient.getChats(), {
+            attempts: 3,
+            delayMs: 8000,
+          });
+          chat = chats.find((item) => item.id?._serialized === GROUP_ID) || null;
+        } catch (error) {
+          log(`catchup-getChats failed: ${error?.message || error}`);
+        }
       }
 
       if (!chat && activeClient.pupPage) {

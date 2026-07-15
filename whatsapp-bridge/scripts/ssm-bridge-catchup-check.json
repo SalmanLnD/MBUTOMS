@@ -1,0 +1,8 @@
+{
+  "commands": [
+    "node -e \"console.log('wwjs='+require('/opt/MBUTOMS/whatsapp-bridge/node_modules/whatsapp-web.js/package.json').version)\"",
+    "date -u",
+    "python3 - <<'PY'\nfrom pathlib import Path\np=Path('/home/ubuntu/.pm2/logs/mbutoms-whatsapp-bridge-out-0.log')\nlines=p.read_text(errors='ignore').splitlines()\nprint('N', len(lines))\nfor ln in lines[-50:]:\n    print(ln.encode('ascii','ignore').decode())\nPY",
+    "echo NODE=$(pgrep -c -f 'node /opt/MBUTOMS/whatsapp-bridge/index.js' || echo 0)"
+  ]
+}
