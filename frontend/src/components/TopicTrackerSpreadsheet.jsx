@@ -12,6 +12,7 @@ import {
   SESSION_STATUS_VALUES,
   SESSION_STATUS_LABELS,
 } from '../utils/topicTrackerConstants.js';
+import { PlusIcon, TrashIcon } from './icons.jsx';
 
 const computeAttendancePercent = (allotted, present) => {
   if (!allotted || allotted <= 0) return '';
@@ -27,23 +28,38 @@ const computeDuration = (start, end) => {
   return String(Math.round((diff / 60) * 10) / 10);
 };
 
-const buildEntryPayload = (row, trackerStatus) => ({
-  scheduleId: row.scheduleId,
-  date: row.date,
-  trainerName: row.trainerName,
-  branchYearSection: row.branchYearSection,
-  roomNo: row.roomNo,
-  courseName: row.courseName,
-  topicModuleCovered: row.topicModuleCovered,
-  sessionStartTime: row.sessionStartTime,
-  sessionEndTime: row.sessionEndTime,
-  allottedStudents: Number(row.allottedStudents) || 0,
-  noPresent: Number(row.noPresent) || 0,
-  sessionStatus: row.sessionStatus,
-  keyObservationsFeedback: row.keyObservationsFeedback,
-  challengesFaced: row.challengesFaced,
-  trackerStatus,
-});
+const getRowTopics = (row) => {
+  if (Array.isArray(row.topicModulesCovered) && row.topicModulesCovered.length) {
+    return row.topicModulesCovered;
+  }
+  return row.topicModuleCovered ? [row.topicModuleCovered] : [''];
+};
+
+const getSelectedTopics = (row) => [
+  ...new Set(getRowTopics(row).map((topic) => String(topic || '').trim()).filter(Boolean)),
+];
+
+const buildEntryPayload = (row, trackerStatus) => {
+  const topics = getSelectedTopics(row);
+  return {
+    scheduleId: row.scheduleId,
+    date: row.date,
+    trainerName: row.trainerName,
+    branchYearSection: row.branchYearSection,
+    roomNo: row.roomNo,
+    courseName: row.courseName,
+    topicModuleCovered: topics.join(', '),
+    topicModulesCovered: topics,
+    sessionStartTime: row.sessionStartTime,
+    sessionEndTime: row.sessionEndTime,
+    allottedStudents: Number(row.allottedStudents) || 0,
+    noPresent: Number(row.noPresent) || 0,
+    sessionStatus: row.sessionStatus,
+    keyObservationsFeedback: row.keyObservationsFeedback,
+    challengesFaced: row.challengesFaced,
+    trackerStatus,
+  };
+};
 
 const getRowKey = (row) => `${row.scheduleId}-${row.date}`;
 const serializeEditableRow = (row) => JSON.stringify(buildEntryPayload(row, 'closed'));
@@ -78,7 +94,10 @@ const TopicTrackerSpreadsheet = ({
     setLoading(true);
     try {
       const data = await getTopicTrackerSessions({ date, subjectId, trainerId });
-      const nextSessions = data.sessions || [];
+      const nextSessions = (data.sessions || []).map((row) => ({
+        ...row,
+        topicModulesCovered: getRowTopics(row),
+      }));
       baselineRowsRef.current = new Map(
         nextSessions.map((row) => [getRowKey(row), serializeEditableRow(row)])
       );
@@ -124,6 +143,11 @@ const TopicTrackerSpreadsheet = ({
     const row = sessions[index];
     if (!row) return;
     const next = { ...row, [field]: value };
+    if (field === 'topicModulesCovered') {
+      next.topicModuleCovered = value.map((topic) => String(topic || '').trim())
+        .filter(Boolean)
+        .join(', ');
+    }
     if (field === 'sessionStartTime' || field === 'sessionEndTime') {
       next.durationHrs = computeDuration(
         field === 'sessionStartTime' ? value : row.sessionStartTime,
@@ -146,11 +170,26 @@ const TopicTrackerSpreadsheet = ({
     setSessions((current) => current.map((item, i) => (i === index ? next : item)));
   };
 
+  const updateTopic = (rowIndex, topicIndex, value) => {
+    const topics = [...getRowTopics(sessions[rowIndex])];
+    topics[topicIndex] = value;
+    updateRow(rowIndex, 'topicModulesCovered', topics);
+  };
+
+  const addTopic = (rowIndex) => {
+    updateRow(rowIndex, 'topicModulesCovered', [...getRowTopics(sessions[rowIndex]), '']);
+  };
+
+  const removeTopic = (rowIndex, topicIndex) => {
+    const topics = getRowTopics(sessions[rowIndex]).filter((_, index) => index !== topicIndex);
+    updateRow(rowIndex, 'topicModulesCovered', topics.length ? topics : ['']);
+  };
+
   const saveRow = async (row, index) => {
     const key = getRowKey(row);
     if (!dirtyRows.has(key)) return;
-    if (!row.topicModuleCovered?.trim()) {
-      showError('Select a topic before saving this slot.');
+    if (!getSelectedTopics(row).length) {
+      showError('Select at least one topic before saving this slot.');
       return;
     }
     if (!row.sessionStatus?.trim()) {
@@ -164,6 +203,8 @@ const TopicTrackerSpreadsheet = ({
       const nextRow = {
         ...row,
         entryId: saved._id,
+        topicModuleCovered: saved.topicModuleCovered,
+        topicModulesCovered: getRowTopics(saved),
         durationHrs: saved.durationHrs,
         attendancePercent: saved.attendancePercent,
         trackerStatus: saved.trackerStatus,
@@ -227,26 +268,73 @@ const TopicTrackerSpreadsheet = ({
       );
     }
 
-    if (column.key === 'topicModuleCovered' && row.topicOptions?.length) {
-      const options = row.topicOptions;
-      const valueNotInList = value && !options.includes(value);
-
+    if (column.key === 'topicModuleCovered') {
+      const options = row.topicOptions || [];
+      const topics = getRowTopics(row);
+      const selectedTopics = new Set(topics.filter(Boolean));
       return (
-        <select
-          className="form-select form-select-sm topic-tracker-cell-input topic-tracker-topic-select"
-          value={value}
-          onChange={(e) => updateRow(index, column.key, e.target.value)}
-          disabled={isSaving}
-          aria-label="Topic / Module Covered"
-        >
-          <option value="">Select topic...</option>
-          {valueNotInList && (
-            <option value={value}>{value}</option>
-          )}
-          {options.map((topic) => (
-            <option key={topic} value={topic}>{topic}</option>
-          ))}
-        </select>
+        <div className="topic-tracker-topics">
+          {topics.map((topic, topicIndex) => {
+            const valueNotInList = topic && options.length && !options.includes(topic);
+            return (
+              <div className="topic-tracker-topic-row" key={`${topicIndex}-${topic}`}>
+                {options.length ? (
+                  <select
+                    className="form-select form-select-sm topic-tracker-cell-input topic-tracker-topic-select"
+                    value={topic}
+                    onChange={(e) => updateTopic(index, topicIndex, e.target.value)}
+                    disabled={isSaving}
+                    aria-label={`Topic / Module Covered ${topicIndex + 1}`}
+                  >
+                    <option value="">Select topic...</option>
+                    {valueNotInList && <option value={topic}>{topic}</option>}
+                    {options.map((option) => (
+                      <option
+                        key={option}
+                        value={option}
+                        disabled={option !== topic && selectedTopics.has(option)}
+                      >
+                        {option}
+                      </option>
+                    ))}
+                  </select>
+                ) : (
+                  <input
+                    type="text"
+                    className="form-control form-control-sm topic-tracker-cell-input topic-tracker-topic-select"
+                    value={topic}
+                    onChange={(e) => updateTopic(index, topicIndex, e.target.value)}
+                    disabled={isSaving}
+                    aria-label={`Topic / Module Covered ${topicIndex + 1}`}
+                  />
+                )}
+                {topics.length > 1 && (
+                  <button
+                    type="button"
+                    className="btn btn-sm btn-outline-danger topic-tracker-topic-action"
+                    onClick={() => removeTopic(index, topicIndex)}
+                    disabled={isSaving}
+                    aria-label={`Remove topic ${topicIndex + 1}`}
+                    title="Remove topic"
+                  >
+                    <TrashIcon size={14} />
+                  </button>
+                )}
+              </div>
+            );
+          })}
+          <button
+            type="button"
+            className="btn btn-sm btn-outline-primary topic-tracker-add-topic"
+            onClick={() => addTopic(index)}
+            disabled={isSaving || topics.some((topic) => !topic)}
+            aria-label="Add another topic"
+            title={topics.some((topic) => !topic) ? 'Select the current topic first' : 'Add another topic'}
+          >
+            <PlusIcon size={14} />
+            <span>Add topic</span>
+          </button>
+        </div>
       );
     }
 

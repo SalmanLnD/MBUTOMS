@@ -5,7 +5,6 @@ import Student from '../models/Student.js';
 import ClassGroup from '../models/ClassGroup.js';
 import TopicTrackerEntry from '../models/TopicTrackerEntry.js';
 import Leave from '../models/Leave.js';
-import { normalizeDate } from './scheduleHelpers.js';
 import { filterSchedulesActiveOnDate } from './activeSchedulesForDate.js';
 import { computeHours } from './trainerClassHours.js';
 import { resolveTrainerScheduleCodes } from './trainerMappings.js';
@@ -16,16 +15,28 @@ import {
   buildTrainerFilterForCoordinatorSubjects,
 } from './subjectCoordinatorAccess.js';
 import { getTopicOptionsForSubjectDoc } from './topicTrackerTopicCatalog.js';
-import { getLeaveOverlapFilter } from './leaveDateRange.js';
+import { getLeaveDayWindow, getLeaveOverlapFilter, toLeaveDateKey } from './leaveDateRange.js';
+import {
+  formatTopicModulesCovered,
+  getEntryTopicModules,
+} from './topicTrackerEntryTopics.js';
 
 const WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
-const formatDateKey = (date) => {
-  const base = normalizeDate(date);
-  const y = base.getFullYear();
-  const m = String(base.getMonth() + 1).padStart(2, '0');
-  const d = String(base.getDate()).padStart(2, '0');
-  return `${y}-${m}-${d}`;
+const formatDateKey = (date) => toLeaveDateKey(date);
+
+const toOperationalNoon = (dateInput) => {
+  const key = toLeaveDateKey(dateInput);
+  return new Date(`${key}T12:00:00+05:30`);
+};
+
+const pickBestTrackerEntry = (entries = []) => {
+  if (!entries.length) return null;
+  return [...entries].sort((a, b) => {
+    const closedDiff = Number(b.trackerStatus === 'closed') - Number(a.trackerStatus === 'closed');
+    if (closedDiff) return closedDiff;
+    return new Date(b.updatedAt || 0) - new Date(a.updatedAt || 0);
+  })[0];
 };
 
 const buildBranchYearSection = (schedule, classGroup) => {
@@ -123,7 +134,11 @@ const entryToSession = (entry, defaults) => ({
   courseName: entry?.courseName || defaults.courseName,
   branchYearSection: entry?.branchYearSection || defaults.branchYearSection,
   roomNo: entry?.roomNo || defaults.roomNo,
-  topicModuleCovered: entry?.topicModuleCovered || '',
+  topicModuleCovered: formatTopicModulesCovered(
+    entry?.topicModulesCovered,
+    entry?.topicModuleCovered
+  ),
+  topicModulesCovered: getEntryTopicModules(entry),
   sessionStartTime: entry?.sessionStartTime || defaults.sessionStartTime,
   sessionEndTime: entry?.sessionEndTime || defaults.sessionEndTime,
   durationHrs: entry?.durationHrs ?? defaults.durationHrs,
@@ -147,9 +162,10 @@ export const buildTopicTrackerSessions = async ({
   trainerId,
   user,
 }) => {
-  const ref = normalizeDate(date);
-  const dateKey = formatDateKey(ref);
-  const dayName = WEEKDAYS[ref.getDay()];
+  const dateKey = toLeaveDateKey(date);
+  const dayWindow = getLeaveDayWindow(dateKey);
+  const ref = toOperationalNoon(dateKey);
+  const dayName = WEEKDAYS[ref.getUTCDay()];
 
   const scheduleFilter = { day: dayName };
   if (subjectId) scheduleFilter.subject = subjectId;
@@ -289,12 +305,21 @@ export const buildTopicTrackerSessions = async ({
 
   const scheduleIds = sessionDefaults.map((item) => item.scheduleRef);
   const entries = await TopicTrackerEntry.find({
-    date: ref,
+    date: { $gte: dayWindow.start, $lt: dayWindow.endExclusive },
     schedule: { $in: scheduleIds },
   }).lean();
 
+  const entriesBySchedule = new Map();
+  entries.forEach((entry) => {
+    const key = entry.schedule.toString();
+    if (!entriesBySchedule.has(key)) entriesBySchedule.set(key, []);
+    entriesBySchedule.get(key).push(entry);
+  });
   const entryMap = new Map(
-    entries.map((entry) => [entry.schedule.toString(), entry])
+    [...entriesBySchedule.entries()].map(([scheduleId, list]) => [
+      scheduleId,
+      pickBestTrackerEntry(list),
+    ])
   );
 
   const sessions = sessionDefaults.map((defaults) => {
@@ -306,8 +331,8 @@ export const buildTopicTrackerSessions = async ({
 };
 
 export const buildTopicTrackerOverview = async ({ date, user }) => {
-  const ref = normalizeDate(date);
-  const dateKey = formatDateKey(ref);
+  const dateKey = toLeaveDateKey(date);
+  const ref = toOperationalNoon(dateKey);
   const overviewMap = new Map();
   const seenSessionKeys = new Set();
 
@@ -430,7 +455,7 @@ export const buildTopicTrackerExportRows = async () => {
       entry.branchYearSection || '',
       entry.roomNo || '',
       entry.courseName || entry.subject?.name || '',
-      entry.topicModuleCovered || '',
+      formatTopicModulesCovered(entry.topicModulesCovered, entry.topicModuleCovered),
       entry.sessionStartTime || '',
       entry.sessionEndTime || '',
       entry.durationHrs ?? '',
@@ -459,7 +484,10 @@ export const buildTopicTrackerClassSummary = async ({ subjectId, user, trainerId
   let subjects = [];
   let entryFilter = {
     trackerStatus: 'closed',
-    topicModuleCovered: { $nin: [null, ''] },
+    $or: [
+      { topicModulesCovered: { $exists: true, $ne: [] } },
+      { topicModuleCovered: { $nin: [null, ''] } },
+    ],
   };
 
   if (ownTrainerId) {
@@ -513,7 +541,7 @@ export const buildTopicTrackerClassSummary = async ({ subjectId, user, trainerId
   }
 
   const entries = await TopicTrackerEntry.find(entryFilter)
-    .select('subject trainer branchYearSection topicModuleCovered date sessionStatus allottedStudents noPresent attendancePercent trainerName')
+    .select('subject trainer branchYearSection topicModuleCovered topicModulesCovered date sessionStatus allottedStudents noPresent attendancePercent trainerName')
     .sort({ date: 1 })
     .lean();
 
@@ -549,8 +577,7 @@ export const buildTopicTrackerClassSummary = async ({ subjectId, user, trainerId
       }
       const row = classMap.get(classKey);
       row.closedSlots += 1;
-      const topic = String(entry.topicModuleCovered || '').trim();
-      if (topic) {
+      getEntryTopicModules(entry).forEach((topic) => {
         const existing = row.topicHits.get(topic) || { topic, count: 0, lastDate: null };
         existing.count += 1;
         const entryDate = entry.date ? formatDateKey(entry.date) : null;
@@ -558,7 +585,7 @@ export const buildTopicTrackerClassSummary = async ({ subjectId, user, trainerId
           existing.lastDate = entryDate;
         }
         row.topicHits.set(topic, existing);
-      }
+      });
       if (entry.attendancePercent != null && Number.isFinite(Number(entry.attendancePercent))) {
         row.attendanceSum += Number(entry.attendancePercent);
         row.attendanceCount += 1;

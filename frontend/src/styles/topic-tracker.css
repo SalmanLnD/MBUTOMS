@@ -47,3 +47,31 @@
   min-width: 14rem;
   max-width: 22rem;
 }
+
+.topic-tracker-topics {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.35rem;
+  padding: 0.15rem 0;
+}
+
+.topic-tracker-topic-row {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+
+.topic-tracker-topic-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.3rem;
+}
+
+.topic-tracker-add-topic {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  white-space: nowrap;
+}

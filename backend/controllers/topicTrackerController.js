@@ -12,7 +12,6 @@ import {
   buildTopicTrackerClassSummary,
 } from '../utils/topicTrackerSessions.js';
 import { computeHours } from '../utils/trainerClassHours.js';
-import { normalizeDate } from '../utils/scheduleHelpers.js';
 import { findTrainerByScheduleCode } from '../utils/trainerMappings.js';
 import {
   coordinatorCanAccessTrainer,
@@ -24,7 +23,12 @@ import {
   isAllowedTopicForSubject,
 } from '../utils/topicTrackerTopicCatalog.js';
 import Subject from '../models/Subject.js';
-import { getLeaveOverlapFilter } from '../utils/leaveDateRange.js';
+import { getLeaveDayWindow, getLeaveOverlapFilter, toLeaveDateKey } from '../utils/leaveDateRange.js';
+import {
+  formatTopicModulesCovered,
+  getEntryTopicModules,
+  normalizeTopicModulesCovered,
+} from '../utils/topicTrackerEntryTopics.js';
 
 const MANAGEMENT_VIEW_ROLES = [...FULL_ACCESS_ROLES, ROLES.SUBJECT_COORDINATOR];
 
@@ -168,6 +172,7 @@ export const upsertTopicTrackerEntry = async (req, res) => {
     scheduleId,
     date,
     topicModuleCovered,
+    topicModulesCovered,
     sessionStartTime,
     sessionEndTime,
     allottedStudents,
@@ -201,7 +206,9 @@ export const upsertTopicTrackerEntry = async (req, res) => {
     return res.status(403).json({ message: 'Not authorized to update this topic tracker entry' });
   }
 
-  const refDate = normalizeDate(date);
+  const dateKey = toLeaveDateKey(date);
+  const dayWindow = getLeaveDayWindow(dateKey);
+  const refDate = new Date(`${dateKey}T00:00:00.000Z`);
   const startTime = sessionStartTime || schedule.startTime;
   const endTime = sessionEndTime || schedule.endTime;
   const allotted = allottedStudents ?? 0;
@@ -212,13 +219,27 @@ export const upsertTopicTrackerEntry = async (req, res) => {
     return res.status(400).json({ message: 'Invalid tracker status' });
   }
 
-  const existing = await TopicTrackerEntry.findOne({ schedule: scheduleId, date: refDate });
+  const existingCandidates = await TopicTrackerEntry.find({
+    schedule: scheduleId,
+    date: { $gte: dayWindow.start, $lt: dayWindow.endExclusive },
+  }).sort({ updatedAt: -1 });
+  const existing = existingCandidates.find((entry) => entry.trackerStatus === 'closed')
+    || existingCandidates[0]
+    || null;
   const subjectCode = schedule.subject?.code || schedule.subjectCode || '';
-  const resolvedTopic = topicModuleCovered ?? existing?.topicModuleCovered ?? '';
+  const hasTopicsPayload = Array.isArray(topicModulesCovered);
+  const resolvedTopics = hasTopicsPayload
+    ? normalizeTopicModulesCovered(topicModulesCovered)
+    : (topicModuleCovered !== undefined
+      ? normalizeTopicModulesCovered(undefined, topicModuleCovered)
+      : getEntryTopicModules(existing));
 
-  if (resolvedTopic && !isAllowedTopicForSubject(subjectCode, resolvedTopic, schedule.subject?.topics)) {
+  const hasInvalidTopic = resolvedTopics.some(
+    (topic) => !isAllowedTopicForSubject(subjectCode, topic, schedule.subject?.topics)
+  );
+  if (hasInvalidTopic) {
     return res.status(400).json({
-      message: 'Select a topic from the approved list for this subject.',
+      message: 'Select topics from the approved list for this subject.',
     });
   }
 
@@ -246,7 +267,8 @@ export const upsertTopicTrackerEntry = async (req, res) => {
     branchYearSection: branchYearSection || `${schedule.department}, Sem ${schedule.semester} - ${schedule.section}`,
     roomNo: roomNo || schedule.venue?.name || '',
     courseName: courseName || schedule.subject?.name || schedule.subjectCode || '',
-    topicModuleCovered: resolvedTopic,
+    topicModuleCovered: formatTopicModulesCovered(resolvedTopics),
+    topicModulesCovered: resolvedTopics,
     sessionStartTime: startTime,
     sessionEndTime: endTime,
     durationHrs: computeHours(startTime, endTime),
@@ -272,11 +294,17 @@ export const upsertTopicTrackerEntry = async (req, res) => {
     payload.trackerStatus = existing?.trackerStatus || 'pending';
   }
 
-  const entry = await TopicTrackerEntry.findOneAndUpdate(
-    { schedule: scheduleId, date: refDate },
-    { $set: payload },
-    { upsert: true, new: true, setDefaultsOnInsert: true }
-  );
+  const entry = existing
+    ? await TopicTrackerEntry.findByIdAndUpdate(
+      existing._id,
+      { $set: payload },
+      { new: true }
+    )
+    : await TopicTrackerEntry.findOneAndUpdate(
+      { schedule: scheduleId, date: refDate },
+      { $set: payload },
+      { upsert: true, new: true, setDefaultsOnInsert: true }
+    );
 
   await notifyAdminsOfTopicTrackerUpdate(entry, req.user);
   res.json(entry);

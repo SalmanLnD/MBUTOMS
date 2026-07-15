@@ -14,6 +14,10 @@ const topicTrackerEntrySchema = new mongoose.Schema(
     roomNo: { type: String, trim: true, default: '' },
     courseName: { type: String, trim: true, default: '' },
     topicModuleCovered: { type: String, trim: true, default: '' },
+    topicModulesCovered: {
+      type: [{ type: String, trim: true }],
+      default: [],
+    },
     sessionStartTime: { type: String, trim: true, default: '' },
     sessionEndTime: { type: String, trim: true, default: '' },
     durationHrs: { type: Number, default: 0 },
