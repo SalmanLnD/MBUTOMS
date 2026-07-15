@@ -4,6 +4,7 @@ import Trainer from '../models/Trainer.js';
 import { normalizeDate } from '../utils/scheduleHelpers.js';
 import { resolveTrainerScheduleCodes } from '../utils/trainerMappings.js';
 import { isAuthorizedRole, MANAGEMENT_ROLES } from '../utils/roles.js';
+import { notifyReplacementCancellation } from '../utils/replacementNotifications.js';
 
 const WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
@@ -154,8 +155,16 @@ const restoreSchedulesForCancelledLeave = async (leave, originalTrainerCode) => 
 
 export const deleteLeave = async (req, res) => {
   const leave = await Leave.findById(req.params.id)
-    .populate('trainer', 'employeeId')
-    .populate('affectedSchedules');
+    .populate('trainer', 'name employeeId')
+    .populate('affectedSchedules')
+    .populate({
+      path: 'replacements.schedule',
+      select: 'department section startTime endTime day',
+    })
+    .populate({
+      path: 'replacements.replacementTrainer',
+      select: 'name employeeId',
+    });
 
   if (!leave) return res.status(404).json({ message: 'Leave not found' });
 
@@ -172,6 +181,8 @@ export const deleteLeave = async (req, res) => {
   }
 
   const hadReplacements = Array.isArray(leave.replacements) && leave.replacements.length > 0;
+  const revokedReplacements = hadReplacements ? [...leave.replacements] : [];
+
   await restoreSchedulesForCancelledLeave(leave, leave.trainer?.employeeId);
 
   leave.replacements = [];
@@ -179,6 +190,19 @@ export const deleteLeave = async (req, res) => {
   leave.status = 'cancelled';
   leave.markModified('replacements');
   await leave.save();
+
+  if (hadReplacements) {
+    try {
+      await notifyReplacementCancellation({
+        actor: req.user,
+        leave,
+        originalTrainer: leave.trainer,
+        replacements: revokedReplacements,
+      });
+    } catch (error) {
+      console.error('Failed to send replacement cancellation notifications:', error.message);
+    }
+  }
 
   const updated = await Leave.findById(leave._id).populate(populateLeave);
   res.json({

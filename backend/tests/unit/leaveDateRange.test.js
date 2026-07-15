@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
+  getLeaveDateKeysForWeekday,
   getLeaveDayWindow,
   getLeaveOverlapFilter,
   isDateWithinLeave,
@@ -50,4 +51,15 @@ test('derives the correct weekday from historical IST-midnight leave dates', () 
     ),
     ['Wednesday']
   );
+});
+
+test('maps a weekday slot to the matching calendar dates inside a leave range', () => {
+  const leave = {
+    startDate: new Date('2026-08-01T00:00:00.000Z'),
+    endDate: new Date('2026-08-03T00:00:00.000Z'),
+  };
+
+  assert.deepEqual(getLeaveDateKeysForWeekday(leave, 'Monday'), ['2026-08-03']);
+  assert.deepEqual(getLeaveDateKeysForWeekday(leave, 'Saturday'), ['2026-08-01']);
+  assert.deepEqual(getLeaveDateKeysForWeekday(leave, 'Tuesday'), []);
 });

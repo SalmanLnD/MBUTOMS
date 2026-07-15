@@ -1,6 +1,6 @@
 import Notification from '../models/Notification.js';
 import User from '../models/User.js';
-import { toLeaveDateKey } from './leaveDateRange.js';
+import { getLeaveDateKeysForWeekday, toLeaveDateKey } from './leaveDateRange.js';
 
 const formatDateLabel = (dateInput) => {
   const key = toLeaveDateKey(dateInput);
@@ -24,6 +24,27 @@ const buildClassLabel = (schedule) => {
   const className = [schedule.department, schedule.section].filter(Boolean).join(' ');
   const time = [schedule.startTime, schedule.endTime].filter(Boolean).join('–');
   return [className, time].filter(Boolean).join(', ');
+};
+
+export const buildAssignmentDateLabel = (leave, schedule) => {
+  const dateKeys = getLeaveDateKeysForWeekday(leave, schedule?.day);
+  const labels = dateKeys.map((key) => formatDateLabel(key));
+  if (!labels.length) return buildDateRangeLabel(leave);
+
+  const daySuffix = schedule?.day ? ` (${schedule.day})` : '';
+  if (labels.length === 1) return `${labels[0]}${daySuffix}`;
+  return `${labels.join(', ')}${daySuffix}`;
+};
+
+export const buildAssignmentDetail = (leave, schedule) => {
+  const dateLabel = buildAssignmentDateLabel(leave, schedule);
+  const classLabel = buildClassLabel(schedule);
+  return [dateLabel, classLabel].filter(Boolean).join(' — ');
+};
+
+const getAssignmentTopicTrackerDateKey = (leave, schedule) => {
+  const dateKeys = getLeaveDateKeysForWeekday(leave, schedule?.day);
+  return dateKeys[0] || toLeaveDateKey(leave.startDate);
 };
 
 const getTrainerUsers = async (trainerIds) => {
@@ -53,6 +74,122 @@ const notificationBase = (actor) => ({
   entityPath: '/topic-tracker',
 });
 
+export const buildReplacementNotificationMessages = ({
+  originalTrainerName,
+  replacementTrainerName,
+  previousReplacementTrainerName = '',
+  detail,
+}) => {
+  const isReassignment = Boolean(previousReplacementTrainerName);
+
+  if (!isReassignment) {
+    return {
+      replacement: `You were assigned to cover ${originalTrainerName}'s class: ${detail}`,
+      original: `${replacementTrainerName} was assigned to cover your class: ${detail}`,
+      previous: '',
+    };
+  }
+
+  return {
+    replacement: `You are now assigned to cover ${originalTrainerName}'s class, replacing ${previousReplacementTrainerName}: ${detail}`,
+    original: `Your class replacement changed from ${previousReplacementTrainerName} to ${replacementTrainerName}: ${detail}`,
+    previous: `You are no longer assigned to cover ${originalTrainerName}'s class. ${replacementTrainerName} is the new replacement: ${detail}`,
+  };
+};
+
+export const buildReplacementCancellationMessages = ({
+  originalTrainerName,
+  detailLines = [],
+}) => {
+  const detailText = detailLines.filter(Boolean).join('; ');
+  const assignmentWord = detailLines.length > 1 ? 'assignments' : 'assignment';
+  const verb = detailLines.length > 1 ? 'were' : 'was';
+
+  return {
+    replacement: detailText
+      ? `${originalTrainerName}'s leave was cancelled. Your replacement ${assignmentWord} ${verb} revoked: ${detailText}`
+      : `${originalTrainerName}'s leave was cancelled. Your replacement ${assignmentWord} ${verb} revoked.`,
+    original: detailText
+      ? `Your leave was cancelled. Replacement ${assignmentWord} ${verb} revoked: ${detailText}`
+      : 'Your leave was cancelled.',
+  };
+};
+
+export const notifyReplacementCancellation = async ({
+  actor,
+  leave,
+  originalTrainer,
+  replacements = [],
+}) => {
+  if (!actor?._id || !originalTrainer?._id || !replacements.length) return;
+
+  const assignmentsByReplacement = new Map();
+
+  for (const entry of replacements) {
+    const replacementTrainer = entry.replacementTrainer;
+    const schedule = entry.schedule;
+    if (!replacementTrainer?._id || !schedule?._id) continue;
+
+    const replacementId = replacementTrainer._id.toString();
+    const detailLine = buildAssignmentDetail(leave, schedule);
+    if (!assignmentsByReplacement.has(replacementId)) {
+      assignmentsByReplacement.set(replacementId, {
+        trainer: replacementTrainer,
+        detailLines: [],
+      });
+    }
+    if (detailLine) {
+      assignmentsByReplacement.get(replacementId).detailLines.push(detailLine);
+    }
+  }
+
+  if (!assignmentsByReplacement.size) return;
+
+  const usersByTrainer = await getTrainerUsers([
+    originalTrainer._id,
+    ...[...assignmentsByReplacement.keys()],
+  ]);
+  const base = notificationBase(actor);
+  const notifications = [];
+  const allDetailLines = [...new Set(
+    [...assignmentsByReplacement.values()].flatMap((entry) => entry.detailLines)
+  )];
+  const originalMessages = buildReplacementCancellationMessages({
+    originalTrainerName: originalTrainer.name,
+    detailLines: allDetailLines,
+  });
+
+  for (const user of usersByTrainer.get(originalTrainer._id.toString()) || []) {
+    notifications.push({
+      ...base,
+      recipient: user._id,
+      action: 'cancelled',
+      message: originalMessages.original,
+      entityPath: '/replacements',
+    });
+  }
+
+  for (const { trainer, detailLines } of assignmentsByReplacement.values()) {
+    const messages = buildReplacementCancellationMessages({
+      originalTrainerName: originalTrainer.name,
+      detailLines,
+    });
+    for (const user of usersByTrainer.get(trainer._id.toString()) || []) {
+      notifications.push({
+        ...base,
+        recipient: user._id,
+        action: 'cancelled',
+        message: messages.replacement,
+        entityPath: '',
+      });
+    }
+  }
+
+  if (notifications.length) {
+    await Notification.insertMany(notifications);
+  }
+};
+
 export const notifyReplacementAssignment = async ({
   actor,
   leave,
@@ -73,20 +210,24 @@ export const notifyReplacementAssignment = async ({
     previousReplacementTrainer?._id,
   ]);
 
-  const dateLabel = buildDateRangeLabel(leave);
-  const classLabel = buildClassLabel(schedule);
-  const detail = [dateLabel, classLabel].filter(Boolean).join(' — ');
-  const dateKey = toLeaveDateKey(leave.startDate);
+  const detail = buildAssignmentDetail(leave, schedule);
+  const dateKey = getAssignmentTopicTrackerDateKey(leave, schedule);
   const commonPath = `/topic-tracker?date=${encodeURIComponent(dateKey)}&schedule=${schedule._id}`;
   const base = notificationBase(actor);
   const notifications = [];
+  const messages = buildReplacementNotificationMessages({
+    originalTrainerName: originalTrainer.name,
+    replacementTrainerName: replacementTrainer.name,
+    previousReplacementTrainerName: previousReplacementTrainer?.name,
+    detail,
+  });
 
   for (const user of usersByTrainer.get(replacementId) || []) {
     notifications.push({
       ...base,
       recipient: user._id,
       action: 'assigned',
-      message: `You were assigned to cover ${originalTrainer.name}'s class: ${detail}`,
+      message: messages.replacement,
       entityPath: `${commonPath}&trainer=${replacementId}`,
     });
   }
@@ -95,8 +236,8 @@ export const notifyReplacementAssignment = async ({
     notifications.push({
       ...base,
       recipient: user._id,
-      action: 'assigned',
-      message: `${replacementTrainer.name} was assigned to cover your class: ${detail}`,
+      action: previousId ? 'changed' : 'assigned',
+      message: messages.original,
       entityPath: `${commonPath}&trainer=${originalTrainer._id}`,
     });
   }
@@ -107,7 +248,7 @@ export const notifyReplacementAssignment = async ({
         ...base,
         recipient: user._id,
         action: 'unassigned',
-        message: `Your replacement assignment for ${originalTrainer.name}'s class was changed: ${detail}`,
+        message: messages.previous,
         entityPath: '',
       });
     }

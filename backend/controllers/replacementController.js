@@ -181,8 +181,8 @@ export const getReplacementSuggestions = async (req, res) => {
   res.json({
     schedule,
     subject: subject ? { name: subject.name, code: subject.code } : null,
-    suggestions: eligibleSuggestions.slice(0, 5),
-    otherSuggestions: otherSuggestions.slice(0, 5),
+    suggestions: eligibleSuggestions,
+    otherSuggestions,
   });
 };
 

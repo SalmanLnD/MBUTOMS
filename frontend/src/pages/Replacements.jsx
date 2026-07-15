@@ -44,6 +44,7 @@ const Replacements = () => {
   const [suggestions, setSuggestions] = useState([]);
   const [otherSuggestions, setOtherSuggestions] = useState([]);
   const [suggestionSubject, setSuggestionSubject] = useState(null);
+  const [suggestionFilter, setSuggestionFilter] = useState('');
   const [loadingSuggestions, setLoadingSuggestions] = useState(false);
   const [showAddSlotModal, setShowAddSlotModal] = useState(false);
 
@@ -69,6 +70,7 @@ const Replacements = () => {
     setSuggestions([]);
     setOtherSuggestions([]);
     setSuggestionSubject(null);
+    setSuggestionFilter('');
   };
 
   const handleViewSuggestions = async (leaveId, schedule, replacement = null) => {
@@ -79,6 +81,7 @@ const Replacements = () => {
     setSuggestions([]);
     setOtherSuggestions([]);
     setSuggestionSubject(null);
+    setSuggestionFilter('');
     try {
       const data = await getReplacementSuggestions(schedule._id, leaveId);
       setSuggestions(data.suggestions || []);
@@ -125,6 +128,16 @@ const Replacements = () => {
     ));
 
   const hasAnySuggestions = suggestions.length > 0 || otherSuggestions.length > 0;
+  const suggestionQuery = suggestionFilter.trim().toLowerCase();
+  const matchesSuggestion = (item) => {
+    if (!suggestionQuery) return true;
+    const name = String(item.trainer?.name || '').toLowerCase();
+    const employeeId = String(item.trainer?.employeeId || '').toLowerCase();
+    return name.includes(suggestionQuery) || employeeId.includes(suggestionQuery);
+  };
+  const visibleSuggestions = suggestions.filter(matchesSuggestion);
+  const visibleOtherSuggestions = otherSuggestions.filter(matchesSuggestion);
+  const hasVisibleSuggestions = visibleSuggestions.length > 0 || visibleOtherSuggestions.length > 0;
 
   const formatReplacementDate = (leave, schedule) => {
     const start = new Date(leave.startDate);
@@ -271,7 +284,7 @@ const Replacements = () => {
       {activeTab === 'all' && selectedSchedule && (
         <Modal
           show
-          title={changingReplacement ? 'Change Replacement Trainer' : 'Top 5 Replacement Trainers'}
+          title={changingReplacement ? 'Change Replacement Trainer' : 'Available Replacement Trainers'}
           onClose={closeSuggestionsModal}
           size="toms-modal-lg"
         >
@@ -281,6 +294,21 @@ const Replacements = () => {
             </p>
             {loadingSuggestions ? <LoadingSpinner message="Finding replacements..." /> : (
               <div className="table-responsive">
+                {hasAnySuggestions && (
+                  <div className="mb-3">
+                    <label className="form-label small mb-1" htmlFor="replacement-suggestion-filter">
+                      Search available trainers
+                    </label>
+                    <input
+                      id="replacement-suggestion-filter"
+                      type="search"
+                      className="form-control form-control-sm"
+                      placeholder="Search by name or employee ID"
+                      value={suggestionFilter}
+                      onChange={(e) => setSuggestionFilter(e.target.value)}
+                    />
+                  </div>
+                )}
                 {suggestions.length === 0 && otherSuggestions.length > 0 && (
                   <div className="alert alert-warning small py-2 mb-3" role="status">
                     No subject-eligible trainers are available for this slot. Other available trainers are listed below.
@@ -299,18 +327,20 @@ const Replacements = () => {
                   <tbody>
                     {!hasAnySuggestions ? (
                       <tr><td colSpan="5" className="text-center text-muted">No available trainers found</td></tr>
+                    ) : !hasVisibleSuggestions ? (
+                      <tr><td colSpan="5" className="text-center text-muted">No trainers match this search</td></tr>
                     ) : (
                       <>
-                        {renderSuggestionRows(suggestions)}
-                        {otherSuggestions.length > 0 && suggestions.length > 0 && (
+                        {renderSuggestionRows(visibleSuggestions)}
+                        {visibleOtherSuggestions.length > 0 && visibleSuggestions.length > 0 && (
                           <tr className="table-light">
                             <td colSpan="5" className="small text-muted py-2">
                               Other available trainers (not subject-eligible)
                             </td>
                           </tr>
                         )}
-                        {renderSuggestionRows(otherSuggestions, {
-                          startIndex: suggestions.length,
+                        {renderSuggestionRows(visibleOtherSuggestions, {
+                          startIndex: visibleSuggestions.length,
                           showWarning: true,
                         })}
                       </>
