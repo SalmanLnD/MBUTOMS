@@ -13,6 +13,7 @@ const TopicTrackerClassSummaryTab = ({
   const [loading, setLoading] = useState(true);
   const [subjects, setSubjects] = useState([]);
   const [selectedSubjectId, setSelectedSubjectId] = useState('');
+  const [selectedTrainerKey, setSelectedTrainerKey] = useState('');
   const [expandedClass, setExpandedClass] = useState('');
 
   const loadSummary = useCallback(async () => {
@@ -36,11 +37,24 @@ const TopicTrackerClassSummaryTab = ({
     return subjects.filter((subject) => subject.subjectId === selectedSubjectId);
   }, [subjects, selectedSubjectId]);
 
+  const trainerOptions = useMemo(() => {
+    const trainers = new Map();
+    visibleSubjects.forEach((subject) => {
+      subject.classes.forEach((cls) => {
+        const key = cls.trainerKey || cls.trainerId || cls.trainerName;
+        if (key) trainers.set(key, cls.trainerName || 'Unassigned trainer');
+      });
+    });
+    return [...trainers.entries()]
+      .map(([key, name]) => ({ key, name }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+  }, [visibleSubjects]);
+
   return (
     <div>
       {showSubjectFilter && (
         <div className="row g-2 mb-3 align-items-end">
-          <div className="col-md-5">
+          <div className="col-md-4">
             <label className="form-label mb-1" htmlFor="class-summary-subject">Subject</label>
             <select
               id="class-summary-subject"
@@ -48,6 +62,7 @@ const TopicTrackerClassSummaryTab = ({
               value={selectedSubjectId}
               onChange={(e) => {
                 setSelectedSubjectId(e.target.value);
+                setSelectedTrainerKey('');
                 setExpandedClass('');
               }}
             >
@@ -59,10 +74,26 @@ const TopicTrackerClassSummaryTab = ({
               ))}
             </select>
           </div>
-          <div className="col-md-7">
+          <div className="col-md-4">
+            <label className="form-label mb-1" htmlFor="class-summary-trainer">Trainer</label>
+            <select
+              id="class-summary-trainer"
+              className="form-select"
+              value={selectedTrainerKey}
+              onChange={(e) => {
+                setSelectedTrainerKey(e.target.value);
+                setExpandedClass('');
+              }}
+            >
+              <option value="">All trainers</option>
+              {trainerOptions.map((trainer) => (
+                <option key={trainer.key} value={trainer.key}>{trainer.name}</option>
+              ))}
+            </select>
+          </div>
+          <div className="col-md-4">
             <p className="text-muted small mb-0">
-              Coverage is based on your closed topic tracker entries, grouped by class
-              (branch, year and section).
+              Coverage is based on closed topic tracker entries, grouped by trainer and class.
             </p>
           </div>
         </div>
@@ -79,7 +110,13 @@ const TopicTrackerClassSummaryTab = ({
       ) : !visibleSubjects.length ? (
         <div className="alert alert-light border mb-0">{emptyMessage}</div>
       ) : (
-        visibleSubjects.map((subject) => (
+        visibleSubjects.map((subject) => {
+          const visibleClasses = selectedTrainerKey
+            ? subject.classes.filter(
+              (cls) => (cls.trainerKey || cls.trainerId || cls.trainerName) === selectedTrainerKey
+            )
+            : subject.classes;
+          return (
           <div key={subject.subjectId} className="card mb-3">
             <div className="card-header d-flex flex-wrap justify-content-between align-items-center gap-2">
               <div>
@@ -92,6 +129,7 @@ const TopicTrackerClassSummaryTab = ({
               <table className="table table-sm mb-0 align-middle">
                 <thead>
                   <tr>
+                    <th>Trainer</th>
                     <th>Class</th>
                     <th>Closed slots</th>
                     <th>Topics covered</th>
@@ -101,19 +139,21 @@ const TopicTrackerClassSummaryTab = ({
                   </tr>
                 </thead>
                 <tbody>
-                  {!subject.classes.length ? (
+                  {!visibleClasses.length ? (
                     <tr>
-                      <td colSpan="6" className="text-muted text-center py-3">
-                        No closed topic entries yet for this subject.
+                      <td colSpan="7" className="text-muted text-center py-3">
+                        No closed topic entries found for this subject and trainer.
                       </td>
                     </tr>
                   ) : (
-                    subject.classes.map((cls) => {
-                      const expandKey = `${subject.subjectId}::${cls.branchYearSection}`;
+                    visibleClasses.map((cls) => {
+                      const trainerKey = cls.trainerKey || cls.trainerId || cls.trainerName;
+                      const expandKey = `${subject.subjectId}::${trainerKey}::${cls.branchYearSection}`;
                       const isExpanded = expandedClass === expandKey;
                       return (
                         <Fragment key={expandKey}>
                           <tr>
+                            <td>{cls.trainerName || 'Unassigned trainer'}</td>
                             <td>{cls.branchYearSection}</td>
                             <td>{cls.closedSlots}</td>
                             <td>
@@ -143,7 +183,7 @@ const TopicTrackerClassSummaryTab = ({
                           </tr>
                           {isExpanded && (
                             <tr>
-                              <td colSpan="6" className="bg-light">
+                              <td colSpan="7" className="bg-light">
                                 <div className="row g-3 p-2">
                                   <div className="col-md-6">
                                     <h4 className="h6">Covered</h4>
@@ -188,7 +228,8 @@ const TopicTrackerClassSummaryTab = ({
               </table>
             </div>
           </div>
-        ))
+          );
+        })
       )}
     </div>
   );

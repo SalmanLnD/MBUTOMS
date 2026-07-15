@@ -14,6 +14,7 @@ const FeedbackResponsesTab = () => {
   const [pagination, setPagination] = useState(null);
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(20);
   const [monthFilter, setMonthFilter] = useState('');
   const [trainerFilter, setTrainerFilter] = useState('');
   const [trainers, setTrainers] = useState([]);
@@ -25,7 +26,7 @@ const FeedbackResponsesTab = () => {
     try {
       const data = await getFeedbackResponses({
         page,
-        limit: 20,
+        limit: pageSize,
         month: monthFilter || undefined,
         trainer: trainerFilter || undefined,
       });
@@ -36,7 +37,7 @@ const FeedbackResponsesTab = () => {
     } finally {
       setLoading(false);
     }
-  }, [page, monthFilter, trainerFilter]);
+  }, [page, pageSize, monthFilter, trainerFilter]);
 
   const loadSheetStatus = useCallback(async () => {
     try {
@@ -161,7 +162,12 @@ const FeedbackResponsesTab = () => {
               </tbody>
             </table>
           </div>
-          <Pagination pagination={pagination} onPageChange={setPage} />
+          <Pagination
+            pagination={pagination}
+            onPageChange={setPage}
+            pageSize={pageSize}
+            onPageSizeChange={(size) => { setPageSize(size); setPage(1); }}
+          />
         </>
       )}
 

@@ -127,6 +127,7 @@ const ClassesStudents = () => {
   const [studentPagination, setStudentPagination] = useState(null);
   const [studentsLoading, setStudentsLoading] = useState(true);
   const [studentPage, setStudentPage] = useState(1);
+  const [studentPageSize, setStudentPageSize] = useState(10);
   const [studentSearch, setStudentSearch] = useState('');
   const [studentStatusFilter, setStudentStatusFilter] = useState('active');
   const [departmentFilter, setDepartmentFilter] = useState('');
@@ -139,6 +140,7 @@ const ClassesStudents = () => {
   const [attendancePagination, setAttendancePagination] = useState(null);
   const [attendanceLoading, setAttendanceLoading] = useState(true);
   const [attendancePage, setAttendancePage] = useState(1);
+  const [attendancePageSize, setAttendancePageSize] = useState(10);
   const [attendanceStatusFilter, setAttendanceStatusFilter] = useState('');
   const [showAttendanceForm, setShowAttendanceForm] = useState(false);
   const [attendanceForm, setAttendanceForm] = useState({
@@ -168,7 +170,7 @@ const ClassesStudents = () => {
     try {
       const data = await getStudents({
         page: studentPage,
-        limit: 10,
+        limit: studentPageSize,
         search: debouncedStudentSearch,
         status: studentStatusFilter,
         department: departmentFilter,
@@ -188,7 +190,7 @@ const ClassesStudents = () => {
     try {
       const data = await getAttendance({
         page: attendancePage,
-        limit: 10,
+        limit: attendancePageSize,
         type: 'student',
         status: attendanceStatusFilter,
         student: attendanceForm.student || undefined,
@@ -208,11 +210,11 @@ const ClassesStudents = () => {
 
   useEffect(() => {
     if (activeTab === 'students') fetchStudents();
-  }, [activeTab, studentPage, debouncedStudentSearch, studentStatusFilter, departmentFilter, sectionFilter]);
+  }, [activeTab, studentPage, studentPageSize, debouncedStudentSearch, studentStatusFilter, departmentFilter, sectionFilter]);
 
   useEffect(() => {
     if (activeTab === 'attendance') fetchAttendance();
-  }, [activeTab, attendancePage, attendanceStatusFilter]);
+  }, [activeTab, attendancePage, attendancePageSize, attendanceStatusFilter]);
 
   const handleViewClassStudents = (cls) => {
     setClassFilter(cls);
@@ -591,7 +593,12 @@ const ClassesStudents = () => {
                     )}
                   </tbody>
                 </table>
-                <Pagination pagination={studentPagination} onPageChange={setStudentPage} />
+                <Pagination
+                  pagination={studentPagination}
+                  onPageChange={setStudentPage}
+                  pageSize={studentPageSize}
+                  onPageSizeChange={(size) => { setStudentPageSize(size); setStudentPage(1); }}
+                />
               </div>
             </div>
           )}
@@ -668,7 +675,12 @@ const ClassesStudents = () => {
                     )}
                   </tbody>
                 </table>
-                <Pagination pagination={attendancePagination} onPageChange={setAttendancePage} />
+                <Pagination
+                  pagination={attendancePagination}
+                  onPageChange={setAttendancePage}
+                  pageSize={attendancePageSize}
+                  onPageSizeChange={(size) => { setAttendancePageSize(size); setAttendancePage(1); }}
+                />
               </div>
             </div>
           )}

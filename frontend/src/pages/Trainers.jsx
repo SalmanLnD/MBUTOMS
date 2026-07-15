@@ -40,6 +40,7 @@ const Trainers = () => {
   const [sortBy, setSortBy] = useState('employeeId');
   const [sortOrder, setSortOrder] = useState('asc');
   const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
   const [showModal, setShowModal] = useState(false);
   const [editingTrainer, setEditingTrainer] = useState(null);
   const [pendingReset, setPendingReset] = useState(null);
@@ -53,7 +54,7 @@ const Trainers = () => {
     try {
       const data = await getTrainers({
         page,
-        limit: 10,
+        limit: pageSize,
         search: debouncedSearch,
         subject: debouncedSubjectSearch,
         sortBy,
@@ -72,7 +73,7 @@ const Trainers = () => {
     if (activeTab === 'directory') {
       fetchTrainers();
     }
-  }, [activeTab, page, debouncedSearch, debouncedSubjectSearch, sortBy, sortOrder]);
+  }, [activeTab, page, pageSize, debouncedSearch, debouncedSubjectSearch, sortBy, sortOrder]);
 
   const handleSort = (field) => {
     if (sortBy === field) {
@@ -329,7 +330,12 @@ const Trainers = () => {
                     </tbody>
                   </table>
                 </div>
-                <Pagination pagination={pagination} onPageChange={setPage} />
+                <Pagination
+                  pagination={pagination}
+                  onPageChange={setPage}
+                  pageSize={pageSize}
+                  onPageSizeChange={(size) => { setPageSize(size); setPage(1); }}
+                />
               </>
             )}
           </div>

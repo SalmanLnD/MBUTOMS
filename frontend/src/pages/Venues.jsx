@@ -39,6 +39,7 @@ const Venues = () => {
   const [search, setSearch] = useState('');
   const [typeFilter, setTypeFilter] = useState('');
   const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(20);
   const [showModal, setShowModal] = useState(false);
   const [editingVenue, setEditingVenue] = useState(null);
   const [viewingVenue, setViewingVenue] = useState(null);
@@ -51,7 +52,7 @@ const Venues = () => {
     try {
       const data = await getVenues({
         page,
-        limit: 20,
+        limit: pageSize,
         search: debouncedSearch,
         type: typeFilter,
         isActive: 'true',
@@ -70,7 +71,7 @@ const Venues = () => {
   useEffect(() => {
     if (activeTab !== 'rooms') return;
     fetchVenues();
-  }, [activeTab, page, debouncedSearch, typeFilter]);
+  }, [activeTab, page, pageSize, debouncedSearch, typeFilter]);
 
   useEffect(() => {
     getVenueMappingReference()
@@ -261,7 +262,12 @@ const Venues = () => {
                     </tbody>
                   </table>
                 </div>
-                <Pagination pagination={pagination} onPageChange={setPage} />
+                <Pagination
+                  pagination={pagination}
+                  onPageChange={setPage}
+                  pageSize={pageSize}
+                  onPageSizeChange={(size) => { setPageSize(size); setPage(1); }}
+                />
               </>
             )}
           </div>

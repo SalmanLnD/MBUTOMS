@@ -1,6 +1,8 @@
 import TopicTrackerEntry from '../models/TopicTrackerEntry.js';
+import { notifyAdminsOfTopicTrackerUpdate } from '../utils/topicTrackerNotifications.js';
 import Schedule from '../models/Schedule.js';
 import Trainer from '../models/Trainer.js';
+import Leave from '../models/Leave.js';
 import { ROLES, isAuthorizedRole, FULL_ACCESS_ROLES } from '../utils/roles.js';
 import { TOPIC_TRACKER_STATUSES, SESSION_STATUS_VALUES } from '../utils/topicTrackerConstants.js';
 import {
@@ -30,8 +32,25 @@ const computeAttendancePercent = (allotted, present) => {
   return Math.round((present / allotted) * 1000) / 10;
 };
 
-const canEditSession = async (user, trainerId, subjectId) => {
+const isAssignedReplacementForDate = async (user, scheduleId, date) => {
+  if (!user?.trainer || !scheduleId || !date) return false;
+  const ref = normalizeDate(date);
+  return Boolean(await Leave.exists({
+    status: 'approved',
+    startDate: { $lte: ref },
+    endDate: { $gte: ref },
+    replacements: {
+      $elemMatch: {
+        schedule: scheduleId,
+        replacementTrainer: user.trainer,
+      },
+    },
+  }));
+};
+
+const canEditSession = async (user, trainerId, subjectId, { scheduleId, date } = {}) => {
   if (isAuthorizedRole(user?.role, FULL_ACCESS_ROLES)) return true;
+  if (await isAssignedReplacementForDate(user, scheduleId, date)) return true;
   // Coordinators who also teach (e.g. Sai Priya / PSTJ) can edit their own classes.
   if (user?.trainer && user.trainer.toString() === trainerId?.toString()) return true;
   if (isSubjectCoordinator(user)) {
@@ -175,7 +194,10 @@ export const upsertTopicTrackerEntry = async (req, res) => {
 
   const { schedule, trainer } = context;
   const subjectId = schedule.subject?._id || schedule.subject;
-  const allowed = await canEditSession(req.user, trainer._id, subjectId);
+  const allowed = await canEditSession(req.user, trainer._id, subjectId, {
+    scheduleId,
+    date,
+  });
   if (!allowed) {
     return res.status(403).json({ message: 'Not authorized to update this topic tracker entry' });
   }
@@ -257,6 +279,7 @@ export const upsertTopicTrackerEntry = async (req, res) => {
     { upsert: true, new: true, setDefaultsOnInsert: true }
   );
 
+  await notifyAdminsOfTopicTrackerUpdate(entry, req.user);
   res.json(entry);
 };
 
@@ -271,7 +294,10 @@ export const updateTopicTrackerStatus = async (req, res) => {
     return res.status(404).json({ message: 'Topic tracker entry not found' });
   }
 
-  const allowed = await canEditSession(req.user, entry.trainer, entry.subject);
+  const allowed = await canEditSession(req.user, entry.trainer, entry.subject, {
+    scheduleId: entry.schedule,
+    date: entry.date,
+  });
   if (!allowed) {
     return res.status(403).json({ message: 'Not authorized to update this entry' });
   }
@@ -287,6 +313,7 @@ export const updateTopicTrackerStatus = async (req, res) => {
   entry.markedBy = req.user._id;
   await entry.save();
 
+  await notifyAdminsOfTopicTrackerUpdate(entry, req.user);
   res.json(entry);
 };
 

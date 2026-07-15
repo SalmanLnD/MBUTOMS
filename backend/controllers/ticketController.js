@@ -1,3 +1,4 @@
+import mongoose from 'mongoose';
 import Ticket from '../models/Ticket.js';
 import Trainer from '../models/Trainer.js';
 import User from '../models/User.js';
@@ -34,6 +35,9 @@ export const getTickets = async (req, res) => {
   const filter = {};
   if (req.query.status) filter.status = req.query.status;
   if (req.query.type) filter.type = req.query.type;
+  if (req.query.ticket && mongoose.Types.ObjectId.isValid(req.query.ticket)) {
+    filter._id = req.query.ticket;
+  }
 
   if (req.user.role !== ROLES.ADMIN) {
     filter.raisedBy = req.user._id;
@@ -107,7 +111,7 @@ export const createTicket = async (req, res) => {
     trainer,
   });
 
-  if (req.user.role === ROLES.TRAINER) {
+  if (req.user.role !== ROLES.ADMIN) {
     await notifyAdminsOfNewTicket(ticket, req.user);
   }
 

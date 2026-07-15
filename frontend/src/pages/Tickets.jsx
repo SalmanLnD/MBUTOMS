@@ -1,4 +1,5 @@
-import { useState, useEffect } from 'react';
+import { useRef, useState, useEffect } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import Topbar from '../components/Topbar.jsx';
 import LoadingSpinner from '../components/LoadingSpinner.jsx';
 import Pagination from '../components/Pagination.jsx';
@@ -24,12 +25,15 @@ const truncateText = (text, max = 80) => {
 
 const Tickets = () => {
   const { hasRole, user } = useAuth();
+  const location = useLocation();
+  const navigate = useNavigate();
   const isAdmin = hasRole(ROLES.ADMIN);
 
   const [tickets, setTickets] = useState([]);
   const [pagination, setPagination] = useState(null);
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
   const [statusFilter, setStatusFilter] = useState('');
   const [typeFilter, setTypeFilter] = useState('');
   const [showCreateForm, setShowCreateForm] = useState(false);
@@ -38,15 +42,21 @@ const Tickets = () => {
   const [trainers, setTrainers] = useState([]);
   const [createForm, setCreateForm] = useState({ raisedByTrainer: '', type: '', description: '' });
   const [updateForm, setUpdateForm] = useState({ status: '', comment: '' });
+  const [ticketTarget, setTicketTarget] = useState(
+    () => new URLSearchParams(window.location.search).get('ticket') || ''
+  );
+  const [highlightedTicketId, setHighlightedTicketId] = useState(ticketTarget);
+  const highlightedRowRef = useRef(null);
 
   const fetchTickets = async () => {
     setLoading(true);
     try {
       const data = await getTickets({
         page,
-        limit: 10,
+        limit: pageSize,
         status: statusFilter,
         type: typeFilter,
+        ticket: ticketTarget || undefined,
       });
       setTickets(data.tickets);
       setPagination(data.pagination);
@@ -59,7 +69,27 @@ const Tickets = () => {
 
   useEffect(() => {
     fetchTickets();
-  }, [page, statusFilter, typeFilter]);
+  }, [page, pageSize, statusFilter, typeFilter, ticketTarget]);
+
+  useEffect(() => {
+    const nextTarget = new URLSearchParams(location.search).get('ticket') || '';
+    if (!nextTarget) return;
+    setTicketTarget(nextTarget);
+    setHighlightedTicketId(nextTarget);
+    setPage(1);
+  }, [location.search]);
+
+  useEffect(() => {
+    if (!highlightedTicketId || loading) return undefined;
+    if (!tickets.some((ticket) => ticket._id === highlightedTicketId)) return undefined;
+
+    highlightedRowRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    const timerId = window.setTimeout(() => {
+      setHighlightedTicketId('');
+      navigate(location.pathname, { replace: true });
+    }, 3000);
+    return () => window.clearTimeout(timerId);
+  }, [highlightedTicketId, loading, tickets, navigate, location.pathname]);
 
   useEffect(() => {
     if (!showCreateForm || !isAdmin) return;
@@ -123,7 +153,11 @@ const Tickets = () => {
           <select
             className="form-select w-auto"
             value={statusFilter}
-            onChange={(e) => { setStatusFilter(e.target.value); setPage(1); }}
+            onChange={(e) => {
+              setStatusFilter(e.target.value);
+              setTicketTarget('');
+              setPage(1);
+            }}
             aria-label="Filter by status"
           >
             <option value="">All Status</option>
@@ -134,7 +168,11 @@ const Tickets = () => {
           <select
             className="form-select w-auto"
             value={typeFilter}
-            onChange={(e) => { setTypeFilter(e.target.value); setPage(1); }}
+            onChange={(e) => {
+              setTypeFilter(e.target.value);
+              setTicketTarget('');
+              setPage(1);
+            }}
             aria-label="Filter by type"
           >
             <option value="">All Types</option>
@@ -173,7 +211,11 @@ const Tickets = () => {
                     </td>
                   </tr>
                 ) : tickets.map((ticket) => (
-                  <tr key={ticket._id}>
+                  <tr
+                    key={ticket._id}
+                    ref={ticket._id === highlightedTicketId ? highlightedRowRef : undefined}
+                    className={ticket._id === highlightedTicketId ? 'notification-target-highlight' : ''}
+                  >
                     <td className="fw-medium">{ticket.ticketId}</td>
                     {isAdmin && (
                       <td>
@@ -217,7 +259,12 @@ const Tickets = () => {
                 ))}
               </tbody>
             </table>
-            <Pagination pagination={pagination} onPageChange={setPage} />
+            <Pagination
+              pagination={pagination}
+              onPageChange={setPage}
+              pageSize={pageSize}
+              onPageSizeChange={(size) => { setPageSize(size); setPage(1); }}
+            />
           </div>
         </div>
       )}

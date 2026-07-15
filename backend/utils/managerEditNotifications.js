@@ -32,7 +32,15 @@ const RESOURCE_LABELS = {
   tickets: 'support ticket',
 };
 
-const SKIP_PATH_PREFIXES = ['/api/auth', '/api/notifications', '/api/webhooks', '/api/health'];
+const SKIP_PATH_PREFIXES = [
+  '/api/auth',
+  '/api/notifications',
+  '/api/webhooks',
+  '/api/health',
+  // These resources create richer, record-specific notifications in their controllers.
+  '/api/tickets',
+  '/api/topic-tracker',
+];
 
 const extractResourceKey = (path = '') => {
   const segments = path.split('/').filter(Boolean);
@@ -67,6 +75,25 @@ const shouldNotifyForRequest = (req) => {
 const getAdminRecipients = async () =>
   User.find({ role: ROLES.ADMIN, isActive: true }).select('_id').lean();
 
+const getEntityPath = (resourceKey, responseBody) => {
+  const id = responseBody?._id;
+  if (resourceKey === 'trainers' && id) return `/trainers/${id}`;
+
+  const routeByResource = {
+    venues: '/venues',
+    subjects: '/subjects',
+    schedules: '/timetable',
+    leaves: '/leaves',
+    attendance: '/attendance',
+    replacements: '/replacements',
+    classes: '/classes-students',
+    students: '/classes-students',
+    feedback: '/performance',
+    sheets: '/timetable',
+  };
+  return routeByResource[resourceKey] || '';
+};
+
 export const createManagerEditNotifications = async (req, responseBody) => {
   if (!shouldNotifyForRequest(req)) return;
 
@@ -89,7 +116,7 @@ export const createManagerEditNotifications = async (req, responseBody) => {
       action,
       resource,
       message,
-      entityPath: req.originalUrl.split('?')[0],
+      entityPath: getEntityPath(resourceKey, responseBody),
     }))
   );
 };

@@ -1,10 +1,9 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import Modal from './Modal.jsx';
 import LoadingSpinner from './LoadingSpinner.jsx';
 import {
   getTopicTrackerSessions,
   upsertTopicTrackerEntry,
-  updateTopicTrackerStatus,
 } from '../services/topicTrackerService.js';
 import { getErrorMessage } from '../utils/helpers.js';
 import { showError, showSuccess } from '../utils/toast.js';
@@ -46,6 +45,9 @@ const buildEntryPayload = (row, trackerStatus) => ({
   trackerStatus,
 });
 
+const getRowKey = (row) => `${row.scheduleId}-${row.date}`;
+const serializeEditableRow = (row) => JSON.stringify(buildEntryPayload(row, 'closed'));
+
 const TopicTrackerSpreadsheet = ({
   show,
   onClose,
@@ -54,18 +56,34 @@ const TopicTrackerSpreadsheet = ({
   trainerId,
   title,
   canCloseEntries = true,
+  highlightEntryId,
+  highlightScheduleId,
+  onHighlightComplete,
 }) => {
   const [sessions, setSessions] = useState([]);
   const [dayLabel, setDayLabel] = useState('');
   const [loading, setLoading] = useState(true);
   const [savingKey, setSavingKey] = useState('');
+  const [dirtyRows, setDirtyRows] = useState(() => new Set());
+  const baselineRowsRef = useRef(new Map());
+  const [highlightActive, setHighlightActive] = useState(
+    Boolean(highlightEntryId || highlightScheduleId)
+  );
+  const highlightedRowRef = useRef(null);
+  const onHighlightCompleteRef = useRef(onHighlightComplete);
+  onHighlightCompleteRef.current = onHighlightComplete;
 
   const fetchSessions = useCallback(async () => {
     if (!show || !date) return;
     setLoading(true);
     try {
       const data = await getTopicTrackerSessions({ date, subjectId, trainerId });
-      setSessions(data.sessions || []);
+      const nextSessions = data.sessions || [];
+      baselineRowsRef.current = new Map(
+        nextSessions.map((row) => [getRowKey(row), serializeEditableRow(row)])
+      );
+      setDirtyRows(new Set());
+      setSessions(nextSessions);
       setDayLabel(data.day || '');
     } catch (err) {
       showError(getErrorMessage(err));
@@ -78,39 +96,86 @@ const TopicTrackerSpreadsheet = ({
     fetchSessions();
   }, [fetchSessions]);
 
+  useEffect(() => {
+    setHighlightActive(Boolean(highlightEntryId || highlightScheduleId));
+  }, [highlightEntryId, highlightScheduleId]);
+
+  useEffect(() => {
+    if (loading || !highlightActive) return undefined;
+    const hasTarget = sessions.some((row) =>
+      (highlightEntryId && row.entryId === highlightEntryId)
+      || (highlightScheduleId && row.scheduleId === highlightScheduleId)
+    );
+    if (!hasTarget) {
+      setHighlightActive(false);
+      onHighlightCompleteRef.current?.();
+      return undefined;
+    }
+
+    highlightedRowRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    const timerId = window.setTimeout(() => {
+      setHighlightActive(false);
+      onHighlightCompleteRef.current?.();
+    }, 3000);
+    return () => window.clearTimeout(timerId);
+  }, [loading, sessions, highlightActive, highlightEntryId, highlightScheduleId]);
+
   const updateRow = (index, field, value) => {
-    setSessions((prev) => prev.map((row, i) => {
-      if (i !== index) return row;
-      const next = { ...row, [field]: value };
-      if (field === 'sessionStartTime' || field === 'sessionEndTime') {
-        next.durationHrs = computeDuration(
-          field === 'sessionStartTime' ? value : row.sessionStartTime,
-          field === 'sessionEndTime' ? value : row.sessionEndTime
-        );
-      }
-      if (field === 'allottedStudents' || field === 'noPresent') {
-        const allotted = field === 'allottedStudents' ? Number(value) : Number(row.allottedStudents);
-        const present = field === 'noPresent' ? Number(value) : Number(row.noPresent);
-        next.attendancePercent = computeAttendancePercent(allotted, present);
-      }
-      return next;
-    }));
+    const row = sessions[index];
+    if (!row) return;
+    const next = { ...row, [field]: value };
+    if (field === 'sessionStartTime' || field === 'sessionEndTime') {
+      next.durationHrs = computeDuration(
+        field === 'sessionStartTime' ? value : row.sessionStartTime,
+        field === 'sessionEndTime' ? value : row.sessionEndTime
+      );
+    }
+    if (field === 'allottedStudents' || field === 'noPresent') {
+      const allotted = field === 'allottedStudents' ? Number(value) : Number(row.allottedStudents);
+      const present = field === 'noPresent' ? Number(value) : Number(row.noPresent);
+      next.attendancePercent = computeAttendancePercent(allotted, present);
+    }
+    const rowKey = getRowKey(next);
+    const isDirty = baselineRowsRef.current.get(rowKey) !== serializeEditableRow(next);
+    setDirtyRows((current) => {
+      const updated = new Set(current);
+      if (isDirty) updated.add(rowKey);
+      else updated.delete(rowKey);
+      return updated;
+    });
+    setSessions((current) => current.map((item, i) => (i === index ? next : item)));
   };
 
-  const saveClosedRow = async (row, index) => {
-    const key = `${row.scheduleId}-${row.date}`;
+  const saveRow = async (row, index) => {
+    const key = getRowKey(row);
+    if (!dirtyRows.has(key)) return;
+    if (!row.topicModuleCovered?.trim()) {
+      showError('Select a topic before saving this slot.');
+      return;
+    }
+    if (!row.sessionStatus?.trim()) {
+      showError('Select a session status before saving this slot.');
+      return;
+    }
+
     setSavingKey(key);
     try {
       const saved = await upsertTopicTrackerEntry(buildEntryPayload(row, 'closed'));
-      setSessions((prev) => prev.map((item, i) => (i === index ? {
-        ...item,
+      const nextRow = {
         ...row,
         entryId: saved._id,
         durationHrs: saved.durationHrs,
         attendancePercent: saved.attendancePercent,
         trackerStatus: saved.trackerStatus,
-      } : item)));
-      showSuccess('Slot saved and marked closed');
+      };
+      baselineRowsRef.current.set(key, serializeEditableRow(nextRow));
+      setDirtyRows((current) => {
+        const updated = new Set(current);
+        updated.delete(key);
+        return updated;
+      });
+      setSessions((prev) => prev.map((item, i) => (i === index ? nextRow : item)));
+      showSuccess('Slot updated successfully');
     } catch (err) {
       showError(getErrorMessage(err));
     } finally {
@@ -118,63 +183,22 @@ const TopicTrackerSpreadsheet = ({
     }
   };
 
-  const toggleStatus = async (row, index) => {
-    if (!canCloseEntries) return;
-
-    if (row.trackerStatus === 'closed') {
-      if (!row.entryId) {
-        setSessions((prev) => prev.map((item, i) => (i === index ? {
-          ...item,
-          trackerStatus: 'pending',
-        } : item)));
-        return;
-      }
-
-      const key = `${row.scheduleId}-${row.date}`;
-      setSavingKey(key);
-      try {
-        const saved = await updateTopicTrackerStatus(row.entryId, 'pending');
-        setSessions((prev) => prev.map((item, i) => (i === index ? {
-          ...item,
-          trackerStatus: saved.trackerStatus,
-        } : item)));
-      } catch (err) {
-        showError(getErrorMessage(err));
-      } finally {
-        setSavingKey('');
-      }
-      return;
-    }
-
-    if (!row.topicModuleCovered?.trim()) {
-      showError('Select a topic before marking this slot as closed.');
-      return;
-    }
-
-    if (!row.sessionStatus?.trim()) {
-      showError('Select a session status before marking this slot as closed.');
-      return;
-    }
-
-    await saveClosedRow(row, index);
-  };
-
   const renderCell = (row, column, index) => {
     const value = row[column.key] ?? '';
-    const rowKey = `${row.scheduleId}-${row.date}`;
-    const isClosed = row.trackerStatus === 'closed';
+    const rowKey = getRowKey(row);
     const isSaving = savingKey === rowKey;
+    const isDirty = dirtyRows.has(rowKey);
 
     if (column.key === 'trackerStatus') {
       return (
         <button
           type="button"
-          className={`btn btn-sm ${isClosed ? 'btn-outline-secondary' : 'btn-primary'}`}
-          onClick={() => toggleStatus(row, index)}
-          disabled={!canCloseEntries || isSaving}
-          title={canCloseEntries ? (isClosed ? 'Reopen for editing' : 'Save and mark closed') : 'Status'}
+          className="btn btn-sm btn-primary"
+          onClick={() => saveRow(row, index)}
+          disabled={!canCloseEntries || isSaving || !isDirty}
+          title={canCloseEntries ? (isDirty ? 'Save changes' : 'No changes to save') : 'Status'}
         >
-          {isSaving ? 'Saving...' : (isClosed ? 'Reopen' : 'Save')}
+          {isSaving ? 'Saving...' : 'Save'}
         </button>
       );
     }
@@ -187,7 +211,7 @@ const TopicTrackerSpreadsheet = ({
           className="form-select form-select-sm topic-tracker-cell-input"
           value={value}
           onChange={(e) => updateRow(index, column.key, e.target.value)}
-          disabled={isClosed || isSaving}
+          disabled={isSaving}
           aria-label="Session Status"
         >
           <option value="">Select status...</option>
@@ -212,7 +236,7 @@ const TopicTrackerSpreadsheet = ({
           className="form-select form-select-sm topic-tracker-cell-input topic-tracker-topic-select"
           value={value}
           onChange={(e) => updateRow(index, column.key, e.target.value)}
-          disabled={isClosed || isSaving}
+          disabled={isSaving}
           aria-label="Topic / Module Covered"
         >
           <option value="">Select topic...</option>
@@ -239,7 +263,7 @@ const TopicTrackerSpreadsheet = ({
         value={value}
         min={inputType === 'number' ? 0 : undefined}
         onChange={(e) => updateRow(index, column.key, e.target.value)}
-        disabled={isClosed || isSaving}
+        disabled={isSaving}
       />
     );
   };
@@ -272,8 +296,17 @@ const TopicTrackerSpreadsheet = ({
                 </tr>
               </thead>
               <tbody>
-                {sessions.map((row, index) => (
-                  <tr key={`${row.scheduleId}-${row.date}`}>
+                {sessions.map((row, index) => {
+                  const isHighlighted = highlightActive && (
+                    (highlightEntryId && row.entryId === highlightEntryId)
+                    || (highlightScheduleId && row.scheduleId === highlightScheduleId)
+                  );
+                  return (
+                  <tr
+                    key={`${row.scheduleId}-${row.date}`}
+                    ref={isHighlighted ? highlightedRowRef : undefined}
+                    className={isHighlighted ? 'notification-target-highlight' : ''}
+                  >
                     <td className="topic-tracker-slot-col fw-semibold small">
                       {row.slot || row.sessionStartTime}
                     </td>
@@ -281,7 +314,8 @@ const TopicTrackerSpreadsheet = ({
                       <td key={column.key}>{renderCell(row, column, index)}</td>
                     ))}
                   </tr>
-                ))}
+                  );
+                })}
               </tbody>
             </table>
           </div>
@@ -289,7 +323,7 @@ const TopicTrackerSpreadsheet = ({
       </div>
       <div className="toms-modal-footer">
         <p className="small text-muted mb-0 me-auto">
-          Fill the row, then click Save to store and mark closed. Use Reopen to edit again.
+          Change any editable value, then click Save. Rows without changes cannot be saved.
           Unsaved changes are kept until you click Close.
         </p>
         <button type="button" className="btn btn-secondary" onClick={onClose}>

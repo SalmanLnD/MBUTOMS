@@ -48,6 +48,7 @@ const Subjects = () => {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
   const [selectedSubject, setSelectedSubject] = useState(null);
   const [showModal, setShowModal] = useState(false);
   const [editingSubject, setEditingSubject] = useState(null);
@@ -60,7 +61,7 @@ const Subjects = () => {
   const fetchSubjects = async () => {
     setLoading(true);
     try {
-      const params = { page, limit: 10, search: debouncedSearch };
+      const params = { page, limit: pageSize, search: debouncedSearch };
       const data = await getSubjects(params);
       setSubjects(data.subjects);
       setPagination(data.pagination);
@@ -77,7 +78,7 @@ const Subjects = () => {
 
   useEffect(() => {
     fetchSubjects();
-  }, [page, debouncedSearch]);
+  }, [page, pageSize, debouncedSearch]);
 
   const handleDelete = async (id, name) => {
     setPendingDelete({ id, name });
@@ -373,7 +374,12 @@ const Subjects = () => {
                   </tbody>
                 </table>
               </div>
-              <Pagination pagination={pagination} onPageChange={setPage} />
+              <Pagination
+                pagination={pagination}
+                onPageChange={setPage}
+                pageSize={pageSize}
+                onPageSizeChange={(size) => { setPageSize(size); setPage(1); }}
+              />
             </>
           )}
         </div>

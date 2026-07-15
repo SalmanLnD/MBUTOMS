@@ -21,6 +21,7 @@ const Leaves = () => {
   const [pagination, setPagination] = useState(null);
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
   const [statusFilter, setStatusFilter] = useState('');
   const [showForm, setShowForm] = useState(false);
   const [trainers, setTrainers] = useState([]);
@@ -36,7 +37,7 @@ const Leaves = () => {
   const fetchLeaves = async () => {
     setLoading(true);
     try {
-      const data = await getLeaves({ page, limit: 10, status: statusFilter });
+      const data = await getLeaves({ page, limit: pageSize, status: statusFilter });
       setLeaves(data.leaves);
       setPagination(data.pagination);
     } catch (err) {
@@ -46,7 +47,7 @@ const Leaves = () => {
     }
   };
 
-  useEffect(() => { fetchLeaves(); }, [page, statusFilter]);
+  useEffect(() => { fetchLeaves(); }, [page, pageSize, statusFilter]);
 
   useEffect(() => {
     if (!showForm || !canApprove) return;
@@ -202,7 +203,12 @@ const Leaves = () => {
                 ))}
               </tbody>
             </table>
-            <Pagination pagination={pagination} onPageChange={setPage} />
+            <Pagination
+              pagination={pagination}
+              onPageChange={setPage}
+              pageSize={pageSize}
+              onPageSizeChange={(size) => { setPageSize(size); setPage(1); }}
+            />
           </div>
         </div>
       )}

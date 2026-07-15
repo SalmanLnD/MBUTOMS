@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
+import { useNavigate } from 'react-router-dom';
 import { BellIcon, CheckReadIcon } from './icons.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
 import { ROLES } from '../utils/roles.js';
@@ -13,6 +14,7 @@ import { showError } from '../utils/toast.js';
 
 const NotificationBell = () => {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [open, setOpen] = useState(false);
   const [notifications, setNotifications] = useState([]);
   const [unreadCount, setUnreadCount] = useState(0);
@@ -25,7 +27,7 @@ const NotificationBell = () => {
   const canViewNotifications =
     user
     && !user.impersonating
-    && (user.role === ROLES.ADMIN || user.role === ROLES.TRAINER);
+    && [ROLES.ADMIN, ROLES.TRAINER, ROLES.SUBJECT_COORDINATOR].includes(user.role);
 
   const loadNotifications = useCallback(async () => {
     if (!canViewNotifications) return;
@@ -128,6 +130,13 @@ const NotificationBell = () => {
     }
   };
 
+  const handleNotificationClick = async (notification) => {
+    if (!notification.entityPath || notification.entityPath.startsWith('/api/')) return;
+    if (!notification.readAt) await handleMarkRead(notification._id);
+    setOpen(false);
+    navigate(notification.entityPath);
+  };
+
   if (!canViewNotifications) return null;
 
   return (
@@ -181,14 +190,23 @@ const NotificationBell = () => {
                       key={notification._id}
                       className={`notification-item ${isUnread ? 'notification-item--unread' : ''}`}
                     >
-                      <div className="notification-item-content">
+                      <button
+                        type="button"
+                        className={`notification-item-content notification-item-link ${
+                          notification.entityPath && !notification.entityPath.startsWith('/api/')
+                            ? 'notification-item-link--active'
+                            : ''
+                        }`}
+                        onClick={() => handleNotificationClick(notification)}
+                        disabled={!notification.entityPath || notification.entityPath.startsWith('/api/')}
+                      >
                         <p className="notification-item-message mb-1">
                           {notification.message || 'Notification'}
                         </p>
                         <p className="notification-item-meta text-muted small mb-0">
                           {formatDateTime(notification.createdAt)}
                         </p>
-                      </div>
+                      </button>
                       {isUnread && (
                         <button
                           type="button"

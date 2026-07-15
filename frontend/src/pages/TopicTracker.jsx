@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import Topbar from '../components/Topbar.jsx';
 import LoadingSpinner from '../components/LoadingSpinner.jsx';
 import TopicTrackerSpreadsheet from '../components/TopicTrackerSpreadsheet.jsx';
@@ -12,8 +13,24 @@ import { getTopicTrackerStatusBadgeClass } from '../utils/topicTrackerConstants.
 import { ROLES } from '../utils/roles.js';
 import { SheetIcon, ExternalLinkIcon } from '../components/icons.jsx';
 
+const getNotificationTarget = (search) => {
+  const params = new URLSearchParams(search);
+  const entryId = params.get('entry') || '';
+  const scheduleId = params.get('schedule') || '';
+  if (!entryId && !scheduleId) return null;
+  return {
+    entryId,
+    scheduleId,
+    date: params.get('date') || toInputDate(new Date()),
+    subjectId: params.get('subject') || undefined,
+    trainerId: params.get('trainer') || undefined,
+  };
+};
+
 const TopicTracker = () => {
   const { hasRole, user } = useAuth();
+  const location = useLocation();
+  const navigate = useNavigate();
   const isTrainer = hasRole(ROLES.TRAINER);
   const isCoordinator = user?.role === ROLES.SUBJECT_COORDINATOR;
   // Exact role check — subject coordinators must not get campus_manager sheet parity here.
@@ -22,8 +39,13 @@ const TopicTracker = () => {
   const hasLinkedTrainer = Boolean(user?.trainer);
   const canOpenOwnTracker = isTrainer || (isCoordinator && hasLinkedTrainer);
 
+  const [notificationTarget, setNotificationTarget] = useState(
+    () => getNotificationTarget(window.location.search)
+  );
   const [activeTab, setActiveTab] = useState('day');
-  const [selectedDate, setSelectedDate] = useState(() => toInputDate(new Date()));
+  const [selectedDate, setSelectedDate] = useState(
+    () => notificationTarget?.date || toInputDate(new Date())
+  );
   const [overview, setOverview] = useState(null);
   const [loading, setLoading] = useState(true);
   const [sheetStatus, setSheetStatus] = useState(null);
@@ -50,6 +72,29 @@ const TopicTracker = () => {
   useEffect(() => {
     loadOverview();
   }, [loadOverview]);
+
+  useEffect(() => {
+    const nextTarget = getNotificationTarget(location.search);
+    if (!nextTarget) return;
+    setNotificationTarget((current) =>
+      current?.entryId === nextTarget.entryId && current?.scheduleId === nextTarget.scheduleId
+        ? current
+        : nextTarget
+    );
+  }, [location.search]);
+
+  useEffect(() => {
+    if (!notificationTarget) return;
+    setActiveTab('day');
+    setSelectedDate(notificationTarget.date);
+    setSpreadsheet({
+      date: notificationTarget.date,
+      subjectId: notificationTarget.subjectId,
+      trainerId: notificationTarget.trainerId,
+      title: `Updated topic tracker record — ${notificationTarget.date}`,
+    });
+    navigate(location.pathname, { replace: true });
+  }, [notificationTarget, navigate, location.pathname]);
 
   useEffect(() => {
     if (!canManageSheets) return;
@@ -267,8 +312,12 @@ const TopicTracker = () => {
           trainerId={spreadsheet.trainerId}
           title={spreadsheet.title}
           canCloseEntries
+          highlightEntryId={notificationTarget?.entryId}
+          highlightScheduleId={notificationTarget?.scheduleId}
+          onHighlightComplete={() => setNotificationTarget(null)}
           onClose={() => {
             setSpreadsheet(null);
+            setNotificationTarget(null);
             setSummaryRefreshKey((key) => key + 1);
             if (showOverview && activeTab === 'day') loadOverview();
           }}

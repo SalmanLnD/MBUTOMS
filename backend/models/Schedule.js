@@ -27,6 +27,7 @@ const scheduleSchema = new mongoose.Schema(
 
 scheduleSchema.index({ trainerCode: 1, day: 1, startTime: 1 });
 scheduleSchema.index({ day: 1, startTime: 1 });
+scheduleSchema.index({ day: 1, subject: 1, startTime: 1 });
 scheduleSchema.index({ department: 1, section: 1, semester: 1 });
 scheduleSchema.index({ semester: 1, trainerCode: 1 });
 

@@ -4,6 +4,7 @@ import Subject from '../models/Subject.js';
 import Student from '../models/Student.js';
 import ClassGroup from '../models/ClassGroup.js';
 import TopicTrackerEntry from '../models/TopicTrackerEntry.js';
+import Leave from '../models/Leave.js';
 import { normalizeDate } from './scheduleHelpers.js';
 import { filterSchedulesActiveOnDate } from './activeSchedulesForDate.js';
 import { computeHours } from './trainerClassHours.js';
@@ -68,13 +69,37 @@ const buildClassGroupMap = async () => {
 const buildTrainerLookup = async () => {
   const trainers = await Trainer.find().select('name employeeId scheduleTrainerCodes subjects');
   const byCode = new Map();
+  const byId = new Map();
   trainers.forEach((trainer) => {
+    byId.set(trainer._id.toString(), trainer);
     const codes = resolveTrainerScheduleCodes(trainer);
     codes.forEach((code) => {
       byCode.set(code, trainer);
     });
   });
-  return byCode;
+  return { byCode, byId };
+};
+
+const buildReplacementMap = async (scheduleIds, ref) => {
+  if (!scheduleIds.length) return new Map();
+  const leaves = await Leave.find({
+    status: 'approved',
+    startDate: { $lte: ref },
+    endDate: { $gte: ref },
+    'replacements.schedule': { $in: scheduleIds },
+  }).select('replacements.schedule replacements.replacementTrainer').lean();
+
+  const replacementBySchedule = new Map();
+  leaves.forEach((leave) => {
+    (leave.replacements || []).forEach((replacement) => {
+      const scheduleId = replacement.schedule?.toString();
+      const replacementTrainerId = replacement.replacementTrainer?.toString();
+      if (scheduleId && replacementTrainerId) {
+        replacementBySchedule.set(scheduleId, replacementTrainerId);
+      }
+    });
+  });
+  return replacementBySchedule;
 };
 
 const computeAttendancePercent = (allotted, present) => {
@@ -90,7 +115,9 @@ const entryToSession = (entry, defaults) => ({
   day: defaults.day,
   slot: defaults.slot,
   trainerId: defaults.trainerId,
-  trainerName: entry?.trainerName || defaults.trainerName,
+  trainerName: defaults.isReplacementAssignment
+    ? defaults.trainerName
+    : (entry?.trainerName || defaults.trainerName),
   subjectId: defaults.subjectId,
   subjectCode: defaults.subjectCode,
   courseName: entry?.courseName || defaults.courseName,
@@ -132,11 +159,22 @@ export const buildTopicTrackerSessions = async ({
     .populate('venue', 'name building floor')
     .lean();
 
-  schedules = await filterSchedulesActiveOnDate(schedules, ref);
-
-  const trainerByCode = await buildTrainerLookup();
-  const studentCountMap = await buildStudentCountMap();
-  const classGroupMap = await buildClassGroupMap();
+  const [
+    activeSchedules,
+    trainerLookup,
+    studentCountMap,
+    classGroupMap,
+  ] = await Promise.all([
+    filterSchedulesActiveOnDate(schedules, ref),
+    buildTrainerLookup(),
+    buildStudentCountMap(),
+    buildClassGroupMap(),
+  ]);
+  schedules = activeSchedules;
+  const replacementBySchedule = await buildReplacementMap(
+    schedules.map((schedule) => schedule._id),
+    ref
+  );
 
   let allowedTrainerIds = null;
   const ownTrainerId = user?.trainer ? String(user.trainer._id || user.trainer) : '';
@@ -182,9 +220,30 @@ export const buildTopicTrackerSessions = async ({
   const sessionDefaults = [];
 
   schedules.forEach((schedule) => {
-    const trainer = trainerByCode.get(schedule.trainerCode);
-    if (!trainer) return;
-    if (allowedTrainerIds && !allowedTrainerIds.has(trainer._id.toString())) return;
+    const originalTrainer = trainerLookup.byCode.get(schedule.trainerCode);
+    if (!originalTrainer) return;
+
+    const replacementTrainerId = replacementBySchedule.get(schedule._id.toString());
+    const replacementTrainer = replacementTrainerId
+      ? trainerLookup.byId.get(replacementTrainerId)
+      : null;
+    const originalTrainerId = originalTrainer._id.toString();
+    const targetTrainerId = trainerId?.toString();
+    const targetIsOriginal = targetTrainerId === originalTrainerId;
+    const targetIsReplacement = Boolean(
+      replacementTrainer && targetTrainerId === replacementTrainer._id.toString()
+    );
+
+    if (targetTrainerId && !targetIsOriginal && !targetIsReplacement) return;
+    if (
+      allowedTrainerIds
+      && !allowedTrainerIds.has(originalTrainerId)
+      && !(replacementTrainer && allowedTrainerIds.has(replacementTrainer._id.toString()))
+    ) return;
+
+    // A replaced class remains one tracker record. Both trainers can open it, while
+    // the row identifies the trainer who is actually covering the class.
+    const displayTrainer = replacementTrainer || originalTrainer;
 
     const classKey = `${schedule.department}::${schedule.section}::${schedule.semester}`;
     const classGroup = classGroupMap.get(classKey);
@@ -201,8 +260,10 @@ export const buildTopicTrackerSessions = async ({
       dateKey,
       day: dayName,
       slot: schedule.slot || '',
-      trainerId: trainer._id.toString(),
-      trainerName: trainer.name,
+      trainerId: targetIsReplacement ? replacementTrainer._id.toString() : originalTrainerId,
+      trainerName: displayTrainer.name,
+      isReplacementAssignment: Boolean(replacementTrainer),
+      originalTrainerId,
       subjectId: schedule.subject?._id?.toString() || schedule.subject?.toString() || '',
       subjectCode,
       topicOptions: getTopicOptionsForSubjectDoc(schedule.subject),
@@ -214,7 +275,7 @@ export const buildTopicTrackerSessions = async ({
       durationHrs: computeHours(schedule.startTime, schedule.endTime),
       allottedStudents,
       scheduleRef: schedule._id,
-      trainerRef: trainer._id,
+      trainerRef: originalTrainer._id,
       subjectRef: schedule.subject?._id || schedule.subject,
     });
   });
@@ -247,14 +308,6 @@ export const buildTopicTrackerSessions = async ({
 export const buildTopicTrackerOverview = async ({ date, user }) => {
   const ref = normalizeDate(date);
   const dateKey = formatDateKey(ref);
-
-  let subjectFilter = {};
-  if (isSubjectCoordinator(user)) {
-    const subjectIds = getCoordinatorSubjectIds(user);
-    subjectFilter = { _id: { $in: subjectIds } };
-  }
-
-  const subjects = await Subject.find(subjectFilter).select('name code').sort({ name: 1 }).lean();
   const overviewMap = new Map();
   const seenSessionKeys = new Set();
 
@@ -299,21 +352,10 @@ export const buildTopicTrackerOverview = async ({ date, user }) => {
     });
   };
 
-  for (const subject of subjects) {
-    const { sessions } = await buildTopicTrackerSessions({
-      date: ref,
-      subjectId: subject._id.toString(),
-      user,
-    });
-    if (!sessions.length) continue;
-    // Prefer subject catalog name/code for coordinated subjects.
-    sessions.forEach((session) => {
-      session.courseName = subject.name;
-      session.subjectCode = subject.code;
-      session.subjectId = subject._id.toString();
-    });
-    addSessionsToOverview(sessions);
-  }
+  // Load the day once. Previously this rebuilt trainer/student/class maps and
+  // queried tracker entries again for every subject.
+  const { sessions } = await buildTopicTrackerSessions({ date: ref, user });
+  addSessionsToOverview(sessions);
 
   // Coordinators who also teach should see their personal classes (e.g. Sai Priya / PSTJ).
   if (isSubjectCoordinator(user) && user.trainer) {
@@ -471,7 +513,7 @@ export const buildTopicTrackerClassSummary = async ({ subjectId, user, trainerId
   }
 
   const entries = await TopicTrackerEntry.find(entryFilter)
-    .select('subject branchYearSection topicModuleCovered date sessionStatus allottedStudents noPresent attendancePercent trainerName')
+    .select('subject trainer branchYearSection topicModuleCovered date sessionStatus allottedStudents noPresent attendancePercent trainerName')
     .sort({ date: 1 })
     .lean();
 
@@ -488,10 +530,17 @@ export const buildTopicTrackerClassSummary = async ({ subjectId, user, trainerId
     const classMap = new Map();
 
     subjectEntries.forEach((entry) => {
-      const classKey = entry.branchYearSection || 'Unassigned class';
+      const trainerId = entry.trainer?.toString() || '';
+      const trainerName = entry.trainerName || 'Unassigned trainer';
+      const trainerKey = `${trainerId || 'unassigned'}::${trainerName}`;
+      const branchYearSection = entry.branchYearSection || 'Unassigned class';
+      const classKey = `${trainerKey}::${branchYearSection}`;
       if (!classMap.has(classKey)) {
         classMap.set(classKey, {
-          branchYearSection: classKey,
+          trainerKey,
+          trainerId,
+          trainerName,
+          branchYearSection,
           closedSlots: 0,
           topicHits: new Map(),
           attendanceSum: 0,
@@ -543,7 +592,10 @@ export const buildTopicTrackerClassSummary = async ({ subjectId, user, trainerId
           uncoveredTopics,
         };
       })
-      .sort((a, b) => a.branchYearSection.localeCompare(b.branchYearSection));
+      .sort((a, b) =>
+        a.trainerName.localeCompare(b.trainerName)
+        || a.branchYearSection.localeCompare(b.branchYearSection)
+      );
 
     return {
       subjectId: subject._id.toString(),

@@ -16,6 +16,7 @@ const classGroupSchema = new mongoose.Schema(
 );
 
 classGroupSchema.index({ department: 1, section: 1, currentSemester: 1 }, { unique: true });
+classGroupSchema.index({ status: 1, department: 1, section: 1, currentSemester: 1 });
 
 classGroupSchema.virtual('label').get(function label() {
   return `${this.department} ${this.section}`;

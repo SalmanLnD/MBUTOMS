@@ -1,14 +1,23 @@
 import Schedule from '../models/Schedule.js';
-import { isScheduleActiveOnDate } from './subjectStartDate.js';
+import {
+  buildSubjectStartDateMap,
+  DEFAULT_SUBJECT_START_DATE,
+} from './subjectStartDate.js';
+import { normalizeDate } from './scheduleHelpers.js';
 
 export async function filterSchedulesActiveOnDate(schedules, referenceDate = new Date()) {
   if (!schedules.length) return [];
+  const { byId, byCode } = await buildSubjectStartDateMap();
+  const ref = normalizeDate(referenceDate);
 
-  const flags = await Promise.all(
-    schedules.map((schedule) => isScheduleActiveOnDate(schedule, referenceDate))
-  );
-
-  return schedules.filter((_, index) => flags[index]);
+  return schedules.filter((schedule) => {
+    const subjectId = schedule.subject?._id?.toString() || schedule.subject?.toString();
+    const subjectCode = schedule.subjectCode?.trim();
+    const startDate = (subjectId && byId.get(subjectId))
+      || (subjectCode && byCode.get(subjectCode))
+      || DEFAULT_SUBJECT_START_DATE;
+    return ref >= startDate;
+  });
 }
 
 export async function getActiveSchedulesForDay(dayName, referenceDate = new Date()) {

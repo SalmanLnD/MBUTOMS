@@ -24,6 +24,7 @@ const TrainerPunchInLogsTab = () => {
   const [pagination, setPagination] = useState(null);
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(20);
   const [search, setSearch] = useState('');
   const [sourceFilter, setSourceFilter] = useState('');
   const [fromDate, setFromDate] = useState('');
@@ -38,7 +39,7 @@ const TrainerPunchInLogsTab = () => {
     try {
       const params = {
         page,
-        limit: 20,
+        limit: pageSize,
       };
       if (debouncedSearch) params.search = debouncedSearch;
       if (sourceFilter) params.source = sourceFilter;
@@ -53,7 +54,7 @@ const TrainerPunchInLogsTab = () => {
     } finally {
       setLoading(false);
     }
-  }, [page, debouncedSearch, sourceFilter, fromDate, toDate]);
+  }, [page, pageSize, debouncedSearch, sourceFilter, fromDate, toDate]);
 
   useEffect(() => {
     fetchLogs();
@@ -253,7 +254,12 @@ const TrainerPunchInLogsTab = () => {
               </tbody>
             </table>
           </div>
-          <Pagination pagination={pagination} onPageChange={setPage} />
+          <Pagination
+            pagination={pagination}
+            onPageChange={setPage}
+            pageSize={pageSize}
+            onPageSizeChange={(size) => { setPageSize(size); setPage(1); }}
+          />
         </>
       )}
 

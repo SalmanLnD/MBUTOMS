@@ -7,7 +7,6 @@ import { getCalendarDates, toDateKey } from './dateRange.js';
 import { resolveTrainerScheduleCodes } from './trainerMappings.js';
 import { buildSubjectStartDateMap, DEFAULT_SUBJECT_START_DATE } from './subjectStartDate.js';
 import { isScheduleDayInLeaveRange } from './trainerScheduleView.js';
-import { isTrainerOnLeave } from './leaveStatus.js';
 
 const WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
@@ -240,7 +239,7 @@ export const buildTrainerAvailabilityForRange = async ({
   const ownedFilter = { trainerCode: { $in: allCodes } };
   if (semester) ownedFilter.semester = semester;
 
-  const [ownedSchedules, subjectStartMap, replacementLeaves] = await Promise.all([
+  const [ownedSchedules, subjectStartMap, replacementLeaves, activeLeaves] = await Promise.all([
     Schedule.find(ownedFilter).lean(),
     buildSubjectStartDateMap(),
     Leave.find({
@@ -251,7 +250,35 @@ export const buildTrainerAvailabilityForRange = async ({
     })
       .populate('trainer', 'name employeeId')
       .lean(),
+    // One query for all leave in range instead of one per trainer per day.
+    Leave.find({
+      status: 'approved',
+      startDate: { $lte: rangeEnd },
+      endDate: { $gte: rangeStart },
+      trainer: { $in: trainers.map((trainer) => trainer._id) },
+    })
+      .select('trainer startDate endDate')
+      .lean(),
   ]);
+
+  const leaveDatesByTrainer = new Map();
+  activeLeaves.forEach((leave) => {
+    const leaveTrainerId = leave.trainer.toString();
+    if (!leaveDatesByTrainer.has(leaveTrainerId)) {
+      leaveDatesByTrainer.set(leaveTrainerId, []);
+    }
+    leaveDatesByTrainer.get(leaveTrainerId).push({
+      start: normalizeDate(leave.startDate),
+      end: normalizeDate(leave.endDate),
+    });
+  });
+
+  const isOnLeaveForDate = (trainerId, date) => {
+    const ranges = leaveDatesByTrainer.get(trainerId);
+    if (!ranges?.length) return false;
+    const ref = normalizeDate(date);
+    return ranges.some((range) => ref >= range.start && ref <= range.end);
+  };
 
   const schedulesByTrainer = new Map();
   ownedSchedules.forEach((schedule) => {
@@ -320,7 +347,7 @@ export const buildTrainerAvailabilityForRange = async ({
       const dateKey = toDateKey(date);
       const dayName = WEEKDAYS[date.getDay()];
 
-      const onLeave = await isTrainerOnLeave(trainer._id, date);
+      const onLeave = isOnLeaveForDate(trainerId, date);
       if (onLeave) {
         availability.push({
           date: dateKey,

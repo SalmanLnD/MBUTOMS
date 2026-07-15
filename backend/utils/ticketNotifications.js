@@ -11,7 +11,11 @@ export const notifyAdminsOfNewTicket = async (ticket, actor) => {
   if (!recipients.length) return;
 
   const typeLabel = TICKET_TYPE_LABELS[ticket.type] || 'support ticket';
-  const message = `${actor.name} raised a ${typeLabel} ticket (${ticket.ticketId})`;
+  const description = ticket.description?.trim();
+  const detail = description
+    ? `: ${description.length > 100 ? `${description.slice(0, 100)}...` : description}`
+    : '';
+  const message = `${actor.name} raised ${ticket.ticketId} (${typeLabel})${detail}`;
 
   await Notification.insertMany(
     recipients.map((recipient) => ({
@@ -22,7 +26,7 @@ export const notifyAdminsOfNewTicket = async (ticket, actor) => {
       action: 'raised',
       resource: 'support ticket',
       message,
-      entityPath: '/tickets',
+      entityPath: `/tickets?ticket=${ticket._id}`,
     }))
   );
 };
@@ -43,6 +47,6 @@ export const notifyRaisedByOfTicketStatusUpdate = async (ticket, actor, status, 
     action: 'updated',
     resource: 'support ticket',
     message,
-    entityPath: '/tickets',
+    entityPath: `/tickets?ticket=${ticket._id}`,
   });
 };
