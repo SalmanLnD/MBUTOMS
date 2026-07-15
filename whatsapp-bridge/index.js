@@ -534,11 +534,29 @@ const wireClient = (activeClient) => {
     if (!GROUP_ID) return;
     try {
       // WhatsApp store is often not fully warm immediately after ready.
-      await sleep(10000);
+      await sleep(12000);
+      try {
+        const state = await activeClient.getState();
+        log(`Catch-up: WhatsApp state=${state}`);
+      } catch (error) {
+        log(`Catch-up: getState failed: ${error?.message || error}`);
+      }
+
+      // Opening the punch group forces the message store to hydrate.
+      if (typeof activeClient.interface?.openChatWindow === 'function') {
+        try {
+          await activeClient.interface.openChatWindow(GROUP_ID);
+          await sleep(5000);
+          log('Catch-up: opened punch group chat window');
+        } catch (error) {
+          log(`Catch-up: openChatWindow failed: ${error?.message || error}`);
+        }
+      }
+
       let chat = null;
       try {
         chat = await withRetries('catchup-getChatById', () => activeClient.getChatById(GROUP_ID), {
-          attempts: 3,
+          attempts: 4,
           delayMs: 8000,
         });
       } catch (error) {
@@ -547,10 +565,53 @@ const wireClient = (activeClient) => {
 
       if (!chat) {
         const chats = await withRetries('catchup-getChats', () => activeClient.getChats(), {
-          attempts: 2,
+          attempts: 3,
           delayMs: 8000,
         });
         chat = chats.find((item) => item.id?._serialized === GROUP_ID) || null;
+      }
+
+      if (!chat && activeClient.pupPage) {
+        log('Catch-up: trying Store.Chat via puppeteer evaluate');
+        const serialized = await activeClient.pupPage.evaluate(async (groupId, limit) => {
+          const chat = window.Store?.Chat?.get(groupId) || window.Store?.Chat?.find?.((c) => c.id?._serialized === groupId);
+          if (!chat) return { error: 'chat-not-in-store' };
+          const msgs = chat.msgs?.getModelsArray?.() || [];
+          return {
+            count: msgs.length,
+            messages: msgs.slice(-limit).map((msg) => ({
+              id: msg.id?._serialized,
+              timestamp: msg.t,
+              hasMedia: Boolean(msg.mediaData || msg.type === 'image' || msg.type === 'document' || msg.type === 'video'),
+              body: msg.body || msg.caption || '',
+              author: msg.author?._serialized || msg.author || '',
+              from: msg.from?._serialized || msg.from || '',
+              type: msg.type,
+            })),
+          };
+        }, GROUP_ID, catchupMessageLimit);
+
+        if (serialized?.error) {
+          log(`Catch-up Store lookup failed: ${serialized.error}`);
+        } else if (serialized?.messages?.length) {
+          log(`Catch-up: Store returned ${serialized.messages.length} messages (raw=${serialized.count})`);
+          const cutoffMs = Date.now() - catchupLookbackMs;
+          for (const raw of serialized.messages) {
+            if ((raw.timestamp || 0) * 1000 < cutoffMs) continue;
+            if (!raw.hasMedia) continue;
+            // Re-fetch as a real Message model when possible.
+            try {
+              const message = await activeClient.getMessageById(raw.id);
+              if (message) {
+                await handleMessage(message, { fromCatchUp: true });
+              }
+            } catch (error) {
+              log(`Catch-up getMessageById failed for ${raw.id}: ${error?.message || error}`);
+            }
+          }
+          log('Catch-up complete via Store fallback');
+          return;
+        }
       }
 
       if (!chat) {

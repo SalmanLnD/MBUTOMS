@@ -1,0 +1,27 @@
+{
+  "commands": [
+    "date -u",
+    "ps -eo pid,ppid,etime,cmd | grep -E '4702|700833|PM2|pm2|whatsapp-bridge' | grep -v grep | tr -cd '\\11\\12\\15\\40-\\176'",
+    "sudo -u ubuntu bash -lc 'pm2 kill' || true",
+    "sudo pkill -9 -f 'PM2' || true",
+    "sudo pkill -9 -f 'God Daemon' || true",
+    "sudo pkill -9 -f '/opt/MBUTOMS/whatsapp-bridge/index.js' || true",
+    "sudo pkill -9 -f 'wwebjs_auth' || true",
+    "sudo pkill -9 -f 'chrome-linux64/chrome' || true",
+    "sleep 6",
+    "echo LEFT_NODE=$(pgrep -c -f 'node /opt/MBUTOMS/whatsapp-bridge/index.js' || echo 0)",
+    "echo LEFT_PM2=$(pgrep -c -f 'PM2' || echo 0)",
+    "echo LEFT_CHROME=$(pgrep -c -f 'chrome-linux64/chrome' || echo 0)",
+    "ps -eo pid,ppid,etime,cmd | grep -E 'whatsapp-bridge|PM2|chrome-linux64/chrome --type=zygote' | grep -v grep | tr -cd '\\11\\12\\15\\40-\\176' || echo CLEAN",
+    "rm -f /opt/MBUTOMS/whatsapp-bridge/.wwebjs_auth/session/SingletonLock /opt/MBUTOMS/whatsapp-bridge/.wwebjs_auth/session/DevToolsActivePort /opt/MBUTOMS/whatsapp-bridge/.bridge-instance.lock",
+    "sudo -u ubuntu bash -lc 'cd /opt/MBUTOMS && git fetch origin main && git reset --hard origin/main'",
+    "sudo -u ubuntu bash -lc 'cd /opt/MBUTOMS/whatsapp-bridge && pm2 start ecosystem.config.cjs && pm2 save'",
+    "sleep 15",
+    "echo AFTER_NODE=$(pgrep -c -f 'node /opt/MBUTOMS/whatsapp-bridge/index.js' || echo 0)",
+    "ps -eo pid,ppid,etime,cmd | grep 'whatsapp-bridge/index' | grep -v grep | tr -cd '\\11\\12\\15\\40-\\176'",
+    "sleep 140",
+    "python3 - <<'PY'\nfrom pathlib import Path\np=Path('/home/ubuntu/.pm2/logs/mbutoms-whatsapp-bridge-out-0.log')\nlines=p.read_text(errors='ignore').splitlines()\nprint('N', len(lines))\nfor ln in lines[-35:]:\n    print(ln.encode('ascii','ignore').decode())\nPY",
+    "echo FINAL_NODE=$(pgrep -c -f 'node /opt/MBUTOMS/whatsapp-bridge/index.js' || echo 0)",
+    "ps -eo pid,ppid,etime,cmd | grep 'whatsapp-bridge/index' | grep -v grep | tr -cd '\\11\\12\\15\\40-\\176'"
+  ]
+}
