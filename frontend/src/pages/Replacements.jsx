@@ -15,6 +15,7 @@ import AddSlotReplacementModal from '../components/AddSlotReplacementModal.jsx';
 import { EditIcon } from '../components/icons.jsx';
 import ActionIconButton from '../components/ActionIconButton.jsx';
 import Pagination from '../components/Pagination.jsx';
+import { usePagination } from '../hooks/usePagination.js';
 
 const REPLACEMENT_STATUS = {
   current: { label: 'Current', className: 'bg-success' },
@@ -26,11 +27,16 @@ const REPLACEMENT_STATUS = {
 };
 
 const Replacements = () => {
+  const {
+    page,
+    setPage,
+    pageSize,
+    changePageSize,
+    pagination,
+    setPagination,
+  } = usePagination({ initialPageSize: 10 });
   const [activeTab, setActiveTab] = useState('all');
   const [replacements, setReplacements] = useState([]);
-  const [pagination, setPagination] = useState(null);
-  const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(10);
   const [loading, setLoading] = useState(true);
   const [selectedSchedule, setSelectedSchedule] = useState(null);
   const [selectedLeaveId, setSelectedLeaveId] = useState('');
@@ -244,12 +250,14 @@ const Replacements = () => {
                 </tbody>
               </table>
             </div>
-            <Pagination
-              pagination={pagination}
-              onPageChange={setPage}
-              pageSize={pageSize}
-              onPageSizeChange={(size) => { setPageSize(size); setPage(1); }}
-            />
+              <Pagination
+                pagination={pagination}
+                onPageChange={setPage}
+                pageSize={pageSize}
+                onPageSizeChange={changePageSize}
+                showSummary
+                align="between"
+              />
           </div>
         </div>
       )}

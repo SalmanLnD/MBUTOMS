@@ -8,6 +8,7 @@ import VenueFormModal from '../components/VenueFormModal.jsx';
 import ConfirmModal from '../components/ConfirmModal.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
 import { useDebounce } from '../hooks/useDebounce.js';
+import { usePagination } from '../hooks/usePagination.js';
 import { getVenues, getVenueMappingReference, deleteVenue } from '../services/venueService.js';
 import { EditIcon, TrashIcon } from '../components/icons.jsx';
 import ActionIconButton from '../components/ActionIconButton.jsx';
@@ -30,16 +31,22 @@ const VENUE_TABS = [
 const Venues = () => {
   const { hasManagementRole, hasFullAccess } = useAuth();
   const canManage = hasManagementRole();
+  const {
+    page,
+    setPage,
+    pageSize,
+    changePageSize,
+    resetPage,
+    pagination,
+    setPagination,
+  } = usePagination({ initialPageSize: 20 });
 
   const [activeTab, setActiveTab] = useState('map');
   const [venues, setVenues] = useState([]);
   const [mappingReference, setMappingReference] = useState([]);
-  const [pagination, setPagination] = useState(null);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [typeFilter, setTypeFilter] = useState('');
-  const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(20);
   const [showModal, setShowModal] = useState(false);
   const [editingVenue, setEditingVenue] = useState(null);
   const [viewingVenue, setViewingVenue] = useState(null);
@@ -169,14 +176,14 @@ const Venues = () => {
                   className="form-control"
                   placeholder="Search room, building, or floor..."
                   value={search}
-                  onChange={(e) => { setSearch(e.target.value); setPage(1); }}
+                  onChange={(e) => { setSearch(e.target.value); resetPage(); }}
                 />
               </div>
               <div className="col-md-3">
                 <select
                   className="form-select"
                   value={typeFilter}
-                  onChange={(e) => { setTypeFilter(e.target.value); setPage(1); }}
+                  onChange={(e) => { setTypeFilter(e.target.value); resetPage(); }}
                 >
                   <option value="">All Types</option>
                   {Object.entries(venueTypes).map(([key, label]) => (
@@ -262,12 +269,14 @@ const Venues = () => {
                     </tbody>
                   </table>
                 </div>
-                <Pagination
-                  pagination={pagination}
-                  onPageChange={setPage}
-                  pageSize={pageSize}
-                  onPageSizeChange={(size) => { setPageSize(size); setPage(1); }}
-                />
+                  <Pagination
+                    pagination={pagination}
+                    onPageChange={setPage}
+                    pageSize={pageSize}
+                    onPageSizeChange={changePageSize}
+                    showSummary
+                    align="between"
+                  />
               </>
             )}
           </div>

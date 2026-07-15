@@ -10,6 +10,7 @@ import TrainerPunchInLogsTab from '../components/TrainerPunchInLogsTab.jsx';
 import ConfirmModal from '../components/ConfirmModal.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
 import { useDebounce } from '../hooks/useDebounce.js';
+import { usePagination } from '../hooks/usePagination.js';
 import { getTrainers, deleteTrainer, resetTrainerPassword } from '../services/trainerService.js';
 import { EditIcon, EyeIcon, KeyIcon, TrashIcon } from '../components/icons.jsx';
 import ActionIconButton from '../components/ActionIconButton.jsx';
@@ -31,16 +32,22 @@ const Trainers = () => {
       : ['directory', 'attendance', 'logs'];
   const defaultTab = isTrainerUser ? 'details' : 'directory';
   const activeTab = validTabs.includes(tabParam) ? tabParam : defaultTab;
+  const {
+    page,
+    setPage,
+    pageSize,
+    changePageSize,
+    resetPage,
+    pagination,
+    setPagination,
+  } = usePagination({ initialPageSize: 10 });
 
   const [trainers, setTrainers] = useState([]);
-  const [pagination, setPagination] = useState(null);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [subjectSearch, setSubjectSearch] = useState('');
   const [sortBy, setSortBy] = useState('employeeId');
   const [sortOrder, setSortOrder] = useState('asc');
-  const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(10);
   const [showModal, setShowModal] = useState(false);
   const [editingTrainer, setEditingTrainer] = useState(null);
   const [pendingReset, setPendingReset] = useState(null);
@@ -218,7 +225,7 @@ const Trainers = () => {
                   className="form-control"
                   placeholder="Search trainers..."
                   value={search}
-                  onChange={(e) => { setSearch(e.target.value); setPage(1); }}
+                  onChange={(e) => { setSearch(e.target.value); resetPage(); }}
                   aria-label="Search trainers"
                 />
               </div>
@@ -228,7 +235,7 @@ const Trainers = () => {
                   className="form-control"
                   placeholder="Filter by subject name or code..."
                   value={subjectSearch}
-                  onChange={(e) => { setSubjectSearch(e.target.value); setPage(1); }}
+                  onChange={(e) => { setSubjectSearch(e.target.value); resetPage(); }}
                   aria-label="Filter trainers by subject"
                 />
               </div>
@@ -330,12 +337,14 @@ const Trainers = () => {
                     </tbody>
                   </table>
                 </div>
-                <Pagination
-                  pagination={pagination}
-                  onPageChange={setPage}
-                  pageSize={pageSize}
-                  onPageSizeChange={(size) => { setPageSize(size); setPage(1); }}
-                />
+                  <Pagination
+                    pagination={pagination}
+                    onPageChange={setPage}
+                    pageSize={pageSize}
+                    onPageSizeChange={changePageSize}
+                    showSummary
+                    align="between"
+                  />
               </>
             )}
           </div>

@@ -366,22 +366,6 @@ body {
   box-shadow: var(--shadow-soft);
 }
 
-/* Pagination */
-.page-link {
-  border-radius: var(--radius-sm);
-  margin: 0 2px;
-  transition: all 0.2s;
-}
-
-.page-link:hover {
-  transform: translateY(-1px);
-}
-
-.page-item.active .page-link {
-  background: linear-gradient(135deg, var(--toms-teal) 0%, #0891b2 100%);
-  border-color: transparent;
-}
-
 /* Toast theming */
 .Toastify__toast--success {
   background: linear-gradient(135deg, #059669 0%, var(--toms-emerald) 100%) !important;

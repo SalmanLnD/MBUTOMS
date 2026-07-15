@@ -1,0 +1,82 @@
+/* Shared list pagination — used by Pagination.jsx */
+
+.toms-pagination {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem 1rem;
+  margin-top: 1rem;
+}
+
+.toms-pagination--between {
+  justify-content: space-between;
+}
+
+.toms-pagination--end {
+  justify-content: flex-end;
+}
+
+.toms-pagination__summary {
+  font-size: 0.85rem;
+  color: var(--text-muted, #64748b);
+  margin: 0;
+}
+
+.toms-pagination__nav {
+  margin-bottom: 0;
+}
+
+.toms-pagination .page-link {
+  border-radius: var(--radius-sm, 0.375rem);
+  margin: 0 2px;
+  transition: transform 0.2s, box-shadow 0.2s, background 0.2s;
+}
+
+.toms-pagination .page-link:hover {
+  transform: translateY(-1px);
+}
+
+.toms-pagination .page-item.active .page-link {
+  background: linear-gradient(135deg, var(--toms-teal) 0%, #0891b2 100%);
+  border-color: transparent;
+  color: #fff;
+}
+
+.toms-pagination__size {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.toms-pagination__size-label {
+  margin-bottom: 0;
+  font-size: 0.85rem;
+  color: var(--text-muted, #64748b);
+}
+
+.toms-pagination__size-select {
+  width: auto;
+  min-width: 4.5rem;
+}
+
+@media (max-width: 480px) {
+  .toms-pagination {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .toms-pagination--between,
+  .toms-pagination--end {
+    justify-content: center;
+  }
+
+  .toms-pagination__size {
+    justify-content: center;
+  }
+
+  .toms-pagination__nav {
+    justify-content: center;
+    flex-wrap: wrap;
+  }
+}

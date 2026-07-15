@@ -8,6 +8,7 @@ import ActionIconButton from './ActionIconButton.jsx';
 import { showError, showSuccess } from '../utils/toast.js';
 import { useAuth } from '../context/AuthContext.jsx';
 import { useDebounce } from '../hooks/useDebounce.js';
+import { usePagination } from '../hooks/usePagination.js';
 import { deleteTrainerPunchInLog, getTrainerPunchInLogs } from '../services/attendanceService.js';
 import { formatDate, formatDateTime, formatStatus, getErrorMessage } from '../utils/helpers.js';
 
@@ -19,12 +20,18 @@ const SOURCE_BADGE = {
 const TrainerPunchInLogsTab = () => {
   const { hasManagementRole } = useAuth();
   const canManageAll = hasManagementRole();
+  const {
+    page,
+    setPage,
+    pageSize,
+    changePageSize,
+    resetPage,
+    pagination,
+    setPagination,
+  } = usePagination({ initialPageSize: 20 });
 
   const [logs, setLogs] = useState([]);
-  const [pagination, setPagination] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(20);
   const [search, setSearch] = useState('');
   const [sourceFilter, setSourceFilter] = useState('');
   const [fromDate, setFromDate] = useState('');
@@ -65,7 +72,7 @@ const TrainerPunchInLogsTab = () => {
     setSourceFilter('');
     setFromDate('');
     setToDate('');
-    setPage(1);
+    resetPage();
   };
 
   const handleConfirmDelete = async () => {
@@ -113,7 +120,7 @@ const TrainerPunchInLogsTab = () => {
               value={search}
               onChange={(e) => {
                 setSearch(e.target.value);
-                setPage(1);
+                resetPage();
               }}
               aria-label="Search punch-in logs by trainer"
             />
@@ -129,7 +136,7 @@ const TrainerPunchInLogsTab = () => {
             value={sourceFilter}
             onChange={(e) => {
               setSourceFilter(e.target.value);
-              setPage(1);
+              resetPage();
             }}
             aria-label="Filter by punch-in source"
           >
@@ -149,7 +156,7 @@ const TrainerPunchInLogsTab = () => {
             value={fromDate}
             onChange={(e) => {
               setFromDate(e.target.value);
-              setPage(1);
+              resetPage();
             }}
             aria-label="Filter from date"
           />
@@ -165,7 +172,7 @@ const TrainerPunchInLogsTab = () => {
             value={toDate}
             onChange={(e) => {
               setToDate(e.target.value);
-              setPage(1);
+              resetPage();
             }}
             aria-label="Filter to date"
           />
@@ -254,12 +261,14 @@ const TrainerPunchInLogsTab = () => {
               </tbody>
             </table>
           </div>
-          <Pagination
-            pagination={pagination}
-            onPageChange={setPage}
-            pageSize={pageSize}
-            onPageSizeChange={(size) => { setPageSize(size); setPage(1); }}
-          />
+            <Pagination
+              pagination={pagination}
+              onPageChange={setPage}
+              pageSize={pageSize}
+              onPageSizeChange={changePageSize}
+              showSummary
+              align="between"
+            />
         </>
       )}
 

@@ -4,6 +4,7 @@ import LoadingSpinner from '../components/LoadingSpinner.jsx';
 import Pagination from '../components/Pagination.jsx';
 import { showError, showSuccess } from '../utils/toast.js';
 import { useAuth } from '../context/AuthContext.jsx';
+import { usePagination } from '../hooks/usePagination.js';
 import { getLeaves, createLeave, updateLeave, deleteLeave, previewAffectedSchedules } from '../services/leaveService.js';
 import { getTrainers } from '../services/trainerService.js';
 import { formatDate, formatStatus, getErrorMessage, toInputDate } from '../utils/helpers.js';
@@ -16,12 +17,18 @@ import ActionIconButton from '../components/ActionIconButton.jsx';
 const Leaves = () => {
   const { hasManagementRole } = useAuth();
   const canApprove = hasManagementRole();
+  const {
+    page,
+    setPage,
+    pageSize,
+    changePageSize,
+    resetPage,
+    pagination,
+    setPagination,
+  } = usePagination({ initialPageSize: 10 });
 
   const [leaves, setLeaves] = useState([]);
-  const [pagination, setPagination] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(10);
   const [statusFilter, setStatusFilter] = useState('');
   const [showForm, setShowForm] = useState(false);
   const [trainers, setTrainers] = useState([]);
@@ -144,7 +151,7 @@ const Leaves = () => {
       <Topbar title="Leave Management" />
 
       <div className="d-flex justify-content-between align-items-center mb-3">
-        <select className="form-select w-auto" value={statusFilter} onChange={(e) => { setStatusFilter(e.target.value); setPage(1); }}>
+        <select className="form-select w-auto" value={statusFilter} onChange={(e) => { setStatusFilter(e.target.value); resetPage(); }}>
           <option value="">All Status</option>
           <option value="pending">Pending</option>
           <option value="approved">Approved</option>
@@ -207,7 +214,9 @@ const Leaves = () => {
               pagination={pagination}
               onPageChange={setPage}
               pageSize={pageSize}
-              onPageSizeChange={(size) => { setPageSize(size); setPage(1); }}
+              onPageSizeChange={changePageSize}
+              showSummary
+              align="between"
             />
           </div>
         </div>

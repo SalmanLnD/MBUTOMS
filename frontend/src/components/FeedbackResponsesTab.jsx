@@ -6,15 +6,22 @@ import { getFeedbackResponses, getFeedbackSheetStatus } from '../services/feedba
 import { getTrainers } from '../services/trainerService.js';
 import { showError } from '../utils/toast.js';
 import { getErrorMessage } from '../utils/helpers.js';
+import { usePagination } from '../hooks/usePagination.js';
 import { SheetIcon, ExternalLinkIcon } from './icons.jsx';
 import '../styles/feedback-forms.css';
 
 const FeedbackResponsesTab = () => {
+  const {
+    page,
+    setPage,
+    pageSize,
+    changePageSize,
+    resetPage,
+    pagination,
+    setPagination,
+  } = usePagination({ initialPageSize: 20 });
   const [responses, setResponses] = useState([]);
-  const [pagination, setPagination] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(20);
   const [monthFilter, setMonthFilter] = useState('');
   const [trainerFilter, setTrainerFilter] = useState('');
   const [trainers, setTrainers] = useState([]);
@@ -79,7 +86,7 @@ const FeedbackResponsesTab = () => {
               type="month"
               className="form-control"
               value={monthFilter}
-              onChange={(e) => { setMonthFilter(e.target.value); setPage(1); }}
+              onChange={(e) => { setMonthFilter(e.target.value); resetPage(); }}
               aria-label="Filter by month"
             />
           </div>
@@ -89,7 +96,7 @@ const FeedbackResponsesTab = () => {
               id="feedback-trainer-filter"
               className="form-select"
               value={trainerFilter}
-              onChange={(e) => { setTrainerFilter(e.target.value); setPage(1); }}
+              onChange={(e) => { setTrainerFilter(e.target.value); resetPage(); }}
               aria-label="Filter by trainer"
             >
               <option value="">All trainers</option>
@@ -162,12 +169,14 @@ const FeedbackResponsesTab = () => {
               </tbody>
             </table>
           </div>
-          <Pagination
-            pagination={pagination}
-            onPageChange={setPage}
-            pageSize={pageSize}
-            onPageSizeChange={(size) => { setPageSize(size); setPage(1); }}
-          />
+            <Pagination
+              pagination={pagination}
+              onPageChange={setPage}
+              pageSize={pageSize}
+              onPageSizeChange={changePageSize}
+              showSummary
+              align="between"
+            />
         </>
       )}
 

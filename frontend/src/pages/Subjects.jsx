@@ -9,6 +9,7 @@ import SubjectTopicsModal from '../components/SubjectTopicsModal.jsx';
 import ConfirmModal from '../components/ConfirmModal.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
 import { useDebounce } from '../hooks/useDebounce.js';
+import { usePagination } from '../hooks/usePagination.js';
 import { getSubjects, deleteSubject, updateSubjectResources } from '../services/subjectService.js';
 import { EditIcon, TrashIcon } from '../components/icons.jsx';
 import ActionIconButton from '../components/ActionIconButton.jsx';
@@ -42,13 +43,19 @@ const Subjects = () => {
   const isSubjectCoordinator = hasRole(ROLES.SUBJECT_COORDINATOR);
   const showFullSubjectDetails = canManage || isSubjectCoordinator;
   const isTrainerUser = user?.role === ROLES.TRAINER;
+  const {
+    page,
+    setPage,
+    pageSize,
+    changePageSize,
+    resetPage,
+    pagination,
+    setPagination,
+  } = usePagination({ initialPageSize: 10 });
 
   const [subjects, setSubjects] = useState([]);
-  const [pagination, setPagination] = useState(null);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
-  const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(10);
   const [selectedSubject, setSelectedSubject] = useState(null);
   const [showModal, setShowModal] = useState(false);
   const [editingSubject, setEditingSubject] = useState(null);
@@ -277,7 +284,7 @@ const Subjects = () => {
                 className="form-control"
                 placeholder="Search subjects..."
                 value={search}
-                onChange={(e) => { setSearch(e.target.value); setPage(1); }}
+                onChange={(e) => { setSearch(e.target.value); resetPage(); }}
               />
             </div>
             {canManage && (
@@ -374,12 +381,14 @@ const Subjects = () => {
                   </tbody>
                 </table>
               </div>
-              <Pagination
-                pagination={pagination}
-                onPageChange={setPage}
-                pageSize={pageSize}
-                onPageSizeChange={(size) => { setPageSize(size); setPage(1); }}
-              />
+                <Pagination
+                  pagination={pagination}
+                  onPageChange={setPage}
+                  pageSize={pageSize}
+                  onPageSizeChange={changePageSize}
+                  showSummary
+                  align="between"
+                />
             </>
           )}
         </div>

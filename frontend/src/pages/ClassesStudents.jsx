@@ -8,6 +8,7 @@ import StudentFormModal from '../components/StudentFormModal.jsx';
 import Modal from '../components/Modal.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
 import { useDebounce } from '../hooks/useDebounce.js';
+import { usePagination } from '../hooks/usePagination.js';
 import ClassFormModal from '../components/ClassFormModal.jsx';
 import { getClasses, deleteClass } from '../services/classService.js';
 import {
@@ -124,10 +125,16 @@ const ClassesStudents = () => {
   };
 
   const [students, setStudents] = useState([]);
-  const [studentPagination, setStudentPagination] = useState(null);
+  const {
+    page: studentPage,
+    setPage: setStudentPage,
+    pageSize: studentPageSize,
+    changePageSize: changeStudentPageSize,
+    resetPage: resetStudentPage,
+    pagination: studentPagination,
+    setPagination: setStudentPagination,
+  } = usePagination({ initialPageSize: 10 });
   const [studentsLoading, setStudentsLoading] = useState(true);
-  const [studentPage, setStudentPage] = useState(1);
-  const [studentPageSize, setStudentPageSize] = useState(10);
   const [studentSearch, setStudentSearch] = useState('');
   const [studentStatusFilter, setStudentStatusFilter] = useState('active');
   const [departmentFilter, setDepartmentFilter] = useState('');
@@ -137,10 +144,16 @@ const ClassesStudents = () => {
   const [pendingDelete, setPendingDelete] = useState(null);
 
   const [attendanceRecords, setAttendanceRecords] = useState([]);
-  const [attendancePagination, setAttendancePagination] = useState(null);
+  const {
+    page: attendancePage,
+    setPage: setAttendancePage,
+    pageSize: attendancePageSize,
+    changePageSize: changeAttendancePageSize,
+    resetPage: resetAttendancePage,
+    pagination: attendancePagination,
+    setPagination: setAttendancePagination,
+  } = usePagination({ initialPageSize: 10 });
   const [attendanceLoading, setAttendanceLoading] = useState(true);
-  const [attendancePage, setAttendancePage] = useState(1);
-  const [attendancePageSize, setAttendancePageSize] = useState(10);
   const [attendanceStatusFilter, setAttendanceStatusFilter] = useState('');
   const [showAttendanceForm, setShowAttendanceForm] = useState(false);
   const [attendanceForm, setAttendanceForm] = useState({
@@ -221,14 +234,14 @@ const ClassesStudents = () => {
     setDepartmentFilter(cls.department);
     setSectionFilter(cls.section);
     setActiveTab('students');
-    setStudentPage(1);
+    resetStudentPage();
   };
 
   const clearClassFilter = () => {
     setClassFilter(null);
     setDepartmentFilter('');
     setSectionFilter('');
-    setStudentPage(1);
+    resetStudentPage();
   };
 
   const handleClassSaved = () => {
@@ -483,7 +496,7 @@ const ClassesStudents = () => {
                 value={studentSearch}
                 onChange={(e) => {
                   setStudentSearch(e.target.value);
-                  setStudentPage(1);
+                  resetStudentPage();
                 }}
               />
             </div>
@@ -493,7 +506,7 @@ const ClassesStudents = () => {
                 value={studentStatusFilter}
                 onChange={(e) => {
                   setStudentStatusFilter(e.target.value);
-                  setStudentPage(1);
+                  resetStudentPage();
                 }}
               >
                 <option value="">All Status</option>
@@ -597,7 +610,9 @@ const ClassesStudents = () => {
                   pagination={studentPagination}
                   onPageChange={setStudentPage}
                   pageSize={studentPageSize}
-                  onPageSizeChange={(size) => { setStudentPageSize(size); setStudentPage(1); }}
+                  onPageSizeChange={changeStudentPageSize}
+                  showSummary
+                  align="between"
                 />
               </div>
             </div>
@@ -614,7 +629,7 @@ const ClassesStudents = () => {
                 value={attendanceStatusFilter}
                 onChange={(e) => {
                   setAttendanceStatusFilter(e.target.value);
-                  setAttendancePage(1);
+                  resetAttendancePage();
                 }}
               >
                 <option value="">All Status</option>
@@ -679,7 +694,9 @@ const ClassesStudents = () => {
                   pagination={attendancePagination}
                   onPageChange={setAttendancePage}
                   pageSize={attendancePageSize}
-                  onPageSizeChange={(size) => { setAttendancePageSize(size); setAttendancePage(1); }}
+                  onPageSizeChange={changeAttendancePageSize}
+                  showSummary
+                  align="between"
                 />
               </div>
             </div>

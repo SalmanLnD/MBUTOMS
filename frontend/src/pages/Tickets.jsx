@@ -6,6 +6,7 @@ import Pagination from '../components/Pagination.jsx';
 import Modal from '../components/Modal.jsx';
 import { showError, showSuccess } from '../utils/toast.js';
 import { useAuth } from '../context/AuthContext.jsx';
+import { usePagination } from '../hooks/usePagination.js';
 import { getTickets, createTicket, updateTicketStatus } from '../services/ticketService.js';
 import { getTrainers } from '../services/trainerService.js';
 import { formatDateTime, formatStatus, getErrorMessage } from '../utils/helpers.js';
@@ -28,12 +29,18 @@ const Tickets = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const isAdmin = hasRole(ROLES.ADMIN);
+  const {
+    page,
+    setPage,
+    pageSize,
+    changePageSize,
+    resetPage,
+    pagination,
+    setPagination,
+  } = usePagination({ initialPageSize: 10 });
 
   const [tickets, setTickets] = useState([]);
-  const [pagination, setPagination] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(10);
   const [statusFilter, setStatusFilter] = useState('');
   const [typeFilter, setTypeFilter] = useState('');
   const [showCreateForm, setShowCreateForm] = useState(false);
@@ -263,7 +270,9 @@ const Tickets = () => {
               pagination={pagination}
               onPageChange={setPage}
               pageSize={pageSize}
-              onPageSizeChange={(size) => { setPageSize(size); setPage(1); }}
+              onPageSizeChange={changePageSize}
+              showSummary
+              align="between"
             />
           </div>
         </div>

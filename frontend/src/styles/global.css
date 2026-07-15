@@ -35,6 +35,8 @@ html {
   font-size: 90%;
   max-width: 100%;
   overflow-x: hidden;
+  /* Block browser back/forward edge-swipe / trackpad history navigation. */
+  overscroll-behavior-x: none;
 }
 
 body {
@@ -42,6 +44,7 @@ body {
   font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
   max-width: 100%;
   overflow-x: hidden;
+  overscroll-behavior-x: none;
 }
 
 .main-content {
@@ -52,7 +55,8 @@ body {
   padding: 1.5rem;
   overflow-x: hidden;
   overflow-y: auto;
-  overscroll-behavior: contain;
+  overscroll-behavior-x: none;
+  overscroll-behavior-y: auto;
   -webkit-overflow-scrolling: touch;
 }
 
@@ -560,11 +564,18 @@ body {
 
 /* Phone portrait — Samsung Galaxy A71 baseline (412px × 915px in DevTools). */
 @media (max-width: 480px) {
+  /* Scroll the document on phones so native pull-to-refresh works. */
   html,
   body,
   #root {
     width: 100%;
     max-width: 100%;
+    height: auto;
+    min-height: 100dvh;
+    overflow-x: hidden;
+    overflow-y: auto;
+    overscroll-behavior-x: none;
+    overscroll-behavior-y: auto;
   }
 
   html {
@@ -576,9 +587,10 @@ body {
     flex-direction: column;
     width: 100%;
     max-width: 100%;
-    height: 100dvh;
-    max-height: 100dvh;
-    overflow: hidden;
+    height: auto;
+    min-height: 100dvh;
+    max-height: none;
+    overflow: visible;
   }
 
   .app-layout > .sidebar {
@@ -594,6 +606,9 @@ body {
     max-width: 100%;
     height: auto;
     min-height: 0;
+    overflow: visible;
+    overscroll-behavior-x: none;
+    overscroll-behavior-y: auto;
     padding: 0.75rem 0.65rem;
     padding-left: max(0.65rem, env(safe-area-inset-left, 0px));
     padding-right: max(0.65rem, env(safe-area-inset-right, 0px));
