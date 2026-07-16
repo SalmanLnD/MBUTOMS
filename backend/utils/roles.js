@@ -21,6 +21,12 @@ export const MANAGEMENT_ROLES = [
   ROLES.CAMPUS_MANAGER,
 ];
 
+/**
+ * Roles that apply leave for themselves only (linked trainer record).
+ * Subject coordinators are trainer-like for leave, plus coordinator extras elsewhere.
+ */
+export const TRAINER_LIKE_ROLES = [ROLES.TRAINER, ROLES.SUBJECT_COORDINATOR];
+
 /** Linked trainer accounts for these roles are hidden from attendance/timetable. */
 export const ROSTER_HIDDEN_STAFF_ROLES = [
   ROLES.ADMIN,
@@ -56,5 +62,10 @@ export const isAuthorizedRole = (userRole, allowedRoles = []) => {
   if (!userRole || !allowedRoles.length) return false;
   return allowedRoles.some((allowed) => roleMatches(userRole, allowed));
 };
+
+export const isTrainerLikeRole = (userRole) => TRAINER_LIKE_ROLES.includes(userRole);
+
+/** Only admins may create leave requests on behalf of other trainers. */
+export const canCreateLeaveForOthers = (userRole) => userRole === ROLES.ADMIN;
 
 export const canImpersonate = (userRole) => IMPERSONATION_ROLES.includes(userRole);

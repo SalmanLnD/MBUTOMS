@@ -3,7 +3,11 @@ import Schedule from '../models/Schedule.js';
 import Trainer from '../models/Trainer.js';
 import { normalizeDate } from '../utils/scheduleHelpers.js';
 import { resolveTrainerScheduleCodes } from '../utils/trainerMappings.js';
-import { isAuthorizedRole, MANAGEMENT_ROLES } from '../utils/roles.js';
+import {
+  FULL_ACCESS_ROLES,
+  canCreateLeaveForOthers,
+  isTrainerLikeRole,
+} from '../utils/roles.js';
 import { notifyReplacementCancellation } from '../utils/replacementNotifications.js';
 import { clearAttendanceGridCache } from '../utils/attendanceGridCache.js';
 import { LEAVE_SCOPES } from '../utils/leaveScope.js';
@@ -14,6 +18,11 @@ import {
 } from '../utils/leaveAffectedClasses.js';
 
 const WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+
+const isOwnLeave = (leave, user) =>
+  leave.trainer._id.toString() === user.trainer?.toString();
+
+const hasExactFullAccess = (role) => FULL_ACCESS_ROLES.includes(role);
 
 const populateLeave = [
   { path: 'trainer', select: 'name employeeId email department' },
@@ -93,8 +102,8 @@ export const getLeaves = async (req, res) => {
   if (req.query.status) filter.status = req.query.status;
   if (req.query.trainer) filter.trainer = req.query.trainer;
 
-  // Trainers only see their own leaves
-  if (req.user.role === 'trainer' && req.user.trainer) {
+  // Trainers and subject coordinators only see their own leaves
+  if (isTrainerLikeRole(req.user.role) && req.user.trainer) {
     filter.trainer = req.user.trainer;
   }
 
@@ -111,7 +120,7 @@ export const getLeaveById = async (req, res) => {
   const leave = await Leave.findById(req.params.id).populate(populateLeave);
   if (!leave) return res.status(404).json({ message: 'Leave not found' });
 
-  if (req.user.role === 'trainer' && leave.trainer._id.toString() !== req.user.trainer?.toString()) {
+  if (isTrainerLikeRole(req.user.role) && !isOwnLeave(leave, req.user)) {
     return res.status(403).json({ message: 'Not authorized' });
   }
 
@@ -120,9 +129,21 @@ export const getLeaveById = async (req, res) => {
 };
 
 export const createLeave = async (req, res) => {
-  const trainerId = req.user.role === 'trainer' ? req.user.trainer : req.body.trainer;
-  if (!trainerId) {
-    return res.status(400).json({ message: 'Trainer is required' });
+  let trainerId;
+  if (isTrainerLikeRole(req.user.role)) {
+    trainerId = req.user.trainer;
+    if (!trainerId) {
+      return res.status(400).json({ message: 'Your account is not linked to a trainer profile' });
+    }
+  } else if (canCreateLeaveForOthers(req.user.role)) {
+    trainerId = req.body.trainer;
+    if (!trainerId) {
+      return res.status(400).json({ message: 'Trainer is required' });
+    }
+  } else {
+    return res.status(403).json({
+      message: 'Only admins can apply leave on behalf of other trainers',
+    });
   }
 
   const startDate = normalizeDate(req.body.startDate);
@@ -158,7 +179,7 @@ export const updateLeave = async (req, res) => {
   const leave = await Leave.findById(req.params.id);
   if (!leave) return res.status(404).json({ message: 'Leave not found' });
 
-  if (!isAuthorizedRole(req.user.role, MANAGEMENT_ROLES)) {
+  if (!hasExactFullAccess(req.user.role)) {
     return res.status(403).json({ message: 'Only managers can approve or reject leaves' });
   }
 
@@ -207,11 +228,11 @@ export const deleteLeave = async (req, res) => {
     return res.status(400).json({ message: 'This leave cannot be cancelled' });
   }
 
-  if (req.user.role === 'trainer') {
-    if (leave.trainer._id.toString() !== req.user.trainer?.toString()) {
+  if (isTrainerLikeRole(req.user.role)) {
+    if (!isOwnLeave(leave, req.user)) {
       return res.status(403).json({ message: 'Not authorized' });
     }
-  } else if (!isAuthorizedRole(req.user.role, MANAGEMENT_ROLES)) {
+  } else if (!hasExactFullAccess(req.user.role)) {
     return res.status(403).json({ message: 'Not authorized' });
   }
 
@@ -248,7 +269,14 @@ export const deleteLeave = async (req, res) => {
 };
 
 export const previewAffectedSchedules = async (req, res) => {
-  const trainerId = req.query.trainer || req.user.trainer;
+  let trainerId;
+  if (isTrainerLikeRole(req.user.role)) {
+    trainerId = req.user.trainer;
+  } else if (canCreateLeaveForOthers(req.user.role)) {
+    trainerId = req.query.trainer || req.user.trainer;
+  } else {
+    return res.status(403).json({ message: 'Not authorized' });
+  }
   if (!trainerId) {
     return res.status(400).json({ message: 'Trainer is required' });
   }

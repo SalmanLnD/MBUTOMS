@@ -13,10 +13,18 @@ import Modal from '../components/Modal.jsx';
 import ConfirmModal from '../components/ConfirmModal.jsx';
 import { TrashIcon } from '../components/icons.jsx';
 import ActionIconButton from '../components/ActionIconButton.jsx';
+import {
+  FULL_ACCESS_ROLES,
+  canCreateLeaveForOthers,
+  isTrainerLikeRole,
+} from '../utils/roles.js';
 
 const Leaves = () => {
-  const { hasManagementRole } = useAuth();
-  const canApprove = hasManagementRole();
+  const { user } = useAuth();
+  // Exact role check — avoid campus_manager ↔ subject_coordinator aliasing
+  const canApprove = FULL_ACCESS_ROLES.includes(user?.role);
+  const canApplyForOthers = canCreateLeaveForOthers(user?.role);
+  const selfLeaveOnly = isTrainerLikeRole(user?.role);
   const {
     page,
     setPage,
@@ -57,11 +65,11 @@ const Leaves = () => {
   useEffect(() => { fetchLeaves(); }, [page, pageSize, statusFilter]);
 
   useEffect(() => {
-    if (!showForm || !canApprove) return;
+    if (!showForm || !canApplyForOthers) return;
     getTrainers({ limit: 100, sortBy: 'name', sortOrder: 'asc' })
       .then((d) => setTrainers(d.trainers || []))
       .catch(() => setTrainers([]));
-  }, [showForm, canApprove]);
+  }, [showForm, canApplyForOthers]);
 
   const openLeaveForm = () => {
     setForm({
@@ -81,8 +89,7 @@ const Leaves = () => {
 
   useEffect(() => {
     if (!showForm || !form.startDate || !form.endDate) return;
-    // Preview only works when a trainer context exists (trainer role)
-    if (hasManagementRole() && !form.trainer) {
+    if (canApplyForOthers && !form.trainer) {
       setPreview(null);
       return;
     }
@@ -97,12 +104,18 @@ const Leaves = () => {
       }
     };
     loadPreview();
-  }, [form.startDate, form.endDate, form.trainer, showForm]);
+  }, [form.startDate, form.endDate, form.trainer, showForm, canApplyForOthers]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
-      await createLeave(form);
+      const payload = {
+        startDate: form.startDate,
+        endDate: form.endDate,
+        reason: form.reason,
+      };
+      if (canApplyForOthers) payload.trainer = form.trainer;
+      await createLeave(payload);
       showSuccess('Leave application submitted');
       closeLeaveForm();
       fetchLeaves();
@@ -137,7 +150,11 @@ const Leaves = () => {
     }
   };
 
-  const canCancelLeave = (leave) => !['rejected', 'cancelled'].includes(leave.status);
+  const canCancelLeave = (leave) => {
+    if (['rejected', 'cancelled'].includes(leave.status)) return false;
+    if (!selfLeaveOnly) return true;
+    return leave.trainer?._id === user?.trainer || leave.trainer?._id?.toString() === user?.trainer?.toString();
+  };
 
   const getLeaveStatusBadgeClass = (status) => {
     if (status === 'approved') return 'success';
@@ -226,7 +243,7 @@ const Leaves = () => {
         <Modal show title="Apply for Leave" onClose={closeLeaveForm}>
           <form onSubmit={handleSubmit}>
             <div className="toms-modal-body">
-              {canApprove && (
+              {canApplyForOthers && (
                 <div className="mb-3">
                   <label className="form-label">Trainer</label>
                   <select

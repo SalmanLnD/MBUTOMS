@@ -19,6 +19,9 @@ export const MANAGEMENT_ROLES = [
   ROLES.CAMPUS_MANAGER,
 ];
 
+/** Roles that apply leave for themselves only (linked trainer record). */
+export const TRAINER_LIKE_ROLES = [ROLES.TRAINER, ROLES.SUBJECT_COORDINATOR];
+
 export const IMPERSONATION_ROLES = FULL_ACCESS_ROLES;
 
 const roleMatches = (userRole, allowedRole) => {
@@ -42,6 +45,11 @@ export const matchesRole = (userRole, allowedRoles = []) => {
   if (!userRole || !allowedRoles.length) return false;
   return allowedRoles.some((allowed) => roleMatches(userRole, allowed));
 };
+
+export const isTrainerLikeRole = (userRole) => TRAINER_LIKE_ROLES.includes(userRole);
+
+/** Only admins may create leave requests on behalf of other trainers. */
+export const canCreateLeaveForOthers = (userRole) => userRole === ROLES.ADMIN;
 
 export const canImpersonate = (userRole) => IMPERSONATION_ROLES.includes(userRole);
 
