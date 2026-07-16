@@ -54,7 +54,11 @@ export const login = async (req, res) => {
 
   const usedInitialPassword = await user.matchPassword(INITIAL_TRAINER_PASSWORD);
   if (
-    (user.role === ROLES.TRAINER || user.role === ROLES.SUBJECT_COORDINATOR)
+    (
+      user.role === ROLES.TRAINER
+      || user.role === ROLES.SUBJECT_COORDINATOR
+      || user.role === ROLES.MANAGER
+    )
     && usedInitialPassword
   ) {
     user.mustResetPassword = true;
