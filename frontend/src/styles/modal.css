@@ -214,7 +214,9 @@
   padding: 0;
 }
 
-.toms-styled-select__trigger {
+/* Doubled class specificity so this beats Bootstrap's `.form-select { display: block }`
+   even when the bootstrap CSS chunk loads after app CSS in production builds. */
+.toms-styled-select .toms-styled-select__trigger {
   display: flex;
   align-items: center;
   justify-content: space-between;

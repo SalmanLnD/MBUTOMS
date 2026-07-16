@@ -10,7 +10,9 @@ export default defineConfig({
           if (!id.includes('node_modules')) return undefined;
           if (id.includes('@fullcalendar')) return 'fullcalendar';
           if (id.includes('chart.js') || id.includes('react-chartjs-2')) return 'charts';
-          if (id.includes('bootstrap')) return 'bootstrap';
+          // Keep bootstrap CSS in the main chunk: a separate CSS chunk is linked
+          // after app CSS, letting bootstrap override our theme/component styles.
+          if (id.includes('bootstrap') && !id.endsWith('.css')) return 'bootstrap';
           if (
             id.includes('/react/')
             || id.includes('/react-dom/')
