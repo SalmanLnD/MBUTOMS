@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { createContext, useContext } from 'react';
 import {
   login as loginApi,
@@ -117,41 +117,54 @@ export const AuthProvider = ({ children }) => {
     };
   }, [user]);
 
-  const login = async (email, password) => {
+  const login = useCallback(async (email, password) => {
     const data = await loginApi({ email, password });
     applySession(data);
     return data;
-  };
+  }, [applySession]);
 
-  const completePasswordReset = (data) => {
+  const completePasswordReset = useCallback((data) => {
     applySession({
       ...data,
       mustResetPassword: false,
       requiresPasswordReset: false,
     });
-  };
+  }, [applySession]);
 
-  const logout = () => {
+  const logout = useCallback(() => {
     resetAllModalArtifacts();
     resetSessionExpiredState();
     localStorage.removeItem('toms_token');
     localStorage.removeItem('toms_user');
     localStorage.removeItem('toms_admin_token');
     setUser(null);
-  };
+  }, []);
 
-  const hasRole = (...roles) => matchesRole(user?.role, roles);
+  const userRole = user?.role;
+  const isImpersonating = Boolean(user?.impersonating);
+  const impersonatorRole = user?.impersonator?.role;
 
-  const hasManagementRole = () => matchesRole(user?.role, MANAGEMENT_ROLES);
+  const hasRole = useCallback(
+    (...roles) => matchesRole(userRole, roles),
+    [userRole]
+  );
 
-  const hasFullAccess = () => matchesRole(user?.role, FULL_ACCESS_ROLES);
+  const hasManagementRole = useCallback(
+    () => matchesRole(userRole, MANAGEMENT_ROLES),
+    [userRole]
+  );
 
-  const canImpersonateUsers = () => {
-    const staffRole = user?.impersonating ? user?.impersonator?.role : user?.role;
-    return canImpersonate(staffRole) && !user?.impersonating;
-  };
+  const hasFullAccess = useCallback(
+    () => matchesRole(userRole, FULL_ACCESS_ROLES),
+    [userRole]
+  );
 
-  const startImpersonation = async (targetUserId) => {
+  const canImpersonateUsers = useCallback(() => {
+    const staffRole = isImpersonating ? impersonatorRole : userRole;
+    return canImpersonate(staffRole) && !isImpersonating;
+  }, [isImpersonating, impersonatorRole, userRole]);
+
+  const startImpersonation = useCallback(async (targetUserId) => {
     const currentToken = localStorage.getItem('toms_token');
     const data = await impersonateUserApi(targetUserId);
     if (currentToken && !localStorage.getItem('toms_admin_token')) {
@@ -159,37 +172,51 @@ export const AuthProvider = ({ children }) => {
     }
     applySession(data);
     return data;
-  };
+  }, [applySession]);
 
-  const stopImpersonation = async () => {
+  const stopImpersonation = useCallback(async () => {
     const data = await stopImpersonationApi();
     localStorage.removeItem('toms_admin_token');
     applySession(data);
     return data;
-  };
+  }, [applySession]);
 
-  const fetchImpersonationTargets = async () => {
+  const fetchImpersonationTargets = useCallback(async () => {
     const data = await getImpersonationTargetsApi();
     return data.targets || [];
-  };
+  }, []);
+
+  const value = useMemo(() => ({
+    user,
+    loading,
+    login,
+    logout,
+    hasRole,
+    hasManagementRole,
+    hasFullAccess,
+    canImpersonateUsers,
+    startImpersonation,
+    stopImpersonation,
+    fetchImpersonationTargets,
+    completePasswordReset,
+    resetPasswordApi,
+  }), [
+    user,
+    loading,
+    login,
+    logout,
+    hasRole,
+    hasManagementRole,
+    hasFullAccess,
+    canImpersonateUsers,
+    startImpersonation,
+    stopImpersonation,
+    fetchImpersonationTargets,
+    completePasswordReset,
+  ]);
 
   return (
-    <AuthContext.Provider value={{
-      user,
-      loading,
-      login,
-      logout,
-      hasRole,
-      hasManagementRole,
-      hasFullAccess,
-      canImpersonateUsers,
-      startImpersonation,
-      stopImpersonation,
-      fetchImpersonationTargets,
-      completePasswordReset,
-      resetPasswordApi,
-    }}
-    >
+    <AuthContext.Provider value={value}>
       {children}
     </AuthContext.Provider>
   );

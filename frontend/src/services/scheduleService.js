@@ -5,13 +5,13 @@ export const getSchedules = async (params = {}) => {
   return data;
 };
 
-export const getPublicTimetable = async (params = {}) => {
-  const { data } = await api.get('/schedules/public-timetable', { params });
+export const getPublicTimetable = async (params = {}, { signal } = {}) => {
+  const { data } = await api.get('/schedules/public-timetable', { params, signal });
   return data;
 };
 
-export const getTimetableBoard = async (params = {}) => {
-  const { data } = await api.get('/schedules/timetable-board', { params });
+export const getTimetableBoard = async (params = {}, { signal } = {}) => {
+  const { data } = await api.get('/schedules/timetable-board', { params, signal });
   return data;
 };
 

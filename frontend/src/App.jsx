@@ -1,5 +1,5 @@
 import { Routes, Route, Navigate, useNavigate } from 'react-router-dom';
-import { useEffect } from 'react';
+import { lazy, Suspense, useEffect } from 'react';
 import { useAuth } from './context/AuthContext.jsx';
 import { useLoginModal } from './context/LoginModalContext.jsx';
 import ProtectedRoute from './components/ProtectedRoute.jsx';
@@ -8,21 +8,22 @@ import LoginModal from './components/LoginModal.jsx';
 import SessionExpiredModal from './components/SessionExpiredModal.jsx';
 import MainLayout from './layouts/MainLayout.jsx';
 import OptionalAuthLayout from './layouts/OptionalAuthLayout.jsx';
-import Dashboard from './pages/Dashboard.jsx';
-import Trainers from './pages/Trainers.jsx';
-import TrainerProfile from './pages/TrainerProfile.jsx';
-import Venues from './pages/Venues.jsx';
-import Subjects from './pages/Subjects.jsx';
-import Timetable from './pages/Timetable.jsx';
-import TrainerSchedule from './pages/TrainerSchedule.jsx';
-import ClassesStudents from './pages/ClassesStudents.jsx';
-import Leaves from './pages/Leaves.jsx';
-import Tickets from './pages/Tickets.jsx';
-import TopicTracker from './pages/TopicTracker.jsx';
-import Replacements from './pages/Replacements.jsx';
-import Performance from './pages/Performance.jsx';
-import PublicFeedbackForm from './pages/PublicFeedbackForm.jsx';
 import { needsPasswordReset, MANAGEMENT_ROLES } from './utils/roles.js';
+
+const Dashboard = lazy(() => import('./pages/Dashboard.jsx'));
+const Trainers = lazy(() => import('./pages/Trainers.jsx'));
+const TrainerProfile = lazy(() => import('./pages/TrainerProfile.jsx'));
+const Venues = lazy(() => import('./pages/Venues.jsx'));
+const Subjects = lazy(() => import('./pages/Subjects.jsx'));
+const Timetable = lazy(() => import('./pages/Timetable.jsx'));
+const TrainerSchedule = lazy(() => import('./pages/TrainerSchedule.jsx'));
+const ClassesStudents = lazy(() => import('./pages/ClassesStudents.jsx'));
+const Leaves = lazy(() => import('./pages/Leaves.jsx'));
+const Tickets = lazy(() => import('./pages/Tickets.jsx'));
+const TopicTracker = lazy(() => import('./pages/TopicTracker.jsx'));
+const Replacements = lazy(() => import('./pages/Replacements.jsx'));
+const Performance = lazy(() => import('./pages/Performance.jsx'));
+const PublicFeedbackForm = lazy(() => import('./pages/PublicFeedbackForm.jsx'));
 
 const LoginRedirect = () => {
   const { user, loading } = useAuth();
@@ -56,6 +57,7 @@ const HomeRedirect = () => {
 
 const App = () => (
   <>
+    <Suspense fallback={<LoadingSpinner fullPage message="Loading page..." />}>
     <Routes>
       <Route path="/login" element={<LoginRedirect />} />
       <Route path="/f/:slug" element={<PublicFeedbackForm />} />
@@ -103,6 +105,7 @@ const App = () => (
       <Route path="/" element={<HomeRedirect />} />
       <Route path="*" element={<HomeRedirect />} />
     </Routes>
+    </Suspense>
     <LoginModal />
     <SessionExpiredModal />
   </>

@@ -79,7 +79,7 @@ const FeedbackResponsesTab = () => {
     <div>
       <div className="d-flex flex-wrap align-items-end justify-content-between gap-2 mb-3">
         <div className="d-flex flex-wrap align-items-end gap-2 flex-grow-1">
-          <div style={{ minWidth: '180px', maxWidth: '240px' }}>
+          <div className="feedback-filter-field feedback-filter-field--month">
             <label className="form-label mb-1" htmlFor="feedback-month-filter">Filter by month</label>
             <input
               id="feedback-month-filter"
@@ -90,7 +90,7 @@ const FeedbackResponsesTab = () => {
               aria-label="Filter by month"
             />
           </div>
-          <div style={{ minWidth: '200px', maxWidth: '280px' }}>
+          <div className="feedback-filter-field feedback-filter-field--trainer">
             <label className="form-label mb-1" htmlFor="feedback-trainer-filter">Filter by trainer</label>
             <select
               id="feedback-trainer-filter"

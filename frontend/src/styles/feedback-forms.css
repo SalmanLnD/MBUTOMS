@@ -85,7 +85,26 @@
   padding: 1rem;
 }
 
-@media (max-width: 480px) {
+.feedback-filter-field--month {
+  min-width: 180px;
+  max-width: 240px;
+}
+
+.feedback-filter-field--trainer {
+  min-width: 200px;
+  max-width: 280px;
+}
+
+@media (max-width: 575.98px) {
+  .feedback-filter-field--month,
+  .feedback-filter-field--trainer {
+    min-width: 0;
+    max-width: 100%;
+    flex: 1 1 100%;
+  }
+}
+
+@media (max-width: 575.98px) {
   .feedback-form-shell {
     max-width: 100%;
     margin: 0;

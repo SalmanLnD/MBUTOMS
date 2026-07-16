@@ -1,5 +1,4 @@
 import { useState, useEffect } from 'react';
-import Topbar from '../components/Topbar.jsx';
 import LoadingSpinner from '../components/LoadingSpinner.jsx';
 import { showError, showSuccess } from '../utils/toast.js';
 import {
@@ -155,8 +154,6 @@ const Replacements = () => {
 
   return (
     <>
-      <Topbar title="Replacements" />
-
       <ul className="nav nav-tabs mb-3">
         <li className="nav-item">
           <button
@@ -183,7 +180,7 @@ const Replacements = () => {
       ) : loading ? <LoadingSpinner /> : (
         <div className="card table-card">
           <div className="card-body">
-            <div className="d-flex justify-content-between align-items-center mb-3">
+            <div className="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
               <h5 className="card-title mb-0">Replacement Register</h5>
               <button
                 type="button"

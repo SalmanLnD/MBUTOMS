@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import Topbar from '../components/Topbar.jsx';
 import LoadingSpinner from '../components/LoadingSpinner.jsx';
 import TopicTrackerSpreadsheet from '../components/TopicTrackerSpreadsheet.jsx';
 import TopicTrackerSheetSetupModal from '../components/TopicTrackerSheetSetupModal.jsx';
@@ -12,6 +11,7 @@ import { showError } from '../utils/toast.js';
 import { getTopicTrackerStatusBadgeClass } from '../utils/topicTrackerConstants.js';
 import { ROLES } from '../utils/roles.js';
 import { SheetIcon, ExternalLinkIcon } from '../components/icons.jsx';
+import '../styles/topic-tracker.css';
 
 const getNotificationTarget = (search) => {
   const params = new URLSearchParams(search);
@@ -122,8 +122,6 @@ const TopicTracker = () => {
 
   return (
     <>
-      <Topbar title="Topic Tracker" />
-
       {showOverview && (
         <ul className="nav nav-tabs mb-3">
           <li className="nav-item">

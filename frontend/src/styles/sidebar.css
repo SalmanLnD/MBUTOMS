@@ -250,8 +250,8 @@
   padding-inline: 0.65rem;
 }
 
-/* On phone portrait the sidebar is replaced by the floating bubble nav. */
-@media (max-width: 480px) {
+/* On mobile the sidebar is replaced by the floating bubble nav. */
+@media (max-width: 767.98px) {
   .sidebar {
     display: none;
   }

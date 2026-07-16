@@ -1,7 +1,7 @@
 import api from './api.js';
 
-export const getTickets = async (params = {}) => {
-  const { data } = await api.get('/tickets', { params });
+export const getTickets = async (params = {}, { signal } = {}) => {
+  const { data } = await api.get('/tickets', { params, signal });
   return data;
 };
 

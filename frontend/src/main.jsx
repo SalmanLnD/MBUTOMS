@@ -11,7 +11,6 @@ import { purgeModalOverlaysOnBoot, resetAllModalArtifacts } from './utils/modalC
 import './styles/global.css';
 import './styles/theme.css';
 import './styles/modal.css';
-import './styles/topic-tracker.css';
 
 purgeModalOverlaysOnBoot();
 

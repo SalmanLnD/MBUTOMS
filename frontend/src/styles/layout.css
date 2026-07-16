@@ -1,6 +1,5 @@
 .topbar {
   background: var(--surface-glass);
-  backdrop-filter: blur(16px);
   padding: 0.85rem 1.5rem;
   border-radius: var(--radius-md);
   border: 1px solid var(--border-glass);
@@ -12,9 +11,36 @@
   box-shadow: var(--shadow-lift);
 }
 
+.topbar-view-as {
+  min-width: 12rem;
+  max-width: 16rem;
+}
+
 .topbar-view-as .styled-select-trigger {
   min-height: 2rem;
   font-size: 0.82rem;
+}
+
+.topbar-spacer {
+  flex-grow: 1;
+  min-width: 0;
+}
+
+/* MOBILE (<= 767.98px): compact topbar — identity moves to the bubble-nav chip. */
+@media (max-width: 767.98px) {
+  .topbar-user {
+    display: none;
+  }
+
+  .topbar-spacer {
+    flex-grow: 0;
+  }
+
+  .topbar-view-as {
+    min-width: 0;
+    flex: 1 1 100%;
+    max-width: 100%;
+  }
 }
 
 .impersonation-banner {
@@ -56,6 +82,14 @@
 .notification-bell-trigger:hover {
   background: rgba(20, 184, 166, 0.16);
   border-color: rgba(20, 184, 166, 0.45);
+}
+
+/* Touch devices: grow the bell to a ~44px tap target. */
+@media (pointer: coarse) {
+  .notification-bell-trigger {
+    width: 2.75rem;
+    height: 2.75rem;
+  }
 }
 
 .notification-bell-badge {

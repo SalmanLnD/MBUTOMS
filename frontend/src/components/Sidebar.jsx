@@ -46,18 +46,20 @@ const Sidebar = ({ collapsed = false, labelsVisible = true, onToggle }) => {
       </nav>
 
       <div className="sidebar-footer">
-        <button
-          type="button"
-          className="sidebar-toggle"
-          onClick={onToggle}
-          aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-          title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-        >
-          <ChevronLeftIcon size={18} />
-          <span className="sidebar-toggle-label">
-            {collapsed ? 'Expand' : 'Collapse'}
-          </span>
-        </button>
+        {onToggle && (
+          <button
+            type="button"
+            className="sidebar-toggle"
+            onClick={onToggle}
+            aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+            title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+          >
+            <ChevronLeftIcon size={18} />
+            <span className="sidebar-toggle-label">
+              {collapsed ? 'Expand' : 'Collapse'}
+            </span>
+          </button>
+        )}
 
         <div className="user-info">
           <div className="user-avatar" title={user?.name || 'User'}>

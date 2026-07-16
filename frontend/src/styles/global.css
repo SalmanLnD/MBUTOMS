@@ -1,3 +1,11 @@
+/*
+ * Responsive breakpoint convention (aligned with Bootstrap 5):
+ *   <= 575.98px  phone portrait fine-tuning (font scale, tightest padding)
+ *   <= 767.98px  MOBILE: bubble nav, stacked shell, document scroll
+ *   768–991.98px TABLET: sidebar auto-collapsed to icon rail (see MainLayout)
+ *   >= 992px     desktop
+ * Use these values for any new media queries.
+ */
 :root {
   --sidebar-width-expanded: 260px;
   --sidebar-width-collapsed: 72px;
@@ -75,7 +83,6 @@ body {
   border: 1px solid var(--border-glass);
   border-radius: var(--radius-lg);
   background: var(--surface-glass);
-  backdrop-filter: blur(16px);
   box-shadow: var(--shadow-soft);
   transition: transform var(--transition-base), box-shadow var(--transition-base);
   transform-style: preserve-3d;
@@ -170,7 +177,6 @@ body {
   border: 1px solid var(--border-glass);
   border-radius: var(--radius-lg);
   background: var(--surface-glass);
-  backdrop-filter: blur(16px);
   box-shadow: var(--shadow-soft);
   transition: box-shadow var(--transition-base);
   max-width: 100%;
@@ -241,6 +247,15 @@ body {
 
 .timetable-all-trainers--two-col .timetable-trainer-section {
   height: 100%;
+}
+
+/* Vertical rhythm between virtualized timetable rows (Virtuoso renders one row per item). */
+.timetable-virtual-row {
+  padding-bottom: 1.75rem;
+}
+
+.timetable-all-trainers--two-col.timetable-virtual-row {
+  padding-bottom: 2rem;
 }
 
 @media (max-width: 1100px) {
@@ -315,6 +330,12 @@ body {
   border-collapse: separate;
   border-spacing: 0;
   table-layout: fixed;
+}
+
+/* Skip layout/paint for attendance rows outside the scroll viewport. */
+.trainer-attendance-month-table tbody tr {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 3rem;
 }
 
 .trainer-attendance-month-table col.trainer-attendance-oif-col {
@@ -620,8 +641,8 @@ body {
   font-size: 0.9rem;
 }
 
-/* Phone portrait — Samsung Galaxy A71 baseline (412px × 915px in DevTools). */
-@media (max-width: 480px) {
+/* MOBILE (phones + small tablets portrait): stacked shell, bubble nav, document scroll. */
+@media (max-width: 767.98px) {
   /* Scroll the document on phones so native pull-to-refresh works. */
   html,
   body,
@@ -634,10 +655,6 @@ body {
     overflow-y: auto;
     overscroll-behavior-x: none;
     overscroll-behavior-y: auto;
-  }
-
-  html {
-    font-size: 87.5%;
   }
 
   .app-layout {
@@ -816,5 +833,12 @@ body {
     flex: 0 0 0;
     height: 0;
     overflow: visible;
+  }
+}
+
+/* Phone portrait fine-tuning (Galaxy A71 / iPhone class devices). */
+@media (max-width: 575.98px) {
+  html {
+    font-size: 87.5%;
   }
 }

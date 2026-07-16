@@ -1,10 +1,11 @@
 import { useState, useEffect } from 'react';
-import Topbar from '../components/Topbar.jsx';
 import LoadingSpinner from '../components/LoadingSpinner.jsx';
 import Pagination from '../components/Pagination.jsx';
 import { showError, showSuccess } from '../utils/toast.js';
 import { useAuth } from '../context/AuthContext.jsx';
 import { usePagination } from '../hooks/usePagination.js';
+import { useDebounce } from '../hooks/useDebounce.js';
+import { isAbortError } from '../services/api.js';
 import { getLeaves, createLeave, updateLeave, deleteLeave, previewAffectedSchedules } from '../services/leaveService.js';
 import { getTrainers } from '../services/trainerService.js';
 import { formatDate, formatStatus, getErrorMessage, toInputDate } from '../utils/helpers.js';
@@ -49,20 +50,25 @@ const Leaves = () => {
   const [preview, setPreview] = useState(null);
   const [pendingCancel, setPendingCancel] = useState(null);
 
-  const fetchLeaves = async () => {
+  const fetchLeaves = async (signal) => {
     setLoading(true);
     try {
-      const data = await getLeaves({ page, limit: pageSize, status: statusFilter });
+      const data = await getLeaves({ page, limit: pageSize, status: statusFilter }, { signal });
       setLeaves(data.leaves);
       setPagination(data.pagination);
     } catch (err) {
+      if (isAbortError(err)) return;
       showError(getErrorMessage(err));
     } finally {
-      setLoading(false);
+      if (!signal?.aborted) setLoading(false);
     }
   };
 
-  useEffect(() => { fetchLeaves(); }, [page, pageSize, statusFilter]);
+  useEffect(() => {
+    const controller = new AbortController();
+    fetchLeaves(controller.signal);
+    return () => controller.abort();
+  }, [page, pageSize, statusFilter]);
 
   useEffect(() => {
     if (!showForm || !canApplyForOthers) return;
@@ -87,24 +93,30 @@ const Leaves = () => {
     setPreview(null);
   };
 
+  const debouncedStartDate = useDebounce(form.startDate);
+  const debouncedEndDate = useDebounce(form.endDate);
+
   useEffect(() => {
-    if (!showForm || !form.startDate || !form.endDate) return;
+    if (!showForm || !debouncedStartDate || !debouncedEndDate) return undefined;
     if (canApplyForOthers && !form.trainer) {
       setPreview(null);
-      return;
+      return undefined;
     }
+    const controller = new AbortController();
     const loadPreview = async () => {
       try {
-        const params = { startDate: form.startDate, endDate: form.endDate };
+        const params = { startDate: debouncedStartDate, endDate: debouncedEndDate };
         if (form.trainer) params.trainer = form.trainer;
-        const data = await previewAffectedSchedules(params);
+        const data = await previewAffectedSchedules(params, { signal: controller.signal });
         setPreview(data);
-      } catch {
+      } catch (err) {
+        if (isAbortError(err)) return;
         setPreview(null);
       }
     };
     loadPreview();
-  }, [form.startDate, form.endDate, form.trainer, showForm, canApplyForOthers]);
+    return () => controller.abort();
+  }, [debouncedStartDate, debouncedEndDate, form.trainer, showForm, canApplyForOthers]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -165,9 +177,7 @@ const Leaves = () => {
 
   return (
     <>
-      <Topbar title="Leave Management" />
-
-      <div className="d-flex justify-content-between align-items-center mb-3">
+      <div className="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
         <select className="form-select w-auto" value={statusFilter} onChange={(e) => { setStatusFilter(e.target.value); resetPage(); }}>
           <option value="">All Status</option>
           <option value="pending">Pending</option>

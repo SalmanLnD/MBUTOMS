@@ -1,7 +1,7 @@
 import api from './api.js';
 
-export const getLeaves = async (params = {}) => {
-  const { data } = await api.get('/leaves', { params });
+export const getLeaves = async (params = {}, { signal } = {}) => {
+  const { data } = await api.get('/leaves', { params, signal });
   return data;
 };
 
@@ -20,7 +20,7 @@ export const deleteLeave = async (id) => {
   return data;
 };
 
-export const previewAffectedSchedules = async (params) => {
-  const { data } = await api.get('/leaves/preview/affected', { params });
+export const previewAffectedSchedules = async (params, { signal } = {}) => {
+  const { data } = await api.get('/leaves/preview/affected', { params, signal });
   return data;
 };

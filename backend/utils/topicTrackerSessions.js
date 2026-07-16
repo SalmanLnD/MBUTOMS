@@ -185,6 +185,9 @@ export const buildTopicTrackerSessions = async ({
   subjectId,
   trainerId,
   user,
+  // lite: overview-only projection — skips subject topics/topicOptions, venue,
+  // student-count aggregate, and class-group lookup that the overview never reads.
+  lite = false,
 }) => {
   const dateKey = toLeaveDateKey(date);
   const dayWindow = getLeaveDayWindow(dateKey);
@@ -194,10 +197,12 @@ export const buildTopicTrackerSessions = async ({
   const scheduleFilter = { day: dayName };
   if (subjectId) scheduleFilter.subject = subjectId;
 
-  let schedules = await Schedule.find(scheduleFilter)
-    .populate('subject', 'name code topics')
-    .populate('venue', 'name building floor')
-    .lean();
+  let scheduleQuery = Schedule.find(scheduleFilter)
+    .populate('subject', lite ? 'name code' : 'name code topics');
+  if (!lite) {
+    scheduleQuery = scheduleQuery.populate('venue', 'name building floor');
+  }
+  let schedules = await scheduleQuery.lean();
 
   const [
     activeSchedules,
@@ -209,8 +214,8 @@ export const buildTopicTrackerSessions = async ({
     filterSchedulesActiveOnDate(schedules, ref),
     getCanceledScheduleIdsForDate(ref),
     buildTrainerLookup(),
-    buildStudentCountMap(),
-    buildClassGroupMap(),
+    lite ? new Map() : buildStudentCountMap(),
+    lite ? new Map() : buildClassGroupMap(),
   ]);
   schedules = activeSchedules.filter(
     (schedule) => !canceledScheduleIds.has(schedule._id.toString())
@@ -313,7 +318,7 @@ export const buildTopicTrackerSessions = async ({
       replacementTrainerName: replacementTrainer?.name || '',
       subjectId: schedule.subject?._id?.toString() || schedule.subject?.toString() || '',
       subjectCode,
-      topicOptions: getTopicOptionsForSubjectDoc(schedule.subject),
+      topicOptions: lite ? null : getTopicOptionsForSubjectDoc(schedule.subject),
       courseName: schedule.subject?.name || schedule.subjectCode || '',
       branchYearSection: buildBranchYearSection(schedule, classGroup),
       roomNo: venueName,
@@ -414,7 +419,7 @@ export const buildTopicTrackerOverview = async ({ date, user }) => {
 
   // Load the day once. Previously this rebuilt trainer/student/class maps and
   // queried tracker entries again for every subject.
-  const { sessions } = await buildTopicTrackerSessions({ date: ref, user });
+  const { sessions } = await buildTopicTrackerSessions({ date: ref, user, lite: true });
   addSessionsToOverview(sessions);
 
   // Coordinators who also teach should see their personal classes (e.g. Sai Priya / PSTJ).
@@ -424,6 +429,7 @@ export const buildTopicTrackerOverview = async ({ date, user }) => {
       date: ref,
       trainerId: ownTrainerId,
       user,
+      lite: true,
     });
     addSessionsToOverview(ownSessions);
   }

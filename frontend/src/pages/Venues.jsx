@@ -1,5 +1,4 @@
 import { useState, useEffect } from 'react';
-import Topbar from '../components/Topbar.jsx';
 import LoadingSpinner from '../components/LoadingSpinner.jsx';
 import Pagination from '../components/Pagination.jsx';
 import VenueDetailModal from '../components/VenueDetailModal.jsx';
@@ -13,6 +12,7 @@ import { getVenues, getVenueMappingReference, deleteVenue } from '../services/ve
 import { EditIcon, TrashIcon } from '../components/icons.jsx';
 import ActionIconButton from '../components/ActionIconButton.jsx';
 import { getErrorMessage } from '../utils/helpers.js';
+import { usePageTitle } from '../context/PageTitleContext.jsx';
 
 const venueTypes = {
   classroom: 'Classroom',
@@ -31,6 +31,7 @@ const VENUE_TABS = [
 const Venues = () => {
   const { hasManagementRole, hasFullAccess } = useAuth();
   const canManage = hasManagementRole();
+  usePageTitle(canManage ? 'Venue Management' : 'Venues');
   const {
     page,
     setPage,
@@ -104,8 +105,6 @@ const Venues = () => {
 
   return (
     <>
-      <Topbar title={canManage ? 'Venue Management' : 'Venues'} />
-
       <ul className="nav nav-tabs mb-3 venues-tabs" role="tablist">
         {VENUE_TABS.map((tab) => (
           <li key={tab.id} className="nav-item" role="presentation">

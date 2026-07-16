@@ -1,6 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import Topbar from '../components/Topbar.jsx';
 import TrainerTimetableGrid from '../components/TrainerTimetableGrid.jsx';
 import LoadingSpinner from '../components/LoadingSpinner.jsx';
 import { showError } from '../utils/toast.js';
@@ -57,8 +56,6 @@ const TrainerSchedule = () => {
 
   return (
     <>
-      <Topbar title="Trainer Schedule" />
-
       <div className="mb-3">
         <Link to={`/trainers/${id}`} className="btn btn-link text-decoration-none ps-0">
           ← Back to Profile

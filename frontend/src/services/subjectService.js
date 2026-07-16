@@ -1,7 +1,7 @@
 import api from './api.js';
 
-export const getSubjects = async (params = {}) => {
-  const { data } = await api.get('/subjects', { params });
+export const getSubjects = async (params = {}, { signal } = {}) => {
+  const { data } = await api.get('/subjects', { params, signal });
   return data;
 };
 

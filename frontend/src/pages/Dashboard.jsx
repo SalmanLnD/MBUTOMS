@@ -10,7 +10,6 @@ import {
   Legend,
 } from 'chart.js';
 import { Bar, Doughnut } from 'react-chartjs-2';
-import Topbar from '../components/Topbar.jsx';
 import StatCard from '../components/StatCard.jsx';
 import LoadingSpinner from '../components/LoadingSpinner.jsx';
 import { showError } from '../utils/toast.js';
@@ -83,25 +82,23 @@ const Dashboard = () => {
 
   return (
     <>
-      <Topbar title="Dashboard" />
-
       <div className="row g-3 mb-4">
-        <div className="col-sm-6 col-xl-4">
+        <div className="col-6 col-xl-4">
           <StatCard title="Total Trainers" value={cards?.totalTrainers} icon={<TrainerIcon size={24} />} accent="teal" />
         </div>
-        <div className="col-sm-6 col-xl-4">
+        <div className="col-6 col-xl-4">
           <StatCard title="Total Students" value={cards?.totalStudents} icon={<StudentIcon size={24} />} accent="violet" />
         </div>
-        <div className="col-sm-6 col-xl-4">
+        <div className="col-6 col-xl-4">
           <StatCard title="Today's Classes" value={cards?.todaysClasses} icon={<CalendarIcon size={24} />} accent="amber" />
         </div>
-        <div className="col-sm-6 col-xl-4">
+        <div className="col-6 col-xl-4">
           <StatCard title="Today's Leaves" value={cards?.todaysLeaves} icon={<LeaveIcon size={24} />} accent="rose" />
         </div>
-        <div className="col-sm-6 col-xl-4">
+        <div className="col-6 col-xl-4">
           <StatCard title="Active Venues" value={cards?.activeVenues} icon={<VenueIcon size={24} />} accent="cyan" />
         </div>
-        <div className="col-sm-6 col-xl-4">
+        <div className="col-6 col-xl-4">
           <StatCard title="Pending Replacements" value={cards?.pendingReplacements} icon={<ReplacementIcon size={24} />} accent="gold" />
         </div>
       </div>

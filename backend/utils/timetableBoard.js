@@ -6,6 +6,10 @@ import { resolveTrainerScheduleCodes } from './trainerMappings.js';
 import { isScheduleDayInLeaveRange } from './trainerScheduleView.js';
 import { getCanceledScheduleIdsForDate } from './classCancellations.js';
 
+// Only the fields the timetable grid renders — keeps the board payload small.
+const BOARD_SCHEDULE_FIELDS =
+  'trainerCode day startTime endTime department section subjectCode subject slot semester replacementFor venue isLab isProject';
+
 const buildTrainerCodeIndex = (trainers) => {
   const codeToTrainers = new Map();
   trainers.forEach((trainer) => {
@@ -44,7 +48,10 @@ export const buildTimetableBoardForDate = async ({
   const trainerById = new Map(trainers.map((trainer) => [trainer._id.toString(), trainer]));
 
   const [ownedSchedules, leaves, canceledScheduleIds] = await Promise.all([
-    Schedule.find(ownedFilter).populate('venue', 'name building floor type').lean(),
+    Schedule.find(ownedFilter)
+      .select(BOARD_SCHEDULE_FIELDS)
+      .populate('venue', 'name building floor')
+      .lean(),
     Leave.find({
       status: 'approved',
       startDate: { $lte: ref },
@@ -79,7 +86,8 @@ export const buildTimetableBoardForDate = async ({
     const replacementSchedules = await Schedule.find({
       _id: { $in: replacementScheduleIds },
     })
-      .populate('venue', 'name building floor type')
+      .select(BOARD_SCHEDULE_FIELDS)
+      .populate('venue', 'name building floor')
       .lean();
     const scheduleById = new Map(
       replacementSchedules.map((schedule) => [schedule._id.toString(), schedule])

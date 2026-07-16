@@ -116,7 +116,7 @@ const Topbar = ({ title }) => {
       <header className="topbar d-flex justify-content-between align-items-center mb-4 gap-3">
         <h1 className="h4 mb-0 fw-semibold">{title}</h1>
         {showAcademicCalendars && (
-          <div className="topbar-spacer flex-grow-1 d-flex justify-content-center">
+          <div className="topbar-spacer d-flex justify-content-center">
             <a
               href={ACADEMIC_CALENDARS_URL}
               target="_blank"
@@ -124,7 +124,8 @@ const Topbar = ({ title }) => {
               className="btn btn-outline-primary btn-sm topbar-calendars-btn d-inline-flex align-items-center gap-2"
             >
               <CalendarIcon size={16} />
-              Academic Calendars
+              <span className="d-none d-sm-inline">Academic Calendars</span>
+              <span className="d-inline d-sm-none">Calendars</span>
             </a>
           </div>
         )}
@@ -132,7 +133,7 @@ const Topbar = ({ title }) => {
           {user ? (
             <>
               {canImpersonateUsers() && (
-                <div className="topbar-view-as" style={{ minWidth: '12rem', maxWidth: '16rem' }}>
+                <div className="topbar-view-as">
                   <StyledSelect
                     value=""
                     onChange={(event) => handleViewAsTrainer(event.target.value)}

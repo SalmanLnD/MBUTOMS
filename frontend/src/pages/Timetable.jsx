@@ -1,5 +1,5 @@
-import { useState, useCallback, useEffect, useMemo } from 'react';
-import Topbar from '../components/Topbar.jsx';
+import { useState, useCallback, useEffect, useMemo, useRef, memo } from 'react';
+import { Virtuoso } from 'react-virtuoso';
 import TrainerTimetableGrid from '../components/TrainerTimetableGrid.jsx';
 import TimetableSlotModal from '../components/TimetableSlotModal.jsx';
 import LoadingSpinner from '../components/LoadingSpinner.jsx';
@@ -16,9 +16,80 @@ import TimetableSheetSetupModal from '../components/TimetableSheetSetupModal.jsx
 import ClassCancellationModal from '../components/ClassCancellationModal.jsx';
 import { CalendarIcon, SheetIcon, ExternalLinkIcon } from '../components/icons.jsx';
 import { getErrorMessage, toInputDate } from '../utils/helpers.js';
+import { isAbortError } from '../services/api.js';
 import { scheduleMatchesSubject, resolveScheduleTrainerCode } from '../utils/scheduleSubject.js';
 import { getSubjectSemesterRoman } from '../utils/classPy.js';
 import { resolveTrainerTimetableGridOptions } from '../utils/trainerTimetableDisplay.js';
+
+const trainerLabel = (trainer) =>
+  trainer.name && trainer.name !== trainer.employeeId
+    ? `${trainer.name} (${trainer.employeeId})`
+    : trainer.employeeId;
+
+const TrainerSection = memo(({
+  trainer,
+  visibleSchedules,
+  allSubjects,
+  selectedSubject,
+  isViewOnly,
+  editable,
+  onCellClick,
+}) => {
+  const gridOptions = resolveTrainerTimetableGridOptions({
+    trainer,
+    visibleSchedules,
+    allSubjects,
+    selectedSubject,
+  });
+
+  return (
+    <section className="timetable-trainer-section">
+      <div className="d-flex flex-wrap justify-content-between align-items-baseline gap-2 mb-2">
+        <h6 className="mb-0 fw-semibold timetable-trainer-title">{trainerLabel(trainer)}</h6>
+        <span className="timetable-slot-count">
+          {visibleSchedules.length} slot{visibleSchedules.length === 1 ? '' : 's'}
+        </span>
+      </div>
+      <TrainerTimetableGrid
+        schedules={visibleSchedules}
+        trainerCode={trainer.employeeId}
+        subjectLabel={gridOptions.subjectLabel}
+        fixedSlots={gridOptions.fixedSlots}
+        viewOnly={isViewOnly}
+        editMode={editable}
+        showSubjectInCells={gridOptions.showSubjectInCells}
+        showTimingsInCells={gridOptions.showTimingsInCells}
+        onCellClick={
+          isViewOnly
+            ? undefined
+            : (cellData) => onCellClick({ ...cellData, trainerCode: trainer.employeeId })
+        }
+      />
+    </section>
+  );
+});
+TrainerSection.displayName = 'TrainerSection';
+
+/** Finds the scrollable ancestor so Virtuoso follows the page scroll (main-content on desktop, window on mobile). */
+const useScrollParent = () => {
+  const anchorRef = useRef(null);
+  const [scrollParent, setScrollParent] = useState(null);
+
+  useEffect(() => {
+    let el = anchorRef.current?.parentElement;
+    while (el && el !== document.body) {
+      const { overflowY } = window.getComputedStyle(el);
+      if (overflowY === 'auto' || overflowY === 'scroll') {
+        setScrollParent(el);
+        return;
+      }
+      el = el.parentElement;
+    }
+    setScrollParent(null);
+  }, []);
+
+  return { anchorRef, scrollParent };
+};
 
 const inferSemesterForTrainer = (trainerCode, schedules, subject) => {
   const fromSubject = getSubjectSemesterRoman(subject);
@@ -39,7 +110,7 @@ const Timetable = () => {
   const [trainers, setTrainers] = useState([]);
   const [schedulesByTrainer, setSchedulesByTrainer] = useState({});
   const [allSubjects, setAllSubjects] = useState([]);
-  const [trainerSubjectsCache, setTrainerSubjectsCache] = useState({});
+  const trainerSubjectsCacheRef = useRef(new Map());
   const [loading, setLoading] = useState(true);
   const [trainerSearch, setTrainerSearch] = useState('');
   const [selectedSubjectId, setSelectedSubjectId] = useState('');
@@ -62,11 +133,11 @@ const Timetable = () => {
     setSheetStatus(null);
   }, [isViewOnly]);
 
-  const loadData = useCallback(async () => {
+  const loadData = useCallback(async (signal) => {
     setLoading(true);
     try {
       if (isViewOnly) {
-        const data = await getPublicTimetable({ referenceDate });
+        const data = await getPublicTimetable({ referenceDate }, { signal });
         setTrainers(data.trainers || []);
         setSchedulesByTrainer(data.schedulesByTrainer || {});
         setAllSubjects(data.subjects || []);
@@ -74,23 +145,26 @@ const Timetable = () => {
       }
 
       const [trainerData, subjectData, boardData] = await Promise.all([
-        getTrainers({ limit: 200, sortBy: 'employeeId', sortOrder: 'asc', rosterOnly: true }),
-        getSubjects({ limit: 100 }),
-        getTimetableBoard({ referenceDate }),
+        getTrainers({ limit: 200, sortBy: 'employeeId', sortOrder: 'asc', rosterOnly: true, fields: 'lite' }, { signal }),
+        getSubjects({ limit: 100 }, { signal }),
+        getTimetableBoard({ referenceDate }, { signal }),
       ]);
 
       setTrainers(trainerData.trainers || []);
       setSchedulesByTrainer(boardData.schedulesByTrainer || {});
       setAllSubjects(subjectData.subjects || []);
     } catch (err) {
+      if (isAbortError(err)) return;
       showError(getErrorMessage(err));
     } finally {
-      setLoading(false);
+      if (!signal?.aborted) setLoading(false);
     }
   }, [isViewOnly, referenceDate]);
 
   useEffect(() => {
-    loadData();
+    const controller = new AbortController();
+    loadData(controller.signal);
+    return () => controller.abort();
   }, [loadData]);
 
   const loadSheetStatus = useCallback(async () => {
@@ -159,17 +233,16 @@ const Timetable = () => {
     [visibleTrainerEntries]
   );
 
-  const loadTrainerSubjectsForModal = async (trainerId) => {
-    if (trainerSubjectsCache[trainerId]) {
-      return trainerSubjectsCache[trainerId];
-    }
+  const loadTrainerSubjectsForModal = useCallback(async (trainerId) => {
+    const cached = trainerSubjectsCacheRef.current.get(trainerId);
+    if (cached) return cached;
     const data = await getSubjects({ trainer: trainerId, limit: 50 });
     const subjects = data.subjects || [];
-    setTrainerSubjectsCache((current) => ({ ...current, [trainerId]: subjects }));
+    trainerSubjectsCacheRef.current.set(trainerId, subjects);
     return subjects;
-  };
+  }, []);
 
-  const handleCellClick = async ({ trainerCode, schedule, day, slot }) => {
+  const handleCellClick = useCallback(async ({ trainerCode, schedule, day, slot }) => {
     if (isViewOnly || !canEdit || !editMode) return;
 
     const trainer = trainerOptions.find((item) => item.employeeId === trainerCode);
@@ -208,7 +281,15 @@ const Timetable = () => {
           activeSubject
         ),
     });
-  };
+  }, [
+    isViewOnly,
+    canEdit,
+    editMode,
+    trainerOptions,
+    selectedSubject,
+    schedulesByTrainer,
+    loadTrainerSubjectsForModal,
+  ]);
 
   const handleSlotModalClose = async (saved) => {
     setSlotModal(null);
@@ -218,15 +299,47 @@ const Timetable = () => {
     }
   };
 
-  const trainerLabel = (trainer) =>
-    trainer.name && trainer.name !== trainer.employeeId
-      ? `${trainer.name} (${trainer.employeeId})`
-      : trainer.employeeId;
+  const { anchorRef, scrollParent } = useScrollParent();
+  const twoColumn = visibleTrainerEntries.length > 1;
+
+  // Chunk entries into visual rows (pairs in two-column mode) so Virtuoso
+  // only mounts the trainer grids near the viewport.
+  const virtualRows = useMemo(() => {
+    if (!twoColumn) return visibleTrainerEntries.map((entry) => [entry]);
+    const rows = [];
+    for (let i = 0; i < visibleTrainerEntries.length; i += 2) {
+      rows.push(visibleTrainerEntries.slice(i, i + 2));
+    }
+    return rows;
+  }, [visibleTrainerEntries, twoColumn]);
+
+  const renderVirtualRow = useCallback(
+    (index) => {
+      const row = virtualRows[index];
+      return (
+        <div
+          className={`timetable-all-trainers ${twoColumn ? 'timetable-all-trainers--two-col' : ''} timetable-virtual-row`}
+        >
+          {row.map(({ trainer, visibleSchedules }) => (
+            <TrainerSection
+              key={trainer.employeeId}
+              trainer={trainer}
+              visibleSchedules={visibleSchedules}
+              allSubjects={allSubjects}
+              selectedSubject={selectedSubject}
+              isViewOnly={isViewOnly}
+              editable={canEdit && editMode}
+              onCellClick={handleCellClick}
+            />
+          ))}
+        </div>
+      );
+    },
+    [virtualRows, twoColumn, allSubjects, selectedSubject, isViewOnly, canEdit, editMode, handleCellClick]
+  );
 
   return (
     <>
-      <Topbar title="Timetable" />
-
       {isViewOnly && (
         <div className="timetable-view-only-banner mb-3" role="status">
           View only — sign in to manage timetables and access other sections.
@@ -354,6 +467,7 @@ const Timetable = () => {
         )}
       </div>
 
+      <div ref={anchorRef} />
       {loading ? (
         <LoadingSpinner message="Loading timetables..." />
       ) : visibleTrainerEntries.length === 0 ? (
@@ -363,46 +477,14 @@ const Timetable = () => {
           </div>
         </div>
       ) : (
-        <div
-          className={`timetable-all-trainers ${
-            visibleTrainerEntries.length > 1 ? 'timetable-all-trainers--two-col' : ''
-          }`}
-        >
-          {visibleTrainerEntries.map(({ trainer, visibleSchedules }) => {
-            const gridOptions = resolveTrainerTimetableGridOptions({
-              trainer,
-              visibleSchedules,
-              allSubjects,
-              selectedSubject,
-            });
-
-            return (
-              <section key={trainer.employeeId} className="timetable-trainer-section">
-                <div className="d-flex flex-wrap justify-content-between align-items-baseline gap-2 mb-2">
-                  <h6 className="mb-0 fw-semibold timetable-trainer-title">{trainerLabel(trainer)}</h6>
-                  <span className="timetable-slot-count">
-                    {visibleSchedules.length} slot{visibleSchedules.length === 1 ? '' : 's'}
-                  </span>
-                </div>
-                <TrainerTimetableGrid
-                  schedules={visibleSchedules}
-                  trainerCode={trainer.employeeId}
-                  subjectLabel={gridOptions.subjectLabel}
-                  fixedSlots={gridOptions.fixedSlots}
-                  viewOnly={isViewOnly}
-                  editMode={canEdit && editMode}
-                  showSubjectInCells={gridOptions.showSubjectInCells}
-                  showTimingsInCells={gridOptions.showTimingsInCells}
-                  onCellClick={
-                    isViewOnly
-                      ? undefined
-                      : (cellData) => handleCellClick({ ...cellData, trainerCode: trainer.employeeId })
-                  }
-                />
-              </section>
-            );
-          })}
-        </div>
+        <Virtuoso
+          useWindowScroll={!scrollParent}
+          customScrollParent={scrollParent || undefined}
+          totalCount={virtualRows.length}
+          itemContent={renderVirtualRow}
+          increaseViewportBy={{ top: 400, bottom: 800 }}
+          computeItemKey={(index) => virtualRows[index][0]?.trainer.employeeId || index}
+        />
       )}
 
       {slotModal && canEdit && !isViewOnly && (

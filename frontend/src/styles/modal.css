@@ -367,3 +367,44 @@
 .toms-styled-select__menu-inner::-webkit-scrollbar-track {
   background: transparent;
 }
+
+/* Phone portrait: full-width dialogs, dvh-based heights, comfortable footer buttons. */
+@media (max-width: 575.98px) {
+  .toms-modal-overlay {
+    padding: 0.5rem;
+    padding-top: max(0.5rem, env(safe-area-inset-top, 0px));
+    padding-bottom: max(0.5rem, env(safe-area-inset-bottom, 0px));
+  }
+
+  .toms-modal-dialog,
+  .toms-modal-dialog.toms-modal-lg,
+  .toms-modal-dialog.toms-modal-xl {
+    max-width: 100%;
+  }
+
+  .toms-modal-dialog {
+    max-height: calc(100dvh - 1rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px));
+  }
+
+  .toms-modal-scrollable .toms-modal-content {
+    max-height: calc(100dvh - 1rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px));
+  }
+
+  .toms-modal-header {
+    padding: 0.85rem 1rem;
+  }
+
+  .toms-modal-body {
+    padding: 1rem;
+  }
+
+  .toms-modal-footer {
+    padding: 0.85rem 1rem;
+    flex-wrap: wrap;
+  }
+
+  .toms-modal-footer .btn {
+    flex: 1 1 auto;
+    min-height: 2.75rem;
+  }
+}

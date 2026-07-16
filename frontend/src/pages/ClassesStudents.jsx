@@ -1,5 +1,4 @@
 import { useState, useEffect, useMemo } from 'react';
-import Topbar from '../components/Topbar.jsx';
 import LoadingSpinner from '../components/LoadingSpinner.jsx';
 import Pagination from '../components/Pagination.jsx';
 import { showError, showSuccess } from '../utils/toast.js';
@@ -298,8 +297,6 @@ const ClassesStudents = () => {
 
   return (
     <>
-      <Topbar title="Classes & Students" />
-
       <ul className="nav nav-tabs mb-3">
         {tabs.map((tab) => (
           <li className="nav-item" key={tab.id}>

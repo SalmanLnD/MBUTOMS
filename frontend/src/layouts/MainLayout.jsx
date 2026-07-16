@@ -3,7 +3,10 @@ import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 import Sidebar from '../components/Sidebar.jsx';
 import MobileBubbleNav from '../components/MobileBubbleNav.jsx';
 import ResetPasswordModal from '../components/ResetPasswordModal.jsx';
+import Topbar from '../components/Topbar.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
+import { PageTitleProvider, usePageTitleValue } from '../context/PageTitleContext.jsx';
+import { useMediaQuery } from '../hooks/useMediaQuery.js';
 import { resetAllModalArtifacts } from '../utils/modalCleanup.js';
 import '../styles/layout.css';
 
@@ -23,6 +26,10 @@ const MainContent = memo(function MainContent({ children }) {
 
 const AppShell = ({ children }) => {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(readCollapsedPreference);
+  // Tablet band (768–991.98px): force the icon rail so content keeps its width.
+  // The stored preference is not overwritten and applies again on desktop.
+  const isTablet = useMediaQuery('(max-width: 991.98px)');
+  const effectiveCollapsed = isTablet || sidebarCollapsed;
 
   const toggleSidebar = useCallback(() => {
     setSidebarCollapsed((current) => !current);
@@ -37,16 +44,21 @@ const AppShell = ({ children }) => {
   }, [sidebarCollapsed]);
 
   return (
-    <div className={`app-layout ${sidebarCollapsed ? 'sidebar-collapsed' : ''}`}>
+    <div className={`app-layout ${effectiveCollapsed ? 'sidebar-collapsed' : ''}`}>
       <Sidebar
-        collapsed={sidebarCollapsed}
-        labelsVisible={!sidebarCollapsed}
-        onToggle={toggleSidebar}
+        collapsed={effectiveCollapsed}
+        labelsVisible={!effectiveCollapsed}
+        onToggle={isTablet ? undefined : toggleSidebar}
       />
       <MainContent>{children}</MainContent>
       <MobileBubbleNav />
     </div>
   );
+};
+
+const LayoutTopbar = () => {
+  const title = usePageTitleValue();
+  return <Topbar title={title} />;
 };
 
 const MainLayout = () => {
@@ -65,12 +77,15 @@ const MainLayout = () => {
   };
 
   return (
-    <AppShell>
-      <Outlet />
-      {needsReset && (
-        <ResetPasswordModal show onComplete={handlePasswordResetComplete} />
-      )}
-    </AppShell>
+    <PageTitleProvider>
+      <AppShell>
+        <LayoutTopbar />
+        <Outlet />
+        {needsReset && (
+          <ResetPasswordModal show onComplete={handlePasswordResetComplete} />
+        )}
+      </AppShell>
+    </PageTitleProvider>
   );
 };
 

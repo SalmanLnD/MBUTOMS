@@ -67,6 +67,9 @@ export const getDashboardStats = async (req, res) => {
     Leave.find({
       status: 'approved',
       endDate: { $gte: today },
+      // Bound the window so open-ended future leaves don't blow up the
+      // cancellation-map range scan.
+      startDate: { $lte: new Date(today.getTime() + 30 * 24 * 60 * 60 * 1000) },
       affectedSchedules: { $exists: true, $not: { $size: 0 } },
     })
       .select('startDate endDate affectedSchedules replacements')
@@ -86,16 +89,20 @@ export const getDashboardStats = async (req, res) => {
 
   const todaysClasses = activeToday.count;
 
+  const cancellationWindowEnd = new Date(today.getTime() + 30 * 24 * 60 * 60 * 1000);
+  const leaveRangeStart = replacementLeaves.reduce(
+    (earliest, leave) => (leave.startDate < earliest ? leave.startDate : earliest),
+    replacementLeaves[0]?.startDate
+  );
+  const leaveRangeEnd = replacementLeaves.reduce(
+    (latest, leave) => (leave.endDate > latest ? leave.endDate : latest),
+    replacementLeaves[0]?.endDate
+  );
   const cancellationMap = replacementLeaves.length
     ? await getCancellationMapForRange(
-      replacementLeaves.reduce(
-        (earliest, leave) => (leave.startDate < earliest ? leave.startDate : earliest),
-        replacementLeaves[0].startDate
-      ),
-      replacementLeaves.reduce(
-        (latest, leave) => (leave.endDate > latest ? leave.endDate : latest),
-        replacementLeaves[0].endDate
-      )
+      leaveRangeStart,
+      // Clamp so a months-long leave doesn't scan cancellations far into the future.
+      leaveRangeEnd > cancellationWindowEnd ? cancellationWindowEnd : leaveRangeEnd
     )
     : new Map();
 

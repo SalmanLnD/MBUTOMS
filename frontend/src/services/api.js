@@ -1,6 +1,10 @@
 import axios from 'axios';
 import { notifySessionExpired } from '../utils/sessionManager.js';
 
+/** True when a request failed because its AbortSignal was aborted. */
+export const isAbortError = (error) =>
+  axios.isCancel?.(error) || error?.code === 'ERR_CANCELED' || error?.name === 'CanceledError' || error?.name === 'AbortError';
+
 const api = axios.create({
   baseURL: import.meta.env.VITE_API_URL || '/api',
   headers: { 'Content-Type': 'application/json' },

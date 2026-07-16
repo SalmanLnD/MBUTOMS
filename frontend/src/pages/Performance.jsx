@@ -1,5 +1,4 @@
 import { useState, useEffect, useCallback } from 'react';
-import Topbar from '../components/Topbar.jsx';
 import LoadingSpinner from '../components/LoadingSpinner.jsx';
 import FeedbackSummaryTab from '../components/FeedbackSummaryTab.jsx';
 import FeedbackResponsesTab from '../components/FeedbackResponsesTab.jsx';
@@ -33,8 +32,6 @@ const Performance = () => {
 
   return (
     <>
-      <Topbar title="Performance" />
-
       <ul className="nav nav-tabs mb-3">
         <li className="nav-item">
           <button type="button" className={`nav-link ${activeTab === 'summary' ? 'active' : ''}`} onClick={() => setActiveTab('summary')}>

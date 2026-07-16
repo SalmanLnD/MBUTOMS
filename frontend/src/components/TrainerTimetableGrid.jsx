@@ -1,3 +1,4 @@
+import { memo } from 'react';
 import { buildTimetableGrid, WEEKDAYS, formatDayShort } from '../utils/timetableGrid.js';
 import { formatTimeRange, formatScheduleClassLabel, formatScheduleVenueLabel } from '../utils/scheduleUtils.js';
 import { getEffectiveSubjectCode } from '../utils/scheduleSubject.js';
@@ -198,4 +199,4 @@ const TrainerTimetableGrid = ({
   );
 };
 
-export default TrainerTimetableGrid;
+export default memo(TrainerTimetableGrid);

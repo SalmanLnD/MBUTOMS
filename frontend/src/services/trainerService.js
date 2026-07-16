@@ -1,7 +1,7 @@
 import api from './api.js';
 
-export const getTrainers = async (params = {}) => {
-  const { data } = await api.get('/trainers', { params });
+export const getTrainers = async (params = {}, { signal } = {}) => {
+  const { data } = await api.get('/trainers', { params, signal });
   return data;
 };
 

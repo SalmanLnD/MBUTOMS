@@ -1,6 +1,5 @@
 import { useRef, useState, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import Topbar from '../components/Topbar.jsx';
 import LoadingSpinner from '../components/LoadingSpinner.jsx';
 import Pagination from '../components/Pagination.jsx';
 import Modal from '../components/Modal.jsx';
@@ -10,6 +9,7 @@ import { usePagination } from '../hooks/usePagination.js';
 import { getTickets, createTicket, updateTicketStatus } from '../services/ticketService.js';
 import { getTrainers } from '../services/trainerService.js';
 import { formatDateTime, formatStatus, getErrorMessage } from '../utils/helpers.js';
+import { isAbortError } from '../services/api.js';
 import {
   TICKET_TYPES,
   TICKET_STATUSES,
@@ -55,7 +55,7 @@ const Tickets = () => {
   const [highlightedTicketId, setHighlightedTicketId] = useState(ticketTarget);
   const highlightedRowRef = useRef(null);
 
-  const fetchTickets = async () => {
+  const fetchTickets = async (signal) => {
     setLoading(true);
     try {
       const data = await getTickets({
@@ -64,18 +64,21 @@ const Tickets = () => {
         status: statusFilter,
         type: typeFilter,
         ticket: ticketTarget || undefined,
-      });
+      }, { signal });
       setTickets(data.tickets);
       setPagination(data.pagination);
     } catch (err) {
+      if (isAbortError(err)) return;
       showError(getErrorMessage(err));
     } finally {
-      setLoading(false);
+      if (!signal?.aborted) setLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchTickets();
+    const controller = new AbortController();
+    fetchTickets(controller.signal);
+    return () => controller.abort();
   }, [page, pageSize, statusFilter, typeFilter, ticketTarget]);
 
   useEffect(() => {
@@ -153,8 +156,6 @@ const Tickets = () => {
 
   return (
     <>
-      <Topbar title="Support Tickets" />
-
       <div className="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
         <div className="d-flex flex-wrap gap-2">
           <select

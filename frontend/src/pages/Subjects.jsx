@@ -1,5 +1,4 @@
 import { useState, useEffect } from 'react';
-import Topbar from '../components/Topbar.jsx';
 import LoadingSpinner from '../components/LoadingSpinner.jsx';
 import Pagination from '../components/Pagination.jsx';
 import { showError, showSuccess } from '../utils/toast.js';
@@ -15,6 +14,8 @@ import { EditIcon, TrashIcon } from '../components/icons.jsx';
 import ActionIconButton from '../components/ActionIconButton.jsx';
 import { getErrorMessage } from '../utils/helpers.js';
 import { ROLES } from '../utils/roles.js';
+import { usePageTitle } from '../context/PageTitleContext.jsx';
+import { isAbortError } from '../services/api.js';
 
 const formatSchools = (subject) => {
   if (subject.schools?.length) {
@@ -40,6 +41,7 @@ const openExternalLink = (url) => {
 const Subjects = () => {
   const { user, hasRole, hasFullAccess } = useAuth();
   const canManage = hasFullAccess();
+  usePageTitle(canManage ? 'Subject Management' : 'Subjects');
   const isSubjectCoordinator = hasRole(ROLES.SUBJECT_COORDINATOR);
   const showFullSubjectDetails = canManage || isSubjectCoordinator;
   const isTrainerUser = user?.role === ROLES.TRAINER;
@@ -65,11 +67,11 @@ const Subjects = () => {
 
   const debouncedSearch = useDebounce(search);
 
-  const fetchSubjects = async () => {
+  const fetchSubjects = async (signal) => {
     setLoading(true);
     try {
       const params = { page, limit: pageSize, search: debouncedSearch };
-      const data = await getSubjects(params);
+      const data = await getSubjects(params, { signal });
       setSubjects(data.subjects);
       setPagination(data.pagination);
       setSelectedSubject((current) => {
@@ -77,14 +79,17 @@ const Subjects = () => {
         return data.subjects.find((subject) => subject._id === current._id) || null;
       });
     } catch (err) {
+      if (isAbortError(err)) return;
       showError(getErrorMessage(err));
     } finally {
-      setLoading(false);
+      if (!signal?.aborted) setLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchSubjects();
+    const controller = new AbortController();
+    fetchSubjects(controller.signal);
+    return () => controller.abort();
   }, [page, pageSize, debouncedSearch]);
 
   const handleDelete = async (id, name) => {
@@ -273,8 +278,6 @@ const Subjects = () => {
 
   return (
     <>
-      <Topbar title={canManage ? 'Subject Management' : 'Subjects'} />
-
       <div className="card table-card mb-3">
         <div className="card-body">
           <div className="row g-2 mb-3 align-items-center">

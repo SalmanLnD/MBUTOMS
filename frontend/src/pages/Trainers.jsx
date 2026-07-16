@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import Topbar from '../components/Topbar.jsx';
 import LoadingSpinner from '../components/LoadingSpinner.jsx';
 import Pagination from '../components/Pagination.jsx';
 import { showError, showSuccess } from '../utils/toast.js';
@@ -17,12 +16,15 @@ import ActionIconButton from '../components/ActionIconButton.jsx';
 import TrainerDetailsPanel from '../components/TrainerDetailsPanel.jsx';
 import { getErrorMessage } from '../utils/helpers.js';
 import { ROLES } from '../utils/roles.js';
+import { usePageTitle } from '../context/PageTitleContext.jsx';
+import { isAbortError } from '../services/api.js';
 
 const Trainers = () => {
   const { user, hasRole, hasFullAccess } = useAuth();
   const canManage = hasFullAccess();
   const isTrainerUser = user?.role === ROLES.TRAINER;
   const isSubjectCoordinator = hasRole(ROLES.SUBJECT_COORDINATOR);
+  usePageTitle(isTrainerUser ? 'My Profile' : isSubjectCoordinator ? 'Subject Trainers' : 'Trainer Management');
   const [searchParams, setSearchParams] = useSearchParams();
   const tabParam = searchParams.get('tab');
   const validTabs = isTrainerUser
@@ -56,7 +58,7 @@ const Trainers = () => {
   const debouncedSearch = useDebounce(search);
   const debouncedSubjectSearch = useDebounce(subjectSearch);
 
-  const fetchTrainers = async () => {
+  const fetchTrainers = async (signal) => {
     setLoading(true);
     try {
       const data = await getTrainers({
@@ -66,20 +68,22 @@ const Trainers = () => {
         subject: debouncedSubjectSearch,
         sortBy,
         sortOrder,
-      });
+      }, { signal });
       setTrainers(data.trainers);
       setPagination(data.pagination);
     } catch (err) {
+      if (isAbortError(err)) return;
       showError(getErrorMessage(err));
     } finally {
-      setLoading(false);
+      if (!signal?.aborted) setLoading(false);
     }
   };
 
   useEffect(() => {
-    if (activeTab === 'directory') {
-      fetchTrainers();
-    }
+    if (activeTab !== 'directory') return undefined;
+    const controller = new AbortController();
+    fetchTrainers(controller.signal);
+    return () => controller.abort();
   }, [activeTab, page, pageSize, debouncedSearch, debouncedSubjectSearch, sortBy, sortOrder]);
 
   const handleSort = (field) => {
@@ -149,8 +153,6 @@ const Trainers = () => {
 
   return (
     <>
-      <Topbar title={isTrainerUser ? 'My Profile' : isSubjectCoordinator ? 'Subject Trainers' : 'Trainer Management'} />
-
       <ul className="nav nav-tabs mb-3">
         {isTrainerUser ? (
           <li className="nav-item">

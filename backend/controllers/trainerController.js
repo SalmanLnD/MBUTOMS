@@ -92,14 +92,17 @@ export const getTrainers = async (req, res) => {
   }
   const sort = getSortOption(req.query.sortBy, req.query.sortOrder);
 
-  const [trainers, total] = await Promise.all([
-    Trainer.find(finalFilter)
+  // fields=lite: minimal payload for grid/dropdown consumers (e.g. Timetable),
+  // skipping the heavy department/subjects populates.
+  const liteFields = req.query.fields === 'lite';
+  const trainerQuery = liteFields
+    ? Trainer.find(finalFilter).select('name employeeId scheduleTrainerCodes status')
+    : Trainer.find(finalFilter)
       .populate('department', 'name code')
-      .populate('subjects', 'name code slotCount slotTimings')
-      .sort(sort)
-      .skip(skip)
-      .limit(limit)
-      .lean(),
+      .populate('subjects', 'name code slotCount slotTimings');
+
+  const [trainers, total] = await Promise.all([
+    trainerQuery.sort(sort).skip(skip).limit(limit).lean(),
     Trainer.countDocuments(finalFilter),
   ]);
 
