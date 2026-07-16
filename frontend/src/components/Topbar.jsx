@@ -129,7 +129,7 @@ const Topbar = ({ title }) => {
             </a>
           </div>
         )}
-        <div className="d-flex align-items-center gap-2 gap-md-3 flex-wrap justify-content-end">
+        <div className="topbar-actions d-flex align-items-center gap-2 gap-md-3 flex-wrap justify-content-end">
           {user ? (
             <>
               {canImpersonateUsers() && (

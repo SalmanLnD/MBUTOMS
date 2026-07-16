@@ -16,9 +16,28 @@
   max-width: 16rem;
 }
 
-.topbar-view-as .styled-select-trigger {
-  min-height: 2rem;
+/* Compact pill trigger that matches the topbar chips (user badge, bell). */
+.topbar-view-as .toms-styled-select__trigger {
+  min-height: 2.25rem;
+  padding: 0.3rem 0.9rem;
   font-size: 0.82rem;
+  font-weight: 500;
+  color: var(--toms-navy-700);
+  background-color: rgba(20, 184, 166, 0.08);
+  border: 1px solid rgba(20, 184, 166, 0.25);
+  border-radius: 999px;
+  box-shadow: none;
+}
+
+.topbar-view-as .toms-styled-select__trigger:hover {
+  background-color: rgba(20, 184, 166, 0.16);
+  border-color: rgba(20, 184, 166, 0.45);
+}
+
+.topbar-view-as .toms-styled-select.is-open .toms-styled-select__trigger,
+.topbar-view-as .toms-styled-select__trigger:focus-visible {
+  border-color: var(--toms-teal, #14b8a6);
+  box-shadow: 0 0 0 3px rgba(20, 184, 166, 0.18);
 }
 
 .topbar-spacer {
@@ -36,10 +55,16 @@
     flex-grow: 0;
   }
 
-  .topbar-view-as {
+  /* Actions fill the wrapped row: [view-as select | bell | Logout] on one line. */
+  .topbar-actions {
+    flex: 1 1 auto;
     min-width: 0;
-    flex: 1 1 100%;
-    max-width: 100%;
+  }
+
+  .topbar-view-as {
+    flex: 1 1 auto;
+    min-width: 0;
+    max-width: none;
   }
 }
 

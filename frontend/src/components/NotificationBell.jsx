@@ -54,7 +54,11 @@ const NotificationBell = () => {
     if (!open || !rootRef.current) return;
     const rect = rootRef.current.getBoundingClientRect();
     const width = Math.min(22 * 16, window.innerWidth - 24);
-    const right = Math.max(12, window.innerWidth - rect.right);
+    // Anchor to the bell, but clamp so the panel never overflows the left edge.
+    const right = Math.min(
+      Math.max(12, window.innerWidth - rect.right),
+      Math.max(12, window.innerWidth - width - 12)
+    );
     const top = rect.bottom + 8;
     const maxHeight = Math.max(12 * 16, Math.min(24 * 16, window.innerHeight - top - 16));
 
