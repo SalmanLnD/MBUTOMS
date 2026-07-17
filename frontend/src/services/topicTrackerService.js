@@ -27,6 +27,20 @@ export const updateTopicTrackerStatus = async (entryId, status) => {
   return data;
 };
 
+export const getCancellationApprovals = async (status = 'pending') => {
+  const { data } = await api.get('/topic-tracker/cancellation-approvals', {
+    params: { status },
+  });
+  return data;
+};
+
+export const reviewCancellationApproval = async (entryId, status) => {
+  const { data } = await api.patch(`/topic-tracker/entries/${entryId}/cancellation-approval`, {
+    status,
+  });
+  return data;
+};
+
 export const getTopicTrackerSheetStatus = async () => {
   const { data } = await api.get('/topic-tracker/sheets/status');
   return data;

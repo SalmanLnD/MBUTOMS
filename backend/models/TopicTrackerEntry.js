@@ -1,5 +1,8 @@
 import mongoose from 'mongoose';
-import { TOPIC_TRACKER_STATUSES } from '../utils/topicTrackerConstants.js';
+import {
+  TOPIC_TRACKER_STATUSES,
+  CANCELLATION_APPROVAL_STATUSES,
+} from '../utils/topicTrackerConstants.js';
 
 const topicTrackerEntrySchema = new mongoose.Schema(
   {
@@ -33,6 +36,23 @@ const topicTrackerEntrySchema = new mongoose.Schema(
       default: 'pending',
       index: true,
     },
+    /**
+     * When sessionStatus is cancelled/postponed, admins approve in Topic Tracker
+     * before a ClassCancellation is created (which deducts attendance hours).
+     */
+    cancellationApprovalStatus: {
+      type: String,
+      enum: CANCELLATION_APPROVAL_STATUSES,
+      default: 'none',
+      index: true,
+    },
+    cancellationApprovedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
+    cancellationApprovedAt: { type: Date, default: null },
+    classCancellation: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'ClassCancellation',
+      default: null,
+    },
     closedAt: { type: Date, default: null },
     closedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
     markedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
@@ -45,6 +65,11 @@ topicTrackerEntrySchema.index({ subject: 1, date: 1, trackerStatus: 1 });
 topicTrackerEntrySchema.index({ trainer: 1, date: 1 });
 topicTrackerEntrySchema.index({ subject: 1, trackerStatus: 1, date: 1 });
 topicTrackerEntrySchema.index({ trainer: 1, trackerStatus: 1, date: 1 });
+topicTrackerEntrySchema.index({
+  sessionStatus: 1,
+  cancellationApprovalStatus: 1,
+  date: -1,
+});
 
 const TopicTrackerEntry = mongoose.model('TopicTrackerEntry', topicTrackerEntrySchema);
 export default TopicTrackerEntry;

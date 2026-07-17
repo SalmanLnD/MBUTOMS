@@ -13,6 +13,18 @@ export const SESSION_STATUS_LABELS = {
   postponed: 'Postponed',
 };
 
+/** Session statuses that require admin approval before hours are deducted. */
+export const ALERT_SESSION_STATUSES = ['cancelled', 'postponed'];
+
+export const CANCELLATION_APPROVAL_STATUSES = ['none', 'pending', 'approved', 'rejected'];
+
+export const CANCELLATION_APPROVAL_LABELS = {
+  none: 'None',
+  pending: 'Pending approval',
+  approved: 'Approved',
+  rejected: 'Rejected',
+};
+
 export const TOPIC_TRACKER_COLUMNS = [
   'Date',
   'Trainer Name',

@@ -13,6 +13,13 @@ export const SESSION_STATUS_LABELS = {
   postponed: 'Postponed',
 };
 
+export const getSessionStatusBadgeClass = (status) => {
+  if (status === 'completed') return 'bg-success';
+  if (status === 'cancelled') return 'bg-danger';
+  if (status === 'postponed') return 'bg-warning text-dark';
+  return 'bg-secondary';
+};
+
 export const getTopicTrackerStatusBadgeClass = (status) => {
   if (status === 'closed') return 'bg-success';
   return 'bg-warning text-dark';

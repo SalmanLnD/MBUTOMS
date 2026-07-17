@@ -1,10 +1,17 @@
 import TopicTrackerEntry from '../models/TopicTrackerEntry.js';
-import { notifyAdminsOfTopicTrackerUpdate } from '../utils/topicTrackerNotifications.js';
+import {
+  notifyAdminsOfTopicTrackerUpdate,
+  notifyAdminsOfSessionStatusAlert,
+} from '../utils/topicTrackerNotifications.js';
 import Schedule from '../models/Schedule.js';
 import Trainer from '../models/Trainer.js';
 import Leave from '../models/Leave.js';
 import { ROLES, isAuthorizedRole, FULL_ACCESS_ROLES } from '../utils/roles.js';
-import { TOPIC_TRACKER_STATUSES, SESSION_STATUS_VALUES } from '../utils/topicTrackerConstants.js';
+import { TOPIC_TRACKER_STATUSES, SESSION_STATUS_VALUES, ALERT_SESSION_STATUSES } from '../utils/topicTrackerConstants.js';
+import ClassCancellation from '../models/ClassCancellation.js';
+import { clearAttendanceGridCache } from '../utils/attendanceGridCache.js';
+import { getCanceledScheduleIdsForDate } from '../utils/classCancellations.js';
+import { normalizeAttendanceDate } from '../utils/attendanceTracking.js';
 import {
   buildTopicTrackerSessions,
   buildTopicTrackerOverview,
@@ -294,6 +301,29 @@ export const upsertTopicTrackerEntry = async (req, res) => {
     payload.trackerStatus = existing?.trackerStatus || 'pending';
   }
 
+  const previousSessionStatus = existing?.sessionStatus || '';
+  const previousApproval = existing?.cancellationApprovalStatus || 'none';
+
+  // Queue cancelled/postponed sessions for admin approval (hours deducted only after approve).
+  if (ALERT_SESSION_STATUSES.includes(resolvedSessionStatus)) {
+    if (previousApproval === 'approved' && previousSessionStatus === resolvedSessionStatus) {
+      payload.cancellationApprovalStatus = 'approved';
+      payload.cancellationApprovedBy = existing.cancellationApprovedBy || null;
+      payload.cancellationApprovedAt = existing.cancellationApprovedAt || null;
+      payload.classCancellation = existing.classCancellation || null;
+    } else {
+      payload.cancellationApprovalStatus = 'pending';
+      payload.cancellationApprovedBy = null;
+      payload.cancellationApprovedAt = null;
+      payload.classCancellation = null;
+    }
+  } else {
+    payload.cancellationApprovalStatus = 'none';
+    payload.cancellationApprovedBy = null;
+    payload.cancellationApprovedAt = null;
+    payload.classCancellation = null;
+  }
+
   const entry = existing
     ? await TopicTrackerEntry.findByIdAndUpdate(
       existing._id,
@@ -306,7 +336,16 @@ export const upsertTopicTrackerEntry = async (req, res) => {
       { upsert: true, new: true, setDefaultsOnInsert: true }
     );
 
-  await notifyAdminsOfTopicTrackerUpdate(entry, req.user);
+  // Prominent alert when a session is newly cancelled/postponed; otherwise the
+  // generic update notification. The alert replaces the generic one to avoid noise.
+  const alerted = await notifyAdminsOfSessionStatusAlert(
+    entry,
+    req.user,
+    previousSessionStatus
+  );
+  if (!alerted) {
+    await notifyAdminsOfTopicTrackerUpdate(entry, req.user);
+  }
   res.json(entry);
 };
 
@@ -341,6 +380,119 @@ export const updateTopicTrackerStatus = async (req, res) => {
   await entry.save();
 
   await notifyAdminsOfTopicTrackerUpdate(entry, req.user);
+  res.json(entry);
+};
+
+/**
+ * Admin queue: cancelled/postponed topic-tracker sessions awaiting hour deduction.
+ * Includes legacy entries that never had cancellationApprovalStatus set.
+ */
+export const getCancellationApprovals = async (req, res) => {
+  if (!isAuthorizedRole(req.user.role, FULL_ACCESS_ROLES)) {
+    return res.status(403).json({ message: 'Not authorized' });
+  }
+
+  const statusFilter = String(req.query.status || 'pending');
+  const filter = {
+    sessionStatus: { $in: ALERT_SESSION_STATUSES },
+  };
+
+  if (statusFilter === 'pending') {
+    filter.$or = [
+      { cancellationApprovalStatus: 'pending' },
+      { cancellationApprovalStatus: 'none' },
+      { cancellationApprovalStatus: { $exists: false } },
+    ];
+  } else if (statusFilter === 'approved' || statusFilter === 'rejected') {
+    filter.cancellationApprovalStatus = statusFilter;
+  } else if (statusFilter !== 'all') {
+    return res.status(400).json({ message: 'Invalid status filter' });
+  }
+
+  // Backfill pending for legacy cancelled/postponed rows still on "none".
+  if (statusFilter === 'pending') {
+    await TopicTrackerEntry.updateMany(
+      {
+        sessionStatus: { $in: ALERT_SESSION_STATUSES },
+        $or: [
+          { cancellationApprovalStatus: 'none' },
+          { cancellationApprovalStatus: { $exists: false } },
+        ],
+      },
+      { $set: { cancellationApprovalStatus: 'pending' } }
+    );
+  }
+
+  const entries = await TopicTrackerEntry.find(filter)
+    .populate('trainer', 'name employeeId')
+    .populate('subject', 'name code')
+    .populate('markedBy', 'name role')
+    .populate('cancellationApprovedBy', 'name role')
+    .sort({ date: -1, updatedAt: -1 })
+    .limit(200)
+    .lean();
+
+  res.json({ entries });
+};
+
+export const reviewCancellationApproval = async (req, res) => {
+  if (!isAuthorizedRole(req.user.role, FULL_ACCESS_ROLES)) {
+    return res.status(403).json({ message: 'Not authorized' });
+  }
+
+  const decision = String(req.body.status || '');
+  if (!['approved', 'rejected'].includes(decision)) {
+    return res.status(400).json({ message: 'status must be approved or rejected' });
+  }
+
+  const entry = await TopicTrackerEntry.findById(req.params.id);
+  if (!entry) {
+    return res.status(404).json({ message: 'Topic tracker entry not found' });
+  }
+  if (!ALERT_SESSION_STATUSES.includes(entry.sessionStatus)) {
+    return res.status(400).json({
+      message: 'Only cancelled or postponed sessions can be reviewed.',
+    });
+  }
+  if (entry.cancellationApprovalStatus === 'approved') {
+    return res.status(409).json({ message: 'This cancellation was already approved.' });
+  }
+
+  if (decision === 'rejected') {
+    entry.cancellationApprovalStatus = 'rejected';
+    entry.cancellationApprovedBy = req.user._id;
+    entry.cancellationApprovedAt = new Date();
+    entry.classCancellation = null;
+    await entry.save();
+    return res.json(entry);
+  }
+
+  // Approve → create ClassCancellation so attendance hours exclude this slot.
+  const cancelDate = normalizeAttendanceDate(entry.date);
+  const canceledIds = await getCanceledScheduleIdsForDate(cancelDate);
+  let cancellationId = entry.classCancellation;
+
+  if (!canceledIds.has(entry.schedule.toString())) {
+    const cancellation = await ClassCancellation.create({
+      date: cancelDate,
+      scope: 'classes',
+      schedules: [entry.schedule],
+      school: null,
+      reason: `Topic tracker ${entry.sessionStatus} approved`,
+      createdBy: req.user._id,
+    });
+    cancellationId = cancellation._id;
+    clearAttendanceGridCache();
+  } else {
+    clearAttendanceGridCache();
+  }
+
+  entry.cancellationApprovalStatus = 'approved';
+  entry.cancellationApprovedBy = req.user._id;
+  entry.cancellationApprovedAt = new Date();
+  entry.classCancellation = cancellationId;
+  await entry.save();
+
   res.json(entry);
 };
 

@@ -4,6 +4,7 @@ import LoadingSpinner from '../components/LoadingSpinner.jsx';
 import TopicTrackerSpreadsheet from '../components/TopicTrackerSpreadsheet.jsx';
 import TopicTrackerSheetSetupModal from '../components/TopicTrackerSheetSetupModal.jsx';
 import TopicTrackerClassSummaryTab from '../components/TopicTrackerClassSummaryTab.jsx';
+import TopicTrackerCancellationsTab from '../components/TopicTrackerCancellationsTab.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
 import { getTopicTrackerOverview, getTopicTrackerSheetStatus } from '../services/topicTrackerService.js';
 import { getErrorMessage, toInputDate } from '../utils/helpers.js';
@@ -15,10 +16,15 @@ import '../styles/topic-tracker.css';
 
 const getNotificationTarget = (search) => {
   const params = new URLSearchParams(search);
+  const tab = params.get('tab') || '';
   const entryId = params.get('entry') || '';
   const scheduleId = params.get('schedule') || '';
+  if (tab === 'cancellations' && entryId) {
+    return { tab: 'cancellations', entryId };
+  }
   if (!entryId && !scheduleId) return null;
   return {
+    tab: 'day',
     entryId,
     scheduleId,
     date: params.get('date') || toInputDate(new Date()),
@@ -42,7 +48,12 @@ const TopicTracker = () => {
   const [notificationTarget, setNotificationTarget] = useState(
     () => getNotificationTarget(window.location.search)
   );
-  const [activeTab, setActiveTab] = useState('day');
+  const [activeTab, setActiveTab] = useState(
+    () => (notificationTarget?.tab === 'cancellations' ? 'cancellations' : 'day')
+  );
+  const [cancellationHighlightId, setCancellationHighlightId] = useState(
+    () => (notificationTarget?.tab === 'cancellations' ? notificationTarget.entryId : '')
+  );
   const [selectedDate, setSelectedDate] = useState(
     () => notificationTarget?.date || toInputDate(new Date())
   );
@@ -85,6 +96,12 @@ const TopicTracker = () => {
 
   useEffect(() => {
     if (!notificationTarget) return;
+    if (notificationTarget.tab === 'cancellations') {
+      setActiveTab('cancellations');
+      setCancellationHighlightId(notificationTarget.entryId || '');
+      navigate(location.pathname, { replace: true });
+      return;
+    }
     setActiveTab('day');
     setSelectedDate(notificationTarget.date);
     setSpreadsheet({
@@ -142,6 +159,17 @@ const TopicTracker = () => {
               Class-wise summary
             </button>
           </li>
+          {canManageSheets && (
+            <li className="nav-item">
+              <button
+                type="button"
+                className={`nav-link ${activeTab === 'cancellations' ? 'active' : ''}`}
+                onClick={() => setActiveTab('cancellations')}
+              >
+                Cancelled sessions
+              </button>
+            </li>
+          )}
         </ul>
       )}
 
@@ -196,6 +224,20 @@ const TopicTracker = () => {
         <div className="card table-card">
           <div className="card-body">
             <TopicTrackerClassSummaryTab refreshKey={summaryRefreshKey} />
+          </div>
+        </div>
+      )}
+
+      {canManageSheets && activeTab === 'cancellations' && (
+        <div className="card table-card">
+          <div className="card-body">
+            <TopicTrackerCancellationsTab
+              highlightEntryId={cancellationHighlightId}
+              onHighlightComplete={() => {
+                setCancellationHighlightId('');
+                setNotificationTarget(null);
+              }}
+            />
           </div>
         </div>
       )}

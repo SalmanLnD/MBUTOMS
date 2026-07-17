@@ -6,6 +6,8 @@ import {
   getTopicTrackerClassSummary,
   upsertTopicTrackerEntry,
   updateTopicTrackerStatus,
+  getCancellationApprovals,
+  reviewCancellationApproval,
   exportTopicTrackerForSheets,
 } from '../controllers/topicTrackerController.js';
 import {
@@ -30,6 +32,16 @@ router.get('/topics', asyncHandler(getTopicTrackerTopics));
 router.get('/sessions', asyncHandler(getTopicTrackerSessions));
 router.put('/entries', asyncHandler(upsertTopicTrackerEntry));
 router.patch('/entries/:id/status', asyncHandler(updateTopicTrackerStatus));
+router.get(
+  '/cancellation-approvals',
+  authorizeExact('admin', 'manager', 'campus_manager'),
+  asyncHandler(getCancellationApprovals)
+);
+router.patch(
+  '/entries/:id/cancellation-approval',
+  authorizeExact('admin', 'manager', 'campus_manager'),
+  asyncHandler(reviewCancellationApproval)
+);
 
 router.get(
   '/sheets/status',

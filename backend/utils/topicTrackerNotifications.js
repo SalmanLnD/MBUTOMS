@@ -1,6 +1,7 @@
 import Notification from '../models/Notification.js';
 import User from '../models/User.js';
 import { ROLES } from './roles.js';
+import { ALERT_SESSION_STATUSES } from './topicTrackerConstants.js';
 
 const getAdminRecipients = async (actorId) =>
   User.find({
@@ -15,6 +16,14 @@ const toDateKey = (value) => {
 };
 
 const buildEntityPath = (entry) => {
+  const isAlert = ALERT_SESSION_STATUSES.includes(entry.sessionStatus);
+  if (isAlert && (entry.cancellationApprovalStatus === 'pending' || !entry.cancellationApprovalStatus || entry.cancellationApprovalStatus === 'none')) {
+    const params = new URLSearchParams({
+      tab: 'cancellations',
+      entry: String(entry._id),
+    });
+    return `/topic-tracker?${params.toString()}`;
+  }
   const params = new URLSearchParams({
     date: toDateKey(entry.date),
     subject: String(entry.subject),
@@ -51,4 +60,39 @@ export const notifyAdminsOfTopicTrackerUpdate = async (entry, actor) => {
       entityPath: buildEntityPath(entry),
     }))
   );
+};
+
+/**
+ * Dedicated admin alert when a trainer newly marks a session cancelled or
+ * postponed. Returns true when the alert was sent (caller can then skip the
+ * generic update notification to avoid double noise).
+ */
+export const notifyAdminsOfSessionStatusAlert = async (entry, actor, previousStatus = '') => {
+  if (!actor?._id || actor.role === ROLES.ADMIN) return false;
+
+  const status = entry?.sessionStatus || '';
+  if (!ALERT_SESSION_STATUSES.includes(status) || status === previousStatus) return false;
+
+  const recipients = await getAdminRecipients(actor._id);
+  if (!recipients.length) return false;
+
+  const location = [entry.courseName, entry.branchYearSection, entry.slot].filter(Boolean).join(' — ');
+  const date = toDateKey(entry.date);
+  const message = `Session ${status}: ${actor.name} marked${location ? ` ${location}` : ' a session'}${
+    date ? ` on ${date}` : ''
+  } as ${status}`;
+
+  await Notification.insertMany(
+    recipients.map((recipient) => ({
+      recipient: recipient._id,
+      actor: actor._id,
+      actorName: actor.name,
+      actorRole: actor.role,
+      action: 'flagged',
+      resource: 'session status',
+      message,
+      entityPath: buildEntityPath(entry),
+    }))
+  );
+  return true;
 };
