@@ -85,15 +85,16 @@ export const getTopicTrackerAppsScriptSetup = async (req) => {
     apiKey,
     script,
     steps: [
-      'Create a new Google Sheet for topic tracker responses.',
-      'Extensions → Apps Script, delete sample code, paste the script below, and save.',
+      'Create a new Google Sheet (or open your existing Topic Tracker workbook).',
+      'Extensions → Apps Script, replace any old script with the script below, and save.',
       'Run installTriggers once (authorize when Google asks).',
-      'Use menu TOMS Topic Tracker → Refresh now to test.',
-      'Paste your sheet URL below and click Save link.',
+      'Use menu TOMS Topic Tracker → Refresh now — this fills the master Topic Tracker tab plus one tab per trainer (Employee ID - Name).',
+      'Paste your sheet URL below and click Save link (skip if already linked).',
     ],
     note:
       'Google Apps Script runs on Google servers and cannot call localhost. '
-      + 'Use your deployed API URL (set API_PUBLIC_URL in backend .env) or a tunnel like ngrok for local testing.',
+      + 'Use your deployed API URL (set API_PUBLIC_URL in backend .env) or a tunnel like ngrok for local testing. '
+      + 'Do not hand-edit the synced Topic Tracker or trainer tabs — each refresh clears and rewrites them from TOMS.',
   };
 };
 

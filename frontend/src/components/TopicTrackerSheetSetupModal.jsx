@@ -70,8 +70,10 @@ const TopicTrackerSheetSetupModal = ({ show, initialUrl = '', onClose, onLinked 
           ) : setup && (
             <>
               <p className="text-muted small">
-                Trainer and coordinator responses sync to your Google Sheet every 5 minutes
-                (or when you use menu <strong>TOMS Topic Tracker → Refresh now</strong>).
+                Trainer and coordinator responses sync every 5 minutes
+                (or via <strong>TOMS Topic Tracker → Refresh now</strong>).
+                Sync writes a master <strong>Topic Tracker</strong> tab and a separate tab per trainer
+                named like <code>EmployeeID - Name</code>.
               </p>
 
               <ol className="small mb-3">
