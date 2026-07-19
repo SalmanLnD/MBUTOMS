@@ -174,7 +174,10 @@ const TrainerAttendanceTab = () => {
                 mockPrepHours: acc.mockPrepHours + Number(cell.mockPrepHours || 0),
                 classHandlingHours: acc.classHandlingHours + Number(cell.classHandlingHours || 0),
                 oifDays: acc.oifDays + (countsAsOifDay(cell.oifNumber) ? 1 : 0),
-                foodAllowanceDays: acc.foodAllowanceDays + (cell.foodAllowance ? 1 : 0),
+                leaveDays: acc.leaveDays + (cell.isOnLeave ? 1 : 0),
+                replacementRequiredDays:
+                  acc.replacementRequiredDays
+                  + (cell.isOnLeave && cell.isReplacementRequired ? 1 : 0),
                 workingDays: acc.workingDays,
               };
             },
@@ -182,7 +185,8 @@ const TrainerAttendanceTab = () => {
               mockPrepHours: 0,
               classHandlingHours: 0,
               oifDays: 0,
-              foodAllowanceDays: 0,
+              leaveDays: 0,
+              replacementRequiredDays: 0,
               workingDays: dateKeys.length,
             }
           );

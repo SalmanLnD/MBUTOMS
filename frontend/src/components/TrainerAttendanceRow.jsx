@@ -180,8 +180,12 @@ const TrainerAttendanceRow = memo(({
           <strong>{row.totals?.oifDays || 0}</strong>
         </div>
         <div>
-          <span className="text-muted">Food days</span>
-          <strong>{row.totals?.foodAllowanceDays || 0}</strong>
+          <span className="text-muted">Leaves</span>
+          <strong>{row.totals?.leaveDays || 0}</strong>
+        </div>
+        <div title="Replacement Required Days — full-day leave on a day the trainer had scheduled classes (slot leaves are excluded)">
+          <span className="text-muted">RRD</span>
+          <strong>{row.totals?.replacementRequiredDays || 0}</strong>
         </div>
       </div>
     </td>

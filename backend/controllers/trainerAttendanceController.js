@@ -6,6 +6,7 @@ import {
   formatAttendanceMonthKey,
   getAttendanceCalendarDates,
   getAttendanceMonthRange,
+  getAttendanceWeekdayName,
   isAttendanceWeekendDate,
   normalizeAttendanceDate,
   parseAttendanceMonthParam,
@@ -55,7 +56,8 @@ const buildRowTotals = (days, dateKeys) => {
   let mockPrepHours = 0;
   let classHandlingHours = 0;
   let oifDays = 0;
-  let foodAllowanceDays = 0;
+  let leaveDays = 0;
+  let replacementRequiredDays = 0;
 
   dateKeys.forEach((dateKey) => {
     const cell = days[dateKey];
@@ -63,14 +65,19 @@ const buildRowTotals = (days, dateKeys) => {
     mockPrepHours += Number(cell.mockPrepHours || 0);
     classHandlingHours += Number(cell.classHandlingHours || 0);
     if (countsAsOifDay(cell.oifNumber)) oifDays += 1;
-    if (cell.foodAllowance) foodAllowanceDays += 1;
+    if (cell.isOnLeave) {
+      leaveDays += 1;
+      // Slot leaves never set isOnLeave; RRD is full-day leave ∩ teaching weekday only.
+      if (cell.isReplacementRequired) replacementRequiredDays += 1;
+    }
   });
 
   return {
     mockPrepHours,
     classHandlingHours,
     oifDays,
-    foodAllowanceDays,
+    leaveDays,
+    replacementRequiredDays,
     workingDays: dateKeys.length,
   };
 };
@@ -172,6 +179,16 @@ export const buildTrainerAttendanceGridPayload = async ({
 
   const logMap = buildLogMap(logs);
   const fullDayLeaveKeys = new Set();
+  const trainingWeekdaysByTrainer = new Map();
+
+  trainers.forEach((trainer) => {
+    const trainerId = trainer._id.toString();
+    const weekdays = new Set(
+      (schedulesByTrainer.get(trainerId) || []).map((schedule) => schedule.day)
+    );
+    trainingWeekdaysByTrainer.set(trainerId, weekdays);
+  });
+
   approvedLeaves.forEach((leave) => {
     const trainerId = leave.trainer.toString();
     const dayScheduleIds = getLeaveWeekdayScheduleIds(
@@ -189,6 +206,8 @@ export const buildTrainerAttendanceGridPayload = async ({
 
   const rows = trainers.map((trainer) => {
     const days = {};
+    const trainerId = trainer._id.toString();
+    const trainingWeekdays = trainingWeekdaysByTrainer.get(trainerId) || new Set();
 
     dates.forEach((date) => {
       const dateKey = toAttendanceDateKey(date);
@@ -202,6 +221,7 @@ export const buildTrainerAttendanceGridPayload = async ({
         const leaveOifNumber = attendanceTypeUsesOifNumber(attendanceType)
           ? (log?.oifNumber || '')
           : '';
+        const weekdayName = getAttendanceWeekdayName(date);
         days[dateKey] = {
           id: log?._id || null,
           attendanceType,
@@ -211,6 +231,8 @@ export const buildTrainerAttendanceGridPayload = async ({
           mockPrepHours: 0,
           classHandlingHours: 0,
           isOnLeave: true,
+          // RRD only for full-day leave on a weekday the trainer teaches.
+          isReplacementRequired: trainingWeekdays.has(weekdayName),
           isFuture: date > today,
         };
         return;
@@ -231,6 +253,7 @@ export const buildTrainerAttendanceGridPayload = async ({
         mockPrepHours,
         classHandlingHours,
         isOnLeave: false,
+        isReplacementRequired: false,
         isFuture: date > today,
       };
     });

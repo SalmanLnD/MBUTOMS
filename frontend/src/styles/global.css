@@ -618,8 +618,8 @@ body {
 }
 
 .trainer-attendance-totals-col {
-  min-width: 7.5rem;
-  width: 7.5rem;
+  min-width: 8.5rem;
+  width: 8.5rem;
   background: #ffffff;
   border-left: 2px solid rgba(20, 184, 166, 0.35) !important;
   box-shadow: none;
