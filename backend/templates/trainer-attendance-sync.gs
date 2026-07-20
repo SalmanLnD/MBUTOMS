@@ -4,7 +4,7 @@
  */
 const EXPORT_URL = '__EXPORT_URL__';
 const API_KEY = '__API_KEY__';
-const DEFAULT_SHEET_NAME = 'Trainer Attendance';
+const DEFAULT_SHEET_NAME = 'Trainer Attendance from July 13';
 
 function syncTrainerAttendance() {
   const url = EXPORT_URL + '?key=' + encodeURIComponent(API_KEY);

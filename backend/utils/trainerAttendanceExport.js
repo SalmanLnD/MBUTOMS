@@ -185,7 +185,7 @@ export const buildTrainerAttendanceExportPayload = async () => {
     });
 
   return {
-    sheetName: 'Trainer Attendance',
+    sheetName: 'Trainer Attendance from July 13',
     dateGroupSize: DAILY_FIELDS.length,
     frozenRows: 2,
     frozenColumns: 2,
