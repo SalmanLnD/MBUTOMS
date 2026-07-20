@@ -12,6 +12,7 @@ import { migrateSubjectCommercialFields } from '../utils/migrateSubjectCommercia
 import { migrateSubjectAcademicYear } from '../utils/migrateSubjectAcademicYear.js';
 import { migrateSubjectPracticePortalUrls } from '../utils/migrateSubjectPracticePortalUrls.js';
 import { migrateSubjectTopicsFromCatalog } from '../utils/migrateSubjectTopicsFromCatalog.js';
+import { migrateSubjectOifNumbers } from '../utils/migrateSubjectOifNumbers.js';
 import { removeAllPedhData } from '../scripts/remove-all-pedh-data.mjs';
 import { syncSubjectCoordinators } from '../utils/syncSubjectCoordinators.js';
 import { syncLrreVSemesterTimetable } from '../utils/syncLrreVSemesterTimetable.js';
@@ -32,6 +33,7 @@ const runEssentialStartup = async () => {
   const academicYearMigration = await migrateSubjectAcademicYear();
   const practicePortalMigration = await migrateSubjectPracticePortalUrls();
   const subjectTopicsMigration = await migrateSubjectTopicsFromCatalog();
+  const subjectOifMigration = await migrateSubjectOifNumbers();
   const pedhCleanup = await removeAllPedhData();
   const coordinatorSync = await syncSubjectCoordinators();
   console.log(
@@ -45,6 +47,11 @@ const runEssentialStartup = async () => {
   }
   if (subjectTopicsMigration.updatedCount) {
     console.log(`Subject topics migration: ${subjectTopicsMigration.updatedCount} subject(s) seeded from catalogs`);
+  }
+  if (subjectOifMigration.subjectsUpdated || subjectOifMigration.attendanceUpdated) {
+    console.log(
+      `Subject OIF migration: ${subjectOifMigration.subjectsUpdated} subject(s), ${subjectOifMigration.attendanceUpdated} attendance cell(s) updated to CT OIF numbers`
+    );
   }
   if (pedhCleanup.removedSchedules || pedhCleanup.removedTrainers || pedhCleanup.removedSubject) {
     console.log(

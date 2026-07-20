@@ -29,7 +29,10 @@ const leaveSchema = new mongoose.Schema(
     replacements: [
       {
         schedule: { type: mongoose.Schema.Types.ObjectId, ref: 'Schedule', required: true },
-        replacementTrainer: { type: mongoose.Schema.Types.ObjectId, ref: 'Trainer', required: true },
+        // Campus trainer (optional when isExternal). Kept null for externals so hours are not attributed.
+        replacementTrainer: { type: mongoose.Schema.Types.ObjectId, ref: 'Trainer', default: null },
+        isExternal: { type: Boolean, default: false },
+        externalTrainerName: { type: String, trim: true, default: '' },
         assignedAt: { type: Date, default: Date.now },
         assignedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
       },

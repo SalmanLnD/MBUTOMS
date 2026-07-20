@@ -99,15 +99,30 @@ const buildReplacementMap = async (scheduleIds, ref) => {
     status: 'approved',
     ...getLeaveOverlapFilter(ref),
     'replacements.schedule': { $in: scheduleIds },
-  }).select('replacements.schedule replacements.replacementTrainer').lean();
+  }).select(
+    'replacements.schedule replacements.replacementTrainer replacements.isExternal replacements.externalTrainerName'
+  ).lean();
 
   const replacementBySchedule = new Map();
   leaves.forEach((leave) => {
     (leave.replacements || []).forEach((replacement) => {
       const scheduleId = replacement.schedule?.toString();
+      if (!scheduleId) return;
+
+      if (replacement.isExternal && replacement.externalTrainerName) {
+        replacementBySchedule.set(scheduleId, {
+          isExternal: true,
+          name: replacement.externalTrainerName,
+        });
+        return;
+      }
+
       const replacementTrainerId = replacement.replacementTrainer?.toString();
-      if (scheduleId && replacementTrainerId) {
-        replacementBySchedule.set(scheduleId, replacementTrainerId);
+      if (replacementTrainerId) {
+        replacementBySchedule.set(scheduleId, {
+          isExternal: false,
+          trainerId: replacementTrainerId,
+        });
       }
     });
   });
@@ -272,7 +287,13 @@ export const buildTopicTrackerSessions = async ({
     const originalTrainer = trainerLookup.byCode.get(schedule.trainerCode);
     if (!originalTrainer) return;
 
-    const replacementTrainerId = replacementBySchedule.get(schedule._id.toString());
+    const replacementInfo = replacementBySchedule.get(schedule._id.toString());
+    const externalReplacementName = replacementInfo?.isExternal
+      ? String(replacementInfo.name || '').trim()
+      : '';
+    const replacementTrainerId = !replacementInfo?.isExternal
+      ? replacementInfo?.trainerId
+      : null;
     const replacementTrainer = replacementTrainerId
       ? trainerLookup.byId.get(replacementTrainerId)
       : null;
@@ -290,9 +311,11 @@ export const buildTopicTrackerSessions = async ({
       && !(replacementTrainer && allowedTrainerIds.has(replacementTrainer._id.toString()))
     ) return;
 
-    // A replaced class remains one tracker record. Both trainers can open it, while
-    // the row identifies the trainer who is actually covering the class.
-    const displayTrainer = replacementTrainer || originalTrainer;
+    // A replaced class remains one tracker record. Campus replacements can open it;
+    // externals are name-only and do not own the tracker row or class hours.
+    const displayTrainerName = replacementTrainer?.name
+      || externalReplacementName
+      || originalTrainer.name;
 
     const classKey = `${schedule.department}::${schedule.section}::${schedule.semester}`;
     const classGroup = classGroupMap.get(classKey);
@@ -310,12 +333,12 @@ export const buildTopicTrackerSessions = async ({
       day: dayName,
       slot: schedule.slot || '',
       trainerId: targetIsReplacement ? replacementTrainer._id.toString() : originalTrainerId,
-      trainerName: displayTrainer.name,
-      isReplacementAssignment: Boolean(replacementTrainer),
+      trainerName: displayTrainerName,
+      isReplacementAssignment: Boolean(replacementTrainer || externalReplacementName),
       originalTrainerId,
       originalTrainerName: originalTrainer.name,
       replacementTrainerId: replacementTrainer?._id?.toString() || '',
-      replacementTrainerName: replacementTrainer?.name || '',
+      replacementTrainerName: replacementTrainer?.name || externalReplacementName || '',
       subjectId: schedule.subject?._id?.toString() || schedule.subject?.toString() || '',
       subjectCode,
       topicOptions: lite ? null : getTopicOptionsForSubjectDoc(schedule.subject),

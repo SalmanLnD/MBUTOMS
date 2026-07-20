@@ -46,6 +46,8 @@ const Replacements = () => {
   const [suggestionFilter, setSuggestionFilter] = useState('');
   const [loadingSuggestions, setLoadingSuggestions] = useState(false);
   const [showAddSlotModal, setShowAddSlotModal] = useState(false);
+  const [externalTrainerName, setExternalTrainerName] = useState('');
+  const [assigningExternal, setAssigningExternal] = useState(false);
 
   const fetchReplacements = async () => {
     setLoading(true);
@@ -70,12 +72,15 @@ const Replacements = () => {
     setOtherSuggestions([]);
     setSuggestionSubject(null);
     setSuggestionFilter('');
+    setExternalTrainerName('');
+    setAssigningExternal(false);
   };
 
   const handleViewSuggestions = async (leaveId, schedule, replacement = null) => {
     setSelectedSchedule(schedule);
     setSelectedLeaveId(leaveId);
     setChangingReplacement(Boolean(replacement));
+    setExternalTrainerName(replacement?.isExternal ? (replacement.name || '') : '');
     setLoadingSuggestions(true);
     setSuggestions([]);
     setOtherSuggestions([]);
@@ -95,12 +100,36 @@ const Replacements = () => {
 
   const handleAssign = async (trainerId) => {
     try {
-      await assignReplacement(selectedLeaveId, selectedSchedule._id, trainerId);
+      await assignReplacement(selectedLeaveId, selectedSchedule._id, {
+        replacementTrainerId: trainerId,
+      });
       showSuccess(changingReplacement ? 'Replacement trainer updated' : 'Replacement trainer assigned');
       closeSuggestionsModal();
       fetchReplacements();
     } catch (err) {
       showError(getErrorMessage(err));
+    }
+  };
+
+  const handleAssignExternal = async () => {
+    const name = externalTrainerName.trim();
+    if (!name) {
+      showError('Enter the external trainer name');
+      return;
+    }
+    setAssigningExternal(true);
+    try {
+      await assignReplacement(selectedLeaveId, selectedSchedule._id, {
+        isExternal: true,
+        externalTrainerName: name,
+      });
+      showSuccess(changingReplacement ? 'Replacement updated to external trainer' : 'External trainer assigned');
+      closeSuggestionsModal();
+      fetchReplacements();
+    } catch (err) {
+      showError(getErrorMessage(err));
+    } finally {
+      setAssigningExternal(false);
     }
   };
 
@@ -234,7 +263,12 @@ const Replacements = () => {
                       <td>
                         {replacement ? (
                           <div className="d-flex align-items-center gap-2">
-                            <span className="small"><strong>{replacement.name}</strong></span>
+                            <span className="small">
+                              <strong>{replacement.name}</strong>
+                              {replacement.isExternal && (
+                                <span className="badge bg-secondary ms-1">External</span>
+                              )}
+                            </span>
                             {canAssign && (
                               <ActionIconButton
                                 variant="edit"
@@ -348,6 +382,42 @@ const Replacements = () => {
                     )}
                   </tbody>
                 </table>
+
+                <div className="border-top pt-3 mt-3">
+                  <p className="small text-muted mb-2">
+                    No campus trainer available? Assign an external trainer. Hours are not tracked for external trainers.
+                  </p>
+                  <div className="row g-2 align-items-end">
+                    <div className="col-sm">
+                      <label className="form-label small mb-1" htmlFor="external-trainer-name">
+                        External trainer name
+                      </label>
+                      <input
+                        id="external-trainer-name"
+                        type="text"
+                        className="form-control form-control-sm"
+                        placeholder="Enter external trainer name"
+                        value={externalTrainerName}
+                        onChange={(e) => setExternalTrainerName(e.target.value)}
+                        disabled={assigningExternal}
+                      />
+                    </div>
+                    <div className="col-sm-auto">
+                      <button
+                        type="button"
+                        className="btn btn-sm btn-outline-primary"
+                        onClick={handleAssignExternal}
+                        disabled={assigningExternal || !externalTrainerName.trim()}
+                      >
+                        {assigningExternal
+                          ? 'Assigning...'
+                          : changingReplacement
+                            ? 'Update to External'
+                            : 'Assign External'}
+                      </button>
+                    </div>
+                  </div>
+                </div>
               </div>
             )}
           </div>

@@ -10,7 +10,8 @@ export const IDSA_TRAINER_NAMES = {
 
 export const IDSA_SUBJECT = {
   code: '22CS102033',
-  name: 'Industry Data Structures and Algorithms',
+  name: 'Industrial Data Structures and Algorithms',
+  oifNumber: 'CT27004',
 };
 
 export const IDSA_DEPARTMENT_CODES = ['CSE', 'AIML', 'DS', 'IT', 'CS', 'AI&DS'];
@@ -19,7 +20,8 @@ export const ADMIN_TRAINER_EMPLOYEE_ID = '131665';
 
 export const DSAP_SUBJECT = {
   code: '25CA202009',
-  name: 'Data Structures and Algorithms with Python',
+  name: 'Data Structures and Algorithms Using Python',
+  oifNumber: 'CT27008',
 };
 
 export const PSTP_TRAINER_NAMES = {
@@ -30,6 +32,7 @@ export const PSTP_TRAINER_NAMES = {
 export const PSTP_SUBJECT = {
   code: '22CS102034',
   name: 'Problem Solving Through Python',
+  oifNumber: 'CT27005',
 };
 
 export const PSTP_DEPARTMENT_CODES = ['ECE', 'EIE', 'EEE', 'CE'];

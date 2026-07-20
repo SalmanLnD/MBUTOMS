@@ -200,15 +200,16 @@ export const notifyReplacementAssignment = async ({
   previousReplacementTrainer = null,
   affectedDateKeys,
 }) => {
-  if (!actor?._id || !originalTrainer?._id || !replacementTrainer?._id) return;
+  if (!actor?._id || !originalTrainer?._id || !replacementTrainer?.name) return;
 
+  const isExternal = Boolean(replacementTrainer.isExternal) || !replacementTrainer._id;
   const previousId = previousReplacementTrainer?._id?.toString();
-  const replacementId = replacementTrainer._id.toString();
-  if (previousId === replacementId) return;
+  const replacementId = replacementTrainer._id?.toString() || '';
+  if (!isExternal && previousId && previousId === replacementId) return;
 
   const usersByTrainer = await getTrainerUsers([
     originalTrainer._id,
-    replacementTrainer._id,
+    !isExternal ? replacementTrainer._id : null,
     previousReplacementTrainer?._id,
   ]);
 
@@ -217,21 +218,26 @@ export const notifyReplacementAssignment = async ({
   const commonPath = `/topic-tracker?date=${encodeURIComponent(dateKey)}&schedule=${schedule._id}`;
   const base = notificationBase(actor);
   const notifications = [];
+  const displayReplacementName = isExternal
+    ? `${replacementTrainer.name} (external)`
+    : replacementTrainer.name;
   const messages = buildReplacementNotificationMessages({
     originalTrainerName: originalTrainer.name,
-    replacementTrainerName: replacementTrainer.name,
+    replacementTrainerName: displayReplacementName,
     previousReplacementTrainerName: previousReplacementTrainer?.name,
     detail,
   });
 
-  for (const user of usersByTrainer.get(replacementId) || []) {
-    notifications.push({
-      ...base,
-      recipient: user._id,
-      action: 'assigned',
-      message: messages.replacement,
-      entityPath: `${commonPath}&trainer=${replacementId}`,
-    });
+  if (!isExternal && replacementId) {
+    for (const user of usersByTrainer.get(replacementId) || []) {
+      notifications.push({
+        ...base,
+        recipient: user._id,
+        action: 'assigned',
+        message: messages.replacement,
+        entityPath: `${commonPath}&trainer=${replacementId}`,
+      });
+    }
   }
 
   for (const user of usersByTrainer.get(originalTrainer._id.toString()) || []) {

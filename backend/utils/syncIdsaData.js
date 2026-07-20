@@ -69,6 +69,7 @@ export const syncIdsaTrainersAndSubject = async () => {
     ),
     slotTimings: SOC_FOUR_SLOT_TIMINGS,
     slotCount: 4,
+    oifNumber: IDSA_SUBJECT.oifNumber || IDSA_SUBJECT.code,
   };
 
   if (subject) {
@@ -78,7 +79,6 @@ export const syncIdsaTrainersAndSubject = async () => {
   } else if (socSchool && semesterIII && trainers.length) {
     subject = await Subject.create({
       ...subjectPayload,
-      oifNumber: IDSA_SUBJECT.code,
       dealNumber: IDSA_SUBJECT.code,
       startDate: DEFAULT_SUBJECT_START_DATE,
     });

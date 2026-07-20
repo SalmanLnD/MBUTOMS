@@ -32,6 +32,17 @@ export const enrichSchedulesWithReplacementFor = async (schedules, referenceDate
       if (!scheduleId) return;
       if (!scheduleIds.some((id) => id.toString() === scheduleId)) return;
 
+      if (entry.isExternal && entry.externalTrainerName) {
+        replacementBySchedule.set(scheduleId, {
+          trainerCode: originalCode,
+          trainerName: originalName,
+          replacementTrainerCode: null,
+          replacementTrainerName: entry.externalTrainerName,
+          isExternal: true,
+        });
+        return;
+      }
+
       const replacementTrainer = entry.replacementTrainer;
       if (!replacementTrainer) return;
 
@@ -40,6 +51,7 @@ export const enrichSchedulesWithReplacementFor = async (schedules, referenceDate
         trainerName: originalName,
         replacementTrainerCode: replacementTrainer.employeeId,
         replacementTrainerName: replacementTrainer.name,
+        isExternal: false,
       });
     });
   });

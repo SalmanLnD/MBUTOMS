@@ -48,6 +48,7 @@ export const syncPstpTrainersAndSubject = async () => {
     trainerEligible: trainers.map((t) => t._id),
     slotTimings: SOC_FOUR_SLOT_TIMINGS,
     slotCount: 4,
+    oifNumber: PSTP_SUBJECT.oifNumber || PSTP_SUBJECT.code,
   };
 
   if (subject) {
@@ -66,7 +67,6 @@ export const syncPstpTrainersAndSubject = async () => {
   } else if (semesterIII && trainers.length) {
     subject = await Subject.create({
       ...subjectPayload,
-      oifNumber: PSTP_SUBJECT.code,
       dealNumber: PSTP_SUBJECT.code,
       startDate: DEFAULT_SUBJECT_START_DATE,
     });

@@ -40,14 +40,29 @@ const resolveReplacementTrainer = (leave, schedule, trainersById) => {
     (entry) => getScheduleId(entry.schedule) === scheduleId
   );
 
-  if (!record?.replacementTrainer) return null;
+  if (!record) return null;
+
+  if (record.isExternal && record.externalTrainerName) {
+    return {
+      _id: null,
+      name: record.externalTrainerName,
+      employeeId: null,
+      isExternal: true,
+    };
+  }
+
+  if (!record.replacementTrainer) return null;
 
   if (typeof record.replacementTrainer === 'object' && record.replacementTrainer.name) {
-    return record.replacementTrainer;
+    return {
+      ...record.replacementTrainer,
+      isExternal: false,
+    };
   }
 
   const trainerId = record.replacementTrainer.toString();
-  return trainersById.get(trainerId) || null;
+  const trainer = trainersById.get(trainerId);
+  return trainer ? { ...trainer, isExternal: false } : null;
 };
 
 export const getReplacementSuggestions = async (req, res) => {
@@ -318,14 +333,34 @@ export const getAllReplacements = async (req, res) => {
 };
 
 export const assignReplacement = async (req, res) => {
-  const { leaveId, scheduleId, replacementTrainerId } = req.body;
+  const {
+    leaveId,
+    scheduleId,
+    replacementTrainerId,
+    isExternal = false,
+    externalTrainerName = '',
+  } = req.body;
 
   const schedule = await Schedule.findById(scheduleId);
   if (!schedule) return res.status(404).json({ message: 'Schedule not found' });
 
-  const trainer = await Trainer.findById(replacementTrainerId);
-  if (!trainer || trainer.status !== 'active') {
-    return res.status(400).json({ message: 'Replacement trainer is not available' });
+  const useExternal = Boolean(isExternal);
+  const externalName = String(externalTrainerName || '').trim();
+
+  if (useExternal) {
+    if (!externalName) {
+      return res.status(400).json({ message: 'External trainer name is required' });
+    }
+  } else if (!replacementTrainerId) {
+    return res.status(400).json({ message: 'Replacement trainer is required' });
+  }
+
+  let trainer = null;
+  if (!useExternal) {
+    trainer = await Trainer.findById(replacementTrainerId);
+    if (!trainer || trainer.status !== 'active') {
+      return res.status(400).json({ message: 'Replacement trainer is not available' });
+    }
   }
 
   const leaveFilter = {
@@ -354,54 +389,78 @@ export const assignReplacement = async (req, res) => {
   if (normalizeDate(leave.endDate) < normalizeDate(new Date())) {
     return res.status(400).json({ message: 'Previous replacement records cannot be changed' });
   }
-  if (leave.trainer?._id?.toString() === trainer._id.toString()) {
+  if (!useExternal && leave.trainer?._id?.toString() === trainer._id.toString()) {
     return res.status(400).json({ message: 'The original trainer cannot replace their own class' });
   }
 
-  const available = await isTrainerAvailableForReplacement({
-    trainerId: replacementTrainerId,
-    scheduleDay: schedule.day,
-    leaveStart: leave.startDate,
-    leaveEnd: leave.endDate,
-    status: trainer.status,
-  });
-  if (!available) {
-    return res.status(400).json({ message: 'Replacement trainer is on leave during this class' });
+  if (!useExternal) {
+    const available = await isTrainerAvailableForReplacement({
+      trainerId: replacementTrainerId,
+      scheduleDay: schedule.day,
+      leaveStart: leave.startDate,
+      leaveEnd: leave.endDate,
+      status: trainer.status,
+    });
+    if (!available) {
+      return res.status(400).json({ message: 'Replacement trainer is on leave during this class' });
+    }
   }
 
   if (!Array.isArray(leave.replacements)) {
     leave.replacements = [];
   }
 
-  const replacementEntry = {
-    schedule: scheduleId,
-    replacementTrainer: replacementTrainerId,
-    assignedAt: new Date(),
-    assignedBy: req.user._id,
-  };
-
   const existingIndex = leave.replacements.findIndex(
     (entry) => entry.schedule.toString() === scheduleId.toString()
   );
-  const previousReplacementId = existingIndex >= 0
-    ? leave.replacements[existingIndex].replacementTrainer?.toString()
+  const previousEntry = existingIndex >= 0 ? leave.replacements[existingIndex] : null;
+  const previousWasExternal = Boolean(previousEntry?.isExternal);
+  const previousExternalName = previousWasExternal
+    ? String(previousEntry.externalTrainerName || '').trim()
     : '';
-  const assignmentChanged = previousReplacementId !== replacementTrainerId.toString();
+  const previousReplacementId = !previousWasExternal && previousEntry?.replacementTrainer
+    ? previousEntry.replacementTrainer.toString()
+    : '';
+
+  const assignmentChanged = useExternal
+    ? !previousWasExternal || previousExternalName !== externalName || Boolean(previousReplacementId)
+    : previousWasExternal || previousReplacementId !== replacementTrainerId.toString();
+
   const previousReplacementTrainer = assignmentChanged && previousReplacementId
     ? await Trainer.findById(previousReplacementId).select('name employeeId')
     : null;
 
+  const replacementPayload = {
+    schedule: scheduleId,
+    replacementTrainer: useExternal ? null : replacementTrainerId,
+    isExternal: useExternal,
+    externalTrainerName: useExternal ? externalName : '',
+    assignedAt: new Date(),
+    assignedBy: req.user._id,
+  };
+
   if (existingIndex >= 0) {
-    leave.replacements[existingIndex].replacementTrainer = replacementTrainerId;
-    leave.replacements[existingIndex].assignedAt = new Date();
-    leave.replacements[existingIndex].assignedBy = req.user._id;
+    leave.replacements[existingIndex].replacementTrainer = replacementPayload.replacementTrainer;
+    leave.replacements[existingIndex].isExternal = replacementPayload.isExternal;
+    leave.replacements[existingIndex].externalTrainerName = replacementPayload.externalTrainerName;
+    leave.replacements[existingIndex].assignedAt = replacementPayload.assignedAt;
+    leave.replacements[existingIndex].assignedBy = replacementPayload.assignedBy;
   } else {
-    leave.replacements.push(replacementEntry);
+    leave.replacements.push(replacementPayload);
   }
 
   leave.markModified('replacements');
   await leave.save();
   clearAttendanceGridCache();
+
+  const resolvedReplacement = useExternal
+    ? { _id: null, name: externalName, employeeId: null, isExternal: true }
+    : {
+      _id: trainer._id,
+      name: trainer.name,
+      employeeId: trainer.employeeId,
+      isExternal: false,
+    };
 
   if (assignmentChanged) {
     try {
@@ -410,7 +469,7 @@ export const assignReplacement = async (req, res) => {
         leave,
         schedule,
         originalTrainer: leave.trainer,
-        replacementTrainer: trainer,
+        replacementTrainer: resolvedReplacement,
         previousReplacementTrainer,
         affectedDateKeys,
       });
@@ -422,11 +481,7 @@ export const assignReplacement = async (req, res) => {
 
   res.json({
     schedule,
-    replacement: {
-      _id: trainer._id,
-      name: trainer.name,
-      employeeId: trainer.employeeId,
-    },
+    replacement: resolvedReplacement,
   });
 };
 

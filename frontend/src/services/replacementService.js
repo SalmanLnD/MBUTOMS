@@ -17,12 +17,20 @@ export const getTrainerAvailability = async (params = {}) => {
   return data;
 };
 
-export const assignReplacement = async (leaveId, scheduleId, replacementTrainerId) => {
-  const { data } = await api.post('/replacements/assign', {
-    leaveId,
-    scheduleId,
-    replacementTrainerId,
-  });
+export const assignReplacement = async (leaveId, scheduleId, options = {}) => {
+  const payload = typeof options === 'string'
+    ? { leaveId, scheduleId, replacementTrainerId: options }
+    : {
+      leaveId,
+      scheduleId,
+      ...(options.isExternal
+        ? {
+          isExternal: true,
+          externalTrainerName: options.externalTrainerName,
+        }
+        : { replacementTrainerId: options.replacementTrainerId }),
+    };
+  const { data } = await api.post('/replacements/assign', payload);
   return data;
 };
 

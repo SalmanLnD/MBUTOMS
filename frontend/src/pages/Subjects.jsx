@@ -407,6 +407,10 @@ const Subjects = () => {
                 <p className="mb-0"><code>{selectedSubject.code}</code></p>
               </div>
               <div className="col-sm-4">
+                <label className="text-muted small">OIF Number</label>
+                <p className="mb-0"><code>{selectedSubject.oifNumber || '—'}</code></p>
+              </div>
+              <div className="col-sm-4">
                 <label className="text-muted small">Academic Year</label>
                 <p className="mb-0">{selectedSubject.academicYear || '2026-27'}</p>
               </div>
