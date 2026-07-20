@@ -27,4 +27,6 @@ test('accepts blank or configured food allowances only', () => {
     formatFoodAllowance(FOOD_ALLOWANCE_TYPES.BREAKFAST_LUNCH_DINNER),
     'Breakfast, Lunch, Dinner'
   );
+  assert.equal(formatFoodAllowance(''), 'none');
+  assert.equal(formatFoodAllowance(undefined), 'none');
 });

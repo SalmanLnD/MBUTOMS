@@ -21,4 +21,5 @@ export const FOOD_ALLOWANCE_LABELS = {
 export const isValidFoodAllowance = (value) =>
   value === '' || Object.values(FOOD_ALLOWANCE_TYPES).includes(value);
 
-export const formatFoodAllowance = (value) => FOOD_ALLOWANCE_LABELS[value] || '';
+export const formatFoodAllowance = (value) =>
+  FOOD_ALLOWANCE_LABELS[value] || 'none';

@@ -59,16 +59,22 @@ function syncTrainerAttendance() {
 
   sheet.setFrozenRows(payload.frozenRows || 2);
   sheet.setFrozenColumns(payload.frozenColumns || 2);
+
+  const usedRange = sheet.getRange(1, 1, maxRows, maxColumns);
+  usedRange
+    .setHorizontalAlignment('center')
+    .setVerticalAlignment('middle')
+    .setWrap(true)
+    .setBorder(true, true, true, true, true, true);
+
   sheet.getRange(1, 1, 2, maxColumns)
     .setFontWeight('bold')
-    .setHorizontalAlignment('center')
     .setBackground('#d9ead3');
   sheet.getRange(3, 1, Math.max(maxRows - 2, 1), 2).setFontWeight('bold');
   sheet.setColumnWidth(1, 180);
   sheet.setColumnWidth(2, 100);
   if (maxColumns > 2) {
     sheet.setColumnWidths(3, maxColumns - 2, 90);
-    sheet.getRange(3, 3, Math.max(maxRows - 2, 1), maxColumns - 2).setWrap(true);
   }
 
   SpreadsheetApp.flush();
