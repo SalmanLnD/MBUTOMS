@@ -1,3 +1,4 @@
+import Leave from '../models/Leave.js';
 import Trainer from '../models/Trainer.js';
 import { buildTimetableBoardForDate } from './timetableBoard.js';
 import {
@@ -8,7 +9,9 @@ import { normalizeDate } from './scheduleHelpers.js';
 import { mergeRosterFilter } from './rosterFilter.js';
 import { parseTimeToMinutes } from './timetableSlots.js';
 import { enrichVenueRecord } from './venueBuildingMappings.js';
-import { toLeaveDateKey } from './leaveDateRange.js';
+import { getLeaveOverlapFilter, isDateWithinLeave, toLeaveDateKey } from './leaveDateRange.js';
+import { isScheduleDayInLeaveRange } from './trainerScheduleView.js';
+import { getLeaveWeekdayScheduleIds, isFullDayLeave } from './leaveScope.js';
 
 const OPERATIONS_TIMEZONE = 'Asia/Kolkata';
 
@@ -68,12 +71,77 @@ const pickCurrentSchedule = (schedules, dayName, minutes, ref, byId, byCode) => 
       && isScheduleActiveAtMinutes(schedule, minutes)
   );
   if (!candidates.length) return null;
-  // Prefer the longest-running slot if overlapping data exists.
   return [...candidates].sort((a, b) => {
     const durationA = parseTimeToMinutes(a.endTime) - parseTimeToMinutes(a.startTime);
     const durationB = parseTimeToMinutes(b.endTime) - parseTimeToMinutes(b.startTime);
     return durationB - durationA || a.startTime.localeCompare(b.startTime);
   })[0];
+};
+
+export const isTrainerOnLeaveNow = ({
+  leaves = [],
+  trainerId,
+  trainerSchedules = [],
+  referenceDate,
+  dayName,
+  minutes,
+}) => {
+  const trainerLeaves = leaves.filter(
+    (leave) => leave.trainer?.toString() === trainerId
+  );
+
+  for (const leave of trainerLeaves) {
+    if (!isDateWithinLeave(referenceDate, leave)) continue;
+    if (!isScheduleDayInLeaveRange(dayName, leave)) continue;
+
+    const dayScheduleIds = getLeaveWeekdayScheduleIds(leave, trainerSchedules);
+    if (isFullDayLeave(leave, { dayScheduleIds })) return true;
+
+    const affectedIds = new Set(
+      (leave.affectedSchedules || []).map((id) => id?.toString?.() || String(id))
+    );
+    const activeLeaveSlot = trainerSchedules.some(
+      (schedule) =>
+        schedule.day === dayName
+        && affectedIds.has(schedule._id.toString())
+        && isScheduleActiveAtMinutes(schedule, minutes)
+    );
+    if (activeLeaveSlot) return true;
+  }
+
+  return false;
+};
+
+export const buildReplacementByScheduleMap = (leaves = [], trainerById = new Map()) => {
+  const map = new Map();
+  leaves.forEach((leave) => {
+    (leave.replacements || []).forEach((replacement) => {
+      const scheduleId = replacement.schedule?.toString();
+      if (!scheduleId) return;
+
+      if (replacement.isExternal && replacement.externalTrainerName) {
+        map.set(scheduleId, {
+          isExternal: true,
+          name: replacement.externalTrainerName.trim(),
+          trainerId: null,
+          employeeId: null,
+        });
+        return;
+      }
+
+      const replacementTrainerId = replacement.replacementTrainer?.toString();
+      const trainer = replacementTrainerId ? trainerById.get(replacementTrainerId) : null;
+      if (!trainer) return;
+
+      map.set(scheduleId, {
+        isExternal: false,
+        name: trainer.name,
+        trainerId: trainer._id?.toString() || replacementTrainerId,
+        employeeId: trainer.employeeId || '',
+      });
+    });
+  });
+  return map;
 };
 
 const serializeVenue = (venue) => {
@@ -115,7 +183,9 @@ const buildTrainerLiveRow = ({
   employeeId = null,
   name,
   isExternal = false,
-  current,
+  status = 'free',
+  current = null,
+  replacedTrainerName = '',
 }) => {
   if (!current) {
     return {
@@ -123,9 +193,10 @@ const buildTrainerLiveRow = ({
       employeeId,
       name,
       isExternal,
-      status: 'free',
+      status,
       venue: null,
       schedule: null,
+      replacedTrainerName: replacedTrainerName || '',
     };
   }
 
@@ -138,7 +209,93 @@ const buildTrainerLiveRow = ({
     status: venue ? 'in_class' : 'in_class_no_venue',
     venue,
     schedule: serializeSchedule(current),
+    replacedTrainerName: replacedTrainerName || '',
   };
+};
+
+const resolveRosterTrainerRow = ({
+  trainer,
+  boardSchedules,
+  clock,
+  ref,
+  byId,
+  byCode,
+  replacementBySchedule,
+  leaves,
+}) => {
+  const ownedSchedules = boardSchedules.filter((schedule) => !schedule.isReplacementAssignment);
+  const coveringSchedules = boardSchedules.filter((schedule) => schedule.isReplacementAssignment);
+  const onLeaveNow = isTrainerOnLeaveNow({
+    leaves,
+    trainerId: trainer._id.toString(),
+    trainerSchedules: ownedSchedules,
+    referenceDate: ref,
+    dayName: clock.dayName,
+    minutes: clock.minutes,
+  });
+
+  const currentCovering = pickCurrentSchedule(
+    coveringSchedules,
+    clock.dayName,
+    clock.minutes,
+    ref,
+    byId,
+    byCode
+  );
+  if (currentCovering) {
+    return buildTrainerLiveRow({
+      trainerId: trainer._id,
+      employeeId: trainer.employeeId,
+      name: trainer.name,
+      current: currentCovering,
+    });
+  }
+
+  const currentOwned = pickCurrentSchedule(
+    ownedSchedules,
+    clock.dayName,
+    clock.minutes,
+    ref,
+    byId,
+    byCode
+  );
+
+  if (currentOwned) {
+    const scheduleId = currentOwned._id.toString();
+    const replacement = replacementBySchedule.get(scheduleId);
+    if (replacement) {
+      return buildTrainerLiveRow({
+        trainerId: replacement.trainerId,
+        employeeId: replacement.employeeId,
+        name: replacement.name,
+        isExternal: replacement.isExternal,
+        current: currentOwned,
+        replacedTrainerName: trainer.name,
+      });
+    }
+    if (onLeaveNow) {
+      return buildTrainerLiveRow({
+        trainerId: trainer._id,
+        employeeId: trainer.employeeId,
+        name: trainer.name,
+        status: 'not_available',
+      });
+    }
+
+    return buildTrainerLiveRow({
+      trainerId: trainer._id,
+      employeeId: trainer.employeeId,
+      name: trainer.name,
+      current: currentOwned,
+    });
+  }
+
+  return buildTrainerLiveRow({
+    trainerId: trainer._id,
+    employeeId: trainer.employeeId,
+    name: trainer.name,
+    status: onLeaveNow ? 'not_available' : 'free',
+  });
 };
 
 /**
@@ -161,27 +318,57 @@ export const buildLiveTrainerVenues = async ({ now = new Date() } = {}) => {
     buildSubjectStartDateMap(),
   ]);
 
+  const trainerIds = trainers.map((trainer) => trainer._id);
+  const trainerById = new Map(trainers.map((trainer) => [trainer._id.toString(), trainer]));
   const ref = normalizeDate(referenceDate);
   const { byId, byCode } = subjectStarts;
 
-  const rows = trainers.map((trainer) => {
-    const boardSchedules = schedulesByTrainer[trainer.employeeId] || [];
-    const current = pickCurrentSchedule(
-      boardSchedules,
-      clock.dayName,
-      clock.minutes,
-      ref,
-      byId,
-      byCode
-    );
+  const leaves = trainerIds.length
+    ? await Leave.find({
+      status: 'approved',
+      trainer: { $in: trainerIds },
+      ...getLeaveOverlapFilter(referenceDate),
+    })
+      .select('trainer startDate endDate scope reason affectedSchedules replacements')
+      .populate('replacements.replacementTrainer', 'name employeeId')
+      .lean()
+    : [];
 
-    return buildTrainerLiveRow({
-      trainerId: trainer._id,
-      employeeId: trainer.employeeId,
-      name: trainer.name,
-      current,
-    });
+  const replacementLeaves = await Leave.find({
+    status: 'approved',
+    ...getLeaveOverlapFilter(referenceDate),
+    'replacements.0': { $exists: true },
+  })
+    .select('replacements')
+    .populate('replacements.replacementTrainer', 'name employeeId')
+    .lean();
+
+  const allTrainersForReplacement = await Trainer.find()
+    .select('name employeeId')
+    .lean();
+  allTrainersForReplacement.forEach((trainer) => {
+    trainerById.set(trainer._id.toString(), trainer);
   });
+
+  const replacementBySchedule = buildReplacementByScheduleMap(
+    replacementLeaves,
+    trainerById
+  );
+
+  const rows = trainers.map((trainer) => resolveRosterTrainerRow({
+    trainer,
+    boardSchedules: schedulesByTrainer[trainer.employeeId] || [],
+    clock,
+    ref,
+    byId,
+    byCode,
+    replacementBySchedule,
+    leaves,
+  }));
+
+  const representedScheduleIds = new Set(
+    rows.map((row) => row.schedule?._id).filter(Boolean)
+  );
 
   const externalKeys = Object.keys(schedulesByTrainer)
     .filter((key) => key.startsWith('external:'))
@@ -204,6 +391,8 @@ export const buildLiveTrainerVenues = async ({ now = new Date() } = {}) => {
       byId,
       byCode
     );
+    if (current && representedScheduleIds.has(current._id.toString())) return;
+
     const name = current?.externalTrainerName
       || boardSchedules.find((schedule) => schedule.externalTrainerName)?.externalTrainerName
       || key.slice('external:'.length);

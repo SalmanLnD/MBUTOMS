@@ -9,12 +9,14 @@ const REFRESH_MS = 60_000;
 
 const statusLabel = (status) => {
   if (status === 'free') return 'Free';
+  if (status === 'not_available') return 'Not available';
   if (status === 'in_class_no_venue') return 'In class (no venue)';
   return 'In class';
 };
 
 const statusBadgeClass = (status) => {
   if (status === 'free') return 'bg-success';
+  if (status === 'not_available') return 'bg-secondary';
   if (status === 'in_class_no_venue') return 'bg-warning text-dark';
   return 'bg-primary';
 };
@@ -30,6 +32,7 @@ const classLabel = (schedule) => {
 const rowBlock = (row) => row.venue?.displayBuilding || row.venue?.building || '';
 
 const venueLabel = (row) => {
+  if (row.status === 'not_available') return 'Not available';
   if (row.status === 'free') return 'Free';
   if (!row.venue) return 'No venue assigned';
   const location = row.venue.locationSummary && row.venue.locationSummary !== '—'
@@ -43,6 +46,7 @@ const venueLabel = (row) => {
 const rowKey = (row) =>
   row.trainerId
   || row.employeeId
+  || (row.replacedTrainerName ? `covering:${row.name}:${row.replacedTrainerName}` : null)
   || (row.isExternal ? `external:${row.name}` : row.name);
 
 const VenueLiveTab = () => {
@@ -105,9 +109,12 @@ const VenueLiveTab = () => {
     const q = search.trim().toLowerCase();
     return trainers.filter((row) => {
       if (statusFilter === 'free' && row.status !== 'free') return false;
-      if (statusFilter === 'in_class' && row.status === 'free') return false;
+      if (statusFilter === 'not_available' && row.status !== 'not_available') return false;
+      if (statusFilter === 'in_class' && (row.status === 'free' || row.status === 'not_available')) {
+        return false;
+      }
       if (blockFilter) {
-        if (row.status === 'free' || !row.venue) return false;
+        if (row.status === 'free' || row.status === 'not_available' || !row.venue) return false;
         if (rowBlock(row) !== blockFilter) return false;
       }
       if (!q) return true;
@@ -134,7 +141,8 @@ const VenueLiveTab = () => {
     return {
       total: trainers.length,
       free: trainers.filter((row) => row.status === 'free').length,
-      inClass: trainers.filter((row) => row.status !== 'free').length,
+      notAvailable: trainers.filter((row) => row.status === 'not_available').length,
+      inClass: trainers.filter((row) => row.status === 'in_class' || row.status === 'in_class_no_venue').length,
     };
   }, [payload]);
 
@@ -177,6 +185,7 @@ const VenueLiveTab = () => {
               <option value="">All statuses</option>
               <option value="in_class">In class</option>
               <option value="free">Free</option>
+              <option value="not_available">Not available</option>
             </select>
           </div>
           <div className="col-md-3">
@@ -184,7 +193,7 @@ const VenueLiveTab = () => {
               {payload?.day || '—'} · {payload?.currentTime || '—'} IST
               {payload?.date ? ` · ${payload.date}` : ''}
               {' · '}
-              {counts.inClass} in class, {counts.free} free
+              {counts.inClass} in class, {counts.free} free, {counts.notAvailable} not available
               {refreshing ? ' · Refreshing…' : ''}
             </div>
           </div>
@@ -227,6 +236,11 @@ const VenueLiveTab = () => {
                       {row.name}
                       {row.isExternal ? (
                         <span className="badge bg-secondary ms-2">External</span>
+                      ) : null}
+                      {row.replacedTrainerName ? (
+                        <span className="badge bg-light text-dark border ms-2">
+                          Replacing {row.replacedTrainerName}
+                        </span>
                       ) : null}
                     </td>
                     <td>{row.employeeId || '—'}</td>
