@@ -12,6 +12,8 @@ const emptyForm = {
   classId: '',
   branch: '',
   sectionLabel: '',
+  py: '',
+  semesterLabel: '',
   status: 'active',
 };
 
@@ -33,7 +35,17 @@ const StudentFormModal = ({ show, student, defaultClass, onClose, onSaved }) => 
   useEffect(() => {
     if (student) {
       const matched = classOptions.find(
-        (item) => item.department === student.branch && item.section === student.sectionLabel
+        (item) =>
+          item.department === student.branch
+          && item.section === student.sectionLabel
+          && (
+            !student.py
+            || Number(item.py) === Number(student.py)
+          )
+          && (
+            !student.semesterLabel
+            || item.currentSemester === student.semesterLabel
+          )
       );
       setForm({
         rollNumber: student.rollNumber || '',
@@ -42,6 +54,8 @@ const StudentFormModal = ({ show, student, defaultClass, onClose, onSaved }) => 
         classId: matched?._id || '',
         branch: student.branch || '',
         sectionLabel: student.sectionLabel || student.section?.name || '',
+        py: student.py || matched?.py || '',
+        semesterLabel: student.semesterLabel || matched?.currentSemester || '',
         status: student.status || 'active',
       });
     } else if (defaultClass) {
@@ -50,6 +64,8 @@ const StudentFormModal = ({ show, student, defaultClass, onClose, onSaved }) => 
         classId: defaultClass._id || '',
         branch: defaultClass.department || '',
         sectionLabel: defaultClass.section || '',
+        py: defaultClass.py || '',
+        semesterLabel: defaultClass.currentSemester || '',
       });
     } else {
       setForm(emptyForm);
@@ -65,6 +81,8 @@ const StudentFormModal = ({ show, student, defaultClass, onClose, onSaved }) => 
         classId: value,
         branch: cls?.department || '',
         sectionLabel: cls?.section || '',
+        py: cls?.py || '',
+        semesterLabel: cls?.currentSemester || '',
       }));
       return;
     }

@@ -102,9 +102,15 @@ const StudentBulkUploadModal = ({ show, onClose, onImported }) => {
             <strong>Section</strong>
             ,
             {' '}
+            <strong>Passed Out Year</strong>
+            ,
+            {' '}
+            <strong>Semester</strong>
+            ,
+            {' '}
             <strong>Status</strong>
             .
-            Roll Number and Name are required. Status defaults to active.
+            Roll Number and Name are required. Semester accepts I–VIII or 1–8. Status defaults to active.
           </p>
 
           <div className="d-flex flex-wrap gap-2 mb-3">

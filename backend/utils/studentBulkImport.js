@@ -1,7 +1,28 @@
 import ExcelJS from 'exceljs';
 import Student from '../models/Student.js';
+import Semester from '../models/Semester.js';
 
 const STATUS_VALUES = new Set(['active', 'inactive', 'graduated']);
+const SEMESTER_NUMBER_BY_LABEL = {
+  i: 1,
+  ii: 2,
+  iii: 3,
+  iv: 4,
+  v: 5,
+  vi: 6,
+  vii: 7,
+  viii: 8,
+};
+const SEMESTER_LABEL_BY_NUMBER = {
+  1: 'I',
+  2: 'II',
+  3: 'III',
+  4: 'IV',
+  5: 'V',
+  6: 'VI',
+  7: 'VII',
+  8: 'VIII',
+};
 
 const HEADER_ALIASES = {
   rollnumber: 'rollNumber',
@@ -19,6 +40,15 @@ const HEADER_ALIASES = {
   section: 'sectionLabel',
   'section label': 'sectionLabel',
   sectionlabel: 'sectionLabel',
+  py: 'py',
+  'passed out year': 'py',
+  'pass out year': 'py',
+  'passed-out year': 'py',
+  'passout year': 'py',
+  'passing year': 'py',
+  semester: 'semesterLabel',
+  sem: 'semesterLabel',
+  'current semester': 'semesterLabel',
   status: 'status',
 };
 
@@ -55,12 +85,53 @@ const normalizeEmail = (value) => {
   return email;
 };
 
+const normalizePy = (value) => {
+  const raw = String(value || '').trim();
+  if (!raw) return { ok: true, value: undefined };
+  const year = Number(raw);
+  if (!Number.isInteger(year) || year < 2000 || year > 2100) {
+    return { ok: false, value: undefined };
+  }
+  return { ok: true, value: year };
+};
+
+const normalizeSemesterLabel = (value) => {
+  const raw = String(value || '').trim();
+  if (!raw) return { ok: true, value: undefined, number: undefined };
+
+  const asNumber = Number(raw);
+  if (Number.isInteger(asNumber) && SEMESTER_LABEL_BY_NUMBER[asNumber]) {
+    return {
+      ok: true,
+      value: SEMESTER_LABEL_BY_NUMBER[asNumber],
+      number: asNumber,
+    };
+  }
+
+  const cleaned = raw
+    .replace(/semester|sem/gi, '')
+    .trim()
+    .toLowerCase();
+  const number = SEMESTER_NUMBER_BY_LABEL[cleaned];
+  if (number) {
+    return {
+      ok: true,
+      value: SEMESTER_LABEL_BY_NUMBER[number],
+      number,
+    };
+  }
+
+  return { ok: false, value: undefined, number: undefined };
+};
+
 export const STUDENT_BULK_TEMPLATE_HEADERS = [
   'Roll Number',
   'Name',
   'Email',
   'Branch',
   'Section',
+  'Passed Out Year',
+  'Semester',
   'Status',
 ];
 
@@ -69,12 +140,23 @@ export const buildStudentBulkTemplateBuffer = async () => {
   const sheet = workbook.addWorksheet('Students');
   sheet.addRow(STUDENT_BULK_TEMPLATE_HEADERS);
   sheet.getRow(1).font = { bold: true };
-  sheet.addRow(['24CSE001', 'Sample Student', 'student@example.com', 'CSE', 'A', 'active']);
+  sheet.addRow([
+    '24CSE001',
+    'Sample Student',
+    'student@example.com',
+    'CSE',
+    'A',
+    2028,
+    'III',
+    'active',
+  ]);
   sheet.columns = [
     { width: 16 },
     { width: 24 },
     { width: 28 },
     { width: 12 },
+    { width: 12 },
+    { width: 16 },
     { width: 12 },
     { width: 12 },
   ];
@@ -170,12 +252,18 @@ const validateParsedRow = (row) => {
   const sectionLabel = String(row.sectionLabel || '').trim();
   const email = normalizeEmail(row.email);
   const status = normalizeStatus(row.status);
+  const pyResult = normalizePy(row.py);
+  const semesterResult = normalizeSemesterLabel(row.semesterLabel);
 
   const errors = [];
   if (!rollNumber) errors.push('Roll Number is required');
   if (!name) errors.push('Name is required');
   if (email === null) errors.push('Email is invalid');
   if (status === null) errors.push('Status must be active, inactive, or graduated');
+  if (!pyResult.ok) errors.push('Passed Out Year must be a 4-digit year (2000–2100)');
+  if (!semesterResult.ok) {
+    errors.push('Semester must be I–VIII or 1–8');
+  }
 
   if (errors.length) {
     return { ok: false, rowNumber: row.__rowNumber, errors };
@@ -184,12 +272,15 @@ const validateParsedRow = (row) => {
   return {
     ok: true,
     rowNumber: row.__rowNumber,
+    semesterNumber: semesterResult.number,
     payload: {
       rollNumber,
       name,
       email: email || undefined,
       branch: branch || undefined,
       sectionLabel: sectionLabel || undefined,
+      py: pyResult.value,
+      semesterLabel: semesterResult.value,
       status: status || 'active',
     },
   };
@@ -213,7 +304,27 @@ export const importStudentsFromRows = async (rows, { updateExisting = false } = 
     };
   }
 
-  const rollNumbers = validPayloads.map((row) => row.payload.rollNumber);
+  const semesterNumbers = [...new Set(
+    validPayloads
+      .map((row) => row.semesterNumber)
+      .filter((number) => Number.isInteger(number))
+  )];
+  const semesters = semesterNumbers.length
+    ? await Semester.find({ number: { $in: semesterNumbers } }).select('_id number').lean()
+    : [];
+  const semesterIdByNumber = new Map(
+    semesters.map((semester) => [semester.number, semester._id])
+  );
+
+  const withSemesterRefs = validPayloads.map((row) => {
+    const payload = { ...row.payload };
+    if (row.semesterNumber && semesterIdByNumber.has(row.semesterNumber)) {
+      payload.semester = semesterIdByNumber.get(row.semesterNumber);
+    }
+    return { ...row, payload };
+  });
+
+  const rollNumbers = withSemesterRefs.map((row) => row.payload.rollNumber);
   const existing = await Student.find({ rollNumber: { $in: rollNumbers } })
     .select('rollNumber')
     .lean();
@@ -227,7 +338,7 @@ export const importStudentsFromRows = async (rows, { updateExisting = false } = 
   const toCreate = [];
   const toUpdate = [];
 
-  for (const row of validPayloads) {
+  for (const row of withSemesterRefs) {
     if (existingSet.has(row.payload.rollNumber)) {
       if (updateExisting) {
         toUpdate.push(row);

@@ -572,6 +572,8 @@ const ClassesStudents = () => {
                       <th>Name</th>
                       <th>Branch</th>
                       <th>Section</th>
+                      <th>PY</th>
+                      <th>Semester</th>
                       <th>Email</th>
                       <th>Status</th>
                       {canManage && <th />}
@@ -580,7 +582,7 @@ const ClassesStudents = () => {
                   <tbody>
                     {students.length === 0 ? (
                       <tr>
-                        <td colSpan={canManage ? 7 : 6} className="text-center text-muted py-4">
+                        <td colSpan={canManage ? 9 : 8} className="text-center text-muted py-4">
                           No students found
                         </td>
                       </tr>
@@ -591,6 +593,8 @@ const ClassesStudents = () => {
                           <td>{s.name}</td>
                           <td>{s.branch || '-'}</td>
                           <td>{s.sectionLabel || s.section?.name || '-'}</td>
+                          <td>{s.py || '-'}</td>
+                          <td>{s.semesterLabel || s.semester?.name || '-'}</td>
                           <td>{s.email || '-'}</td>
                           <td>
                             <span className="badge bg-secondary">{formatStatus(s.status)}</span>
