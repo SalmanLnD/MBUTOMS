@@ -1,62 +1,40 @@
-import { useState, useEffect, useCallback } from 'react';
-import LoadingSpinner from '../components/LoadingSpinner.jsx';
-import FeedbackSummaryTab from '../components/FeedbackSummaryTab.jsx';
-import FeedbackResponsesTab from '../components/FeedbackResponsesTab.jsx';
-import FeedbackFormTab from '../components/FeedbackFormTab.jsx';
-import { getFeedbackSummary } from '../services/feedbackService.js';
-import { showError } from '../utils/toast.js';
-import { getErrorMessage } from '../utils/helpers.js';
+import { useState } from 'react';
+import FeedbackSection from '../components/FeedbackSection.jsx';
+import ObservationsTab from '../components/ObservationsTab.jsx';
+import PlpTab from '../components/PlpTab.jsx';
+
+const PERFORMANCE_TABS = [
+  { id: 'feedback', label: 'Feedback' },
+  { id: 'observations', label: 'Observations' },
+  { id: 'plp', label: 'PLP' },
+];
 
 const Performance = () => {
-  const [activeTab, setActiveTab] = useState('summary');
-  const [summary, setSummary] = useState(null);
-  const [loadingSummary, setLoadingSummary] = useState(true);
-
-  const loadSummary = useCallback(async () => {
-    setLoadingSummary(true);
-    try {
-      const data = await getFeedbackSummary();
-      setSummary(data);
-    } catch (err) {
-      showError(getErrorMessage(err));
-    } finally {
-      setLoadingSummary(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    if (activeTab === 'summary') {
-      loadSummary();
-    }
-  }, [activeTab, loadSummary]);
+  const [activeTab, setActiveTab] = useState('feedback');
 
   return (
     <>
-      <ul className="nav nav-tabs mb-3">
-        <li className="nav-item">
-          <button type="button" className={`nav-link ${activeTab === 'summary' ? 'active' : ''}`} onClick={() => setActiveTab('summary')}>
-            Summary
-          </button>
-        </li>
-        <li className="nav-item">
-          <button type="button" className={`nav-link ${activeTab === 'responses' ? 'active' : ''}`} onClick={() => setActiveTab('responses')}>
-            Response logs
-          </button>
-        </li>
-        <li className="nav-item">
-          <button type="button" className={`nav-link ${activeTab === 'forms' ? 'active' : ''}`} onClick={() => setActiveTab('forms')}>
-            Feedback form
-          </button>
-        </li>
+      <ul className="nav nav-tabs mb-3" role="tablist">
+        {PERFORMANCE_TABS.map((tab) => (
+          <li className="nav-item" key={tab.id} role="presentation">
+            <button
+              type="button"
+              role="tab"
+              className={`nav-link ${activeTab === tab.id ? 'active' : ''}`}
+              aria-selected={activeTab === tab.id}
+              onClick={() => setActiveTab(tab.id)}
+            >
+              {tab.label}
+            </button>
+          </li>
+        ))}
       </ul>
 
       <div className="card table-card">
         <div className="card-body">
-          {activeTab === 'summary' && (
-            <FeedbackSummaryTab summary={summary} loading={loadingSummary} />
-          )}
-          {activeTab === 'responses' && <FeedbackResponsesTab />}
-          {activeTab === 'forms' && <FeedbackFormTab />}
+          {activeTab === 'feedback' && <FeedbackSection />}
+          {activeTab === 'observations' && <ObservationsTab />}
+          {activeTab === 'plp' && <PlpTab />}
         </div>
       </div>
     </>
