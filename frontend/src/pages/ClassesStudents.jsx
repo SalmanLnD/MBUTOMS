@@ -62,13 +62,41 @@ const ClassesStudents = () => {
       const key = String(schoolId);
       if (!map.has(key)) map.set(key, new Set());
       map.get(key).add(department.code);
-      // Class/timetable aliases used alongside CE-ME.
+      // Class/timetable aliases used alongside department codes.
       if (department.code === 'CE-ME') {
         map.get(key).add('CE & ME');
+      }
+      if (department.code === 'ECE' || department.code === 'EIE') {
+        map.get(key).add('ECE & EIE');
+      }
+      if (department.code === 'BCOM-CA') {
+        map.get(key).add('B.COM(CA)');
       }
     });
     return map;
   }, [departments]);
+
+  const schoolNameByClassDepartment = useMemo(() => {
+    const map = new Map();
+    departments.forEach((department) => {
+      const schoolName = department.school?.name || '';
+      if (!schoolName || !department.code) return;
+      map.set(department.code, schoolName);
+      if (department.code === 'CE-ME') {
+        map.set('CE & ME', schoolName);
+      }
+      if (department.code === 'ECE' || department.code === 'EIE') {
+        map.set('ECE & EIE', schoolName);
+      }
+      if (department.code === 'BCOM-CA') {
+        map.set('B.COM(CA)', schoolName);
+      }
+    });
+    return map;
+  }, [departments]);
+
+  const classSchoolName = (cls) =>
+    schoolNameByClassDepartment.get(cls.department) || '-';
 
   const classFilterOptions = useMemo(() => {
     const schoolDeptCodes = classSchoolFilter
@@ -297,6 +325,9 @@ const ClassesStudents = () => {
       (department) =>
         department.code === cls.department
         || (department.code === 'CE-ME' && cls.department === 'CE & ME')
+        || ((department.code === 'ECE' || department.code === 'EIE')
+          && cls.department === 'ECE & EIE')
+        || (department.code === 'BCOM-CA' && cls.department === 'B.COM(CA)')
     );
     const schoolId = matchingDept?.school?._id || matchingDept?.school;
     setStudentSchoolFilter(schoolId ? String(schoolId) : '');
@@ -504,6 +535,7 @@ const ClassesStudents = () => {
                       <th role="button" onClick={() => handleClassSort('department')}>
                         Department{classSortIcon('department')}
                       </th>
+                      <th>School</th>
                       <th role="button" onClick={() => handleClassSort('section')}>
                         Section{classSortIcon('section')}
                       </th>
@@ -517,7 +549,7 @@ const ClassesStudents = () => {
                   <tbody>
                     {filteredClasses.length === 0 ? (
                       <tr>
-                        <td colSpan="6" className="text-center text-muted py-4">
+                        <td colSpan="7" className="text-center text-muted py-4">
                           {hasClassFilters ? 'No classes match the selected filters' : 'No classes found'}
                         </td>
                       </tr>
@@ -526,6 +558,7 @@ const ClassesStudents = () => {
                         <tr key={cls._id}>
                           <td>{cls.py}</td>
                           <td>{cls.department || '-'}</td>
+                          <td>{classSchoolName(cls)}</td>
                           <td>{cls.section || '-'}</td>
                           <td>{cls.currentSemester || '-'}</td>
                           <td>{cls.studentCount}</td>
