@@ -1,4 +1,8 @@
 import Student from '../models/Student.js';
+// Register related models so populate() works on serverless cold starts.
+import '../models/Batch.js';
+import '../models/Section.js';
+import '../models/Semester.js';
 import {
   buildStudentBulkTemplateBuffer,
   importStudentsFromRows,
