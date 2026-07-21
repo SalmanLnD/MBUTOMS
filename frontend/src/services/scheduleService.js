@@ -15,6 +15,11 @@ export const getTimetableBoard = async (params = {}, { signal } = {}) => {
   return data;
 };
 
+export const getLiveTrainerVenues = async ({ signal } = {}) => {
+  const { data } = await api.get('/schedules/live-venues', { signal });
+  return data;
+};
+
 export const getClassCancellationOptions = async (date) => {
   const { data } = await api.get('/schedules/class-cancellations/options', {
     params: { date },

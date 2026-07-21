@@ -3,6 +3,7 @@ import {
   getSchedules,
   getPublicTimetable,
   getTimetableBoard,
+  getLiveTrainerVenues,
   getScheduleById,
   getTrainerSchedule,
   getTrainerScheduleByCode,
@@ -28,6 +29,7 @@ router.get('/public-timetable', asyncHandler(getPublicTimetable));
 router.use(protect);
 
 router.get('/timetable-board', asyncHandler(getTimetableBoard));
+router.get('/live-venues', asyncHandler(getLiveTrainerVenues));
 router.get('/batches/list', asyncHandler(getBatches));
 router.get(
   '/class-cancellations/options',

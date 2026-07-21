@@ -11,6 +11,7 @@ import ClassGroup from '../models/ClassGroup.js';
 
 import { buildTimetableBoardForDate } from '../utils/timetableBoard.js';
 import { mergeRosterFilter } from '../utils/rosterFilter.js';
+import { buildLiveTrainerVenues } from '../utils/liveTrainerVenues.js';
 import {
   sanitizeSchedulesByTrainerForPublic,
   sanitizeTrainerForPublic,
@@ -191,6 +192,11 @@ export const getTimetableBoard = async (req, res) => {
     referenceDate,
     schedulesByTrainer,
   });
+};
+
+export const getLiveTrainerVenues = async (req, res) => {
+  const payload = await buildLiveTrainerVenues({ now: new Date() });
+  res.json(payload);
 };
 
 export const getSchedules = async (req, res) => {

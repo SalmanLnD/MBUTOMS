@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import LoadingSpinner from '../components/LoadingSpinner.jsx';
 import Pagination from '../components/Pagination.jsx';
 import VenueDetailModal from '../components/VenueDetailModal.jsx';
+import VenueLiveTab from '../components/VenueLiveTab.jsx';
 import { showError, showSuccess } from '../utils/toast.js';
 import VenueFormModal from '../components/VenueFormModal.jsx';
 import ConfirmModal from '../components/ConfirmModal.jsx';
@@ -23,6 +24,7 @@ const venueTypes = {
 };
 
 const VENUE_TABS = [
+  { id: 'live', label: 'Live' },
   { id: 'map', label: 'Campus map' },
   { id: 'ranges', label: 'Range-wise mapping' },
   { id: 'rooms', label: 'Room details' },
@@ -42,7 +44,7 @@ const Venues = () => {
     setPagination,
   } = usePagination({ initialPageSize: 20 });
 
-  const [activeTab, setActiveTab] = useState('map');
+  const [activeTab, setActiveTab] = useState('live');
   const [venues, setVenues] = useState([]);
   const [mappingReference, setMappingReference] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -120,6 +122,8 @@ const Venues = () => {
           </li>
         ))}
       </ul>
+
+      {activeTab === 'live' && <VenueLiveTab />}
 
       {activeTab === 'map' && (
         <div className="card table-card">
