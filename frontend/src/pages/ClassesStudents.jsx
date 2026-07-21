@@ -15,6 +15,7 @@ import {
   getStudents,
   deleteStudent,
 } from '../services/studentService.js';
+import { getSchools, getDepartments } from '../services/subjectService.js';
 import { getAttendance, markAttendance } from '../services/attendanceService.js';
 import { formatDate, formatStatus, getErrorMessage, toInputDate } from '../utils/helpers.js';
 import { EditIcon, EyeIcon, TrashIcon, UploadIcon } from '../components/icons.jsx';
@@ -42,30 +43,60 @@ const ClassesStudents = () => {
   const [pendingClassDelete, setPendingClassDelete] = useState(null);
   const [classFilter, setClassFilter] = useState(null);
   const [classPyFilter, setClassPyFilter] = useState('');
+  const [classSchoolFilter, setClassSchoolFilter] = useState('');
   const [classDeptFilter, setClassDeptFilter] = useState('');
   const [classSectionFilter, setClassSectionFilter] = useState('');
   const [classSemFilter, setClassSemFilter] = useState('');
   const [classSortBy, setClassSortBy] = useState('department');
   const [classSortOrder, setClassSortOrder] = useState('asc');
+  const [schools, setSchools] = useState([]);
+  const [departments, setDepartments] = useState([]);
 
   const classLabel = (cls) => cls.label || `${cls.department} ${cls.section}`;
 
+  const departmentCodesBySchoolId = useMemo(() => {
+    const map = new Map();
+    departments.forEach((department) => {
+      const schoolId = department.school?._id || department.school;
+      if (!schoolId) return;
+      const key = String(schoolId);
+      if (!map.has(key)) map.set(key, new Set());
+      map.get(key).add(department.code);
+      // Class/timetable aliases used alongside CE-ME.
+      if (department.code === 'CE-ME') {
+        map.get(key).add('CE & ME');
+      }
+    });
+    return map;
+  }, [departments]);
+
   const classFilterOptions = useMemo(() => {
-    const pys = [...new Set(classes.map((c) => c.py).filter(Boolean))].sort((a, b) => a - b);
-    const depts = [...new Set(classes.map((c) => c.department).filter(Boolean))].sort();
+    const schoolDeptCodes = classSchoolFilter
+      ? (departmentCodesBySchoolId.get(classSchoolFilter) || new Set())
+      : null;
+    const schoolScopedClasses = schoolDeptCodes
+      ? classes.filter((cls) => schoolDeptCodes.has(cls.department))
+      : classes;
+
+    const pys = [...new Set(schoolScopedClasses.map((c) => c.py).filter(Boolean))].sort((a, b) => a - b);
+    const depts = [...new Set(schoolScopedClasses.map((c) => c.department).filter(Boolean))].sort();
     const sections = [...new Set(
-      classes
+      schoolScopedClasses
         .filter((c) => !classDeptFilter || c.department === classDeptFilter)
         .map((c) => c.section)
         .filter(Boolean)
     )].sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
-    const semesters = [...new Set(classes.map((c) => c.currentSemester).filter(Boolean))]
+    const semesters = [...new Set(schoolScopedClasses.map((c) => c.currentSemester).filter(Boolean))]
       .sort((a, b) => semesterSortKey(a) - semesterSortKey(b));
     return { pys, depts, sections, semesters };
-  }, [classes, classDeptFilter]);
+  }, [classes, classDeptFilter, classSchoolFilter, departmentCodesBySchoolId]);
 
   const filteredClasses = useMemo(() => {
+    const schoolDeptCodes = classSchoolFilter
+      ? (departmentCodesBySchoolId.get(classSchoolFilter) || new Set())
+      : null;
     const filtered = classes.filter((cls) => {
+      if (schoolDeptCodes && !schoolDeptCodes.has(cls.department)) return false;
       if (classPyFilter && cls.py !== Number(classPyFilter)) return false;
       if (classDeptFilter && cls.department !== classDeptFilter) return false;
       if (classSectionFilter && cls.section !== classSectionFilter) return false;
@@ -96,15 +127,19 @@ const ClassesStudents = () => {
     });
   }, [
     classes,
+    classSchoolFilter,
     classPyFilter,
     classDeptFilter,
     classSectionFilter,
     classSemFilter,
     classSortBy,
     classSortOrder,
+    departmentCodesBySchoolId,
   ]);
 
-  const hasClassFilters = Boolean(classPyFilter || classDeptFilter || classSectionFilter || classSemFilter);
+  const hasClassFilters = Boolean(
+    classSchoolFilter || classPyFilter || classDeptFilter || classSectionFilter || classSemFilter
+  );
 
   const handleClassSort = (field) => {
     if (classSortBy === field) {
@@ -118,6 +153,7 @@ const ClassesStudents = () => {
   const classSortIcon = (field) => (classSortBy === field ? (classSortOrder === 'asc' ? ' ↑' : ' ↓') : '');
 
   const clearClassTableFilters = () => {
+    setClassSchoolFilter('');
     setClassPyFilter('');
     setClassDeptFilter('');
     setClassSectionFilter('');
@@ -137,6 +173,7 @@ const ClassesStudents = () => {
   const [studentsLoading, setStudentsLoading] = useState(true);
   const [studentSearch, setStudentSearch] = useState('');
   const [studentStatusFilter, setStudentStatusFilter] = useState('active');
+  const [studentSchoolFilter, setStudentSchoolFilter] = useState('');
   const [departmentFilter, setDepartmentFilter] = useState('');
   const [sectionFilter, setSectionFilter] = useState('');
   const [showStudentForm, setShowStudentForm] = useState(false);
@@ -187,6 +224,7 @@ const ClassesStudents = () => {
         limit: studentPageSize,
         search: debouncedStudentSearch,
         status: studentStatusFilter,
+        school: studentSchoolFilter || undefined,
         department: departmentFilter,
         section: sectionFilter,
       });
@@ -220,11 +258,32 @@ const ClassesStudents = () => {
 
   useEffect(() => {
     fetchClasses();
+    (async () => {
+      try {
+        const [schoolList, departmentList] = await Promise.all([
+          getSchools(),
+          getDepartments(),
+        ]);
+        setSchools(Array.isArray(schoolList) ? schoolList : []);
+        setDepartments(Array.isArray(departmentList) ? departmentList : []);
+      } catch (err) {
+        showError(getErrorMessage(err));
+      }
+    })();
   }, []);
 
   useEffect(() => {
     if (activeTab === 'students') fetchStudents();
-  }, [activeTab, studentPage, studentPageSize, debouncedStudentSearch, studentStatusFilter, departmentFilter, sectionFilter]);
+  }, [
+    activeTab,
+    studentPage,
+    studentPageSize,
+    debouncedStudentSearch,
+    studentStatusFilter,
+    studentSchoolFilter,
+    departmentFilter,
+    sectionFilter,
+  ]);
 
   useEffect(() => {
     if (activeTab === 'attendance') fetchAttendance();
@@ -234,6 +293,13 @@ const ClassesStudents = () => {
     setClassFilter(cls);
     setDepartmentFilter(cls.department);
     setSectionFilter(cls.section);
+    const matchingDept = departments.find(
+      (department) =>
+        department.code === cls.department
+        || (department.code === 'CE-ME' && cls.department === 'CE & ME')
+    );
+    const schoolId = matchingDept?.school?._id || matchingDept?.school;
+    setStudentSchoolFilter(schoolId ? String(schoolId) : '');
     setActiveTab('students');
     resetStudentPage();
   };
@@ -327,6 +393,23 @@ const ClassesStudents = () => {
             <div className="col-md-2">
               <select
                 className="form-select"
+                value={classSchoolFilter}
+                onChange={(e) => {
+                  setClassSchoolFilter(e.target.value);
+                  setClassDeptFilter('');
+                  setClassSectionFilter('');
+                }}
+                aria-label="Filter by school"
+              >
+                <option value="">All Schools</option>
+                {schools.map((school) => (
+                  <option key={school._id} value={school._id}>{school.name}</option>
+                ))}
+              </select>
+            </div>
+            <div className="col-md-2">
+              <select
+                className="form-select"
                 value={classPyFilter}
                 onChange={(e) => setClassPyFilter(e.target.value)}
                 aria-label="Filter by PY"
@@ -353,7 +436,7 @@ const ClassesStudents = () => {
                 ))}
               </select>
             </div>
-            <div className="col-md-2">
+            <div className="col-md-1">
               <select
                 className="form-select"
                 value={classSectionFilter}
@@ -379,10 +462,10 @@ const ClassesStudents = () => {
                 ))}
               </select>
             </div>
-            <div className="col-md-2">
+            <div className="col-md-1">
               {hasClassFilters && (
                 <button type="button" className="btn btn-sm btn-outline-secondary" onClick={clearClassTableFilters}>
-                  Clear filters
+                  Clear
                 </button>
               )}
             </div>
@@ -510,6 +593,23 @@ const ClassesStudents = () => {
             <div className="col-md-2">
               <select
                 className="form-select"
+                value={studentSchoolFilter}
+                onChange={(e) => {
+                  setStudentSchoolFilter(e.target.value);
+                  if (classFilter) clearClassFilter();
+                  resetStudentPage();
+                }}
+                aria-label="Filter by school"
+              >
+                <option value="">All Schools</option>
+                {schools.map((school) => (
+                  <option key={school._id} value={school._id}>{school.name}</option>
+                ))}
+              </select>
+            </div>
+            <div className="col-md-2">
+              <select
+                className="form-select"
                 value={studentStatusFilter}
                 onChange={(e) => {
                   setStudentStatusFilter(e.target.value);
@@ -522,7 +622,7 @@ const ClassesStudents = () => {
                 <option value="graduated">Graduated</option>
               </select>
             </div>
-            <div className="col-md-4">
+            <div className="col-md-2">
               {classFilter && (
                 <div className="d-flex align-items-center gap-2">
                   <span className="badge bg-primary">

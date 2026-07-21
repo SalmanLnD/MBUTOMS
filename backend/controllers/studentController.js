@@ -1,4 +1,5 @@
 import Student from '../models/Student.js';
+import Department from '../models/Department.js';
 // Register related models so populate() works on serverless cold starts.
 import '../models/Batch.js';
 import '../models/Section.js';
@@ -8,6 +9,7 @@ import {
   importStudentsFromRows,
   parseStudentBulkFile,
 } from '../utils/studentBulkImport.js';
+import { expandAllowedClassDepartments } from '../utils/subjectClassEligibility.js';
 
 const populateStudent = (query) =>
   query
@@ -15,12 +17,24 @@ const populateStudent = (query) =>
     .populate('section', 'name')
     .populate('semester', 'name number');
 
-const buildStudentQuery = (query) => {
+const buildStudentQuery = async (query) => {
   const filter = {};
   if (query.status) filter.status = query.status;
   if (query.batch) filter.batch = query.batch;
-  if (query.department) filter.branch = query.department;
   if (query.section) filter.sectionLabel = query.section;
+
+  if (query.department) {
+    filter.branch = query.department;
+  } else if (query.school) {
+    const departments = await Department.find({ school: query.school })
+      .select('code')
+      .lean();
+    const codes = expandAllowedClassDepartments(
+      departments.map((department) => department.code)
+    );
+    filter.branch = { $in: codes.length ? codes : ['__none__'] };
+  }
+
   if (query.search) {
     const searchRegex = { $regex: query.search, $options: 'i' };
     filter.$or = [
@@ -39,7 +53,7 @@ export const getStudents = async (req, res) => {
   const limit = Math.min(50, Math.max(1, parseInt(req.query.limit, 10) || 10));
   const skip = (page - 1) * limit;
 
-  const filter = buildStudentQuery(req.query);
+  const filter = await buildStudentQuery(req.query);
   const sortField = ['name', 'rollNumber', 'branch', 'createdAt'].includes(req.query.sortBy)
     ? req.query.sortBy
     : 'name';
