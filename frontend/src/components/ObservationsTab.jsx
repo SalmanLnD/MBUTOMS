@@ -19,6 +19,7 @@ const OBSERVATION_SUB_TABS = [
 const emptyDraft = (row) => ({
   rating: row.rating == null ? '' : String(row.rating),
   comments: row.comments || '',
+  scheduleId: row.scheduleId || '',
 });
 
 const ObservationsTab = () => {
@@ -31,6 +32,7 @@ const ObservationsTab = () => {
 
   const monthKey = formatMonthKey(monthParts.year, monthParts.month);
   const monthOptions = useMemo(() => buildMonthOptions(), []);
+  const isClass = observationType === 'class';
 
   const loadObservations = useCallback(async () => {
     setLoading(true);
@@ -58,7 +60,7 @@ const ObservationsTab = () => {
     setDrafts((prev) => ({
       ...prev,
       [trainerId]: {
-        ...(prev[trainerId] || { rating: '', comments: '' }),
+        ...(prev[trainerId] || { rating: '', comments: '', scheduleId: '' }),
         [field]: value,
       },
     }));
@@ -66,6 +68,11 @@ const ObservationsTab = () => {
 
   const handleSave = async (row) => {
     const draft = drafts[row.trainerId] || emptyDraft(row);
+    if (isClass && !draft.scheduleId) {
+      showError('Select the class and slot for this observation');
+      return;
+    }
+
     setSavingId(row.trainerId);
     try {
       const saved = await upsertObservation(row.trainerId, {
@@ -73,15 +80,33 @@ const ObservationsTab = () => {
         type: observationType,
         rating: draft.rating === '' ? null : Number(draft.rating),
         comments: draft.comments,
+        scheduleId: isClass ? draft.scheduleId || null : null,
       });
       setRows((prev) => prev.map((item) => (
         item.trainerId === row.trainerId
-          ? { ...item, rating: saved.rating, comments: saved.comments, updatedAt: saved.updatedAt }
+          ? {
+            ...item,
+            rating: saved.rating,
+            comments: saved.comments,
+            updatedAt: saved.updatedAt,
+            scheduleId: saved.scheduleId,
+            department: saved.department,
+            section: saved.section,
+            slot: saved.slot,
+            startTime: saved.startTime,
+            endTime: saved.endTime,
+            day: saved.day,
+            subjectCode: saved.subjectCode,
+            classDetail: saved.classDetail,
+          }
           : item
       )));
       setDrafts((prev) => ({
         ...prev,
-        [row.trainerId]: emptyDraft(saved),
+        [row.trainerId]: emptyDraft({
+          ...saved,
+          scheduleOptions: row.scheduleOptions,
+        }),
       }));
       showSuccess('Observation saved');
     } catch (err) {
@@ -154,6 +179,7 @@ const ObservationsTab = () => {
               <tr>
                 <th>Trainer</th>
                 <th>Emp ID</th>
+                {isClass && <th style={{ minWidth: 280 }}>Class / slot</th>}
                 <th style={{ width: 120 }}>Rating (1–5)</th>
                 <th>Comments</th>
                 <th style={{ width: 110 }} />
@@ -162,7 +188,7 @@ const ObservationsTab = () => {
             <tbody>
               {rows.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="text-center text-muted py-4">
+                  <td colSpan={isClass ? 6 : 5} className="text-center text-muted py-4">
                     No trainers found
                   </td>
                 </tr>
@@ -170,11 +196,29 @@ const ObservationsTab = () => {
                 rows.map((row) => {
                   const draft = drafts[row.trainerId] || emptyDraft(row);
                   const dirty = String(draft.rating) !== String(row.rating ?? '')
-                    || String(draft.comments || '') !== String(row.comments || '');
+                    || String(draft.comments || '') !== String(row.comments || '')
+                    || String(draft.scheduleId || '') !== String(row.scheduleId || '');
                   return (
                     <tr key={row.trainerId}>
                       <td className="fw-medium">{row.name}</td>
                       <td>{row.employeeId}</td>
+                      {isClass && (
+                        <td>
+                          <select
+                            className="form-select form-select-sm"
+                            value={draft.scheduleId}
+                            onChange={(e) => updateDraft(row.trainerId, 'scheduleId', e.target.value)}
+                            aria-label={`Class and slot for ${row.name}`}
+                          >
+                            <option value="">Select class / slot</option>
+                            {(row.scheduleOptions || []).map((option) => (
+                              <option key={option.scheduleId} value={option.scheduleId}>
+                                {option.label}
+                              </option>
+                            ))}
+                          </select>
+                        </td>
+                      )}
                       <td>
                         <select
                           className="form-select form-select-sm"

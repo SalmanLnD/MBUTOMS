@@ -31,6 +31,19 @@ const trainerObservationSchema = new mongoose.Schema(
       trim: true,
       default: '',
     },
+    // Class observation session context (optional for demo).
+    schedule: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Schedule',
+      default: null,
+    },
+    department: { type: String, trim: true, default: '' },
+    section: { type: String, trim: true, default: '' },
+    slot: { type: String, trim: true, default: '' },
+    startTime: { type: String, trim: true, default: '' },
+    endTime: { type: String, trim: true, default: '' },
+    day: { type: String, trim: true, default: '' },
+    subjectCode: { type: String, trim: true, default: '' },
     ratedBy: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'User',
