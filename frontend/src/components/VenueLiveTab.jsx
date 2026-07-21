@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import LoadingSpinner from './LoadingSpinner.jsx';
 import { getLiveTrainerVenues } from '../services/scheduleService.js';
+import { getVenueMappingReference } from '../services/venueService.js';
 import { getErrorMessage } from '../utils/helpers.js';
 import { showError } from '../utils/toast.js';
 
@@ -26,6 +27,8 @@ const classLabel = (schedule) => {
   return schedule.subjectCode || classPart || '—';
 };
 
+const rowBlock = (row) => row.venue?.displayBuilding || row.venue?.building || '';
+
 const venueLabel = (row) => {
   if (row.status === 'free') return 'Free';
   if (!row.venue) return 'No venue assigned';
@@ -37,12 +40,19 @@ const venueLabel = (row) => {
   return location ? `${row.venue.name} (${location})` : row.venue.name;
 };
 
+const rowKey = (row) =>
+  row.trainerId
+  || row.employeeId
+  || (row.isExternal ? `external:${row.name}` : row.name);
+
 const VenueLiveTab = () => {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [payload, setPayload] = useState(null);
+  const [blockOptions, setBlockOptions] = useState([]);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
+  const [blockFilter, setBlockFilter] = useState('');
 
   const fetchLive = useCallback(async ({ soft = false } = {}) => {
     if (soft) setRefreshing(true);
@@ -69,18 +79,45 @@ const VenueLiveTab = () => {
     };
   }, [fetchLive]);
 
+  useEffect(() => {
+    getVenueMappingReference()
+      .then((data) => {
+        const blocks = [...new Set(
+          (data.reference || []).map((row) => row.building).filter(Boolean)
+        )].sort((a, b) => a.localeCompare(b));
+        setBlockOptions(blocks);
+      })
+      .catch(() => setBlockOptions([]));
+  }, []);
+
+  const availableBlocks = useMemo(() => {
+    const fromLive = new Set(
+      (payload?.trainers || [])
+        .map(rowBlock)
+        .filter(Boolean)
+    );
+    blockOptions.forEach((block) => fromLive.add(block));
+    return [...fromLive].sort((a, b) => a.localeCompare(b));
+  }, [payload, blockOptions]);
+
   const rows = useMemo(() => {
     const trainers = payload?.trainers || [];
     const q = search.trim().toLowerCase();
     return trainers.filter((row) => {
       if (statusFilter === 'free' && row.status !== 'free') return false;
       if (statusFilter === 'in_class' && row.status === 'free') return false;
+      if (blockFilter) {
+        if (row.status === 'free' || !row.venue) return false;
+        if (rowBlock(row) !== blockFilter) return false;
+      }
       if (!q) return true;
       const haystack = [
         row.name,
         row.employeeId,
+        row.isExternal ? 'external' : '',
         row.venue?.name,
         row.venue?.locationSummary,
+        rowBlock(row),
         row.schedule?.subjectCode,
         row.schedule?.department,
         row.schedule?.section,
@@ -90,7 +127,7 @@ const VenueLiveTab = () => {
         .toLowerCase();
       return haystack.includes(q);
     });
-  }, [payload, search, statusFilter]);
+  }, [payload, search, statusFilter, blockFilter]);
 
   const counts = useMemo(() => {
     const trainers = payload?.trainers || [];
@@ -107,7 +144,7 @@ const VenueLiveTab = () => {
     <div className="card table-card">
       <div className="card-body">
         <div className="row g-2 mb-3 align-items-center">
-          <div className="col-md-4">
+          <div className="col-md-3">
             <input
               type="search"
               className="form-control"
@@ -116,6 +153,19 @@ const VenueLiveTab = () => {
               onChange={(e) => setSearch(e.target.value)}
               aria-label="Search live venues"
             />
+          </div>
+          <div className="col-md-2">
+            <select
+              className="form-select"
+              value={blockFilter}
+              onChange={(e) => setBlockFilter(e.target.value)}
+              aria-label="Filter by block"
+            >
+              <option value="">All blocks</option>
+              {availableBlocks.map((block) => (
+                <option key={block} value={block}>{block}</option>
+              ))}
+            </select>
           </div>
           <div className="col-md-2">
             <select
@@ -129,7 +179,7 @@ const VenueLiveTab = () => {
               <option value="free">Free</option>
             </select>
           </div>
-          <div className="col-md-4">
+          <div className="col-md-3">
             <div className="text-muted small">
               {payload?.day || '—'} · {payload?.currentTime || '—'} IST
               {payload?.date ? ` · ${payload.date}` : ''}
@@ -172,9 +222,14 @@ const VenueLiveTab = () => {
                 </tr>
               ) : (
                 rows.map((row) => (
-                  <tr key={row.trainerId || row.employeeId}>
-                    <td className="fw-medium">{row.name}</td>
-                    <td>{row.employeeId}</td>
+                  <tr key={rowKey(row)}>
+                    <td className="fw-medium">
+                      {row.name}
+                      {row.isExternal ? (
+                        <span className="badge bg-secondary ms-2">External</span>
+                      ) : null}
+                    </td>
+                    <td>{row.employeeId || '—'}</td>
                     <td>
                       <span className={`badge ${statusBadgeClass(row.status)}`}>
                         {statusLabel(row.status)}

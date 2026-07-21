@@ -21,6 +21,10 @@ import {
   formatTopicModulesCovered,
   getEntryTopicModules,
 } from './topicTrackerEntryTopics.js';
+import {
+  getStudentCountForClass,
+  resolveAllottedStudents,
+} from './studentCountByClass.js';
 
 const WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
@@ -181,10 +185,10 @@ const entryToSession = (entry, defaults) => ({
   sessionStartTime: entry?.sessionStartTime || defaults.sessionStartTime,
   sessionEndTime: entry?.sessionEndTime || defaults.sessionEndTime,
   durationHrs: entry?.durationHrs ?? defaults.durationHrs,
-  allottedStudents: entry?.allottedStudents ?? defaults.allottedStudents,
+  allottedStudents: resolveAllottedStudents(entry?.allottedStudents, defaults.allottedStudents),
   noPresent: entry?.noPresent ?? 0,
   attendancePercent: entry?.attendancePercent ?? computeAttendancePercent(
-    entry?.allottedStudents ?? defaults.allottedStudents,
+    resolveAllottedStudents(entry?.allottedStudents, defaults.allottedStudents),
     entry?.noPresent ?? 0
   ),
   sessionStatus: entry?.sessionStatus || '',
@@ -319,8 +323,11 @@ export const buildTopicTrackerSessions = async ({
 
     const classKey = `${schedule.department}::${schedule.section}::${schedule.semester}`;
     const classGroup = classGroupMap.get(classKey);
-    const studentKey = `${schedule.department}::${schedule.section}`;
-    const allottedStudents = studentCountMap.get(studentKey) || 0;
+    const allottedStudents = getStudentCountForClass(
+      studentCountMap,
+      schedule.department,
+      schedule.section
+    );
     const venueName = schedule.venue?.name
       || [schedule.venue?.building, schedule.venue?.floor].filter(Boolean).join(' ')
       || '';

@@ -95,10 +95,6 @@ export const buildTimetableBoardForDate = async ({
 
     leaves.forEach((leave) => {
       leave.replacements?.forEach((entry) => {
-        const replacementTrainerId = entry.replacementTrainer?.toString();
-        const trainer = trainerById.get(replacementTrainerId);
-        if (!trainer) return;
-
         const schedule = scheduleById.get(entry.schedule?.toString());
         if (!schedule) return;
         if (canceledScheduleIds.has(schedule._id.toString())) return;
@@ -106,14 +102,37 @@ export const buildTimetableBoardForDate = async ({
         if (!isScheduleDayInLeaveRange(schedule.day, leave)) return;
         if (ownedIds.has(schedule._id.toString())) return;
 
-        board[trainer.employeeId].push({
+        const replacementPayload = {
           ...schedule,
-          trainerCode: trainer.employeeId,
           replacementFor: {
             trainerCode: leave.trainer?.employeeId || '',
             trainerName: leave.trainer?.name || '',
           },
           isReplacementAssignment: true,
+        };
+
+        const replacementTrainerId = entry.replacementTrainer?.toString();
+        const trainer = replacementTrainerId ? trainerById.get(replacementTrainerId) : null;
+        if (trainer) {
+          board[trainer.employeeId].push({
+            ...replacementPayload,
+            trainerCode: trainer.employeeId,
+          });
+          return;
+        }
+
+        const externalName = entry.isExternal
+          ? String(entry.externalTrainerName || '').trim()
+          : '';
+        if (!externalName) return;
+
+        const key = `external:${externalName.toLowerCase()}`;
+        if (!board[key]) board[key] = [];
+        board[key].push({
+          ...replacementPayload,
+          trainerCode: key,
+          isExternal: true,
+          externalTrainerName: externalName,
         });
       });
     });

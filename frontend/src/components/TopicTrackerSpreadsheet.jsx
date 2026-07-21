@@ -410,10 +410,6 @@ const TopicTrackerSpreadsheet = ({
         )}
       </div>
       <div className="toms-modal-footer">
-        <p className="small text-muted mb-0 me-auto">
-          Change any editable value, then click Save. Rows without changes cannot be saved.
-          Unsaved changes are kept until you click Close.
-        </p>
         <button type="button" className="btn btn-secondary" onClick={onClose}>
           Close
         </button>

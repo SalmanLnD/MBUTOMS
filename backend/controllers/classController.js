@@ -3,6 +3,7 @@ import Student from '../models/Student.js';
 import Schedule from '../models/Schedule.js';
 import Subject from '../models/Subject.js';
 import { getAllowedClassDepartmentsForSubject } from '../utils/subjectClassEligibility.js';
+import { getStudentCountForClass } from '../utils/studentCountByClass.js';
 
 const attachStudentCounts = async (classes) => {
   const counts = await Student.aggregate([
@@ -22,14 +23,11 @@ const attachStudentCounts = async (classes) => {
     ])
   );
 
-  return classes.map((cls) => {
-    const key = `${cls.department}::${cls.section}`;
-    return {
-      ...cls,
-      studentCount: countMap.get(key) || 0,
-      label: `${cls.department} ${cls.section}`,
-    };
-  });
+  return classes.map((cls) => ({
+    ...cls,
+    studentCount: getStudentCountForClass(countMap, cls.department, cls.section),
+    label: `${cls.department} ${cls.section}`,
+  }));
 };
 
 export const getClasses = async (req, res) => {

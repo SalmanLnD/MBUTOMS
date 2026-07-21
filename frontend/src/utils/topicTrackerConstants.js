@@ -35,7 +35,7 @@ export const TOPIC_TRACKER_COLUMNS = [
   { key: 'sessionStartTime', label: 'Session Start Time', width: 120 },
   { key: 'sessionEndTime', label: 'Session End Time', width: 120 },
   { key: 'durationHrs', label: 'Duration (Hrs)', readOnly: true, width: 110 },
-  { key: 'allottedStudents', label: 'Allotted students', width: 120 },
+  { key: 'allottedStudents', label: 'Total class count', width: 120 },
   { key: 'noPresent', label: 'No. Present', width: 110 },
   { key: 'attendancePercent', label: 'Attendance %', readOnly: true, width: 110 },
   { key: 'sessionStatus', label: 'Session Status', width: 130 },

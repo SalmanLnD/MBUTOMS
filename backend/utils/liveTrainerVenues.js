@@ -105,6 +105,39 @@ const serializeSchedule = (schedule) => {
     isProject: Boolean(schedule.isProject),
     isReplacementAssignment: Boolean(schedule.isReplacementAssignment),
     replacementFor: schedule.replacementFor || null,
+    isExternal: Boolean(schedule.isExternal),
+    externalTrainerName: schedule.externalTrainerName || '',
+  };
+};
+
+const buildTrainerLiveRow = ({
+  trainerId = null,
+  employeeId = null,
+  name,
+  isExternal = false,
+  current,
+}) => {
+  if (!current) {
+    return {
+      trainerId,
+      employeeId,
+      name,
+      isExternal,
+      status: 'free',
+      venue: null,
+      schedule: null,
+    };
+  }
+
+  const venue = serializeVenue(current.venue);
+  return {
+    trainerId,
+    employeeId,
+    name,
+    isExternal,
+    status: venue ? 'in_class' : 'in_class_no_venue',
+    venue,
+    schedule: serializeSchedule(current),
   };
 };
 
@@ -142,26 +175,44 @@ export const buildLiveTrainerVenues = async ({ now = new Date() } = {}) => {
       byCode
     );
 
-    if (!current) {
-      return {
-        trainerId: trainer._id,
-        employeeId: trainer.employeeId,
-        name: trainer.name,
-        status: 'free',
-        venue: null,
-        schedule: null,
-      };
-    }
-
-    const venue = serializeVenue(current.venue);
-    return {
+    return buildTrainerLiveRow({
       trainerId: trainer._id,
       employeeId: trainer.employeeId,
       name: trainer.name,
-      status: venue ? 'in_class' : 'in_class_no_venue',
-      venue,
-      schedule: serializeSchedule(current),
-    };
+      current,
+    });
+  });
+
+  const externalKeys = Object.keys(schedulesByTrainer)
+    .filter((key) => key.startsWith('external:'))
+    .sort((a, b) => a.localeCompare(b));
+
+  externalKeys.forEach((key) => {
+    const boardSchedules = schedulesByTrainer[key] || [];
+    const hasToday = boardSchedules.some(
+      (schedule) =>
+        schedule.day === clock.dayName
+        && isSubjectStarted(schedule, ref, byId, byCode)
+    );
+    if (!hasToday) return;
+
+    const current = pickCurrentSchedule(
+      boardSchedules,
+      clock.dayName,
+      clock.minutes,
+      ref,
+      byId,
+      byCode
+    );
+    const name = current?.externalTrainerName
+      || boardSchedules.find((schedule) => schedule.externalTrainerName)?.externalTrainerName
+      || key.slice('external:'.length);
+
+    rows.push(buildTrainerLiveRow({
+      name,
+      isExternal: true,
+      current,
+    }));
   });
 
   return {

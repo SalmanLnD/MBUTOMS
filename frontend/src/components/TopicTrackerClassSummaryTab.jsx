@@ -91,18 +91,7 @@ const TopicTrackerClassSummaryTab = ({
               ))}
             </select>
           </div>
-          <div className="col-md-4">
-            <p className="text-muted small mb-0">
-              Coverage is based on closed topic tracker entries, grouped by trainer and class.
-            </p>
-          </div>
         </div>
-      )}
-
-      {!showSubjectFilter && (
-        <p className="text-muted small mb-3">
-          Your class-wise topic coverage from closed tracker entries.
-        </p>
       )}
 
       {loading ? (
