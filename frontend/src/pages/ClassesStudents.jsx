@@ -4,6 +4,7 @@ import Pagination from '../components/Pagination.jsx';
 import { showError, showSuccess } from '../utils/toast.js';
 import ConfirmModal from '../components/ConfirmModal.jsx';
 import StudentFormModal from '../components/StudentFormModal.jsx';
+import StudentBulkUploadModal from '../components/StudentBulkUploadModal.jsx';
 import Modal from '../components/Modal.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
 import { useDebounce } from '../hooks/useDebounce.js';
@@ -16,7 +17,7 @@ import {
 } from '../services/studentService.js';
 import { getAttendance, markAttendance } from '../services/attendanceService.js';
 import { formatDate, formatStatus, getErrorMessage, toInputDate } from '../utils/helpers.js';
-import { EditIcon, EyeIcon, TrashIcon } from '../components/icons.jsx';
+import { EditIcon, EyeIcon, TrashIcon, UploadIcon } from '../components/icons.jsx';
 import ActionIconButton from '../components/ActionIconButton.jsx';
 
 const statusOptions = ['present', 'absent', 'late', 'leave', 'od', 'holiday'];
@@ -139,6 +140,7 @@ const ClassesStudents = () => {
   const [departmentFilter, setDepartmentFilter] = useState('');
   const [sectionFilter, setSectionFilter] = useState('');
   const [showStudentForm, setShowStudentForm] = useState(false);
+  const [showStudentBulkUpload, setShowStudentBulkUpload] = useState(false);
   const [editingStudent, setEditingStudent] = useState(null);
   const [pendingDelete, setPendingDelete] = useState(null);
 
@@ -268,6 +270,14 @@ const ClassesStudents = () => {
     showSuccess('Student saved successfully');
     fetchStudents();
     fetchClasses();
+  };
+
+  const handleStudentBulkImported = (result) => {
+    if ((result?.created || 0) + (result?.updated || 0) > 0) {
+      showSuccess(result.message || 'Students imported');
+      fetchStudents();
+      fetchClasses();
+    }
   };
 
   const handleConfirmDelete = async () => {
@@ -526,16 +536,26 @@ const ClassesStudents = () => {
             </div>
             <div className="col-md-3 text-md-end">
               {canManage && (
-                <button
-                  type="button"
-                  className="btn btn-primary"
-                  onClick={() => {
-                    setEditingStudent(null);
-                    setShowStudentForm(true);
-                  }}
-                >
-                  Add Student
-                </button>
+                <div className="d-inline-flex flex-wrap gap-2 justify-content-md-end">
+                  <button
+                    type="button"
+                    className="btn btn-outline-primary d-inline-flex align-items-center gap-2"
+                    onClick={() => setShowStudentBulkUpload(true)}
+                  >
+                    <UploadIcon size={16} />
+                    Bulk Upload
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-primary"
+                    onClick={() => {
+                      setEditingStudent(null);
+                      setShowStudentForm(true);
+                    }}
+                  >
+                    Add Student
+                  </button>
+                </div>
               )}
             </div>
           </div>
@@ -735,6 +755,14 @@ const ClassesStudents = () => {
             setEditingStudent(null);
           }}
           onSaved={handleStudentSaved}
+        />
+      )}
+
+      {showStudentBulkUpload && (
+        <StudentBulkUploadModal
+          show
+          onClose={() => setShowStudentBulkUpload(false)}
+          onImported={handleStudentBulkImported}
         />
       )}
 

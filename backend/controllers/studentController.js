@@ -1,4 +1,9 @@
 import Student from '../models/Student.js';
+import {
+  buildStudentBulkTemplateBuffer,
+  importStudentsFromRows,
+  parseStudentBulkFile,
+} from '../utils/studentBulkImport.js';
 
 const populateStudent = (query) =>
   query
@@ -92,4 +97,46 @@ export const deleteStudent = async (req, res) => {
   if (!student) return res.status(404).json({ message: 'Student not found' });
   await student.deleteOne();
   res.json({ message: 'Student removed' });
+};
+
+export const downloadStudentBulkTemplate = async (_req, res) => {
+  const buffer = await buildStudentBulkTemplateBuffer();
+  res.setHeader(
+    'Content-Type',
+    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+  );
+  res.setHeader(
+    'Content-Disposition',
+    'attachment; filename="student-bulk-upload-template.xlsx"'
+  );
+  res.send(Buffer.from(buffer));
+};
+
+export const bulkUploadStudents = async (req, res) => {
+  if (!req.file?.buffer) {
+    return res.status(400).json({ message: 'Upload a .xlsx or .csv file' });
+  }
+
+  const updateExisting = String(req.body?.updateExisting || '').toLowerCase() === 'true'
+    || req.body?.updateExisting === true
+    || req.body?.updateExisting === '1';
+
+  let rows;
+  try {
+    rows = await parseStudentBulkFile(req.file);
+  } catch (error) {
+    return res.status(error.statusCode || 400).json({
+      message: error.message || 'Could not read the uploaded file',
+    });
+  }
+
+  if (!rows.length) {
+    return res.status(400).json({ message: 'No student rows found in the file' });
+  }
+
+  const result = await importStudentsFromRows(rows, { updateExisting });
+  res.json({
+    message: `Import complete: ${result.created} created, ${result.updated} updated, ${result.skipped} skipped, ${result.failed} failed`,
+    ...result,
+  });
 };

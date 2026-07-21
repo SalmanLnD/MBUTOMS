@@ -24,3 +24,20 @@ export const deleteStudent = async (id) => {
   const { data } = await api.delete(`/students/${id}`);
   return data;
 };
+
+export const downloadStudentBulkTemplate = async () => {
+  const { data } = await api.get('/students/bulk/template', {
+    responseType: 'blob',
+  });
+  return data;
+};
+
+export const bulkUploadStudents = async (file, { updateExisting = false } = {}) => {
+  const formData = new FormData();
+  formData.append('file', file);
+  formData.append('updateExisting', updateExisting ? 'true' : 'false');
+  const { data } = await api.post('/students/bulk', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  });
+  return data;
+};
