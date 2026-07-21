@@ -433,7 +433,8 @@ body {
 }
 
 .trainer-attendance-grid .trainer-attendance-oif-input,
-.trainer-attendance-grid .trainer-attendance-mock-input {
+.trainer-attendance-grid .trainer-attendance-mock-input,
+.trainer-attendance-grid .trainer-attendance-class-input {
   display: block;
   width: 100%;
   min-width: 0;
@@ -497,12 +498,15 @@ body {
 }
 
 .trainer-attendance-grid .trainer-attendance-mock-input::-webkit-outer-spin-button,
-.trainer-attendance-grid .trainer-attendance-mock-input::-webkit-inner-spin-button {
+.trainer-attendance-grid .trainer-attendance-mock-input::-webkit-inner-spin-button,
+.trainer-attendance-grid .trainer-attendance-class-input::-webkit-outer-spin-button,
+.trainer-attendance-grid .trainer-attendance-class-input::-webkit-inner-spin-button {
   -webkit-appearance: none;
   margin: 0;
 }
 
-.trainer-attendance-grid .trainer-attendance-mock-input {
+.trainer-attendance-grid .trainer-attendance-mock-input,
+.trainer-attendance-grid .trainer-attendance-class-input {
   -moz-appearance: textfield;
   appearance: textfield;
 }

@@ -5,6 +5,7 @@ import Schedule from '../models/Schedule.js';
 import {
   getAttendanceCalendarDates,
   getAttendanceMonthRange,
+  isAttendanceSundayDate,
   toAttendanceDateKey,
   TRAINER_ATTENDANCE_TRACKING_START,
 } from './attendanceDates.js';
@@ -13,7 +14,7 @@ import { mergeRosterFilter } from './rosterFilter.js';
 import { resolveTrainerScheduleCodes } from './trainerMappings.js';
 import { getLeaveOverlapFilter, isDateWithinLeave } from './leaveDateRange.js';
 import { getLeaveWeekdayScheduleIds, isFullDayLeave } from './leaveScope.js';
-import { applyItOifAttendanceRules } from './attendanceOifRules.js';
+import { applyItOifAttendanceRules, allowsManualClassHandlingHours } from './attendanceOifRules.js';
 import {
   attendanceTypeUsesOifNumber,
   formatTrainerAttendanceOifDisplay,
@@ -150,6 +151,9 @@ export const buildTrainerAttendanceExportPayload = async () => {
         const key = `${trainerId}|${dateKey}`;
         const log = logsByTrainerDate.get(key);
         const onLeave = fullDayLeaveKeys.has(key);
+        const [year, month, day] = dateKey.split('-').map(Number);
+        const date = new Date(Date.UTC(year, month - 1, day));
+        const isSunday = isAttendanceSundayDate(date);
         let attendanceType = log?.attendanceType || TRAINER_ATTENDANCE_TYPES.OIF;
         let oifNumber = log?.oifNumber || '';
         let mockPrepHours = log?.mockPrepHours || 0;
@@ -164,6 +168,26 @@ export const buildTrainerAttendanceExportPayload = async () => {
             : '';
           mockPrepHours = 0;
           classHandlingHours = 0;
+        } else if (!log && isSunday) {
+          attendanceType = TRAINER_ATTENDANCE_TYPES.WEEK_OFF;
+          oifNumber = '';
+          mockPrepHours = 0;
+          classHandlingHours = 0;
+        } else if (
+          isSunday
+          && attendanceType !== TRAINER_ATTENDANCE_TYPES.OIF
+          && isLeaveAttendanceType(attendanceType)
+        ) {
+          oifNumber = attendanceTypeUsesOifNumber(attendanceType)
+            ? (log?.oifNumber || '')
+            : '';
+          mockPrepHours = 0;
+          classHandlingHours = 0;
+        } else if (allowsManualClassHandlingHours(oifNumber)) {
+          mockPrepHours = Number(log?.mockPrepHours || 0);
+          classHandlingHours = log?.classHandlingHours != null
+            ? Number(log.classHandlingHours)
+            : 0;
         } else {
           const resolved = applyItOifAttendanceRules({
             oifNumber,

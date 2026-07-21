@@ -23,7 +23,7 @@ import {
   toInputDate,
   TRAINER_ATTENDANCE_TRACKING_START,
 } from '../utils/monthDates.js';
-import { countsAsOifDay } from '../utils/trainerAttendanceTypes.js';
+import { allowsManualClassHandlingHours, countsAsOifDay } from '../utils/trainerAttendanceTypes.js';
 import { ROLES } from '../utils/roles.js';
 import TrainerAttendanceSheetSetupModal from './TrainerAttendanceSheetSetupModal.jsx';
 import { ExternalLinkIcon, SheetIcon } from './icons.jsx';
@@ -158,12 +158,26 @@ const TrainerAttendanceTab = () => {
         ...prev,
         rows: prev.rows.map((row) => {
           if (row.trainer._id !== trainerId) return row;
+          const previousCell = row.days[dateKey] || {};
+          const nextCell = {
+            ...previousCell,
+            [field]: value,
+          };
+          if (field === 'oifNumber') {
+            nextCell.classHoursEditable = allowsManualClassHandlingHours(value);
+            if (!nextCell.classHoursEditable) {
+              // Campus / IT / empty — hours refresh from the server on save.
+            } else if (
+              previousCell.classHandlingHours === undefined
+              || previousCell.classHandlingHours === null
+              || !previousCell.classHoursEditable
+            ) {
+              nextCell.classHandlingHours = previousCell.classHandlingHours || 0;
+            }
+          }
           const nextDays = {
             ...row.days,
-            [dateKey]: {
-              ...row.days[dateKey],
-              [field]: value,
-            },
+            [dateKey]: nextCell,
           };
           const dateKeys = prev.dates.map((date) => date.key);
           const totals = dateKeys.reduce(
@@ -217,6 +231,7 @@ const TrainerAttendanceTab = () => {
         attendanceType: cell.attendanceType,
         oifNumber: cell.oifNumber,
         mockPrepHours: cell.mockPrepHours,
+        classHandlingHours: cell.classHandlingHours,
         foodAllowance: cell.foodAllowance,
       });
 
@@ -239,7 +254,10 @@ const TrainerAttendanceTab = () => {
                   foodAllowance: saved.foodAllowance,
                   mockPrepHours: saved.mockPrepHours,
                   classHandlingHours: saved.classHandlingHours,
+                  classHoursEditable: saved.classHoursEditable,
                   isOnLeave: saved.isOnLeave,
+                  isSundayWeekOff: saved.isSundayWeekOff,
+                  isDefaultWeekOff: saved.isDefaultWeekOff,
                 },
               },
             };

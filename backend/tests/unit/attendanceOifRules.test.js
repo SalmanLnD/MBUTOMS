@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   countsAsOifDay,
+  allowsManualClassHandlingHours,
   resolveClassHandlingHoursForOif,
   resolveMockPrepHoursForOif,
 } from '../../utils/attendanceOifRules.js';
@@ -20,4 +21,13 @@ test('internal training does not count as an OIF day or class hours', () => {
 test('normal OIF numbers still count as OIF days', () => {
   assert.equal(countsAsOifDay('OIF-123'), true);
   assert.equal(countsAsOifDay(''), false);
+});
+
+test('only non-campus OIFs allow manual class handling hours', () => {
+  assert.equal(allowsManualClassHandlingHours(''), false);
+  assert.equal(allowsManualClassHandlingHours('IT'), false);
+  assert.equal(allowsManualClassHandlingHours('CT27004'), false);
+  assert.equal(allowsManualClassHandlingHours('idsa'), false);
+  assert.equal(allowsManualClassHandlingHours('CA26421'), true);
+  assert.equal(allowsManualClassHandlingHours('EXT-99'), true);
 });

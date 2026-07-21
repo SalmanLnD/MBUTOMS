@@ -8,6 +8,7 @@ import {
   getAttendanceMonthRange,
   getAttendanceWeekdayName,
   isAttendanceWeekendDate,
+  isAttendanceSundayDate,
   normalizeAttendanceDate,
   parseAttendanceMonthParam,
   toAttendanceDateKey,
@@ -23,6 +24,7 @@ import {
 } from '../utils/attendanceGridCache.js';
 import {
   applyItOifAttendanceRules,
+  allowsManualClassHandlingHours,
   countsAsOifDay,
   isItOif,
   resolveMockPrepHoursForOif,
@@ -231,6 +233,9 @@ export const buildTrainerAttendanceGridPayload = async ({
           mockPrepHours: 0,
           classHandlingHours: 0,
           isOnLeave: true,
+          isDefaultWeekOff: false,
+          isSundayWeekOff: false,
+          classHoursEditable: false,
           // RRD only for full-day leave on a weekday the trainer teaches.
           isReplacementRequired: trainingWeekdays.has(weekdayName),
           isFuture: date > today,
@@ -238,21 +243,53 @@ export const buildTrainerAttendanceGridPayload = async ({
         return;
       }
       const oifNumber = log?.oifNumber || '';
-      const { mockPrepHours, classHandlingHours } = applyItOifAttendanceRules({
-        oifNumber,
-        mockPrepHours: log?.mockPrepHours ?? 0,
-        classHandlingHours: classHoursCache.get(cacheKey) ?? 0,
-      });
-      const attendanceType = log?.attendanceType || TRAINER_ATTENDANCE_TYPES.OIF;
+      const isSunday = isAttendanceSundayDate(date);
+      const hasSavedLog = Boolean(log);
+      const defaultWeekOff = isSunday && !hasSavedLog;
+      const attendanceType = defaultWeekOff
+        ? TRAINER_ATTENDANCE_TYPES.WEEK_OFF
+        : (log?.attendanceType || TRAINER_ATTENDANCE_TYPES.OIF);
+      const sundayNonWorking = isSunday
+        && attendanceType !== TRAINER_ATTENDANCE_TYPES.OIF
+        && isLeaveAttendanceType(attendanceType);
+      const classHoursEditable = !defaultWeekOff
+        && !sundayNonWorking
+        && allowsManualClassHandlingHours(oifNumber);
+
+      let mockPrepHours = 0;
+      let classHandlingHours = 0;
+      if (defaultWeekOff || sundayNonWorking) {
+        mockPrepHours = 0;
+        classHandlingHours = 0;
+      } else if (classHoursEditable) {
+        mockPrepHours = resolveMockPrepHoursForOif(oifNumber, log?.mockPrepHours ?? 0);
+        classHandlingHours = log?.classHandlingHours != null
+          ? Number(log.classHandlingHours)
+          : 0;
+      } else {
+        const resolved = applyItOifAttendanceRules({
+          oifNumber,
+          mockPrepHours: log?.mockPrepHours ?? 0,
+          classHandlingHours: classHoursCache.get(cacheKey) ?? 0,
+        });
+        mockPrepHours = resolved.mockPrepHours;
+        classHandlingHours = resolved.classHandlingHours;
+      }
+
       days[dateKey] = {
         id: log?._id || null,
         attendanceType,
-        oifNumber,
+        oifNumber: (defaultWeekOff || sundayNonWorking) && !attendanceTypeUsesOifNumber(attendanceType)
+          ? ''
+          : oifNumber,
         oifDisplay: formatTrainerAttendanceOifDisplay(attendanceType, oifNumber),
-        foodAllowance: log?.foodAllowance || '',
+        foodAllowance: defaultWeekOff ? '' : (log?.foodAllowance || ''),
         mockPrepHours,
         classHandlingHours,
+        classHoursEditable,
         isOnLeave: false,
+        isDefaultWeekOff: defaultWeekOff,
+        isSundayWeekOff: defaultWeekOff || sundayNonWorking,
         isReplacementRequired: false,
         isFuture: date > today,
       };
@@ -289,6 +326,7 @@ export const buildTrainerAttendanceGridPayload = async ({
       }),
       isFuture: date > today,
       isWeekend: isAttendanceWeekendDate(date),
+      isSunday: isAttendanceSundayDate(date),
     })),
     rows,
   };
@@ -315,6 +353,7 @@ export const upsertTrainerDailyAttendance = async (req, res) => {
     attendanceType,
     oifNumber,
     mockPrepHours,
+    classHandlingHours: classHandlingHoursInput,
     foodAllowance,
   } = req.body;
 
@@ -395,19 +434,69 @@ export const upsertTrainerDailyAttendance = async (req, res) => {
     return res.status(400).json({ message: 'OIF number must be 12 characters or fewer' });
   }
 
-  const resolvedAttendanceType = isOnFullDayLeave
-    ? String(attendanceType || TRAINER_ATTENDANCE_TYPES.LEAVE).trim()
-    : TRAINER_ATTENDANCE_TYPES.OIF;
-  if (isOnFullDayLeave && !isLeaveAttendanceType(resolvedAttendanceType)) {
-    return res.status(400).json({ message: 'Select a valid leave type.' });
+  const isSunday = isAttendanceSundayDate(day);
+  const requestedType = String(attendanceType || '').trim();
+  let resolvedAttendanceType;
+  let isNonWorkingDay = false;
+
+  if (isOnFullDayLeave) {
+    resolvedAttendanceType = requestedType || TRAINER_ATTENDANCE_TYPES.LEAVE;
+    if (!isLeaveAttendanceType(resolvedAttendanceType)) {
+      return res.status(400).json({ message: 'Select a valid leave type.' });
+    }
+    isNonWorkingDay = true;
+  } else if (isSunday) {
+    if (!requestedType || requestedType === TRAINER_ATTENDANCE_TYPES.WEEK_OFF) {
+      resolvedAttendanceType = TRAINER_ATTENDANCE_TYPES.WEEK_OFF;
+      isNonWorkingDay = true;
+    } else if (requestedType === TRAINER_ATTENDANCE_TYPES.OIF) {
+      resolvedAttendanceType = TRAINER_ATTENDANCE_TYPES.OIF;
+      isNonWorkingDay = false;
+    } else if (isLeaveAttendanceType(requestedType)) {
+      resolvedAttendanceType = requestedType;
+      isNonWorkingDay = true;
+    } else {
+      return res.status(400).json({ message: 'Select a valid attendance type.' });
+    }
+  } else {
+    resolvedAttendanceType = TRAINER_ATTENDANCE_TYPES.OIF;
+    isNonWorkingDay = false;
   }
 
   const finalOifNumber = attendanceTypeUsesOifNumber(resolvedAttendanceType)
     ? trimmedOif
     : '';
-  const finalMockHours = isOnFullDayLeave
+  const finalMockHours = isNonWorkingDay
     ? 0
     : resolveMockPrepHoursForOif(finalOifNumber, parsedMockHours);
+
+  const classHoursEditable = !isNonWorkingDay && allowsManualClassHandlingHours(finalOifNumber);
+  let storedClassHandlingHours = null;
+  let classHandlingHours = 0;
+
+  if (isNonWorkingDay || isItOif(finalOifNumber)) {
+    storedClassHandlingHours = null;
+    classHandlingHours = 0;
+  } else if (classHoursEditable) {
+    const parsedClassHours = classHandlingHoursInput === ''
+      || classHandlingHoursInput === null
+      || classHandlingHoursInput === undefined
+      ? 0
+      : Number(classHandlingHoursInput);
+    if (Number.isNaN(parsedClassHours) || parsedClassHours < 0) {
+      return res.status(400).json({ message: 'Class handling hours must be a valid number' });
+    }
+    storedClassHandlingHours = parsedClassHours;
+    classHandlingHours = parsedClassHours;
+  } else {
+    storedClassHandlingHours = null;
+    const classHoursCache = await computeClassHandlingHoursBatch(
+      [trainer],
+      [day],
+      null
+    );
+    classHandlingHours = classHoursCache.get(`${trainer.toString()}|${toAttendanceDateKey(day)}`) ?? 0;
+  }
 
   const record = await TrainerDailyAttendance.findOneAndUpdate(
     { trainer, date: day },
@@ -418,6 +507,7 @@ export const upsertTrainerDailyAttendance = async (req, res) => {
         attendanceType: resolvedAttendanceType,
         oifNumber: finalOifNumber,
         mockPrepHours: finalMockHours,
+        classHandlingHours: storedClassHandlingHours,
         foodAllowance: resolvedFoodAllowance,
         markedBy: req.user._id,
       },
@@ -425,19 +515,9 @@ export const upsertTrainerDailyAttendance = async (req, res) => {
     { upsert: true, new: true, setDefaultsOnInsert: true }
   );
 
-  let classHandlingHours = 0;
-  if (!isOnFullDayLeave && !isItOif(finalOifNumber)) {
-    const classHoursCache = await computeClassHandlingHoursBatch(
-      [trainer],
-      [day],
-      null
-    );
-    classHandlingHours = classHoursCache.get(`${trainer.toString()}|${toAttendanceDateKey(day)}`) ?? 0;
-  }
-
   clearAttendanceGridCache();
 
-  const resolved = isOnFullDayLeave
+  const resolved = isNonWorkingDay
     ? { mockPrepHours: 0, classHandlingHours: 0 }
     : applyItOifAttendanceRules({
       oifNumber: record.oifNumber,
@@ -455,7 +535,10 @@ export const upsertTrainerDailyAttendance = async (req, res) => {
     foodAllowance: record.foodAllowance || '',
     mockPrepHours: resolved.mockPrepHours,
     classHandlingHours: resolved.classHandlingHours,
+    classHoursEditable,
     isOnLeave: isOnFullDayLeave,
+    isSundayWeekOff: isSunday && isNonWorkingDay && !isOnFullDayLeave,
+    isDefaultWeekOff: false,
   });
 };
 

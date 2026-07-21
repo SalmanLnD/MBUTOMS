@@ -17,6 +17,8 @@ const trainerDailyAttendanceSchema = new mongoose.Schema(
     },
     oifNumber: { type: String, trim: true, maxlength: 12, default: '' },
     mockPrepHours: { type: Number, min: 0, default: 0 },
+    // Used when OIF is not a campus subject (auto timetable hours do not apply).
+    classHandlingHours: { type: Number, min: 0, default: undefined },
     foodAllowance: {
       type: String,
       enum: ['', ...Object.values(FOOD_ALLOWANCE_TYPES)],

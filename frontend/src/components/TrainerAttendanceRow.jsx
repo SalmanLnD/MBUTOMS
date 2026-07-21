@@ -2,7 +2,9 @@ import { memo, Fragment } from 'react';
 import {
   attendanceTypeUsesOifNumber,
   formatTrainerAttendanceOifDisplay,
+  isLeaveAttendanceType,
   LEAVE_TYPE_OPTIONS,
+  TRAINER_ATTENDANCE_TYPES,
 } from '../utils/trainerAttendanceTypes.js';
 import { FOOD_ALLOWANCE_OPTIONS } from '../utils/foodAllowanceTypes.js';
 
@@ -26,12 +28,34 @@ const TrainerAttendanceRow = memo(({
         mockPrepHours: 0,
         classHandlingHours: 0,
         foodAllowance: '',
+        attendanceType: date.isSunday
+          ? TRAINER_ATTENDANCE_TYPES.WEEK_OFF
+          : TRAINER_ATTENDANCE_TYPES.OIF,
       };
       const canEditCell = canEditTrainer(row.trainer._id) && (
         !date.isFuture || (cell.isOnLeave && canEditFutureLeave)
       );
-      const editable = canEditCell && !cell.isOnLeave;
+      const sundayNonWorking = Boolean(
+        date.isSunday
+        && !cell.isOnLeave
+        && cell.attendanceType !== TRAINER_ATTENDANCE_TYPES.OIF
+        && (
+          cell.isDefaultWeekOff
+          || cell.isSundayWeekOff
+          || isLeaveAttendanceType(cell.attendanceType)
+          || !cell.attendanceType
+        )
+      );
+      const treatAsNonWorking = Boolean(cell.isOnLeave || sundayNonWorking);
+      const showTypeSelect = Boolean(cell.isOnLeave || date.isSunday);
+      const sundayPresentMode = Boolean(
+        date.isSunday
+        && !cell.isOnLeave
+        && cell.attendanceType === TRAINER_ATTENDANCE_TYPES.OIF
+      );
+      const editable = canEditCell && !treatAsNonWorking;
       const leaveTypeUsesOif = attendanceTypeUsesOifNumber(cell.attendanceType);
+      const showOifInput = leaveTypeUsesOif || sundayPresentMode;
       const oifSheetValue = formatTrainerAttendanceOifDisplay(
         cell.attendanceType,
         cell.oifNumber
@@ -41,37 +65,48 @@ const TrainerAttendanceRow = memo(({
       const futureClass = date.isFuture ? 'trainer-attendance-future' : '';
       const weekendClass = date.isWeekend ? 'trainer-attendance-weekend' : '';
       const cellClass = [futureClass, weekendClass].filter(Boolean).join(' ');
+      const typeSelectValue = cell.isOnLeave
+        ? (cell.attendanceType || '')
+        : (cell.attendanceType || TRAINER_ATTENDANCE_TYPES.WEEK_OFF);
 
       return (
         <Fragment key={`${row.trainer._id}-${date.key}`}>
           <td className={`trainer-attendance-oif-cell ${cellClass}`}>
-            {cell.isOnLeave ? (
+            {showTypeSelect ? (
               <div className="trainer-attendance-leave-controls">
                 <select
                   className="form-select form-select-sm trainer-attendance-leave-select"
-                  value={cell.attendanceType || ''}
+                  value={typeSelectValue}
                   disabled={!canEditCell || isSaving}
                   onChange={(e) => {
                     const nextType = e.target.value;
                     onUpdateCell(row.trainer._id, date.key, 'attendanceType', nextType);
-                    if (!attendanceTypeUsesOifNumber(nextType)) {
+                    if (
+                      nextType !== TRAINER_ATTENDANCE_TYPES.OIF
+                      && !attendanceTypeUsesOifNumber(nextType)
+                    ) {
                       onUpdateCell(row.trainer._id, date.key, 'oifNumber', '');
+                      onUpdateCell(row.trainer._id, date.key, 'mockPrepHours', 0);
                     }
                     window.setTimeout(() => onSave(row.trainer._id, date.key), 0);
                   }}
-                  aria-label="Leave type"
-                  title="Select leave type"
+                  aria-label={cell.isOnLeave ? 'Leave type' : 'Sunday attendance type'}
+                  title={cell.isOnLeave ? 'Select leave type' : 'Sunday defaults to W.O'}
                 >
-                  <option value="">Leave type...</option>
+                  {cell.isOnLeave ? (
+                    <option value="">Leave type...</option>
+                  ) : (
+                    <option value={TRAINER_ATTENDANCE_TYPES.OIF}>OIF (Present)</option>
+                  )}
                   {LEAVE_TYPE_OPTIONS.map((option) => (
                     <option key={option.value} value={option.value}>
                       {option.label}
                     </option>
                   ))}
                 </select>
-                {leaveTypeUsesOif && (
+                {showOifInput && (
                   <>
-                    {oifSheetValue && (
+                    {oifSheetValue && cell.attendanceType !== TRAINER_ATTENDANCE_TYPES.OIF && (
                       <div
                         className="trainer-attendance-oif-sheet-value small fw-semibold"
                         title="Value for Google Sheet OIF column"
@@ -97,7 +132,7 @@ const TrainerAttendanceRow = memo(({
                     />
                   </>
                 )}
-                {!leaveTypeUsesOif && cell.attendanceType && oifSheetValue && (
+                {!showOifInput && cell.attendanceType && oifSheetValue && (
                   <div
                     className="trainer-attendance-oif-sheet-value small fw-semibold"
                     title="Value for Google Sheet OIF column"
@@ -133,15 +168,35 @@ const TrainerAttendanceRow = memo(({
             />
           </td>
           <td className={`trainer-attendance-class-cell ${cellClass}`}>
-            <span className="trainer-attendance-class-value">
-              {Number(cell.classHandlingHours || 0).toFixed(1)}
-            </span>
+            {cell.classHoursEditable && editable ? (
+              <input
+                type="number"
+                min="0"
+                step="0.5"
+                className="form-control form-control-sm trainer-attendance-class-input"
+                value={cell.classHandlingHours}
+                disabled={isSaving}
+                onChange={(e) => onUpdateCell(
+                  row.trainer._id,
+                  date.key,
+                  'classHandlingHours',
+                  e.target.value
+                )}
+                onBlur={() => onSave(row.trainer._id, date.key)}
+                aria-label={`Class handling hours for ${date.label}`}
+                title="Enter class hours for non-campus OIF"
+              />
+            ) : (
+              <span className="trainer-attendance-class-value">
+                {Number(cell.classHandlingHours || 0).toFixed(1)}
+              </span>
+            )}
           </td>
           <td className={`trainer-attendance-food-cell ${cellClass}`}>
             <select
               className="form-select form-select-sm trainer-attendance-food-select"
               value={cell.foodAllowance || ''}
-              disabled={!canEditCell || isSaving}
+              disabled={!canEditCell || isSaving || treatAsNonWorking}
               onChange={(e) => {
                 onUpdateCell(
                   row.trainer._id,

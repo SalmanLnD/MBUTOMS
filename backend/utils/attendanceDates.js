@@ -58,6 +58,11 @@ export const isAttendanceWeekendDate = (date) => {
   return day === 0 || day === 6;
 };
 
+export const isAttendanceSundayDate = (date) => {
+  const normalized = normalizeAttendanceDate(date);
+  return normalized.getUTCDay() === 0;
+};
+
 export const getAttendanceWeekdayName = (date) => {
   const normalized = normalizeAttendanceDate(date);
   return ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'][

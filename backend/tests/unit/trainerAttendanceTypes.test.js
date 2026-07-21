@@ -17,6 +17,7 @@ test('defines all requested leave attendance types', () => {
     'comp_off',
     'exit',
     'break',
+    'week_off',
     'week_off_oif',
     'e_leave',
     'holiday_oif',
@@ -51,6 +52,10 @@ test('formats leave OIF sheet values with the full entered number', () => {
   assert.equal(
     formatTrainerAttendanceOifDisplay(TRAINER_ATTENDANCE_TYPES.LWO, ''),
     'L.W.O'
+  );
+  assert.equal(
+    formatTrainerAttendanceOifDisplay(TRAINER_ATTENDANCE_TYPES.WEEK_OFF, ''),
+    'W.O'
   );
   assert.equal(
     formatTrainerAttendanceOifDisplay(TRAINER_ATTENDANCE_TYPES.OIF, 'IT'),

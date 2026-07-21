@@ -62,3 +62,16 @@ export const buildAttendanceOifRemap = () => {
   }
   return map;
 };
+
+const CAMPUS_SUBJECT_OIF_KEYS = new Set(
+  SUBJECT_OIF_CATALOG.flatMap((entry) => [
+    entry.oifNumber,
+    ...(entry.aliases || []),
+  ]).map((value) => String(value).trim().toUpperCase()).filter(Boolean)
+);
+
+/** True when the OIF belongs to a known campus course (auto class hours). */
+export const isCampusSubjectOif = (oifNumber) => {
+  const value = String(oifNumber || '').trim().toUpperCase();
+  return Boolean(value) && CAMPUS_SUBJECT_OIF_KEYS.has(value);
+};
