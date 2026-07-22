@@ -15,6 +15,10 @@ import {
 } from '../utils/leaveAffectedClasses.js';
 import { toLeaveDateKey } from '../utils/leaveDateRange.js';
 import { getCanceledScheduleIdsForDate } from '../utils/classCancellations.js';
+import {
+  loadReplacementBusySlotsByTrainer,
+  trainerHasSlotConflict,
+} from '../utils/replacementSlotConflicts.js';
 
 const timeToMinutes = (time) => {
   const [h, m] = time.split(':').map(Number);
@@ -25,10 +29,6 @@ const parseTimeToMinutes = (time) => {
   const [h, m] = time.split(':').map(Number);
   return h * 60 + m;
 };
-
-const timesOverlap = (startA, endA, startB, endB) =>
-  parseTimeToMinutes(startA) < parseTimeToMinutes(endB) &&
-  parseTimeToMinutes(endA) > parseTimeToMinutes(startB);
 
 const WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
@@ -122,7 +122,7 @@ export const getReplacementSuggestions = async (req, res) => {
   );
   const allCodes = [...new Set([...codesByTrainer.values()].flat())];
 
-  const [overlappingLeaves, allSchedules] = await Promise.all([
+  const [overlappingLeaves, allSchedules, replacementBusyByTrainer] = await Promise.all([
     scheduleDayDates.length
       ? Leave.find({
           status: 'approved',
@@ -136,6 +136,12 @@ export const getReplacementSuggestions = async (req, res) => {
     Schedule.find({ trainerCode: { $in: allCodes } })
       .select('trainerCode day startTime endTime')
       .lean(),
+    loadReplacementBusySlotsByTrainer({
+      trainerIds: trainers.map((trainer) => trainer._id),
+      rangeStart: leaveStart,
+      rangeEnd: leaveEnd,
+      exclude: { leaveId: leave._id, scheduleId: schedule._id },
+    }),
   ]);
 
   const leavesByTrainer = new Map();
@@ -165,19 +171,20 @@ export const getReplacementSuggestions = async (req, res) => {
   const otherSuggestions = [];
 
   for (const trainer of trainers) {
-    if (isOnLeaveForScheduleDay(trainer._id.toString())) continue;
+    const trainerId = trainer._id.toString();
+    if (isOnLeaveForScheduleDay(trainerId)) continue;
 
-    const scheduleCodes = codesByTrainer.get(trainer._id.toString()) || [];
+    const scheduleCodes = codesByTrainer.get(trainerId) || [];
     const trainerSchedules = scheduleCodes.flatMap((code) => schedulesByCode.get(code) || []);
 
-    const hasConflict = scheduleDayDates.some((date) => {
-      const dateKey = toLeaveDateKey(date);
-      return trainerSchedules.some(
-        (s) =>
-          s.day === schedule.day
-          && !cancellationMap.get(dateKey)?.has(s._id.toString())
-          && timesOverlap(schedule.startTime, schedule.endTime, s.startTime, s.endTime)
-      );
+    const hasConflict = trainerHasSlotConflict({
+      ownedSchedules: trainerSchedules,
+      replacementBusySlots: replacementBusyByTrainer.get(trainerId) || [],
+      day: schedule.day,
+      startTime: schedule.startTime,
+      endTime: schedule.endTime,
+      dateKeys: affectedDateKeys,
+      cancellationMap,
     });
     if (hasConflict) continue;
 
@@ -403,6 +410,34 @@ export const assignReplacement = async (req, res) => {
     });
     if (!available) {
       return res.status(400).json({ message: 'Replacement trainer is on leave during this class' });
+    }
+
+    const scheduleCodes = resolveTrainerScheduleCodes(trainer);
+    const [ownedSchedules, replacementBusyByTrainer] = await Promise.all([
+      Schedule.find({ trainerCode: { $in: scheduleCodes } })
+        .select('day startTime endTime')
+        .lean(),
+      loadReplacementBusySlotsByTrainer({
+        trainerIds: [trainer._id],
+        rangeStart: leave.startDate,
+        rangeEnd: leave.endDate,
+        exclude: { leaveId: leave._id, scheduleId: schedule._id },
+      }),
+    ]);
+
+    const hasConflict = trainerHasSlotConflict({
+      ownedSchedules,
+      replacementBusySlots: replacementBusyByTrainer.get(trainer._id.toString()) || [],
+      day: schedule.day,
+      startTime: schedule.startTime,
+      endTime: schedule.endTime,
+      dateKeys: affectedDateKeys,
+      cancellationMap,
+    });
+    if (hasConflict) {
+      return res.status(400).json({
+        message: 'Replacement trainer already has a class or replacement in this slot',
+      });
     }
   }
 
