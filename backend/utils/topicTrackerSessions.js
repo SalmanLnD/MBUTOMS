@@ -22,6 +22,7 @@ import {
   getEntryTopicModules,
 } from './topicTrackerEntryTopics.js';
 import {
+  buildStudentCountKey,
   getStudentCountForClass,
   resolveAllottedStudents,
 } from './studentCountByClass.js';
@@ -59,7 +60,11 @@ const buildStudentCountMap = async () => {
     { $match: { status: 'active' } },
     {
       $group: {
-        _id: { department: '$branch', section: '$sectionLabel' },
+        _id: {
+          department: '$branch',
+          section: '$sectionLabel',
+          semester: '$semesterLabel',
+        },
         studentCount: { $sum: 1 },
       },
     },
@@ -67,7 +72,7 @@ const buildStudentCountMap = async () => {
 
   return new Map(
     counts.map((row) => [
-      `${row._id.department}::${row._id.section}`,
+      buildStudentCountKey(row._id.department, row._id.section, row._id.semester),
       row.studentCount,
     ])
   );
@@ -326,7 +331,8 @@ export const buildTopicTrackerSessions = async ({
     const allottedStudents = getStudentCountForClass(
       studentCountMap,
       schedule.department,
-      schedule.section
+      schedule.section,
+      schedule.semester
     );
     const venueName = schedule.venue?.name
       || [schedule.venue?.building, schedule.venue?.floor].filter(Boolean).join(' ')

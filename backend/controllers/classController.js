@@ -3,14 +3,21 @@ import Student from '../models/Student.js';
 import Schedule from '../models/Schedule.js';
 import Subject from '../models/Subject.js';
 import { getAllowedClassDepartmentsForSubject } from '../utils/subjectClassEligibility.js';
-import { getStudentCountForClass } from '../utils/studentCountByClass.js';
+import {
+  buildStudentCountKey,
+  getStudentCountForClass,
+} from '../utils/studentCountByClass.js';
 
 const attachStudentCounts = async (classes) => {
   const counts = await Student.aggregate([
     { $match: { status: 'active' } },
     {
       $group: {
-        _id: { department: '$branch', section: '$sectionLabel' },
+        _id: {
+          department: '$branch',
+          section: '$sectionLabel',
+          semester: '$semesterLabel',
+        },
         studentCount: { $sum: 1 },
       },
     },
@@ -18,14 +25,19 @@ const attachStudentCounts = async (classes) => {
 
   const countMap = new Map(
     counts.map((row) => [
-      `${row._id.department}::${row._id.section}`,
+      buildStudentCountKey(row._id.department, row._id.section, row._id.semester),
       row.studentCount,
     ])
   );
 
   return classes.map((cls) => ({
     ...cls,
-    studentCount: getStudentCountForClass(countMap, cls.department, cls.section),
+    studentCount: getStudentCountForClass(
+      countMap,
+      cls.department,
+      cls.section,
+      cls.currentSemester
+    ),
     label: `${cls.department} ${cls.section}`,
   }));
 };
