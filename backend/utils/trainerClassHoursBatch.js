@@ -136,9 +136,12 @@ export const computeClassHandlingHoursBatch = async (
     Leave.find({
       status: 'approved',
       ...getLeaveOverlapFilter(rangeStart, rangeEnd),
-      'replacements.replacementTrainer': { $in: trainerIds },
+      $or: [
+        { 'replacements.replacementTrainer': { $in: trainerIds } },
+        { trainer: { $in: trainerIds }, 'replacements.0': { $exists: true } },
+      ],
     })
-      .select('startDate endDate replacements')
+      .select('trainer startDate endDate replacements')
       .lean(),
     getCancellationMapForRange(rangeStart, rangeEnd),
   ]);
@@ -170,6 +173,7 @@ export const computeClassHandlingHoursBatch = async (
 
   const replacementByTrainerDate = new Map();
   const replacedOwnedScheduleIdsByTrainerDate = new Map();
+  const seenReplacementKeys = new Set();
 
   dates.forEach((date) => {
     const dateKey = toAttendanceDateKey(date);
@@ -182,15 +186,17 @@ export const computeClassHandlingHoursBatch = async (
       if (!leaveDays?.has(dayName)) return;
 
       leave.replacements?.forEach((entry) => {
-        const replacementTrainerId = entry.replacementTrainer?.toString();
-        if (!replacementTrainerId || !trainerById.has(replacementTrainerId)) return;
+        const scheduleId = entry.schedule?.toString();
+        if (!scheduleId) return;
 
-        const schedule = scheduleById.get(entry.schedule?.toString());
+        const schedule = scheduleById.get(scheduleId);
         if (!schedule || schedule.day !== dayName) return;
-        if (canceledIds.has(schedule._id.toString())) return;
+        if (canceledIds.has(scheduleId)) return;
         if (semester && schedule.semester !== semester) return;
         if (!isActiveOnDate(schedule, date, subjectStartMap)) return;
 
+        // Always exclude the original trainer's owned hours for a covered slot,
+        // including external covers (who do not receive campus hours).
         const originalTrainerId = codeToTrainerId.get(schedule.trainerCode);
         if (originalTrainerId) {
           const originalKey = `${originalTrainerId}|${dateKey}`;
@@ -199,8 +205,16 @@ export const computeClassHandlingHoursBatch = async (
             replacedIds = new Set();
             replacedOwnedScheduleIdsByTrainerDate.set(originalKey, replacedIds);
           }
-          replacedIds.add(schedule._id.toString());
+          replacedIds.add(scheduleId);
         }
+
+        const replacementTrainerId = entry.replacementTrainer?.toString();
+        if (!replacementTrainerId || !trainerById.has(replacementTrainerId)) return;
+        if (entry.isExternal) return;
+
+        const uniqueKey = `${replacementTrainerId}|${dateKey}|${scheduleId}`;
+        if (seenReplacementKeys.has(uniqueKey)) return;
+        seenReplacementKeys.add(uniqueKey);
 
         const key = `${replacementTrainerId}|${dateKey}`;
         let entries = replacementByTrainerDate.get(key);

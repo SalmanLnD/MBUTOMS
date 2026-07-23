@@ -19,6 +19,7 @@ import {
   loadReplacementBusySlotsByTrainer,
   trainerHasSlotConflict,
 } from '../utils/replacementSlotConflicts.js';
+import { dedupeReplacementsBySchedule } from '../utils/leaveReplacements.js';
 
 const timeToMinutes = (time) => {
   const [h, m] = time.split(':').map(Number);
@@ -248,8 +249,23 @@ export const getAllReplacements = async (req, res) => {
       path: 'replacements.replacementTrainer',
       select: 'name employeeId',
     })
-    .sort({ startDate: -1, createdAt: -1 })
-    .lean();
+    .sort({ startDate: -1, createdAt: -1 });
+
+  // Collapse duplicate schedule assignments left by older concurrent writes.
+  const dirtyLeaves = [];
+  for (const leave of leaves) {
+    const before = leave.replacements?.length || 0;
+    const deduped = dedupeReplacementsBySchedule(leave.replacements || []);
+    if (deduped.length !== before) {
+      leave.replacements = deduped;
+      leave.markModified('replacements');
+      dirtyLeaves.push(leave.save());
+    }
+  }
+  if (dirtyLeaves.length) {
+    await Promise.all(dirtyLeaves);
+    clearAttendanceGridCache();
+  }
 
   const replacements = [];
   const cancellationMap = leaves.length
@@ -484,6 +500,7 @@ export const assignReplacement = async (req, res) => {
     leave.replacements.push(replacementPayload);
   }
 
+  leave.replacements = dedupeReplacementsBySchedule(leave.replacements);
   leave.markModified('replacements');
   await leave.save();
   clearAttendanceGridCache();

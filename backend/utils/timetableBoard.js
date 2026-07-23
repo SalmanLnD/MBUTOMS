@@ -92,6 +92,7 @@ export const buildTimetableBoardForDate = async ({
     const scheduleById = new Map(
       replacementSchedules.map((schedule) => [schedule._id.toString(), schedule])
     );
+    const seenBoardKeys = new Set();
 
     leaves.forEach((leave) => {
       leave.replacements?.forEach((entry) => {
@@ -114,6 +115,9 @@ export const buildTimetableBoardForDate = async ({
         const replacementTrainerId = entry.replacementTrainer?.toString();
         const trainer = replacementTrainerId ? trainerById.get(replacementTrainerId) : null;
         if (trainer) {
+          const boardKey = `${trainer.employeeId}|${schedule._id.toString()}`;
+          if (seenBoardKeys.has(boardKey)) return;
+          seenBoardKeys.add(boardKey);
           board[trainer.employeeId].push({
             ...replacementPayload,
             trainerCode: trainer.employeeId,
@@ -127,6 +131,9 @@ export const buildTimetableBoardForDate = async ({
         if (!externalName) return;
 
         const key = `external:${externalName.toLowerCase()}`;
+        const boardKey = `${key}|${schedule._id.toString()}`;
+        if (seenBoardKeys.has(boardKey)) return;
+        seenBoardKeys.add(boardKey);
         if (!board[key]) board[key] = [];
         board[key].push({
           ...replacementPayload,

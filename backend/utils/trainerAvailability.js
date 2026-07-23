@@ -313,6 +313,7 @@ export const buildTrainerAvailabilityForRange = async ({
   );
 
   const replacementByTrainerDate = new Map();
+  const seenReplacementBusyKeys = new Set();
 
   dates.forEach((date) => {
     const dateKey = toDateKey(date);
@@ -331,6 +332,10 @@ export const buildTrainerAvailabilityForRange = async ({
         if (schedule.day !== dayName) return;
         if (!isScheduleDayInLeaveRange(schedule.day, leave)) return;
         if (!isActiveOnDate(schedule, date, subjectStartMap)) return;
+
+        const uniqueKey = `${replacementTrainerId}|${dateKey}|${schedule._id.toString()}`;
+        if (seenReplacementBusyKeys.has(uniqueKey)) return;
+        seenReplacementBusyKeys.add(uniqueKey);
 
         const key = `${replacementTrainerId}|${dateKey}`;
         if (!replacementByTrainerDate.has(key)) replacementByTrainerDate.set(key, []);

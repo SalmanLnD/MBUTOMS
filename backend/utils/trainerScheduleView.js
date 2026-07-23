@@ -71,6 +71,7 @@ export const buildTrainerSchedulesForDate = async ({
 
   const ownedIds = new Set(owned.map((schedule) => schedule._id.toString()));
   const replacementSchedules = [];
+  const seenReplacementScheduleIds = new Set();
 
   leaves.forEach((leave) => {
     if (!isDateWithinLeave(ref, leave)) return;
@@ -83,10 +84,13 @@ export const buildTrainerSchedulesForDate = async ({
         (item) => item && item._id.toString() === entry.schedule.toString()
       );
       if (!schedule) return;
-      if (canceledScheduleIds.has(schedule._id.toString())) return;
+      const scheduleId = schedule._id.toString();
+      if (canceledScheduleIds.has(scheduleId)) return;
       if (semester && schedule.semester !== semester) return;
       if (!isScheduleDayInLeaveRange(schedule.day, leave)) return;
-      if (ownedIds.has(schedule._id.toString())) return;
+      if (ownedIds.has(scheduleId)) return;
+      if (seenReplacementScheduleIds.has(scheduleId)) return;
+      seenReplacementScheduleIds.add(scheduleId);
 
       const plain = schedule.toObject ? schedule.toObject() : { ...schedule };
       replacementSchedules.push({
