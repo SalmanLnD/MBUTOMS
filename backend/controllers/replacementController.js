@@ -54,16 +54,26 @@ const resolveReplacementTrainer = (leave, schedule, trainersById) => {
 
   if (!record.replacementTrainer) return null;
 
-  if (typeof record.replacementTrainer === 'object' && record.replacementTrainer.name) {
+  const populated = record.replacementTrainer;
+  if (typeof populated === 'object' && populated.name) {
     return {
-      ...record.replacementTrainer,
+      _id: populated._id,
+      name: populated.name,
+      employeeId: populated.employeeId || null,
       isExternal: false,
     };
   }
 
-  const trainerId = record.replacementTrainer.toString();
+  const trainerId = populated.toString();
   const trainer = trainersById.get(trainerId);
-  return trainer ? { ...trainer, isExternal: false } : null;
+  return trainer
+    ? {
+      _id: trainer._id,
+      name: trainer.name,
+      employeeId: trainer.employeeId || null,
+      isExternal: false,
+    }
+    : null;
 };
 
 export const getReplacementSuggestions = async (req, res) => {
@@ -265,7 +275,35 @@ export const getAllReplacements = async (req, res) => {
   if (dirtyLeaves.length) {
     await Promise.all(dirtyLeaves);
     clearAttendanceGridCache();
+    // Saving nested replacements drops populate; restore trainer names for the register.
+    await Leave.populate(leaves, {
+      path: 'replacements.replacementTrainer',
+      select: 'name employeeId',
+    });
   }
+
+  const replacementTrainerIds = [
+    ...new Set(
+      leaves.flatMap((leave) =>
+        (leave.replacements || [])
+          .map((entry) => {
+            if (entry.isExternal || !entry.replacementTrainer) return null;
+            return entry.replacementTrainer._id?.toString?.()
+              || entry.replacementTrainer.toString?.()
+              || null;
+          })
+          .filter(Boolean)
+      )
+    ),
+  ];
+  const replacementTrainers = replacementTrainerIds.length
+    ? await Trainer.find({ _id: { $in: replacementTrainerIds } })
+      .select('name employeeId')
+      .lean()
+    : [];
+  const trainersById = new Map(
+    replacementTrainers.map((trainer) => [trainer._id.toString(), trainer])
+  );
 
   const replacements = [];
   const cancellationMap = leaves.length
@@ -299,7 +337,7 @@ export const getAllReplacements = async (req, res) => {
         cancellationMap
       );
       if (!affectedDates.length) continue;
-      const replacement = resolveReplacementTrainer(leave, schedule, new Map());
+      const replacement = resolveReplacementTrainer(leave, schedule, trainersById);
       replacements.push({
         leave: {
           _id: leave._id,
