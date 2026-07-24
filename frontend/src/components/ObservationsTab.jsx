@@ -9,7 +9,7 @@ import {
   shiftMonth,
 } from '../utils/monthDates.js';
 import { showError, showSuccess } from '../utils/toast.js';
-import { getErrorMessage } from '../utils/helpers.js';
+import { getErrorMessage, toInputDate } from '../utils/helpers.js';
 
 const OBSERVATION_SUB_TABS = [
   { id: 'demo', label: 'Demo' },
@@ -20,6 +20,7 @@ const emptyDraft = (row) => ({
   rating: row.rating == null ? '' : String(row.rating),
   comments: row.comments || '',
   scheduleId: row.scheduleId || '',
+  observationDate: row.observationDate || '',
 });
 
 const ObservationsTab = () => {
@@ -57,13 +58,27 @@ const ObservationsTab = () => {
   }, [loadObservations]);
 
   const updateDraft = (trainerId, field, value) => {
-    setDrafts((prev) => ({
-      ...prev,
-      [trainerId]: {
-        ...(prev[trainerId] || { rating: '', comments: '', scheduleId: '' }),
-        [field]: value,
-      },
-    }));
+    setDrafts((prev) => {
+      const current = prev[trainerId] || {
+        rating: '',
+        comments: '',
+        scheduleId: '',
+        observationDate: '',
+      };
+      const next = { ...current, [field]: value };
+
+      // Class observations: autofill today's date on first edit, keep editable.
+      if (
+        isClass
+        && field !== 'observationDate'
+        && !String(current.observationDate || '').trim()
+        && String(value || '').trim()
+      ) {
+        next.observationDate = toInputDate(new Date());
+      }
+
+      return { ...prev, [trainerId]: next };
+    });
   };
 
   const handleSave = async (row) => {
@@ -81,6 +96,7 @@ const ObservationsTab = () => {
         rating: draft.rating === '' ? null : Number(draft.rating),
         comments: draft.comments,
         scheduleId: isClass ? draft.scheduleId || null : null,
+        observationDate: isClass ? (draft.observationDate || '') : '',
       });
       setRows((prev) => prev.map((item) => (
         item.trainerId === row.trainerId
@@ -97,6 +113,7 @@ const ObservationsTab = () => {
             endTime: saved.endTime,
             day: saved.day,
             subjectCode: saved.subjectCode,
+            observationDate: saved.observationDate || '',
             classDetail: saved.classDetail,
           }
           : item
@@ -180,6 +197,7 @@ const ObservationsTab = () => {
                 <th>Trainer</th>
                 <th>Emp ID</th>
                 {isClass && <th style={{ minWidth: 280 }}>Class / slot</th>}
+                {isClass && <th style={{ width: 150 }}>Date</th>}
                 <th style={{ width: 120 }}>Rating (1–5)</th>
                 <th>Comments</th>
                 <th style={{ width: 110 }} />
@@ -188,7 +206,7 @@ const ObservationsTab = () => {
             <tbody>
               {rows.length === 0 ? (
                 <tr>
-                  <td colSpan={isClass ? 6 : 5} className="text-center text-muted py-4">
+                  <td colSpan={isClass ? 7 : 5} className="text-center text-muted py-4">
                     No trainers found
                   </td>
                 </tr>
@@ -197,7 +215,8 @@ const ObservationsTab = () => {
                   const draft = drafts[row.trainerId] || emptyDraft(row);
                   const dirty = String(draft.rating) !== String(row.rating ?? '')
                     || String(draft.comments || '') !== String(row.comments || '')
-                    || String(draft.scheduleId || '') !== String(row.scheduleId || '');
+                    || String(draft.scheduleId || '') !== String(row.scheduleId || '')
+                    || String(draft.observationDate || '') !== String(row.observationDate || '');
                   return (
                     <tr key={row.trainerId}>
                       <td className="fw-medium">{row.name}</td>
@@ -217,6 +236,17 @@ const ObservationsTab = () => {
                               </option>
                             ))}
                           </select>
+                        </td>
+                      )}
+                      {isClass && (
+                        <td>
+                          <input
+                            type="date"
+                            className="form-control form-control-sm"
+                            value={draft.observationDate}
+                            onChange={(e) => updateDraft(row.trainerId, 'observationDate', e.target.value)}
+                            aria-label={`Observation date for ${row.name}`}
+                          />
                         </td>
                       )}
                       <td>

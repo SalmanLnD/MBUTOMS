@@ -26,6 +26,8 @@ const normalizeType = (value) => {
   return OBSERVATION_TYPES.includes(type) ? type : null;
 };
 
+const DATE_KEY_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
+
 const serializeClassFields = (observation = {}) => ({
   scheduleId: observation.schedule?.toString?.() || observation.schedule || null,
   department: observation.department || '',
@@ -35,6 +37,7 @@ const serializeClassFields = (observation = {}) => ({
   endTime: observation.endTime || '',
   day: observation.day || '',
   subjectCode: observation.subjectCode || '',
+  observationDate: observation.observationDate || '',
   classDetail: buildObservationClassDetail(observation),
 });
 
@@ -47,7 +50,19 @@ const emptyClassFields = () => ({
   endTime: '',
   day: '',
   subjectCode: '',
+  observationDate: '',
 });
+
+const normalizeObservationDate = (value) => {
+  const raw = String(value || '').trim();
+  if (!raw) return '';
+  if (!DATE_KEY_PATTERN.test(raw)) {
+    const error = new Error('observationDate must be YYYY-MM-DD');
+    error.statusCode = 400;
+    throw error;
+  }
+  return raw;
+};
 
 const scheduleOptionLabel = (schedule) => {
   const className = [schedule.department, schedule.section].filter(Boolean).join(' ');
@@ -131,6 +146,7 @@ const resolveClassFields = async ({ type, scheduleId, body }) => {
       endTime: schedule.endTime || '',
       day: schedule.day || '',
       subjectCode: schedule.subjectCode || '',
+      observationDate: normalizeObservationDate(body.observationDate),
     };
   }
 
@@ -143,6 +159,7 @@ const resolveClassFields = async ({ type, scheduleId, body }) => {
     endTime: String(body.endTime || '').trim(),
     day: String(body.day || '').trim(),
     subjectCode: String(body.subjectCode || '').trim(),
+    observationDate: normalizeObservationDate(body.observationDate),
   };
 };
 
@@ -165,7 +182,7 @@ export const getObservations = async (req, res) => {
 
   const [observations, scheduleOptionsByTrainer] = await Promise.all([
     TrainerObservation.find({ monthKey, type })
-      .select('trainer rating comments schedule department section slot startTime endTime day subjectCode updatedAt ratedBy')
+      .select('trainer rating comments schedule department section slot startTime endTime day subjectCode observationDate updatedAt ratedBy')
       .lean(),
     type === 'class' ? buildScheduleOptionsByTrainer(trainers) : Promise.resolve({}),
   ]);
@@ -286,7 +303,12 @@ export const upsertObservation = async (req, res) => {
         type,
         comments,
         monthKey,
-        classDetail: type === 'class' ? buildObservationClassDetail(classFields) : '',
+        classDetail: type === 'class'
+          ? buildObservationClassDetail({
+            ...classFields,
+            observationDate: classFields.observationDate,
+          })
+          : '',
       });
     } catch (err) {
       console.error('Failed to send observation notifications:', err.message);

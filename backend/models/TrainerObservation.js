@@ -44,6 +44,8 @@ const trainerObservationSchema = new mongoose.Schema(
     endTime: { type: String, trim: true, default: '' },
     day: { type: String, trim: true, default: '' },
     subjectCode: { type: String, trim: true, default: '' },
+    // Calendar date the class observation happened (YYYY-MM-DD).
+    observationDate: { type: String, trim: true, default: '' },
     ratedBy: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'User',
