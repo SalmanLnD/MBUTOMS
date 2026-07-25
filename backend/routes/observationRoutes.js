@@ -10,7 +10,10 @@ import {
 const router = express.Router();
 
 const authorizeObservationAccess = (req, res, next) => {
-  if (req.impersonator) {
+  // Impersonation preview: allow when the viewed account itself has observation access
+  // (evaluators / coordinators with evaluatorSubjects). Block only for accounts that
+  // would not normally use this screen (e.g. plain trainers).
+  if (req.impersonator && !hasEvaluatorObservationAccess(req.user) && !hasFullObservationAccess(req.user)) {
     return res.status(403).json({
       message: 'Exit trainer view before using admin features.',
     });
