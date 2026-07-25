@@ -82,6 +82,7 @@ function writeSheetValues(sheet, rows) {
   const maxCols = rows.reduce(function (max, row) {
     return Math.max(max, row.length);
   }, 1);
+  const maxRows = rows.length;
   const padded = rows.map(function (row) {
     const copy = row.slice();
     while (copy.length < maxCols) {
@@ -90,8 +91,27 @@ function writeSheetValues(sheet, rows) {
     return copy;
   });
 
-  sheet.getRange(1, 1, padded.length, maxCols).setValues(padded);
-  sheet.getRange(1, 1, 1, maxCols).setFontWeight('bold');
+  if (sheet.getMaxColumns() < maxCols) {
+    sheet.insertColumnsAfter(sheet.getMaxColumns(), maxCols - sheet.getMaxColumns());
+  }
+  if (sheet.getMaxRows() < maxRows) {
+    sheet.insertRowsAfter(sheet.getMaxRows(), maxRows - sheet.getMaxRows());
+  }
+
+  sheet.getRange(1, 1, sheet.getMaxRows(), sheet.getMaxColumns()).breakApart();
+  sheet.clear();
+  sheet.getRange(1, 1, maxRows, maxCols).setValues(padded);
+
+  const usedRange = sheet.getRange(1, 1, maxRows, maxCols);
+  usedRange
+    .setHorizontalAlignment('center')
+    .setVerticalAlignment('middle')
+    .setWrap(true)
+    .setBorder(true, true, true, true, true, true);
+
+  sheet.getRange(1, 1, 1, maxCols)
+    .setFontWeight('bold')
+    .setBackground('#fff2cc');
   sheet.setFrozenRows(1);
 }
 
