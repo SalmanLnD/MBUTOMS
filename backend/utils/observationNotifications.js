@@ -29,11 +29,13 @@ export const buildObservationClassDetail = ({
   day = '',
   subjectCode = '',
   observationDate = '',
+  observationTime = '',
 } = {}) => {
   const className = [department, section].filter(Boolean).join(' ');
   const time = [startTime, endTime].filter(Boolean).join('–');
   const slotPart = slot ? (time ? `${slot} ${time}` : slot) : time;
-  return [observationDate, subjectCode, className, day, slotPart].filter(Boolean).join(' · ');
+  const when = [observationDate, observationTime].filter(Boolean).join(' ');
+  return [when, subjectCode, className, day, slotPart].filter(Boolean).join(' · ');
 };
 
 /**

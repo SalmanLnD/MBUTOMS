@@ -33,6 +33,7 @@ const normalizeType = (value) => {
 };
 
 const DATE_KEY_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
+const TIME_KEY_PATTERN = /^([01]\d|2[0-3]):([0-5]\d)(?::([0-5]\d))?$/;
 
 const serializeClassFields = (observation = {}) => ({
   scheduleId: observation.schedule?.toString?.() || observation.schedule || null,
@@ -44,6 +45,7 @@ const serializeClassFields = (observation = {}) => ({
   day: observation.day || '',
   subjectCode: observation.subjectCode || '',
   observationDate: observation.observationDate || '',
+  observationTime: observation.observationTime || '',
   classDetail: buildObservationClassDetail(observation),
 });
 
@@ -57,6 +59,7 @@ const emptyClassFields = () => ({
   day: '',
   subjectCode: '',
   observationDate: '',
+  observationTime: '',
 });
 
 const normalizeObservationDate = (value) => {
@@ -68,6 +71,18 @@ const normalizeObservationDate = (value) => {
     throw error;
   }
   return raw;
+};
+
+const normalizeObservationTime = (value) => {
+  const raw = String(value || '').trim();
+  if (!raw) return '';
+  const match = raw.match(TIME_KEY_PATTERN);
+  if (!match) {
+    const error = new Error('observationTime must be HH:MM');
+    error.statusCode = 400;
+    throw error;
+  }
+  return `${match[1]}:${match[2]}`;
 };
 
 const scheduleOptionLabel = (schedule) => {
@@ -132,7 +147,18 @@ const buildScheduleOptionsByTrainer = async (trainers) => {
 };
 
 const resolveClassFields = async ({ type, scheduleId, body }) => {
-  if (type !== 'class') return emptyClassFields();
+  const observationDate = normalizeObservationDate(body.observationDate);
+  const observationTime = normalizeObservationTime(body.observationTime);
+
+  // Demo observations carry no class context, but need date/time so PLP can
+  // place them in the right 21–20 cycle.
+  if (type !== 'class') {
+    return {
+      ...emptyClassFields(),
+      observationDate,
+      observationTime,
+    };
+  }
 
   if (scheduleId) {
     const schedule = await Schedule.findById(scheduleId)
@@ -152,7 +178,8 @@ const resolveClassFields = async ({ type, scheduleId, body }) => {
       endTime: schedule.endTime || '',
       day: schedule.day || '',
       subjectCode: schedule.subjectCode || '',
-      observationDate: normalizeObservationDate(body.observationDate),
+      observationDate,
+      observationTime,
     };
   }
 
@@ -165,7 +192,8 @@ const resolveClassFields = async ({ type, scheduleId, body }) => {
     endTime: String(body.endTime || '').trim(),
     day: String(body.day || '').trim(),
     subjectCode: String(body.subjectCode || '').trim(),
-    observationDate: normalizeObservationDate(body.observationDate),
+    observationDate,
+    observationTime,
   };
 };
 
@@ -205,7 +233,7 @@ export const getObservations = async (req, res) => {
       type,
       ...(trainerIds.length ? { trainer: { $in: trainerIds } } : { trainer: { $in: [] } }),
     })
-      .select('trainer rating comments schedule department section slot startTime endTime day subjectCode observationDate updatedAt ratedBy')
+      .select('trainer rating comments schedule department section slot startTime endTime day subjectCode observationDate observationTime updatedAt ratedBy')
       .lean(),
     type === 'class' ? buildScheduleOptionsByTrainer(trainers) : Promise.resolve({}),
   ]);
@@ -287,6 +315,10 @@ export const upsertObservation = async (req, res) => {
     return res.status(400).json({ message: 'Select the class and slot for this class observation' });
   }
 
+  if ((rating != null || comments) && !classFields.observationDate) {
+    return res.status(400).json({ message: 'Observation date is required' });
+  }
+
   const previous = await TrainerObservation.findOne({ trainer: trainerId, monthKey, type })
     .select('comments')
     .lean();
@@ -339,12 +371,11 @@ export const upsertObservation = async (req, res) => {
         type,
         comments,
         monthKey,
-        classDetail: type === 'class'
-          ? buildObservationClassDetail({
-            ...classFields,
-            observationDate: classFields.observationDate,
-          })
-          : '',
+        classDetail: buildObservationClassDetail({
+          ...classFields,
+          observationDate: classFields.observationDate,
+          observationTime: classFields.observationTime,
+        }),
       });
     } catch (err) {
       console.error('Failed to send observation notifications:', err.message);

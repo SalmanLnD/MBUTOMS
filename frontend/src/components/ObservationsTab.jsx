@@ -9,7 +9,7 @@ import {
   shiftMonth,
 } from '../utils/monthDates.js';
 import { showError, showSuccess } from '../utils/toast.js';
-import { getErrorMessage, toInputDate } from '../utils/helpers.js';
+import { getErrorMessage, toInputDate, toInputTime } from '../utils/helpers.js';
 
 const OBSERVATION_SUB_TABS = [
   { id: 'demo', label: 'Demo' },
@@ -21,6 +21,7 @@ const emptyDraft = (row) => ({
   comments: row.comments || '',
   scheduleId: row.scheduleId || '',
   observationDate: row.observationDate || '',
+  observationTime: row.observationTime || '',
 });
 
 const ObservationsTab = () => {
@@ -34,6 +35,7 @@ const ObservationsTab = () => {
   const monthKey = formatMonthKey(monthParts.year, monthParts.month);
   const monthOptions = useMemo(() => buildMonthOptions(), []);
   const isClass = observationType === 'class';
+  const isDemo = observationType === 'demo';
 
   const loadObservations = useCallback(async () => {
     setLoading(true);
@@ -64,17 +66,22 @@ const ObservationsTab = () => {
         comments: '',
         scheduleId: '',
         observationDate: '',
+        observationTime: '',
       };
       const next = { ...current, [field]: value };
+      const editingContent = field !== 'observationDate'
+        && field !== 'observationTime'
+        && String(value || '').trim();
 
-      // Class observations: autofill today's date on first edit, keep editable.
-      if (
-        isClass
-        && field !== 'observationDate'
-        && !String(current.observationDate || '').trim()
-        && String(value || '').trim()
-      ) {
-        next.observationDate = toInputDate(new Date());
+      // Autofill today's date/time on first content edit, keep editable.
+      if (editingContent) {
+        const now = new Date();
+        if (!String(current.observationDate || '').trim()) {
+          next.observationDate = toInputDate(now);
+        }
+        if (isDemo && !String(current.observationTime || '').trim()) {
+          next.observationTime = toInputTime(now);
+        }
       }
 
       return { ...prev, [trainerId]: next };
@@ -87,6 +94,10 @@ const ObservationsTab = () => {
       showError('Select the class and slot for this observation');
       return;
     }
+    if ((draft.rating !== '' || String(draft.comments || '').trim()) && !draft.observationDate) {
+      showError('Select the observation date');
+      return;
+    }
 
     setSavingId(row.trainerId);
     try {
@@ -96,7 +107,8 @@ const ObservationsTab = () => {
         rating: draft.rating === '' ? null : Number(draft.rating),
         comments: draft.comments,
         scheduleId: isClass ? draft.scheduleId || null : null,
-        observationDate: isClass ? (draft.observationDate || '') : '',
+        observationDate: draft.observationDate || '',
+        observationTime: isDemo ? (draft.observationTime || '') : '',
       });
       setRows((prev) => prev.map((item) => (
         item.trainerId === row.trainerId
@@ -114,6 +126,7 @@ const ObservationsTab = () => {
             day: saved.day,
             subjectCode: saved.subjectCode,
             observationDate: saved.observationDate || '',
+            observationTime: saved.observationTime || '',
             classDetail: saved.classDetail,
           }
           : item
@@ -197,7 +210,8 @@ const ObservationsTab = () => {
                 <th>Trainer</th>
                 <th>Emp ID</th>
                 {isClass && <th style={{ minWidth: 280 }}>Class / slot</th>}
-                {isClass && <th style={{ width: 150 }}>Date</th>}
+                <th style={{ width: 150 }}>Date</th>
+                {isDemo && <th style={{ width: 130 }}>Time</th>}
                 <th style={{ width: 120 }}>Rating (1–5)</th>
                 <th>Comments</th>
                 <th style={{ width: 110 }} />
@@ -206,7 +220,7 @@ const ObservationsTab = () => {
             <tbody>
               {rows.length === 0 ? (
                 <tr>
-                  <td colSpan={isClass ? 7 : 5} className="text-center text-muted py-4">
+                  <td colSpan={7} className="text-center text-muted py-4">
                     No trainers found
                   </td>
                 </tr>
@@ -216,7 +230,8 @@ const ObservationsTab = () => {
                   const dirty = String(draft.rating) !== String(row.rating ?? '')
                     || String(draft.comments || '') !== String(row.comments || '')
                     || String(draft.scheduleId || '') !== String(row.scheduleId || '')
-                    || String(draft.observationDate || '') !== String(row.observationDate || '');
+                    || String(draft.observationDate || '') !== String(row.observationDate || '')
+                    || String(draft.observationTime || '') !== String(row.observationTime || '');
                   return (
                     <tr key={row.trainerId}>
                       <td className="fw-medium">{row.name}</td>
@@ -238,14 +253,24 @@ const ObservationsTab = () => {
                           </select>
                         </td>
                       )}
-                      {isClass && (
+                      <td>
+                        <input
+                          type="date"
+                          className="form-control form-control-sm"
+                          value={draft.observationDate}
+                          onChange={(e) => updateDraft(row.trainerId, 'observationDate', e.target.value)}
+                          aria-label={`Observation date for ${row.name}`}
+                          required
+                        />
+                      </td>
+                      {isDemo && (
                         <td>
                           <input
-                            type="date"
+                            type="time"
                             className="form-control form-control-sm"
-                            value={draft.observationDate}
-                            onChange={(e) => updateDraft(row.trainerId, 'observationDate', e.target.value)}
-                            aria-label={`Observation date for ${row.name}`}
+                            value={draft.observationTime}
+                            onChange={(e) => updateDraft(row.trainerId, 'observationTime', e.target.value)}
+                            aria-label={`Observation time for ${row.name}`}
                           />
                         </td>
                       )}

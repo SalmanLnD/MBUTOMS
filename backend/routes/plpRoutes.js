@@ -1,5 +1,9 @@
 import express from 'express';
-import { getPlpSheet } from '../controllers/plpController.js';
+import {
+  getPlpSheet,
+  updatePlpWeightages,
+  upsertPlpFinalRating,
+} from '../controllers/plpController.js';
 import {
   createCompliance,
   deleteCompliance,
@@ -25,6 +29,7 @@ router.use(protect);
 router.use(authorize('admin', 'campus_manager'));
 
 router.get('/', asyncHandler(getPlpSheet));
+router.put('/weightages', asyncHandler(updatePlpWeightages));
 
 router.get('/sheets/status', asyncHandler(getPlpGoogleSheetStatus));
 router.get('/sheets/apps-script/setup', asyncHandler(getPlpGoogleAppsScriptSetup));
@@ -35,5 +40,7 @@ router.get('/compliance/trainers', asyncHandler(getComplianceTrainerOptions));
 router.get('/compliance', asyncHandler(listCompliance));
 router.post('/compliance', asyncHandler(createCompliance));
 router.delete('/compliance/:id', asyncHandler(deleteCompliance));
+
+router.put('/:trainerId/final', asyncHandler(upsertPlpFinalRating));
 
 export default router;

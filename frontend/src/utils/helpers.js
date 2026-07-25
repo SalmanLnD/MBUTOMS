@@ -54,3 +54,11 @@ export const toInputDate = (date) => {
   const day = String(d.getDate()).padStart(2, '0');
   return `${y}-${m}-${day}`;
 };
+
+export const toInputTime = (date = new Date()) => {
+  const d = new Date(date);
+  if (Number.isNaN(d.getTime())) return '';
+  const hours = String(d.getHours()).padStart(2, '0');
+  const minutes = String(d.getMinutes()).padStart(2, '0');
+  return `${hours}:${minutes}`;
+};

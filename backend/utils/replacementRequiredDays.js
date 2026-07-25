@@ -1,11 +1,8 @@
 import Leave from '../models/Leave.js';
 import Schedule from '../models/Schedule.js';
 import {
-  formatAttendanceMonthKey,
   getAttendanceCalendarDates,
-  getAttendanceMonthRange,
   getAttendanceWeekdayName,
-  parseAttendanceMonthParam,
 } from './attendanceDates.js';
 import {
   TRAINER_ATTENDANCE_TRACKING_START,
@@ -16,22 +13,23 @@ import { getLeaveWeekdayScheduleIds, isFullDayLeave } from './leaveScope.js';
 import { resolveTrainerScheduleCodes } from './trainerMappings.js';
 
 /**
- * Map of trainerId -> Replacement Required Days count for a month.
+ * Map of trainerId -> Replacement Required Days count for an inclusive date range.
  * RRD = full-day approved leave on a weekday the trainer has scheduled classes.
  */
 export const getReplacementRequiredDaysByTrainer = async ({
-  monthKey,
+  startDate,
+  endDate,
   trainers = [],
 } = {}) => {
   const counts = new Map(trainers.map((trainer) => [trainer._id.toString(), 0]));
-  if (!trainers.length || !monthKey) return counts;
+  if (!trainers.length || !startDate || !endDate) return counts;
 
-  const { year, month } = parseAttendanceMonthParam(monthKey);
-  const { startDate: monthStart, endDate: monthEnd } = getAttendanceMonthRange(year, month);
-  const rangeStart = monthStart < TRAINER_ATTENDANCE_TRACKING_START
+  let rangeStart = startDate < TRAINER_ATTENDANCE_TRACKING_START
     ? TRAINER_ATTENDANCE_TRACKING_START
-    : monthStart;
-  const dates = getAttendanceCalendarDates(rangeStart, monthEnd);
+    : startDate;
+  if (rangeStart > endDate) return counts;
+
+  const dates = getAttendanceCalendarDates(rangeStart, endDate);
   if (!dates.length) return counts;
 
   const trainerIds = trainers.map((trainer) => trainer._id);
@@ -44,7 +42,7 @@ export const getReplacementRequiredDaysByTrainer = async ({
     Leave.find({
       trainer: { $in: trainerIds },
       status: 'approved',
-      ...getLeaveOverlapFilter(rangeStart, monthEnd),
+      ...getLeaveOverlapFilter(rangeStart, endDate),
     })
       .select('trainer startDate endDate reason scope affectedSchedules')
       .lean(),
@@ -107,9 +105,4 @@ export const getReplacementRequiredDaysByTrainer = async ({
   });
 
   return counts;
-};
-
-export const resolvePlpMonthKey = (monthParam) => {
-  const { year, month } = parseAttendanceMonthParam(monthParam);
-  return formatAttendanceMonthKey(year, month);
 };

@@ -35,4 +35,12 @@ describe('buildObservationClassDetail', () => {
       '2026-07-24 · PSTP · ECE 1 · Thursday · S1 09:00–10:00'
     );
   });
+
+  it('includes demo observation date and time', () => {
+    const detail = buildObservationClassDetail({
+      observationDate: '2026-06-25',
+      observationTime: '14:30',
+    });
+    assert.equal(detail, '2026-06-25 14:30');
+  });
 });

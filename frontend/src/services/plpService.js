@@ -1,10 +1,20 @@
 import api from './api.js';
 
-export const getPlpSheet = async (month, config = {}) => {
+export const getPlpSheet = async (cycle, config = {}) => {
   const { data } = await api.get('/plp', {
     ...config,
-    params: { month, ...(config.params || {}) },
+    params: { cycle, ...(config.params || {}) },
   });
+  return data;
+};
+
+export const updatePlpWeightages = async (weightages) => {
+  const { data } = await api.put('/plp/weightages', weightages);
+  return data;
+};
+
+export const upsertPlpFinalRating = async (trainerId, payload) => {
+  const { data } = await api.put(`/plp/${trainerId}/final`, payload);
   return data;
 };
 

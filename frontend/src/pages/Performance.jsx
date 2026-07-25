@@ -8,8 +8,8 @@ import { useAuth } from '../context/AuthContext.jsx';
 const ALL_PERFORMANCE_TABS = [
   { id: 'feedback', label: 'Feedback' },
   { id: 'observations', label: 'Observations' },
-  { id: 'plp', label: 'PLP' },
   { id: 'compliance', label: 'Compliance' },
+  { id: 'plp', label: 'PLP' },
 ];
 
 const OBSERVATIONS_ONLY_TABS = [
@@ -52,8 +52,8 @@ const Performance = () => {
         <div className="card-body">
           {activeTab === 'feedback' && showAllTabs && <FeedbackSection />}
           {activeTab === 'observations' && <ObservationsTab />}
-          {activeTab === 'plp' && showAllTabs && <PlpTab />}
           {activeTab === 'compliance' && showAllTabs && <ComplianceTab />}
+          {activeTab === 'plp' && showAllTabs && <PlpTab />}
         </div>
       </div>
     </>

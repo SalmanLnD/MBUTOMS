@@ -44,8 +44,10 @@ const trainerObservationSchema = new mongoose.Schema(
     endTime: { type: String, trim: true, default: '' },
     day: { type: String, trim: true, default: '' },
     subjectCode: { type: String, trim: true, default: '' },
-    // Calendar date the class observation happened (YYYY-MM-DD).
+    // Calendar date the observation happened (YYYY-MM-DD). Used for PLP 21–20 cycles.
     observationDate: { type: String, trim: true, default: '' },
+    // Clock time the observation happened (HH:MM). Primarily for demos.
+    observationTime: { type: String, trim: true, default: '' },
     ratedBy: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'User',
