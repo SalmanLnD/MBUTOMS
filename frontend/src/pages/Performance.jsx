@@ -4,13 +4,12 @@ import ObservationsTab from '../components/ObservationsTab.jsx';
 import PlpTab from '../components/PlpTab.jsx';
 import ComplianceTab from '../components/ComplianceTab.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
-import { ROLES } from '../utils/roles.js';
+import { FULL_ACCESS_ROLES, ROLES } from '../utils/roles.js';
 
 const Performance = () => {
-  const { user, hasFullAccess } = useAuth();
-  // PLP / Compliance: admin, manager, campus manager only.
-  const canManagePlp = hasFullAccess();
-  // Feedback: full-access staff + subject coordinators (not pure evaluators).
+  const { user } = useAuth();
+  // Exact role check — subject_coordinator must NOT inherit campus_manager here.
+  const canManagePlp = FULL_ACCESS_ROLES.includes(user?.role);
   const canSeeFeedback = canManagePlp || user?.role === ROLES.SUBJECT_COORDINATOR;
 
   const tabs = useMemo(() => {
