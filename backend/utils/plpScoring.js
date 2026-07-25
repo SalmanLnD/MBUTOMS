@@ -45,18 +45,19 @@ export const complianceScoreFromCount = (count = 0) =>
 
 /**
  * Weighted final PLP rating (raw, before half-rounding / clamp).
- * Null components are excluded and remaining weights are renormalized.
+ * Missing feedback / class / demo (null) count as 0 so their weightage still
+ * pulls the average down instead of being redistributed.
  */
 export const computePlpFinalRating = (scores = {}, weightages = PLP_WEIGHTAGES) => {
   let weighted = 0;
   let totalWeight = 0;
 
-  Object.entries(weightages).forEach(([key, weight]) => {
-    const value = scores[key];
-    if (value == null || !Number.isFinite(Number(value))) return;
-    const w = Number(weight) || 0;
+  PLP_WEIGHTAGE_KEYS.forEach((key) => {
+    const w = Number(weightages[key]) || 0;
     if (w <= 0) return;
-    weighted += Number(value) * w;
+    const raw = scores[key];
+    const value = raw == null || !Number.isFinite(Number(raw)) ? 0 : Number(raw);
+    weighted += value * w;
     totalWeight += w;
   });
 
@@ -89,4 +90,6 @@ export const plpWeightageLabels = (weightages = PLP_WEIGHTAGES) => ({
   attendance: `Attendance (${weightages.attendance}%)`,
   compliance: `Compliance (${weightages.compliance}%)`,
   finalRating: 'Final PLP rating',
+  actualFinal: 'Actual',
+  roundedFinal: 'Rounded',
 });

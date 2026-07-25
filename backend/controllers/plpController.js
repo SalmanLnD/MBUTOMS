@@ -159,9 +159,9 @@ const buildPlpRowsForCycle = async (cycleKey, weightages = PLP_WEIGHTAGES) => {
     const rrdDays = rrdByTrainer.get(id) || 0;
     const complianceCount = complianceMap.get(id) || 0;
     const scores = {
-      feedback: feedbackMap.get(id) ?? null,
-      classObservation: classMap.has(id) ? classMap.get(id) : null,
-      demoObservation: demoMap.has(id) ? demoMap.get(id) : null,
+      feedback: feedbackMap.get(id) ?? 0,
+      classObservation: classMap.has(id) && classMap.get(id) != null ? classMap.get(id) : 0,
+      demoObservation: demoMap.has(id) && demoMap.get(id) != null ? demoMap.get(id) : 0,
       attendance: attendanceScoreFromRrd(rrdDays),
       compliance: complianceScoreFromCount(complianceCount),
     };
@@ -291,7 +291,8 @@ export const buildPlpExportPayload = async () => {
     'RRD days',
     `Compliance (${weightages.compliance}%)`,
     'Compliance count',
-    'Calculated final',
+    'Actual final',
+    'Rounded final',
     'Manual final',
     'Final PLP rating',
   ];
@@ -314,6 +315,7 @@ export const buildPlpExportPayload = async () => {
         row.replacementRequiredDays ?? 0,
         row.complianceScore ?? '',
         row.complianceCount ?? 0,
+        row.calculatedRaw ?? '',
         row.calculatedFinal ?? '',
         row.manualFinal ?? '',
         row.finalPlpRating ?? '',

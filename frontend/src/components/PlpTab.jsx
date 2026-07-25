@@ -216,8 +216,9 @@ const PlpTab = () => {
           Cycle <strong>{cycle.label}</strong>. Class and demo observations, attendance RRD, and
           compliance all count from the 21st to the 20th. Feedback alone uses calendar month{' '}
           <strong>{cycle.feedbackMonthKey}</strong> (e.g. July feedback for the Jun–Jul cycle).
-          Final rating is rounded to 0.5 and clamped between 3.5 and 4.5; you can override it
-          manually.
+          Missing feedback, class, or demo count as <strong>0</strong> (their weightage still
+          applies). The sheet shows the actual weighted value and the rounded final (nearest 0.5,
+          clamped 3.5–4.5); you can override the final manually.
         </p>
       )}
 
@@ -278,13 +279,14 @@ const PlpTab = () => {
                 <th>{headers?.demoObservation || 'Demo observation'}</th>
                 <th>{headers?.attendance || 'Attendance'}</th>
                 <th>{headers?.compliance || 'Compliance'}</th>
-                <th style={{ minWidth: 160 }}>{headers?.finalRating || 'Final PLP rating'}</th>
+                <th style={{ minWidth: 88 }}>{headers?.actualFinal || 'Actual'}</th>
+                <th style={{ minWidth: 180 }}>{headers?.finalRating || 'Final PLP rating'}</th>
               </tr>
             </thead>
             <tbody>
               {rows.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="text-center text-muted py-4">
+                  <td colSpan={9} className="text-center text-muted py-4">
                     No trainers found for this cycle.
                   </td>
                 </tr>
@@ -311,11 +313,12 @@ const PlpTab = () => {
                       </span>
                     )}
                   </td>
+                  <td className="fw-medium">{formatScore(row.calculatedRaw)}</td>
                   <td>
                     <div className="d-flex flex-wrap align-items-center gap-1">
                       <select
                         className="form-select form-select-sm"
-                        style={{ maxWidth: 90 }}
+                        style={{ maxWidth: 100 }}
                         value={finalDrafts[row.trainerId] ?? ''}
                         aria-label={`Final PLP for ${row.name}`}
                         onChange={(e) => setFinalDrafts((prev) => ({
@@ -324,7 +327,7 @@ const PlpTab = () => {
                         }))}
                       >
                         <option value="">
-                          Calc {row.calculatedFinal == null ? '—' : row.calculatedFinal}
+                          Rounded {row.calculatedFinal == null ? '—' : row.calculatedFinal}
                         </option>
                         {FINAL_OPTIONS.map((value) => (
                           <option key={value} value={String(value)}>
@@ -343,7 +346,8 @@ const PlpTab = () => {
                     </div>
                     {row.isManualFinal && (
                       <div className="text-muted small mt-1">
-                        Manual (calc {formatScore(row.calculatedFinal)})
+                        Manual (actual {formatScore(row.calculatedRaw)}, rounded{' '}
+                        {formatScore(row.calculatedFinal)})
                       </div>
                     )}
                   </td>

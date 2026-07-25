@@ -298,10 +298,11 @@ export const upsertObservation = async (req, res) => {
     rating = null;
   } else {
     rating = Number(rating);
-    if (!Number.isFinite(rating) || rating < 1 || rating > 5) {
-      return res.status(400).json({ message: 'Rating must be between 1 and 5' });
+    if (!Number.isFinite(rating) || rating < 0.5 || rating > 5) {
+      return res.status(400).json({ message: 'Rating must be between 0.5 and 5' });
     }
-    rating = Math.round(rating);
+    // Snap to the nearest 0.5 step (0.5, 1, 1.5 … 5).
+    rating = Math.round(rating * 2) / 2;
   }
 
   let classFields;

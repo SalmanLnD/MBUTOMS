@@ -16,6 +16,9 @@ const OBSERVATION_SUB_TABS = [
   { id: 'class', label: 'Class' },
 ];
 
+// Ratings in 0.5 steps: 0.5, 1, 1.5 … 5.
+const RATING_OPTIONS = Array.from({ length: 10 }, (_, i) => (i + 1) * 0.5);
+
 const emptyDraft = (row) => ({
   rating: row.rating == null ? '' : String(row.rating),
   comments: row.comments || '',
@@ -282,7 +285,7 @@ const ObservationsTab = () => {
                           aria-label={`Rating for ${row.name}`}
                         >
                           <option value="">—</option>
-                          {[1, 2, 3, 4, 5].map((value) => (
+                          {RATING_OPTIONS.map((value) => (
                             <option key={value} value={value}>{value}</option>
                           ))}
                         </select>

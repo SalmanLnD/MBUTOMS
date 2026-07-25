@@ -25,7 +25,7 @@ test('compliance score defaults to 5 and deducts per record', () => {
   assert.equal(complianceScoreFromCount(8), 0);
 });
 
-test('final PLP rating uses weightages and skips null components', () => {
+test('final PLP rating uses weightages and treats missing components as zero', () => {
   const total = Object.values(PLP_WEIGHTAGES).reduce((sum, value) => sum + value, 0);
   assert.equal(total, 100);
 
@@ -38,6 +38,8 @@ test('final PLP rating uses weightages and skips null components', () => {
   });
   assert.equal(full, 5);
 
+  // Missing demo (20%) and class (25%) count as 0, not skipped.
+  // (4*30 + 0*25 + 0*20 + 4*15 + 5*10) / 100 = 2.30
   const partial = computePlpFinalRating({
     feedback: 4,
     classObservation: null,
@@ -45,8 +47,25 @@ test('final PLP rating uses weightages and skips null components', () => {
     attendance: 4,
     compliance: 5,
   });
-  // (4*30 + 4*15 + 5*10) / (30+15+10) = 230/55
-  assert.equal(partial, Math.round((230 / 55) * 100) / 100);
+  assert.equal(partial, 2.3);
+
+  // Only attendance + compliance present: still full 100% denominator.
+  // (0*30 + 0*25 + 0*20 + 4*15 + 5*10) / 100 = 1.10
+  const sparse = computePlpFinalRating({
+    feedback: null,
+    classObservation: null,
+    demoObservation: null,
+    attendance: 4,
+    compliance: 5,
+  });
+  assert.equal(sparse, 1.1);
+  assert.equal(computeDisplayPlpFinal({
+    feedback: null,
+    classObservation: null,
+    demoObservation: null,
+    attendance: 4,
+    compliance: 5,
+  }), 3.5);
 });
 
 test('display final rounds to 0.5 and clamps between 3.5 and 4.5', () => {
