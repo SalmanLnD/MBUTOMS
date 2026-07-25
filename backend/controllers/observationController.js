@@ -2,7 +2,10 @@ import Trainer from '../models/Trainer.js';
 import Schedule from '../models/Schedule.js';
 import TrainerObservation, { OBSERVATION_TYPES } from '../models/TrainerObservation.js';
 import { mergeRosterFilter } from '../utils/rosterFilter.js';
-import { resolveTrainerScheduleCodes } from '../utils/trainerMappings.js';
+import {
+  PERFORMANCE_EXCLUDED_EMPLOYEE_IDS,
+  resolveTrainerScheduleCodes,
+} from '../utils/trainerMappings.js';
 import {
   buildObservationClassDetail,
   notifyTrainerOfObservationComments,
@@ -217,6 +220,7 @@ export const getObservations = async (req, res) => {
   const rosterFilter = await mergeRosterFilter(
     {
       status: 'active',
+      employeeId: { $nin: PERFORMANCE_EXCLUDED_EMPLOYEE_IDS },
       ...(evaluatorFilter || {}),
     },
     { rosterOnly: true }

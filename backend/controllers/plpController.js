@@ -5,6 +5,7 @@ import TrainerCompliance from '../models/TrainerCompliance.js';
 import TrainerPlpOverride from '../models/TrainerPlpOverride.js';
 import AppSetting from '../models/AppSetting.js';
 import { mergeRosterFilter } from '../utils/rosterFilter.js';
+import { PERFORMANCE_EXCLUDED_EMPLOYEE_IDS } from '../utils/trainerMappings.js';
 import { getReplacementRequiredDaysByTrainer } from '../utils/replacementRequiredDays.js';
 import {
   buildPlpCycleOptions,
@@ -56,7 +57,10 @@ export const savePlpWeightages = async (input) => {
 
 const buildPlpRowsForCycle = async (cycleKey, weightages = PLP_WEIGHTAGES) => {
   const cycle = getPlpCycleRange(cycleKey);
-  const rosterFilter = await mergeRosterFilter({ status: 'active' }, { rosterOnly: true });
+  const rosterFilter = await mergeRosterFilter({
+    status: 'active',
+    employeeId: { $nin: PERFORMANCE_EXCLUDED_EMPLOYEE_IDS },
+  }, { rosterOnly: true });
   const trainers = await Trainer.find(rosterFilter)
     .select('name employeeId scheduleTrainerCodes')
     .sort({ employeeId: 1 })

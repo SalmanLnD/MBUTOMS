@@ -18,6 +18,9 @@ export const IDSA_DEPARTMENT_CODES = ['CSE', 'AIML', 'DS', 'IT', 'CS', 'AI&DS'];
 
 export const ADMIN_TRAINER_EMPLOYEE_ID = '131665';
 
+/** Excluded from PLP and Observations (e.g. admin teaching load). */
+export const PERFORMANCE_EXCLUDED_EMPLOYEE_IDS = [ADMIN_TRAINER_EMPLOYEE_ID];
+
 export const DSAP_SUBJECT = {
   code: '25CA202009',
   name: 'Data Structures and Algorithms Using Python',
