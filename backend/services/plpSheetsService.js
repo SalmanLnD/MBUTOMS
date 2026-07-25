@@ -76,11 +76,12 @@ export const getPlpAppsScriptSetup = async (req) => {
       'Create one Google Sheet for PLP ratings.',
       'Extensions → Apps Script, delete sample code, paste the script below, and save.',
       'Run installTriggers once and authorize access when Google asks.',
-      'Use menu TOMS PLP → Refresh now to create and test the PLP sheet.',
+      'Use menu TOMS PLP → Refresh now to create one tab per cycle (e.g. June-July 2026).',
       'Paste the Google Sheet URL below and click Save link.',
     ],
     note:
-      'The sheet refreshes every 5 minutes with PLP rows from July 2026 onward. '
+      'The sheet refreshes every 5 minutes with a separate tab per PLP cycle '
+      + '(named like June-July 2026) from July 2026 onward. '
       + 'Google Apps Script cannot call localhost; use the deployed API URL or a tunnel for local testing.',
   };
 };

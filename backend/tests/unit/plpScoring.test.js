@@ -91,6 +91,12 @@ test('PLP cycle 2026-07 is 21 Jun through 20 Jul with July feedback month', () =
   assert.equal(cycle.endKey, '2026-07-20');
   assert.equal(cycle.feedbackMonthKey, '2026-07');
   assert.deepEqual(cycle.observationMonthKeys, ['2026-06', '2026-07']);
+  assert.equal(cycle.sheetName, 'June-July 2026');
+});
+
+test('PLP cycle sheet names use full month names with end-year', () => {
+  assert.equal(getPlpCycleRange('2026-08').sheetName, 'July-August 2026');
+  assert.equal(getPlpCycleRange('2027-01').sheetName, 'December-January 2027');
 });
 
 test('observations are placed in the 21–20 cycle containing their date', () => {

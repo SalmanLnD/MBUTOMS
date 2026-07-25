@@ -22,12 +22,21 @@ const shiftMonthParts = (year, month, delta) => {
   };
 };
 
+const MONTH_FULL_NAMES = [
+  'January', 'February', 'March', 'April', 'May', 'June',
+  'July', 'August', 'September', 'October', 'November', 'December',
+];
+
 const formatMonthLabelShort = (year, month) =>
   new Date(Date.UTC(year, month - 1, 1)).toLocaleDateString('en-IN', {
     month: 'short',
     year: 'numeric',
     timeZone: 'UTC',
   });
+
+/** Google Sheet tab name, e.g. "June-July 2026". */
+export const formatPlpCycleSheetName = (startYear, startMonth, endYear, endMonth) =>
+  `${MONTH_FULL_NAMES[startMonth - 1]}-${MONTH_FULL_NAMES[endMonth - 1]} ${endYear}`;
 
 /**
  * cycleKey is the end-month key (YYYY-MM).
@@ -60,6 +69,7 @@ export const getPlpCycleRange = (cycleKey) => {
     observationMonthKey: formatAttendanceMonthKey(year, month),
     label: `${PLP_CYCLE_START_DAY} ${formatMonthLabelShort(startParts.year, startParts.month)} – ${PLP_CYCLE_END_DAY} ${formatMonthLabelShort(year, month)}`,
     shortLabel: `${formatMonthLabelShort(startParts.year, startParts.month).split(' ')[0]}–${formatMonthLabelShort(year, month)}`,
+    sheetName: formatPlpCycleSheetName(startParts.year, startParts.month, year, month),
   };
 };
 
@@ -111,6 +121,7 @@ export const buildPlpCycleOptions = (referenceDate = new Date()) => {
       value: cycleKey,
       label: range.label,
       shortLabel: range.shortLabel,
+      sheetName: range.sheetName,
       startKey: range.startKey,
       endKey: range.endKey,
       feedbackMonthKey: range.feedbackMonthKey,

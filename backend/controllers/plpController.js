@@ -282,10 +282,6 @@ export const buildPlpExportPayload = async () => {
   const weightages = await getStoredPlpWeightages();
   const cycles = buildPlpCycleOptions();
   const header = [
-    'Cycle',
-    'Cycle start',
-    'Cycle end',
-    'Feedback month',
     'Employee ID',
     'Trainer',
     `Feedback (${weightages.feedback}%)`,
@@ -301,37 +297,46 @@ export const buildPlpExportPayload = async () => {
     'Final PLP rating',
   ];
 
-  const rows = [header];
+  const sheets = [];
   for (const option of cycles) {
     const cycleRows = await buildPlpRowsForCycle(option.value, weightages);
-    cycleRows.forEach((row) => {
-      rows.push([
-        option.label,
-        option.startKey,
-        option.endKey,
-        option.feedbackMonthKey,
-        row.employeeId || '',
-        row.name || '',
-        row.feedbackRating ?? '',
-        row.classObservationRating ?? '',
-        row.demoObservationRating ?? '',
-        row.attendanceScore ?? '',
-        row.replacementRequiredDays ?? 0,
-        row.complianceScore ?? '',
-        row.complianceCount ?? 0,
-        row.calculatedRaw ?? '',
-        row.calculatedFinal ?? '',
-        row.manualFinal ?? '',
-        row.finalPlpRating ?? '',
-      ]);
+    sheets.push({
+      cycleKey: option.value,
+      sheetName: option.sheetName,
+      label: option.label,
+      startKey: option.startKey,
+      endKey: option.endKey,
+      feedbackMonthKey: option.feedbackMonthKey,
+      rows: [
+        header,
+        ...cycleRows.map((row) => [
+          row.employeeId || '',
+          row.name || '',
+          row.feedbackRating ?? '',
+          row.classObservationRating ?? '',
+          row.demoObservationRating ?? '',
+          row.attendanceScore ?? '',
+          row.replacementRequiredDays ?? 0,
+          row.complianceScore ?? '',
+          row.complianceCount ?? 0,
+          row.calculatedRaw ?? '',
+          row.calculatedFinal ?? '',
+          row.manualFinal ?? '',
+          row.finalPlpRating ?? '',
+        ]),
+      ],
     });
   }
 
   return {
     exportedAt: new Date().toISOString(),
-    cycles: cycles.map((cycle) => cycle.value),
+    cycles: cycles.map((cycle) => ({
+      value: cycle.value,
+      sheetName: cycle.sheetName,
+      label: cycle.label,
+    })),
     weightages,
-    rows,
+    sheets,
   };
 };
 
