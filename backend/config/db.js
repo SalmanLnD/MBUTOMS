@@ -24,9 +24,21 @@ import { repairTrainerScheduleCodeLinks } from '../utils/repairTrainerScheduleCo
 
 const getCache = () => {
   if (!globalThis._mongooseCache) {
-    globalThis._mongooseCache = { conn: null, promise: null, startupDone: false };
+    globalThis._mongooseCache = { conn: null, promise: null, startupDone: false, roleSyncDone: false };
   }
   return globalThis._mongooseCache;
+};
+
+/** Lightweight role sync for serverless (Vercel skips full startup). */
+const runRoleSync = async () => {
+  const coordinatorSync = await syncSubjectCoordinators();
+  const evaluatorSync = await syncEvaluators();
+  if (coordinatorSync.updated) {
+    console.log(`Subject coordinator sync: ${coordinatorSync.updated} coordinator account(s) updated`);
+  }
+  if (evaluatorSync.updated) {
+    console.log(`Evaluator sync: ${evaluatorSync.updated} evaluator account(s) updated`);
+  }
 };
 
 const runEssentialStartup = async () => {
@@ -136,6 +148,11 @@ export const connectDB = async ({ runStartup = false } = {}) => {
   if (shouldRunStartup) {
     await runStartupTasks();
     cache.startupDone = true;
+    cache.roleSyncDone = true;
+  } else if (!cache.roleSyncDone) {
+    // Production/serverless: still promote coordinators/evaluators once per instance.
+    cache.roleSyncDone = true;
+    await runRoleSync();
   }
 
   return cache.conn;
