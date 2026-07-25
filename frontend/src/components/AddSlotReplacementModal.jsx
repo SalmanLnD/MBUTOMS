@@ -139,7 +139,6 @@ const AddSlotReplacementModal = ({ show, onClose, onCreated }) => {
                   type="date"
                   className="form-control"
                   value={form.date}
-                  min={toInputDate(new Date())}
                   onChange={(e) => setForm({ ...form, date: e.target.value, scheduleId: '' })}
                   required
                 />
