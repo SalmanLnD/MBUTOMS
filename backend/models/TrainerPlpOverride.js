@@ -17,7 +17,7 @@ const trainerPlpOverrideSchema = new mongoose.Schema(
     finalRating: {
       type: Number,
       required: true,
-      min: 3.5,
+      min: 0,
       max: 4.5,
     },
     updatedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },

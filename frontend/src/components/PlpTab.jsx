@@ -22,7 +22,7 @@ const WEIGHTAGE_FIELDS = [
   { key: 'compliance', label: 'Compliance' },
 ];
 
-const FINAL_OPTIONS = [3.5, 4, 4.5];
+const FINAL_OPTIONS = [0, 3.5, 4, 4.5];
 
 const PlpTab = () => {
   const [cycleKey, setCycleKey] = useState('');
@@ -218,7 +218,8 @@ const PlpTab = () => {
           <strong>{cycle.feedbackMonthKey}</strong> (e.g. July feedback for the Jun–Jul cycle).
           Missing feedback, class, or demo count as <strong>0</strong> (their weightage still
           applies). The sheet shows the actual weighted value and the rounded final (nearest 0.5,
-          clamped 3.5–4.5); you can override the final manually.
+          clamped 3.5–4.5). You can override the final manually — use <strong>0</strong> for
+          trainers on break or long leave.
         </p>
       )}
 
@@ -331,7 +332,7 @@ const PlpTab = () => {
                         </option>
                         {FINAL_OPTIONS.map((value) => (
                           <option key={value} value={String(value)}>
-                            {value}
+                            {value === 0 ? '0 (break/leave)' : value}
                           </option>
                         ))}
                       </select>

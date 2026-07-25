@@ -246,12 +246,16 @@ export const upsertPlpFinalRating = async (req, res) => {
     });
   }
 
-  // Round to the 0.5 grid, but reject values outside the band instead of
-  // silently clamping what the manager typed (e.g. 5 must not become 4.5).
+  // Round to the 0.5 grid. Allow 0 for break / long-leave overrides; otherwise
+  // only the normal 3.5–4.5 band (reject out-of-band values instead of clamping).
   const finalRating = roundToHalf(Number(req.body.finalRating));
-  if (finalRating == null || finalRating < PLP_FINAL_MIN || finalRating > PLP_FINAL_MAX) {
+  const isZeroOverride = finalRating === 0;
+  const inNormalBand = finalRating != null
+    && finalRating >= PLP_FINAL_MIN
+    && finalRating <= PLP_FINAL_MAX;
+  if (finalRating == null || (!isZeroOverride && !inNormalBand)) {
     return res.status(400).json({
-      message: `Final rating must be between ${PLP_FINAL_MIN} and ${PLP_FINAL_MAX} in steps of 0.5`,
+      message: `Final rating must be 0 (break/long leave) or between ${PLP_FINAL_MIN} and ${PLP_FINAL_MAX} in steps of 0.5`,
     });
   }
 
