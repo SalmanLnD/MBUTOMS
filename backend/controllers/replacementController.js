@@ -13,7 +13,6 @@ import {
   getCancellationMapForRange,
   getUncancelledScheduleDateKeys,
 } from '../utils/leaveAffectedClasses.js';
-import { toLeaveDateKey } from '../utils/leaveDateRange.js';
 import { getCanceledScheduleIdsForDate } from '../utils/classCancellations.js';
 import {
   loadReplacementBusySlotsByTrainer,
@@ -318,7 +317,6 @@ export const getAllReplacements = async (req, res) => {
       )
     )
     : new Map();
-  const todayKey = toLeaveDateKey(today);
   for (const leave of leaves) {
     const startDate = normalizeDate(leave.startDate);
     const endDate = normalizeDate(leave.endDate);
@@ -351,9 +349,9 @@ export const getAllReplacements = async (req, res) => {
         schedule,
         replacement,
         timelineStatus,
-        canAssign:
-          leave.status === 'approved'
-          && affectedDates.some((dateKey) => dateKey >= todayKey),
+        // Allow assign/change even after the day is over — classes always had a
+        // trainer, and managers sometimes need to record the replacement later.
+        canAssign: leave.status === 'approved',
         replacementDate: affectedDates[0],
         affectedDates,
         isSlotReplacement:
@@ -446,9 +444,6 @@ export const assignReplacement = async (req, res) => {
     return res.status(400).json({
       message: 'This class is canceled for the leave date, so no replacement is needed.',
     });
-  }
-  if (normalizeDate(leave.endDate) < normalizeDate(new Date())) {
-    return res.status(400).json({ message: 'Previous replacement records cannot be changed' });
   }
   if (!useExternal && leave.trainer?._id?.toString() === trainer._id.toString()) {
     return res.status(400).json({ message: 'The original trainer cannot replace their own class' });
@@ -666,11 +661,6 @@ export const createSlotReplacementRequest = async (req, res) => {
   }
 
   const slotDate = normalizeDate(date);
-  const today = normalizeDate(new Date());
-  if (slotDate < today) {
-    return res.status(400).json({ message: 'Replacement date cannot be in the past' });
-  }
-
   const dayName = WEEKDAYS[slotDate.getDay()];
   if (schedule.day !== dayName) {
     return res.status(400).json({ message: 'Selected slot does not occur on the chosen date' });
