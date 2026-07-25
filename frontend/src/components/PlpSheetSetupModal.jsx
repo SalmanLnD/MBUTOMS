@@ -74,7 +74,8 @@ const PlpSheetSetupModal = ({ show, initialUrl = '', onClose, onLinked }) => {
             <>
               <p className="text-muted small">
                 PLP ratings sync to your Google Sheet every 5 minutes
-                (or when you use menu <strong>TOMS PLP → Refresh now</strong>).
+                with one tab per cycle (e.g. <strong>June-July 2026</strong>),
+                or when you use menu <strong>TOMS PLP → Refresh now</strong>.
               </p>
               <ol className="small mb-3">
                 {setup.steps.map((step) => (
