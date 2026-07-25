@@ -17,16 +17,17 @@ import {
   linkPlpGoogleSheet,
   unlinkPlpGoogleSheet,
 } from '../controllers/plpSheetsController.js';
-import { protect, authorize } from '../middleware/auth.js';
+import { protect, authorizeExact } from '../middleware/auth.js';
 import { asyncHandler } from '../middleware/asyncHandler.js';
 import { requirePlpExportKey } from '../middleware/plpExportAuth.js';
+import { FULL_ACCESS_ROLES } from '../utils/roles.js';
 
 const router = express.Router();
 
 router.get('/export', requirePlpExportKey, asyncHandler(exportPlpSheetData));
 
 router.use(protect);
-router.use(authorize('admin', 'campus_manager'));
+router.use(authorizeExact(...FULL_ACCESS_ROLES));
 
 router.get('/', asyncHandler(getPlpSheet));
 router.put('/weightages', asyncHandler(updatePlpWeightages));

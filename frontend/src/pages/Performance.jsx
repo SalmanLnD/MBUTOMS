@@ -1,30 +1,34 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import FeedbackSection from '../components/FeedbackSection.jsx';
 import ObservationsTab from '../components/ObservationsTab.jsx';
 import PlpTab from '../components/PlpTab.jsx';
 import ComplianceTab from '../components/ComplianceTab.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
-
-const ALL_PERFORMANCE_TABS = [
-  { id: 'feedback', label: 'Feedback' },
-  { id: 'observations', label: 'Observations' },
-  { id: 'compliance', label: 'Compliance' },
-  { id: 'plp', label: 'PLP' },
-];
-
-const OBSERVATIONS_ONLY_TABS = [
-  { id: 'observations', label: 'Observations' },
-];
+import { ROLES } from '../utils/roles.js';
 
 const Performance = () => {
-  const { hasManagementRole } = useAuth();
-  const showAllTabs = hasManagementRole();
-  const tabs = showAllTabs ? ALL_PERFORMANCE_TABS : OBSERVATIONS_ONLY_TABS;
-  const [activeTab, setActiveTab] = useState(showAllTabs ? 'feedback' : 'observations');
+  const { user, hasFullAccess } = useAuth();
+  // PLP / Compliance: admin, manager, campus manager only.
+  const canManagePlp = hasFullAccess();
+  // Feedback: full-access staff + subject coordinators (not pure evaluators).
+  const canSeeFeedback = canManagePlp || user?.role === ROLES.SUBJECT_COORDINATOR;
+
+  const tabs = useMemo(() => {
+    const next = [];
+    if (canSeeFeedback) next.push({ id: 'feedback', label: 'Feedback' });
+    next.push({ id: 'observations', label: 'Observations' });
+    if (canManagePlp) {
+      next.push({ id: 'compliance', label: 'Compliance' });
+      next.push({ id: 'plp', label: 'PLP' });
+    }
+    return next;
+  }, [canSeeFeedback, canManagePlp]);
+
+  const [activeTab, setActiveTab] = useState(tabs[0]?.id || 'observations');
 
   useEffect(() => {
     if (!tabs.some((tab) => tab.id === activeTab)) {
-      setActiveTab(tabs[0].id);
+      setActiveTab(tabs[0]?.id || 'observations');
     }
   }, [tabs, activeTab]);
 
@@ -50,10 +54,10 @@ const Performance = () => {
 
       <div className="card table-card">
         <div className="card-body">
-          {activeTab === 'feedback' && showAllTabs && <FeedbackSection />}
+          {activeTab === 'feedback' && canSeeFeedback && <FeedbackSection />}
           {activeTab === 'observations' && <ObservationsTab />}
-          {activeTab === 'compliance' && showAllTabs && <ComplianceTab />}
-          {activeTab === 'plp' && showAllTabs && <PlpTab />}
+          {activeTab === 'compliance' && canManagePlp && <ComplianceTab />}
+          {activeTab === 'plp' && canManagePlp && <PlpTab />}
         </div>
       </div>
     </>
