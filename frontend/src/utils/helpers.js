@@ -27,6 +27,7 @@ export const formatRole = (role) => {
     [ROLES.MANAGER]: 'Manager',
     [ROLES.SUBJECT_COORDINATOR]: 'Subject Coordinator',
     [ROLES.CAMPUS_MANAGER]: 'Campus Manager',
+    [ROLES.EVALUATOR]: 'Evaluator',
     [ROLES.TRAINER]: 'Trainer',
   };
   return roles[role] || role;

@@ -23,6 +23,7 @@ const userResponse = (user, { impersonator = null } = {}) => ({
   role: user.role,
   trainer: user.trainer,
   coordinatorSubjects: user.coordinatorSubjects || [],
+  evaluatorSubjects: user.evaluatorSubjects || [],
   sessionVersion: user.sessionVersion ?? 1,
   mustResetPassword: Boolean(user.mustResetPassword),
   requiresPasswordReset: Boolean(user.mustResetPassword),
@@ -43,7 +44,8 @@ export const login = async (req, res) => {
 
   const user = await User.findOne({ email: email?.trim()?.toLowerCase() })
     .populate('trainer', 'name employeeId')
-    .populate('coordinatorSubjects', 'name code');
+    .populate('coordinatorSubjects', 'name code')
+    .populate('evaluatorSubjects', 'name code');
   if (!user || !(await user.matchPassword(password))) {
     return res.status(401).json({ message: 'Invalid email or password' });
   }
@@ -57,6 +59,7 @@ export const login = async (req, res) => {
     (
       user.role === ROLES.TRAINER
       || user.role === ROLES.SUBJECT_COORDINATOR
+      || user.role === ROLES.EVALUATOR
       || user.role === ROLES.MANAGER
     )
     && usedInitialPassword
@@ -72,7 +75,8 @@ export const getMe = async (req, res) => {
   const user = await User.findById(req.user._id)
     .select('-password')
     .populate('trainer', 'name employeeId department')
-    .populate('coordinatorSubjects', 'name code');
+    .populate('coordinatorSubjects', 'name code')
+    .populate('evaluatorSubjects', 'name code');
   res.json({
     ...user.toObject(),
     requiresPasswordReset: Boolean(user.mustResetPassword),
@@ -161,12 +165,15 @@ export const impersonateUser = async (req, res) => {
 
   const targetUser = await User.findById(userId)
     .populate('trainer', 'name employeeId')
-    .populate('coordinatorSubjects', 'name code');
+    .populate('coordinatorSubjects', 'name code')
+    .populate('evaluatorSubjects', 'name code');
   if (!targetUser || !targetUser.isActive) {
     return res.status(404).json({ message: 'User not found' });
   }
   if (!IMPERSONATION_TARGET_ROLES.includes(targetUser.role)) {
-    return res.status(400).json({ message: 'Only trainer or subject coordinator accounts can be viewed' });
+    return res.status(400).json({
+      message: 'Only trainer, subject coordinator, or evaluator accounts can be viewed',
+    });
   }
   if (!targetUser.trainer) {
     return res.status(400).json({ message: 'User has no linked trainer profile' });

@@ -3,6 +3,7 @@ export const ROLES = {
   MANAGER: 'manager',
   SUBJECT_COORDINATOR: 'subject_coordinator',
   CAMPUS_MANAGER: 'campus_manager',
+  EVALUATOR: 'evaluator',
   TRAINER: 'trainer',
 };
 
@@ -21,11 +22,21 @@ export const MANAGEMENT_ROLES = [
   ROLES.CAMPUS_MANAGER,
 ];
 
+/** Management plus pure evaluators (Observations access). */
+export const PERFORMANCE_ACCESS_ROLES = [
+  ...MANAGEMENT_ROLES,
+  ROLES.EVALUATOR,
+];
+
 /**
  * Roles that apply leave for themselves only (linked trainer record).
- * Subject coordinators are trainer-like for leave, plus coordinator extras elsewhere.
+ * Subject coordinators / evaluators are trainer-like for leave, plus extras elsewhere.
  */
-export const TRAINER_LIKE_ROLES = [ROLES.TRAINER, ROLES.SUBJECT_COORDINATOR];
+export const TRAINER_LIKE_ROLES = [
+  ROLES.TRAINER,
+  ROLES.SUBJECT_COORDINATOR,
+  ROLES.EVALUATOR,
+];
 
 /** Linked trainer accounts for these roles are hidden from attendance/timetable. */
 export const ROSTER_HIDDEN_STAFF_ROLES = [
@@ -39,6 +50,7 @@ export const IMPERSONATION_ROLES = FULL_ACCESS_ROLES;
 export const IMPERSONATION_TARGET_ROLES = [
   ROLES.TRAINER,
   ROLES.SUBJECT_COORDINATOR,
+  ROLES.EVALUATOR,
 ];
 
 const roleMatches = (userRole, allowedRole) => {

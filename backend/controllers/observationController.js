@@ -7,6 +7,12 @@ import {
   buildObservationClassDetail,
   notifyTrainerOfObservationComments,
 } from '../utils/observationNotifications.js';
+import {
+  buildTrainerFilterForEvaluator,
+  evaluatorCanRateTrainer,
+  getEvaluatorSubjectCodes,
+  hasFullObservationAccess,
+} from '../utils/evaluatorAccess.js';
 
 const MONTH_KEY_PATTERN = /^\d{4}-\d{2}$/;
 const DAY_ORDER = {
@@ -174,14 +180,31 @@ export const getObservations = async (req, res) => {
     return res.status(400).json({ message: 'type must be demo or class' });
   }
 
-  const rosterFilter = await mergeRosterFilter({ status: 'active' }, { rosterOnly: true });
+  const scoped = !hasFullObservationAccess(req.user);
+  const evaluatorFilter = scoped ? await buildTrainerFilterForEvaluator(req.user) : null;
+  const allowedSubjectCodes = scoped
+    ? new Set(await getEvaluatorSubjectCodes(req.user))
+    : null;
+
+  const rosterFilter = await mergeRosterFilter(
+    {
+      status: 'active',
+      ...(evaluatorFilter || {}),
+    },
+    { rosterOnly: true }
+  );
   const trainers = await Trainer.find(rosterFilter)
     .select('name employeeId scheduleTrainerCodes')
     .sort({ employeeId: 1 })
     .lean();
 
+  const trainerIds = trainers.map((trainer) => trainer._id);
   const [observations, scheduleOptionsByTrainer] = await Promise.all([
-    TrainerObservation.find({ monthKey, type })
+    TrainerObservation.find({
+      monthKey,
+      type,
+      ...(trainerIds.length ? { trainer: { $in: trainerIds } } : { trainer: { $in: [] } }),
+    })
       .select('trainer rating comments schedule department section slot startTime endTime day subjectCode observationDate updatedAt ratedBy')
       .lean(),
     type === 'class' ? buildScheduleOptionsByTrainer(trainers) : Promise.resolve({}),
@@ -196,6 +219,12 @@ export const getObservations = async (req, res) => {
     type,
     trainers: trainers.map((trainer) => {
       const observation = byTrainer.get(trainer._id.toString());
+      let scheduleOptions = scheduleOptionsByTrainer[trainer._id.toString()] || [];
+      if (allowedSubjectCodes) {
+        scheduleOptions = scheduleOptions.filter(
+          (option) => !option.subjectCode || allowedSubjectCodes.has(option.subjectCode)
+        );
+      }
       return {
         trainerId: trainer._id,
         employeeId: trainer.employeeId,
@@ -204,7 +233,7 @@ export const getObservations = async (req, res) => {
         comments: observation?.comments || '',
         updatedAt: observation?.updatedAt || null,
         ...serializeClassFields(observation),
-        scheduleOptions: scheduleOptionsByTrainer[trainer._id.toString()] || [],
+        scheduleOptions,
       };
     }),
   });
@@ -227,6 +256,13 @@ export const upsertObservation = async (req, res) => {
   const trainer = await Trainer.findById(trainerId).select('_id name employeeId');
   if (!trainer) {
     return res.status(404).json({ message: 'Trainer not found' });
+  }
+
+  if (!hasFullObservationAccess(req.user)) {
+    const allowed = await evaluatorCanRateTrainer(req.user, trainerId);
+    if (!allowed) {
+      return res.status(403).json({ message: 'Not authorized to rate this trainer' });
+    }
   }
 
   let rating = req.body.rating;

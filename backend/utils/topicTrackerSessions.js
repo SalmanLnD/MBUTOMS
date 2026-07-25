@@ -257,7 +257,7 @@ export const buildTopicTrackerSessions = async ({
     && trainerId.toString() === ownTrainerId
   );
 
-  if (user?.role === ROLES.TRAINER && user.trainer) {
+  if ((user?.role === ROLES.TRAINER || user?.role === ROLES.EVALUATOR) && user.trainer) {
     allowedTrainerIds = new Set([ownTrainerId || user.trainer.toString()]);
   } else if (isSubjectCoordinator(user)) {
     const subjectIds = getCoordinatorSubjectIds(user);
@@ -554,7 +554,7 @@ export const buildTopicTrackerExportRows = async () => {
 export const buildTopicTrackerClassSummary = async ({ subjectId, user, trainerId } = {}) => {
   const ownTrainerId = trainerId
     ? String(trainerId._id || trainerId)
-    : (user?.role === ROLES.TRAINER && user.trainer
+    : ((user?.role === ROLES.TRAINER || user?.role === ROLES.EVALUATOR) && user.trainer
       ? String(user.trainer._id || user.trainer)
       : '');
 

@@ -9,9 +9,10 @@ import {
   MANAGEMENT_ROLES,
 } from '../../utils/roles.js';
 
-test('subject coordinators are trainer-like for leave', () => {
+test('subject coordinators and evaluators are trainer-like for leave', () => {
   assert.equal(isTrainerLikeRole(ROLES.TRAINER), true);
   assert.equal(isTrainerLikeRole(ROLES.SUBJECT_COORDINATOR), true);
+  assert.equal(isTrainerLikeRole(ROLES.EVALUATOR), true);
   assert.equal(isTrainerLikeRole(ROLES.ADMIN), false);
   assert.equal(isTrainerLikeRole(ROLES.MANAGER), false);
   assert.equal(isTrainerLikeRole(ROLES.CAMPUS_MANAGER), false);

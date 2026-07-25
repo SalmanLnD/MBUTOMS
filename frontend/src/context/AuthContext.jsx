@@ -30,6 +30,7 @@ const buildUserData = (data) => ({
   role: data.role,
   trainer: resolveLinkedTrainerId(data.trainer),
   coordinatorSubjects: data.coordinatorSubjects || [],
+  evaluatorSubjects: data.evaluatorSubjects || [],
   sessionVersion: data.sessionVersion ?? 1,
   mustResetPassword: Boolean(data.mustResetPassword),
   requiresPasswordReset: Boolean(data.requiresPasswordReset || data.mustResetPassword),

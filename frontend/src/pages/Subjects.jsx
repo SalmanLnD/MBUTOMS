@@ -44,7 +44,7 @@ const Subjects = () => {
   usePageTitle(canManage ? 'Subject Management' : 'Subjects');
   const isSubjectCoordinator = hasRole(ROLES.SUBJECT_COORDINATOR);
   const showFullSubjectDetails = canManage || isSubjectCoordinator;
-  const isTrainerUser = user?.role === ROLES.TRAINER;
+  const isTrainerUser = user?.role === ROLES.TRAINER || user?.role === ROLES.EVALUATOR;
   const {
     page,
     setPage,

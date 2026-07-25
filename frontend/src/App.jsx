@@ -8,7 +8,7 @@ import LoginModal from './components/LoginModal.jsx';
 import SessionExpiredModal from './components/SessionExpiredModal.jsx';
 import MainLayout from './layouts/MainLayout.jsx';
 import OptionalAuthLayout from './layouts/OptionalAuthLayout.jsx';
-import { needsPasswordReset, MANAGEMENT_ROLES } from './utils/roles.js';
+import { needsPasswordReset, MANAGEMENT_ROLES, PERFORMANCE_ACCESS_ROLES } from './utils/roles.js';
 
 const Dashboard = lazy(() => import('./pages/Dashboard.jsx'));
 const Trainers = lazy(() => import('./pages/Trainers.jsx'));
@@ -94,7 +94,7 @@ const App = () => (
         <Route
           path="/performance"
           element={
-            <ProtectedRoute roles={MANAGEMENT_ROLES}>
+            <ProtectedRoute roles={PERFORMANCE_ACCESS_ROLES}>
               <Performance />
             </ProtectedRoute>
           }

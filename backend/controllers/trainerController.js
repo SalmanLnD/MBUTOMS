@@ -298,7 +298,7 @@ export const resetTrainerPassword = async (req, res) => {
   const user = await syncTrainerUser(trainer, { resetPassword: true });
   if (!user) {
     return res.status(400).json({
-      message: 'Could not reset password for this account. It may not be a trainer or subject coordinator login.',
+      message: 'Could not reset password for this account. It may not be a trainer-linked login.',
     });
   }
 

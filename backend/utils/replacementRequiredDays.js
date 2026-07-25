@@ -1,0 +1,115 @@
+import Leave from '../models/Leave.js';
+import Schedule from '../models/Schedule.js';
+import {
+  formatAttendanceMonthKey,
+  getAttendanceCalendarDates,
+  getAttendanceMonthRange,
+  getAttendanceWeekdayName,
+  parseAttendanceMonthParam,
+} from './attendanceDates.js';
+import {
+  TRAINER_ATTENDANCE_TRACKING_START,
+  toAttendanceDateKey,
+} from './attendanceTracking.js';
+import { getLeaveOverlapFilter, isDateWithinLeave } from './leaveDateRange.js';
+import { getLeaveWeekdayScheduleIds, isFullDayLeave } from './leaveScope.js';
+import { resolveTrainerScheduleCodes } from './trainerMappings.js';
+
+/**
+ * Map of trainerId -> Replacement Required Days count for a month.
+ * RRD = full-day approved leave on a weekday the trainer has scheduled classes.
+ */
+export const getReplacementRequiredDaysByTrainer = async ({
+  monthKey,
+  trainers = [],
+} = {}) => {
+  const counts = new Map(trainers.map((trainer) => [trainer._id.toString(), 0]));
+  if (!trainers.length || !monthKey) return counts;
+
+  const { year, month } = parseAttendanceMonthParam(monthKey);
+  const { startDate: monthStart, endDate: monthEnd } = getAttendanceMonthRange(year, month);
+  const rangeStart = monthStart < TRAINER_ATTENDANCE_TRACKING_START
+    ? TRAINER_ATTENDANCE_TRACKING_START
+    : monthStart;
+  const dates = getAttendanceCalendarDates(rangeStart, monthEnd);
+  if (!dates.length) return counts;
+
+  const trainerIds = trainers.map((trainer) => trainer._id);
+  const codesByTrainer = new Map(
+    trainers.map((trainer) => [trainer._id.toString(), resolveTrainerScheduleCodes(trainer)])
+  );
+  const allScheduleCodes = [...new Set([...codesByTrainer.values()].flat())];
+
+  const [approvedLeaves, schedules] = await Promise.all([
+    Leave.find({
+      trainer: { $in: trainerIds },
+      status: 'approved',
+      ...getLeaveOverlapFilter(rangeStart, monthEnd),
+    })
+      .select('trainer startDate endDate reason scope affectedSchedules')
+      .lean(),
+    allScheduleCodes.length
+      ? Schedule.find({ trainerCode: { $in: allScheduleCodes } })
+        .select('_id trainerCode day')
+        .lean()
+      : [],
+  ]);
+
+  const schedulesByCode = new Map();
+  schedules.forEach((schedule) => {
+    if (!schedulesByCode.has(schedule.trainerCode)) {
+      schedulesByCode.set(schedule.trainerCode, []);
+    }
+    schedulesByCode.get(schedule.trainerCode).push(schedule);
+  });
+
+  const schedulesByTrainer = new Map();
+  const trainingWeekdaysByTrainer = new Map();
+  trainers.forEach((trainer) => {
+    const trainerId = trainer._id.toString();
+    const trainerSchedules = (codesByTrainer.get(trainerId) || [])
+      .flatMap((code) => schedulesByCode.get(code) || []);
+    schedulesByTrainer.set(trainerId, trainerSchedules);
+    trainingWeekdaysByTrainer.set(
+      trainerId,
+      new Set(trainerSchedules.map((schedule) => schedule.day))
+    );
+  });
+
+  const fullDayLeaveKeys = new Set();
+  approvedLeaves.forEach((leave) => {
+    const trainerId = leave.trainer.toString();
+    const dayScheduleIds = getLeaveWeekdayScheduleIds(
+      leave,
+      schedulesByTrainer.get(trainerId) || []
+    );
+    if (!isFullDayLeave(leave, { dayScheduleIds })) return;
+
+    dates.forEach((date) => {
+      if (isDateWithinLeave(date, leave)) {
+        fullDayLeaveKeys.add(`${trainerId}|${toAttendanceDateKey(date)}`);
+      }
+    });
+  });
+
+  trainers.forEach((trainer) => {
+    const trainerId = trainer._id.toString();
+    const trainingWeekdays = trainingWeekdaysByTrainer.get(trainerId) || new Set();
+    let rrd = 0;
+    dates.forEach((date) => {
+      const dateKey = toAttendanceDateKey(date);
+      if (!fullDayLeaveKeys.has(`${trainerId}|${dateKey}`)) return;
+      if (trainingWeekdays.has(getAttendanceWeekdayName(date))) {
+        rrd += 1;
+      }
+    });
+    counts.set(trainerId, rrd);
+  });
+
+  return counts;
+};
+
+export const resolvePlpMonthKey = (monthParam) => {
+  const { year, month } = parseAttendanceMonthParam(monthParam);
+  return formatAttendanceMonthKey(year, month);
+};

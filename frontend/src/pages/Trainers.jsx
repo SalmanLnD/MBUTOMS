@@ -22,7 +22,7 @@ import { isAbortError } from '../services/api.js';
 const Trainers = () => {
   const { user, hasRole, hasFullAccess } = useAuth();
   const canManage = hasFullAccess();
-  const isTrainerUser = user?.role === ROLES.TRAINER;
+  const isTrainerUser = user?.role === ROLES.TRAINER || user?.role === ROLES.EVALUATOR;
   const isSubjectCoordinator = hasRole(ROLES.SUBJECT_COORDINATOR);
   usePageTitle(isTrainerUser ? 'My Profile' : isSubjectCoordinator ? 'Subject Trainers' : 'Trainer Management');
   const [searchParams, setSearchParams] = useSearchParams();

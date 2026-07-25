@@ -83,7 +83,7 @@ export const createTicket = async (req, res) => {
 
       const trainerUser = await User.findOne({
         trainer: trainerRecord._id,
-        role: { $in: [ROLES.TRAINER, ROLES.SUBJECT_COORDINATOR] },
+        role: { $in: [ROLES.TRAINER, ROLES.SUBJECT_COORDINATOR, ROLES.EVALUATOR] },
         isActive: true,
       });
 
@@ -99,6 +99,7 @@ export const createTicket = async (req, res) => {
   } else if (
     req.user.role === ROLES.TRAINER
     || req.user.role === ROLES.SUBJECT_COORDINATOR
+    || req.user.role === ROLES.EVALUATOR
   ) {
     trainer = req.user.trainer;
   }

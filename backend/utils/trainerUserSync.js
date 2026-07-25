@@ -3,7 +3,11 @@ import { INITIAL_TRAINER_PASSWORD } from '../constants/trainerAuth.js';
 import { ROLES } from './roles.js';
 
 /** Roles that log in through a linked trainer profile and can use the initial OTP. */
-const TRAINER_LINKED_LOGIN_ROLES = [ROLES.TRAINER, ROLES.SUBJECT_COORDINATOR];
+const TRAINER_LINKED_LOGIN_ROLES = [
+  ROLES.TRAINER,
+  ROLES.SUBJECT_COORDINATOR,
+  ROLES.EVALUATOR,
+];
 
 export const syncTrainerUser = async (trainer, { resetPassword = false } = {}) => {
   const email = trainer.email?.trim()?.toLowerCase();

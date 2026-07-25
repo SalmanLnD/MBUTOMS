@@ -87,8 +87,8 @@ const Topbar = ({ title }) => {
       { value: '', label: loadingTargets ? 'Loading trainers...' : 'View as trainer...' },
       ...targets.map((target) => ({
         value: target._id,
-        label: target.role === ROLES.SUBJECT_COORDINATOR
-          ? `${target.name} (${target.employeeId}) · ${formatRole(ROLES.SUBJECT_COORDINATOR)}`
+        label: (target.role === ROLES.SUBJECT_COORDINATOR || target.role === ROLES.EVALUATOR)
+          ? `${target.name} (${target.employeeId}) · ${formatRole(target.role)}`
           : `${target.name} (${target.employeeId})`,
       })),
     ],

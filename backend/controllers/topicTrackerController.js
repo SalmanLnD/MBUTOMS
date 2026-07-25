@@ -68,7 +68,7 @@ const canEditSession = async (user, trainerId, subjectId, { scheduleId, date } =
     if (!subjectIds.includes(subjectId?.toString())) return false;
     return coordinatorCanAccessTrainer(user, trainerId);
   }
-  if (user?.role === ROLES.TRAINER) {
+  if (user?.role === ROLES.TRAINER || user?.role === ROLES.EVALUATOR) {
     return user.trainer?.toString() === trainerId?.toString();
   }
   return false;
@@ -133,7 +133,7 @@ export const getTopicTrackerTopics = async (req, res) => {
 };
 
 export const getTopicTrackerClassSummary = async (req, res) => {
-  const isTrainerUser = req.user.role === ROLES.TRAINER;
+  const isTrainerUser = req.user.role === ROLES.TRAINER || req.user.role === ROLES.EVALUATOR;
   const isManagement = isAuthorizedRole(req.user.role, MANAGEMENT_VIEW_ROLES);
 
   if (!isTrainerUser && !isManagement) {

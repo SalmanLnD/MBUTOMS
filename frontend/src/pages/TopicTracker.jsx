@@ -37,7 +37,7 @@ const TopicTracker = () => {
   const { hasRole, user } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
-  const isTrainer = hasRole(ROLES.TRAINER);
+  const isTrainer = hasRole(ROLES.TRAINER) || hasRole(ROLES.EVALUATOR);
   const isCoordinator = user?.role === ROLES.SUBJECT_COORDINATOR;
   // Exact role check — subject coordinators must not get campus_manager sheet parity here.
   const canManageSheets = [ROLES.ADMIN, ROLES.MANAGER, ROLES.CAMPUS_MANAGER].includes(user?.role);
