@@ -1,13 +1,14 @@
 import dotenv from 'dotenv';
 import mongoose from 'mongoose';
 import Schedule from '../models/Schedule.js';
-import Venue from '../models/Venue.js';
 import {
   IDSA_VENUE_NUMBERS,
   IDSA_VENUE_TRAINER_CODES,
   IDSA_SUBJECT_CODE,
   NAVYA_IDSA_VENUE_SLOTS,
+  NAVYA_PSTJ_VENUE_SLOTS,
   resolveIdsaVenueNumber,
+  getVenueNumberForNavyaPstjSlot,
   defaultVenueTypeForNumber,
 } from '../utils/idsaVenueMappings.js';
 import { upsertVenueByNumber } from '../utils/venueUpsert.js';
@@ -29,7 +30,7 @@ for (const venueNumber of IDSA_VENUE_NUMBERS) {
   venueByNumber.set(venueNumber, venue._id);
 }
 
-console.log(`Ensured ${venueByNumber.size} IDSA venue(s) with mapped building details.`);
+console.log(`Ensured ${venueByNumber.size} IDSA/PSTJ venue(s) with mapped building details.`);
 
 let mapped = 0;
 let cleared = 0;
@@ -66,29 +67,46 @@ for (const schedule of idsaSchedules) {
 const pstjSchedules = await Schedule.find({
   trainerCode: NAVYA_TRAINER_CODE,
   subjectCode: PSTJ_SUBJECT_CODE,
-  venue: { $ne: null },
 });
 
 for (const schedule of pstjSchedules) {
-  schedule.venue = null;
-  await schedule.save();
-  cleared += 1;
+  const venueNumber = getVenueNumberForNavyaPstjSlot(schedule.day, schedule.slot);
+  if (!venueNumber) {
+    if (schedule.venue) {
+      schedule.venue = null;
+      await schedule.save();
+      cleared += 1;
+    }
+    continue;
+  }
+
+  const venueId = venueByNumber.get(venueNumber);
+  if (!venueId) {
+    console.warn(`Missing venue record for room ${venueNumber}`);
+    continue;
+  }
+
+  if (schedule.venue?.toString() !== venueId.toString()) {
+    schedule.venue = venueId;
+    await schedule.save();
+    mapped += 1;
+  }
 }
 
-console.log(`Mapped ${mapped} IDSA slot(s) to venues. Cleared ${cleared} slot(s) without venue.`);
+console.log(`Mapped ${mapped} slot(s) to venues. Cleared ${cleared} slot(s) without venue.`);
 
 const navyaIdsaCount = await Schedule.countDocuments({
   trainerCode: NAVYA_TRAINER_CODE,
   subjectCode: IDSA_SUBJECT_CODE,
   venue: { $ne: null },
 });
-const navyaPstjWithoutVenue = await Schedule.countDocuments({
+const navyaPstjWithVenue = await Schedule.countDocuments({
   trainerCode: NAVYA_TRAINER_CODE,
   subjectCode: PSTJ_SUBJECT_CODE,
-  venue: null,
+  venue: { $ne: null },
 });
 
 console.log(`Navya IDSA slots with venue: ${navyaIdsaCount} (expected ${NAVYA_IDSA_VENUE_SLOTS.length}).`);
-console.log(`Navya PSTJ slots without venue: ${navyaPstjWithoutVenue}.`);
+console.log(`Navya PSTJ slots with venue: ${navyaPstjWithVenue} (expected ${NAVYA_PSTJ_VENUE_SLOTS.length}).`);
 
 await mongoose.disconnect();

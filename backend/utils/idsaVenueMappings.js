@@ -5,8 +5,8 @@ import { NAVYA_TRAINER_CODE } from './navyaTimetable.js';
 export const IDSA_VENUE_BUILDING = 'TBD';
 
 export const IDSA_VENUE_NUMBERS = [
-  333, 513, 514, 612, 618, 709, 2854, 4015, 4202, 4203, 4204,
-  4316, 4317, 4318, 4319, 4320, 4321, 4322, 4324, 4400, 4401,
+  207, 208, 224, 331, 333, 513, 514, 612, 618, 709, 2854, 4015, 4202, 4203, 4204,
+  4301, 4303, 4304, 4316, 4317, 4318, 4319, 4320, 4321, 4322, 4324, 4400, 4401,
 ];
 
 const SLOT_INDEX = { S1: 0, S2: 1, S3: 2, S4: 3 };
@@ -27,22 +27,22 @@ export const IDSA_TRAINER_VENUE_GRIDS = {
     Monday: [4015, 4400, null, null],
     Tuesday: [4204, null, 4015, 4204],
     Wednesday: [4400, 2854, 4204, 4015],
-    Thursday: [333, 4015, 4400, 4400],
+    Thursday: [333, 4015, 224, 224],
     Friday: [4204, 4204, 4204, null],
   },
   'IDSA-T7': {
-    Monday: [null, 4401, 4401, 4324],
-    Tuesday: [4401, 4401, 4324, null],
-    Wednesday: [4324, null, 4401, 4401],
-    Thursday: [4400, 4324, null, 4324],
-    Friday: [4324, 4401, 4401, 4324],
+    Monday: [null, 4401, 224, 224],
+    Tuesday: [4401, 4401, 224, null],
+    Wednesday: [331, null, 4401, 4401],
+    Thursday: [4400, 4324, null, 4303],
+    Friday: [4324, 4401, 4401, 4303],
   },
   'IDSA-T6': {
-    Monday: [4322, 4320, 4324, null],
+    Monday: [4301, 4320, 4303, null],
     Tuesday: [4321, null, 4320, null],
-    Wednesday: [4320, 4322, 4321, 4320],
-    Thursday: [4324, 4322, null, 4321],
-    Friday: [4322, 4322, 4322, 4322],
+    Wednesday: [4320, 4304, 4321, 4320],
+    Thursday: [4324, 4304, null, 4321],
+    Friday: [4322, 4322, 4301, 4301],
   },
   'IDSA-T4': {
     Monday: [4319, 4319, 513, null],
@@ -60,7 +60,7 @@ export const IDSA_TRAINER_VENUE_GRIDS = {
   },
 };
 
-/** Navya (IDSA-T2) IDSA slots only — B.COM/PSTJ venues left empty. */
+/** Navya (IDSA-T2) IDSA slots only. */
 export const NAVYA_IDSA_VENUE_SLOTS = [
   { day: 'Monday', slot: 'S1', venue: 4316 },
   { day: 'Monday', slot: 'S2', venue: 4317 },
@@ -70,6 +70,14 @@ export const NAVYA_IDSA_VENUE_SLOTS = [
   { day: 'Thursday', slot: 'S1', venue: 4318 },
   { day: 'Thursday', slot: 'S2', venue: 4319 },
   { day: 'Friday', slot: 'S3', venue: 4319 },
+];
+
+/** Navya B.COM(CA) / PSTJ venues. */
+export const NAVYA_PSTJ_VENUE_SLOTS = [
+  { day: 'Monday', slot: 'S4', venue: 208 },
+  { day: 'Tuesday', slot: 'S4', venue: 208 },
+  { day: 'Thursday', slot: 'S4', venue: 208 },
+  { day: 'Friday', slot: 'S1', venue: 207 },
 ];
 
 export const IDSA_VENUE_TRAINER_CODES = [
@@ -89,6 +97,11 @@ export const getVenueNumberForGridSlot = (trainerCode, day, slot) => {
 
 export const getVenueNumberForNavyaIdsaSlot = (day, slot) => {
   const match = NAVYA_IDSA_VENUE_SLOTS.find((entry) => entry.day === day && entry.slot === slot);
+  return match?.venue ?? null;
+};
+
+export const getVenueNumberForNavyaPstjSlot = (day, slot) => {
+  const match = NAVYA_PSTJ_VENUE_SLOTS.find((entry) => entry.day === day && entry.slot === slot);
   return match?.venue ?? null;
 };
 
