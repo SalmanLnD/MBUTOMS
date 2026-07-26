@@ -6,9 +6,15 @@ import TrainerFormModal from './TrainerFormModal.jsx';
 import { showSuccess } from '../utils/toast.js';
 import { getTrainerById } from '../services/trainerService.js';
 import { formatDate, getErrorMessage, resolveLinkedTrainerId } from '../utils/helpers.js';
+import { useAuth } from '../context/AuthContext.jsx';
 
 const TrainerDetailsPanel = ({ trainerId, canEdit = false }) => {
+  const { user } = useAuth();
   const resolvedTrainerId = resolveLinkedTrainerId(trainerId);
+  const ownTrainerId = resolveLinkedTrainerId(user?.trainer);
+  const showCamuPassword = canEdit || Boolean(
+    resolvedTrainerId && ownTrainerId && resolvedTrainerId === ownTrainerId
+  );
   const [trainer, setTrainer] = useState(null);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState('');
@@ -92,7 +98,7 @@ const TrainerDetailsPanel = ({ trainerId, canEdit = false }) => {
                   <label className="text-muted small">CAMU ERP ID</label>
                   <p className="mb-0">{trainer.camuErpId || '-'}</p>
                 </div>
-                {canEdit && (
+                {showCamuPassword && (
                   <div className="col-sm-6">
                     <label className="text-muted small">CAMU Password</label>
                     <p className="mb-0">{trainer.camuPassword || '-'}</p>
