@@ -8,6 +8,9 @@ export const parseMonthKey = (monthKey) => {
 export const formatMonthKey = (year, month) =>
   `${year}-${String(month).padStart(2, '0')}`;
 
+export const formatMonthLabel = (year, month) =>
+  new Date(year, month - 1, 1).toLocaleDateString('en-IN', { month: 'long', year: 'numeric' });
+
 export const getTrackingStartParts = () =>
   parseMonthKey(STUDENT_TEST_REPORT_TRACKING_START.slice(0, 7));
 

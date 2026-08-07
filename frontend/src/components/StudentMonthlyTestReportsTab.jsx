@@ -2,11 +2,16 @@ import { useState, useEffect, useMemo, useCallback } from 'react';
 import LoadingSpinner from './LoadingSpinner.jsx';
 import { showError, showSuccess } from '../utils/toast.js';
 import { getErrorMessage } from '../utils/helpers.js';
+import { useAuth } from '../context/AuthContext.jsx';
 import { getSchools, getDepartments } from '../services/subjectService.js';
 import {
   getTestReportFilterOptions,
+  getTestReportSubjects,
+  getTestReportSummary,
   getTestReportGrid,
   bulkUpsertTestReports,
+  getTestReportSheetStatus,
+  downloadTestReportExcel,
 } from '../services/studentTestReportService.js';
 import {
   buildMonthOptions,
@@ -19,17 +24,29 @@ import {
   shiftMonth,
   STUDENT_TEST_REPORT_TRACKING_START,
 } from '../utils/studentTestReportDates.js';
+import {
+  DEFAULT_MAX_MARKS,
+  PASS_PERCENTAGE,
+  computePercentage,
+  formatPassStatus,
+} from '../utils/studentTestReportConstants.js';
+import StudentTestReportSheetSetupModal from './StudentTestReportSheetSetupModal.jsx';
+import { DownloadIcon, ExternalLinkIcon, SheetIcon } from './icons.jsx';
 
 const SEMESTER_ORDER = { I: 1, II: 2, III: 3, IV: 4, V: 5, VI: 6, VII: 7, VIII: 8 };
 const semesterSortKey = (sem) => SEMESTER_ORDER[String(sem || '').trim()] ?? 99;
 
 const StudentMonthlyTestReportsTab = () => {
+  const { hasManagementRole } = useAuth();
+  const canManageSheets = hasManagementRole();
+
   const [monthParts, setMonthParts] = useState(() =>
     clampMonthParts(getCurrentMonthParts())
   );
   const [classes, setClasses] = useState([]);
   const [schools, setSchools] = useState([]);
   const [departments, setDepartments] = useState([]);
+  const [subjects, setSubjects] = useState([]);
   const [loadingOptions, setLoadingOptions] = useState(true);
 
   const [schoolFilter, setSchoolFilter] = useState('');
@@ -37,11 +54,18 @@ const StudentMonthlyTestReportsTab = () => {
   const [sectionFilter, setSectionFilter] = useState('');
   const [pyFilter, setPyFilter] = useState('');
   const [semFilter, setSemFilter] = useState('');
+  const [subjectFilter, setSubjectFilter] = useState('');
 
+  const [summary, setSummary] = useState(null);
+  const [loadingSummary, setLoadingSummary] = useState(false);
   const [grid, setGrid] = useState(null);
   const [drafts, setDrafts] = useState({});
   const [loadingGrid, setLoadingGrid] = useState(false);
+  const [loadingSubjects, setLoadingSubjects] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [downloading, setDownloading] = useState(false);
+  const [sheetStatus, setSheetStatus] = useState(null);
+  const [showSheetSetup, setShowSheetSetup] = useState(false);
 
   const monthKey = formatMonthKey(monthParts.year, monthParts.month);
   const monthOptions = useMemo(() => buildMonthOptions(), []);
@@ -102,7 +126,7 @@ const StudentMonthlyTestReportsTab = () => {
     return matches[0] || null;
   }, [classes, deptFilter, sectionFilter, semFilter, pyFilter]);
 
-  const canLoadGrid = Boolean(deptFilter && sectionFilter && semFilter);
+  const canLoadGrid = Boolean(deptFilter && sectionFilter && semFilter && subjectFilter);
 
   useEffect(() => {
     (async () => {
@@ -124,6 +148,58 @@ const StudentMonthlyTestReportsTab = () => {
     })();
   }, []);
 
+  useEffect(() => {
+    if (!canManageSheets) return;
+    getTestReportSheetStatus()
+      .then(setSheetStatus)
+      .catch(() => setSheetStatus(null));
+  }, [canManageSheets]);
+
+  const loadSummary = useCallback(async () => {
+    setLoadingSummary(true);
+    try {
+      const data = await getTestReportSummary({ month: monthKey });
+      setSummary(data);
+    } catch (err) {
+      showError(getErrorMessage(err));
+      setSummary(null);
+    } finally {
+      setLoadingSummary(false);
+    }
+  }, [monthKey]);
+
+  useEffect(() => {
+    loadSummary();
+  }, [loadSummary]);
+
+  useEffect(() => {
+    if (!deptFilter || !sectionFilter || !semFilter) {
+      setSubjects([]);
+      setSubjectFilter('');
+      return;
+    }
+
+    setLoadingSubjects(true);
+    getTestReportSubjects({
+      department: deptFilter,
+      section: sectionFilter,
+      semester: semFilter,
+    })
+      .then((list) => {
+        setSubjects(Array.isArray(list) ? list : []);
+        setSubjectFilter((current) => {
+          if (current && list.some((item) => item._id === current)) return current;
+          return list[0]?._id || '';
+        });
+      })
+      .catch((err) => {
+        showError(getErrorMessage(err));
+        setSubjects([]);
+        setSubjectFilter('');
+      })
+      .finally(() => setLoadingSubjects(false));
+  }, [deptFilter, sectionFilter, semFilter]);
+
   const loadGrid = useCallback(async () => {
     if (!canLoadGrid) {
       setGrid(null);
@@ -139,13 +215,14 @@ const StudentMonthlyTestReportsTab = () => {
         section: sectionFilter,
         semester: semFilter,
         py: pyFilter || undefined,
+        subject: subjectFilter,
       });
       setGrid(data);
       const nextDrafts = {};
       (data.students || []).forEach((row) => {
         nextDrafts[row._id] = {
           marksObtained: row.report?.marksObtained ?? '',
-          maxMarks: row.report?.maxMarks ?? 100,
+          maxMarks: row.report?.maxMarks ?? DEFAULT_MAX_MARKS,
           remarks: row.report?.remarks ?? '',
         };
       });
@@ -157,7 +234,7 @@ const StudentMonthlyTestReportsTab = () => {
     } finally {
       setLoadingGrid(false);
     }
-  }, [canLoadGrid, monthKey, deptFilter, sectionFilter, semFilter, pyFilter]);
+  }, [canLoadGrid, monthKey, deptFilter, sectionFilter, semFilter, pyFilter, subjectFilter]);
 
   useEffect(() => {
     loadGrid();
@@ -178,7 +255,7 @@ const StudentMonthlyTestReportsTab = () => {
       const entries = grid.students.map((row) => ({
         studentId: row._id,
         marksObtained: drafts[row._id]?.marksObtained ?? '',
-        maxMarks: drafts[row._id]?.maxMarks ?? 100,
+        maxMarks: drafts[row._id]?.maxMarks ?? DEFAULT_MAX_MARKS,
         remarks: drafts[row._id]?.remarks ?? '',
       }));
 
@@ -188,14 +265,34 @@ const StudentMonthlyTestReportsTab = () => {
         section: sectionFilter,
         semester: semFilter,
         py: pyFilter ? Number(pyFilter) : selectedClass?.py,
+        subject: subjectFilter,
         entries,
       });
       showSuccess(result.message || 'Test reports saved');
-      loadGrid();
+      await Promise.all([loadGrid(), loadSummary()]);
     } catch (err) {
       showError(getErrorMessage(err));
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleDownloadExcel = async () => {
+    setDownloading(true);
+    try {
+      const blob = await downloadTestReportExcel(monthKey);
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `monthly-test-reports-${monthKey}.xlsx`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      showError(getErrorMessage(err));
+    } finally {
+      setDownloading(false);
     }
   };
 
@@ -205,9 +302,12 @@ const StudentMonthlyTestReportsTab = () => {
     setSectionFilter('');
     setPyFilter('');
     setSemFilter('');
+    setSubjectFilter('');
   };
 
-  const hasFilters = Boolean(schoolFilter || deptFilter || sectionFilter || pyFilter || semFilter);
+  const hasFilters = Boolean(
+    schoolFilter || deptFilter || sectionFilter || pyFilter || semFilter || subjectFilter
+  );
 
   if (loadingOptions) {
     return <LoadingSpinner />;
@@ -215,7 +315,111 @@ const StudentMonthlyTestReportsTab = () => {
 
   return (
     <>
-      <div className="row g-2 mb-3 align-items-center">
+      <div className="d-flex flex-wrap align-items-center gap-2 mb-3">
+        <button
+          type="button"
+          className="btn btn-outline-secondary btn-sm d-inline-flex align-items-center gap-2"
+          disabled={downloading}
+          onClick={handleDownloadExcel}
+        >
+          <DownloadIcon size={16} aria-hidden="true" />
+          {downloading ? 'Downloading...' : 'Download Excel'}
+        </button>
+        {canManageSheets && (
+          sheetStatus?.linked ? (
+            <>
+              <a
+                className="btn btn-outline-primary btn-sm d-inline-flex align-items-center gap-2"
+                href={sheetStatus.spreadsheetUrl}
+                target="_blank"
+                rel="noreferrer"
+              >
+                <ExternalLinkIcon size={16} aria-hidden="true" />
+                Open test reports sheet
+              </a>
+              <button
+                type="button"
+                className="btn btn-outline-secondary btn-sm d-inline-flex align-items-center gap-2"
+                onClick={() => setShowSheetSetup(true)}
+              >
+                <SheetIcon size={16} aria-hidden="true" />
+                Sheet setup
+              </button>
+            </>
+          ) : (
+            <button
+              type="button"
+              className="btn btn-outline-primary btn-sm d-inline-flex align-items-center gap-2"
+              onClick={() => setShowSheetSetup(true)}
+            >
+              <SheetIcon size={16} aria-hidden="true" />
+              Link test reports sheet
+            </button>
+          )
+        )}
+        <span className="text-muted small">
+          Pass threshold: {PASS_PERCENTAGE}% · Default marks: out of {DEFAULT_MAX_MARKS}
+        </span>
+      </div>
+
+      <div className="card table-card mb-3">
+        <div className="card-body">
+          <div className="d-flex justify-content-between align-items-center mb-2">
+            <h6 className="mb-0">
+              Subject-wise summary — {summary?.monthLabel || formatMonthLabel(monthParts.year, monthParts.month)}
+            </h6>
+            {loadingSummary && <span className="text-muted small">Updating...</span>}
+          </div>
+          {loadingSummary && !summary ? (
+            <LoadingSpinner />
+          ) : (
+            <div className="table-responsive">
+              <table className="table table-sm table-hover align-middle mb-0">
+                <thead className="table-light">
+                  <tr>
+                    <th>Subject</th>
+                    <th>Code</th>
+                    <th>Entered</th>
+                    <th>Passed</th>
+                    <th>Failed</th>
+                    <th>Pass %</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {!summary?.subjects?.length ? (
+                    <tr>
+                      <td colSpan="6" className="text-center text-muted py-3">
+                        No marks entered for this month yet
+                      </td>
+                    </tr>
+                  ) : (
+                    summary.subjects.map((row) => (
+                      <tr key={`${row.subjectCode}-${row.subjectName}`}>
+                        <td>{row.subjectName}</td>
+                        <td>{row.subjectCode || '—'}</td>
+                        <td>{row.entered}</td>
+                        <td>{row.passed}</td>
+                        <td>{row.failed}</td>
+                        <td>
+                          {row.passPercentage != null ? (
+                            <span className={row.passPercentage >= PASS_PERCENTAGE ? 'text-success' : 'text-danger'}>
+                              {row.passPercentage}%
+                            </span>
+                          ) : (
+                            '—'
+                          )}
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      </div>
+
+      <div className="row g-2 mb-3 align-items-end">
         <div className="col-md-2">
           <label className="form-label small text-muted mb-1">Month</label>
           <div className="d-flex align-items-center gap-1">
@@ -258,6 +462,7 @@ const StudentMonthlyTestReportsTab = () => {
               setSchoolFilter(e.target.value);
               setDeptFilter('');
               setSectionFilter('');
+              setSubjectFilter('');
             }}
             aria-label="Filter by school"
           >
@@ -275,6 +480,7 @@ const StudentMonthlyTestReportsTab = () => {
             onChange={(e) => {
               setDeptFilter(e.target.value);
               setSectionFilter('');
+              setSubjectFilter('');
             }}
             aria-label="Filter by department"
           >
@@ -289,7 +495,10 @@ const StudentMonthlyTestReportsTab = () => {
           <select
             className="form-select form-select-sm"
             value={sectionFilter}
-            onChange={(e) => setSectionFilter(e.target.value)}
+            onChange={(e) => {
+              setSectionFilter(e.target.value);
+              setSubjectFilter('');
+            }}
             aria-label="Filter by section"
             disabled={!deptFilter}
           >
@@ -313,21 +522,41 @@ const StudentMonthlyTestReportsTab = () => {
             ))}
           </select>
         </div>
-        <div className="col-md-2">
+        <div className="col-md-1">
           <label className="form-label small text-muted mb-1">Semester</label>
           <select
             className="form-select form-select-sm"
             value={semFilter}
-            onChange={(e) => setSemFilter(e.target.value)}
+            onChange={(e) => {
+              setSemFilter(e.target.value);
+              setSubjectFilter('');
+            }}
             aria-label="Filter by semester"
           >
-            <option value="">Select semester</option>
+            <option value="">Sem</option>
             {filterOptions.semesters.map((sem) => (
               <option key={sem} value={sem}>{sem}</option>
             ))}
           </select>
         </div>
-        <div className="col-md-2 d-flex align-items-end gap-2">
+        <div className="col-md-2">
+          <label className="form-label small text-muted mb-1">Subject</label>
+          <select
+            className="form-select form-select-sm"
+            value={subjectFilter}
+            onChange={(e) => setSubjectFilter(e.target.value)}
+            aria-label="Filter by subject"
+            disabled={!deptFilter || !sectionFilter || !semFilter || loadingSubjects}
+          >
+            <option value="">
+              {loadingSubjects ? 'Loading...' : 'Select subject'}
+            </option>
+            {subjects.map((subject) => (
+              <option key={subject._id} value={subject._id}>{subject.label}</option>
+            ))}
+          </select>
+        </div>
+        <div className="col-md-1 d-flex gap-2">
           {hasFilters && (
             <button type="button" className="btn btn-sm btn-outline-secondary" onClick={clearFilters}>
               Clear
@@ -339,14 +568,15 @@ const StudentMonthlyTestReportsTab = () => {
             disabled={!canLoadGrid || !grid?.students?.length || saving}
             onClick={handleSave}
           >
-            {saving ? 'Saving...' : 'Save Marks'}
+            {saving ? 'Saving...' : 'Save'}
           </button>
         </div>
       </div>
 
       {!canLoadGrid && (
         <div className="alert alert-info">
-          Select department, section, and semester to load students for {formatMonthLabel(monthParts.year, monthParts.month)}.
+          Select department, section, semester, and subject to enter marks for{' '}
+          {formatMonthLabel(monthParts.year, monthParts.month)}.
         </div>
       )}
 
@@ -356,26 +586,48 @@ const StudentMonthlyTestReportsTab = () => {
         </div>
       )}
 
+      {canLoadGrid && !loadingSubjects && subjects.length === 0 && (
+        <div className="alert alert-warning">
+          No subjects found for this class in the timetable.
+        </div>
+      )}
+
       {canLoadGrid && loadingGrid ? (
         <LoadingSpinner />
       ) : canLoadGrid && grid ? (
         <div className="card table-card">
           <div className="card-body table-responsive">
-            <div className="d-flex justify-content-between align-items-center mb-2">
+            <div className="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
               <div className="text-muted small">
+                {grid.subject?.name} ({grid.subject?.code})
+                {' · '}
                 {grid.students.length} student{grid.students.length === 1 ? '' : 's'}
                 {' · '}
                 {deptFilter} {sectionFilter} · Sem {semFilter}
                 {pyFilter ? ` · PY ${pyFilter}` : ''}
               </div>
+              {grid.classSummary && (
+                <div className="text-muted small">
+                  Class pass rate:{' '}
+                  {grid.classSummary.passPercentage != null ? (
+                    <strong>{grid.classSummary.passPercentage}%</strong>
+                  ) : (
+                    '—'
+                  )}
+                  {' '}
+                  ({grid.classSummary.passed}/{grid.classSummary.entered} entered)
+                </div>
+              )}
             </div>
             <table className="table table-hover align-middle">
               <thead className="table-light">
                 <tr>
                   <th>Roll No.</th>
                   <th>Name</th>
-                  <th style={{ width: '120px' }}>Marks</th>
-                  <th style={{ width: '100px' }}>Out of</th>
+                  <th style={{ width: '100px' }}>Marks</th>
+                  <th style={{ width: '90px' }}>Out of</th>
+                  <th style={{ width: '90px' }}>%</th>
+                  <th style={{ width: '80px' }}>Result</th>
                   <th>Remarks</th>
                   <th>Last updated</th>
                 </tr>
@@ -383,13 +635,16 @@ const StudentMonthlyTestReportsTab = () => {
               <tbody>
                 {grid.students.length === 0 ? (
                   <tr>
-                    <td colSpan="6" className="text-center text-muted py-4">
+                    <td colSpan="8" className="text-center text-muted py-4">
                       No active students in this class
                     </td>
                   </tr>
                 ) : (
                   grid.students.map((row) => {
                     const draft = drafts[row._id] || {};
+                    const maxMarks = draft.maxMarks ?? DEFAULT_MAX_MARKS;
+                    const pct = computePercentage(draft.marksObtained, maxMarks);
+                    const result = formatPassStatus(draft.marksObtained, maxMarks);
                     return (
                       <tr key={row._id}>
                         <td>{row.rollNumber}</td>
@@ -399,7 +654,7 @@ const StudentMonthlyTestReportsTab = () => {
                             type="number"
                             className="form-control form-control-sm"
                             min="0"
-                            max={draft.maxMarks || 100}
+                            max={maxMarks}
                             step="0.5"
                             value={draft.marksObtained ?? ''}
                             onChange={(e) => updateDraft(row._id, 'marksObtained', e.target.value)}
@@ -412,10 +667,23 @@ const StudentMonthlyTestReportsTab = () => {
                             type="number"
                             className="form-control form-control-sm"
                             min="1"
-                            value={draft.maxMarks ?? 100}
+                            value={maxMarks}
                             onChange={(e) => updateDraft(row._id, 'maxMarks', e.target.value)}
                             aria-label={`Max marks for ${row.name}`}
                           />
+                        </td>
+                        <td>{pct != null ? `${pct}%` : '—'}</td>
+                        <td>
+                          <span className={
+                            result === 'Pass'
+                              ? 'badge bg-success'
+                              : result === 'Fail'
+                                ? 'badge bg-danger'
+                                : 'badge bg-secondary'
+                          }
+                          >
+                            {result}
+                          </span>
                         </td>
                         <td>
                           <input
@@ -451,6 +719,19 @@ const StudentMonthlyTestReportsTab = () => {
           </div>
         </div>
       ) : null}
+
+      {showSheetSetup && canManageSheets && (
+        <StudentTestReportSheetSetupModal
+          show
+          initialUrl={sheetStatus?.spreadsheetUrl || ''}
+          onClose={() => setShowSheetSetup(false)}
+          onLinked={() => {
+            setShowSheetSetup(false);
+            showSuccess('Test reports sheet linked');
+            getTestReportSheetStatus().then(setSheetStatus).catch(() => setSheetStatus(null));
+          }}
+        />
+      )}
     </>
   );
 };
