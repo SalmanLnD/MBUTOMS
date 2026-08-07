@@ -5,7 +5,6 @@ import { showError, showSuccess } from '../utils/toast.js';
 import ConfirmModal from '../components/ConfirmModal.jsx';
 import StudentFormModal from '../components/StudentFormModal.jsx';
 import StudentBulkUploadModal from '../components/StudentBulkUploadModal.jsx';
-import Modal from '../components/Modal.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
 import { useDebounce } from '../hooks/useDebounce.js';
 import { usePagination } from '../hooks/usePagination.js';
@@ -16,18 +15,17 @@ import {
   deleteStudent,
 } from '../services/studentService.js';
 import { getSchools, getDepartments } from '../services/subjectService.js';
-import { getAttendance, markAttendance } from '../services/attendanceService.js';
-import { formatDate, formatStatus, getErrorMessage, toInputDate } from '../utils/helpers.js';
+import { formatStatus, getErrorMessage } from '../utils/helpers.js';
+import StudentMonthlyTestReportsTab from '../components/StudentMonthlyTestReportsTab.jsx';
 import { EditIcon, EyeIcon, TrashIcon, UploadIcon } from '../components/icons.jsx';
 import ActionIconButton from '../components/ActionIconButton.jsx';
 
-const statusOptions = ['present', 'absent', 'late', 'leave', 'od', 'holiday'];
 const SEMESTER_ORDER = { I: 1, II: 2, III: 3, IV: 4, V: 5, VI: 6, VII: 7, VIII: 8 };
 const semesterSortKey = (sem) => SEMESTER_ORDER[String(sem || '').trim()] ?? 99;
 const tabs = [
   { id: 'classes', label: 'Classes' },
   { id: 'students', label: 'Students' },
-  { id: 'attendance', label: 'Student Attendance' },
+  { id: 'test-reports', label: 'Monthly Test Reports' },
 ];
 
 const ClassesStudents = () => {
@@ -209,27 +207,6 @@ const ClassesStudents = () => {
   const [editingStudent, setEditingStudent] = useState(null);
   const [pendingDelete, setPendingDelete] = useState(null);
 
-  const [attendanceRecords, setAttendanceRecords] = useState([]);
-  const {
-    page: attendancePage,
-    setPage: setAttendancePage,
-    pageSize: attendancePageSize,
-    changePageSize: changeAttendancePageSize,
-    resetPage: resetAttendancePage,
-    pagination: attendancePagination,
-    setPagination: setAttendancePagination,
-  } = usePagination({ initialPageSize: 10 });
-  const [attendanceLoading, setAttendanceLoading] = useState(true);
-  const [attendanceStatusFilter, setAttendanceStatusFilter] = useState('');
-  const [showAttendanceForm, setShowAttendanceForm] = useState(false);
-  const [attendanceForm, setAttendanceForm] = useState({
-    type: 'student',
-    student: '',
-    date: toInputDate(new Date()),
-    status: 'present',
-    remarks: '',
-  });
-
   const debouncedStudentSearch = useDebounce(studentSearch);
 
   const fetchClasses = async () => {
@@ -265,25 +242,6 @@ const ClassesStudents = () => {
     }
   };
 
-  const fetchAttendance = async () => {
-    setAttendanceLoading(true);
-    try {
-      const data = await getAttendance({
-        page: attendancePage,
-        limit: attendancePageSize,
-        type: 'student',
-        status: attendanceStatusFilter,
-        student: attendanceForm.student || undefined,
-      });
-      setAttendanceRecords(data.records);
-      setAttendancePagination(data.pagination);
-    } catch (err) {
-      showError(getErrorMessage(err));
-    } finally {
-      setAttendanceLoading(false);
-    }
-  };
-
   useEffect(() => {
     fetchClasses();
     (async () => {
@@ -312,10 +270,6 @@ const ClassesStudents = () => {
     departmentFilter,
     sectionFilter,
   ]);
-
-  useEffect(() => {
-    if (activeTab === 'attendance') fetchAttendance();
-  }, [activeTab, attendancePage, attendancePageSize, attendanceStatusFilter]);
 
   const handleViewClassStudents = (cls) => {
     setClassFilter(cls);
@@ -385,18 +339,6 @@ const ClassesStudents = () => {
       setPendingDelete(null);
       fetchStudents();
       fetchClasses();
-    } catch (err) {
-      showError(getErrorMessage(err));
-    }
-  };
-
-  const handleAttendanceSubmit = async (e) => {
-    e.preventDefault();
-    try {
-      await markAttendance({ ...attendanceForm, type: 'student' });
-      showSuccess('Student attendance marked');
-      setShowAttendanceForm(false);
-      fetchAttendance();
     } catch (err) {
       showError(getErrorMessage(err));
     }
@@ -774,88 +716,8 @@ const ClassesStudents = () => {
         </>
       )}
 
-      {activeTab === 'attendance' && (
-        <>
-          <div className="row g-2 mb-3 align-items-center">
-            <div className="col-md-3">
-              <select
-                className="form-select"
-                value={attendanceStatusFilter}
-                onChange={(e) => {
-                  setAttendanceStatusFilter(e.target.value);
-                  resetAttendancePage();
-                }}
-              >
-                <option value="">All Status</option>
-                {statusOptions.map((s) => (
-                  <option key={s} value={s}>
-                    {formatStatus(s)}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div className="col-md-9 text-md-end">
-              <button
-                type="button"
-                className="btn btn-primary"
-                onClick={() => setShowAttendanceForm(true)}
-              >
-                Mark Attendance
-              </button>
-            </div>
-          </div>
-
-          {attendanceLoading ? (
-            <LoadingSpinner />
-          ) : (
-            <div className="card table-card">
-              <div className="card-body table-responsive">
-                <table className="table table-hover align-middle">
-                  <thead className="table-light">
-                    <tr>
-                      <th>Date</th>
-                      <th>Student</th>
-                      <th>Roll No.</th>
-                      <th>Status</th>
-                      <th>Remarks</th>
-                      <th>Marked By</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {attendanceRecords.length === 0 ? (
-                      <tr>
-                        <td colSpan="6" className="text-center text-muted py-4">
-                          No student attendance records
-                        </td>
-                      </tr>
-                    ) : (
-                      attendanceRecords.map((r) => (
-                        <tr key={r._id}>
-                          <td>{formatDate(r.date)}</td>
-                          <td>{r.student?.name || '-'}</td>
-                          <td>{r.student?.rollNumber || '-'}</td>
-                          <td>
-                            <span className="badge bg-secondary">{formatStatus(r.status)}</span>
-                          </td>
-                          <td>{r.remarks || '-'}</td>
-                          <td>{r.markedBy?.name || '-'}</td>
-                        </tr>
-                      ))
-                    )}
-                  </tbody>
-                </table>
-                <Pagination
-                  pagination={attendancePagination}
-                  onPageChange={setAttendancePage}
-                  pageSize={attendancePageSize}
-                  onPageSizeChange={changeAttendancePageSize}
-                  showSummary
-                  align="between"
-                />
-              </div>
-            </div>
-          )}
-        </>
+      {activeTab === 'test-reports' && (
+        <StudentMonthlyTestReportsTab />
       )}
 
       {showClassForm && (
@@ -915,96 +777,7 @@ const ClassesStudents = () => {
         />
       )}
 
-      {showAttendanceForm && (
-        <StudentAttendanceFormModal
-          show
-          form={attendanceForm}
-          setForm={setAttendanceForm}
-          onClose={() => setShowAttendanceForm(false)}
-          onSubmit={handleAttendanceSubmit}
-        />
-      )}
     </>
-  );
-};
-
-const StudentAttendanceFormModal = ({ show, form, setForm, onClose, onSubmit }) => {
-  const [students, setStudents] = useState([]);
-  const [loadingStudents, setLoadingStudents] = useState(true);
-
-  useEffect(() => {
-    getStudents({ limit: 100, status: 'active' })
-      .then((d) => setStudents(d.students || []))
-      .finally(() => setLoadingStudents(false));
-  }, []);
-
-  return (
-    <Modal show={show} title="Mark Student Attendance" onClose={onClose}>
-      <form onSubmit={onSubmit}>
-        <div className="toms-modal-body">
-          <div className="mb-3">
-            <label className="form-label">Student</label>
-            {loadingStudents ? (
-              <div className="text-muted small">Loading students...</div>
-            ) : (
-              <select
-                className="form-select"
-                value={form.student}
-                onChange={(e) => setForm({ ...form, student: e.target.value })}
-                required
-              >
-                <option value="">Select student</option>
-                {students.map((s) => (
-                  <option key={s._id} value={s._id}>
-                    {s.rollNumber} - {s.name}
-                  </option>
-                ))}
-              </select>
-            )}
-          </div>
-          <div className="mb-3">
-            <label className="form-label">Date</label>
-            <input
-              type="date"
-              className="form-control"
-              value={form.date}
-              onChange={(e) => setForm({ ...form, date: e.target.value })}
-              required
-            />
-          </div>
-          <div className="mb-3">
-            <label className="form-label">Status</label>
-            <select
-              className="form-select"
-              value={form.status}
-              onChange={(e) => setForm({ ...form, status: e.target.value })}
-            >
-              {statusOptions.map((s) => (
-                <option key={s} value={s}>
-                  {formatStatus(s)}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div className="mb-3">
-            <label className="form-label">Remarks</label>
-            <input
-              className="form-control"
-              value={form.remarks}
-              onChange={(e) => setForm({ ...form, remarks: e.target.value })}
-            />
-          </div>
-        </div>
-        <div className="toms-modal-footer">
-          <button type="button" className="btn btn-secondary" onClick={onClose}>
-            Cancel
-          </button>
-          <button type="submit" className="btn btn-primary">
-            Save
-          </button>
-        </div>
-      </form>
-    </Modal>
   );
 };
 
