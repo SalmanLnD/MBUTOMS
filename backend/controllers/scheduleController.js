@@ -214,7 +214,10 @@ export const getSchedules = async (req, res) => {
 
   const filter = await buildFilter(req.query);
   const schedules = sortSchedules(
-    await Schedule.find(filter).populate('venue', 'name building floor type')
+    await Schedule.find(filter)
+      .select('trainerCode day startTime endTime department section subjectCode subject slot semester venue isLab isProject')
+      .populate('venue', 'name building floor type')
+      .lean()
   );
   res.json(schedules);
 };

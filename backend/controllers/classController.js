@@ -8,7 +8,14 @@ import {
   getStudentCountForClass,
 } from '../utils/studentCountByClass.js';
 
-const attachStudentCounts = async (classes) => {
+const STUDENT_COUNT_CACHE_TTL_MS = 60_000;
+let studentCountCache = { map: null, expiresAt: 0 };
+
+const getActiveStudentCountMap = async () => {
+  if (studentCountCache.map && Date.now() < studentCountCache.expiresAt) {
+    return studentCountCache.map;
+  }
+
   const counts = await Student.aggregate([
     { $match: { status: 'active' } },
     {
@@ -23,12 +30,26 @@ const attachStudentCounts = async (classes) => {
     },
   ]);
 
-  const countMap = new Map(
+  const map = new Map(
     counts.map((row) => [
       buildStudentCountKey(row._id.department, row._id.section, row._id.semester),
       row.studentCount,
     ])
   );
+
+  studentCountCache = {
+    map,
+    expiresAt: Date.now() + STUDENT_COUNT_CACHE_TTL_MS,
+  };
+  return map;
+};
+
+export const invalidateStudentCountCache = () => {
+  studentCountCache = { map: null, expiresAt: 0 };
+};
+
+const attachStudentCounts = async (classes) => {
+  const countMap = await getActiveStudentCountMap();
 
   return classes.map((cls) => ({
     ...cls,

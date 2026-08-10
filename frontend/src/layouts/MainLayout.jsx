@@ -21,7 +21,11 @@ const readCollapsedPreference = () => {
 };
 
 const MainContent = memo(function MainContent({ children }) {
-  return <main className="main-content">{children}</main>;
+  return (
+    <main className="main-content">
+      <div className="spatial-page spatial-layer">{children}</div>
+    </main>
+  );
 });
 
 const AppShell = ({ children }) => {

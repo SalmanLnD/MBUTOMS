@@ -12,8 +12,10 @@ const PublicLayout = () => (
   <PageTitleProvider>
     <div className="app-layout app-layout--public">
       <main className="main-content main-content--public">
-        <LayoutTopbar />
-        <Outlet />
+        <div className="spatial-page spatial-layer">
+          <LayoutTopbar />
+          <Outlet />
+        </div>
       </main>
     </div>
   </PageTitleProvider>

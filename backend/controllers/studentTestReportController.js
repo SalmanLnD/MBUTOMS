@@ -40,8 +40,17 @@ const getTrainerScheduleCodes = async (trainerId) => {
   return [...codes].filter(Boolean);
 };
 
-const getTrainerClassKeys = async (trainerId) => {
-  const codes = await getTrainerScheduleCodes(trainerId);
+const getTrainerScheduleCodesCached = async (req, trainerId) => {
+  if (!req?._trainerScheduleCodes) {
+    req._trainerScheduleCodes = await getTrainerScheduleCodes(trainerId);
+  }
+  return req._trainerScheduleCodes;
+};
+
+const getTrainerClassKeys = async (trainerId, req) => {
+  const codes = req
+    ? await getTrainerScheduleCodesCached(req, trainerId)
+    : await getTrainerScheduleCodes(trainerId);
   if (!codes.length) return new Set();
 
   const schedules = await Schedule.find({ trainerCode: { $in: codes } })
@@ -56,15 +65,17 @@ const getTrainerClassKeys = async (trainerId) => {
 const classKey = (department, section, semester) =>
   `${department}|${section}|${semester}`;
 
-const canAccessClass = async (user, department, section, semester) => {
+const canAccessClass = async (user, department, section, semester, req) => {
   if (canViewAll(user)) return true;
   if (!user?.trainer) return false;
-  const allowed = await getTrainerClassKeys(user.trainer);
+  const allowed = await getTrainerClassKeys(user.trainer, req);
   return allowed.has(classKey(department, section, semester));
 };
 
-const getTrainerSubjectIdsForClass = async (trainerId, department, section, semester) => {
-  const codes = await getTrainerScheduleCodes(trainerId);
+const getTrainerSubjectIdsForClass = async (trainerId, department, section, semester, req) => {
+  const codes = req
+    ? await getTrainerScheduleCodesCached(req, trainerId)
+    : await getTrainerScheduleCodes(trainerId);
   if (!codes.length) return new Set();
 
   const schedules = await Schedule.find({
@@ -79,14 +90,15 @@ const getTrainerSubjectIdsForClass = async (trainerId, department, section, seme
   );
 };
 
-const canAccessSubject = async (user, subjectId, department, section, semester) => {
+const canAccessSubject = async (user, subjectId, department, section, semester, req) => {
   if (canViewAll(user)) return true;
   if (!user?.trainer || !subjectId) return false;
   const allowed = await getTrainerSubjectIdsForClass(
     user.trainer,
     department,
     section,
-    semester
+    semester,
+    req
   );
   return allowed.has(String(subjectId));
 };
@@ -103,7 +115,7 @@ export const getTestReportFilterOptions = async (req, res) => {
 
   let filtered = classes;
   if (!canViewAll(req.user) && req.user?.trainer) {
-    const allowed = await getTrainerClassKeys(req.user.trainer);
+    const allowed = await getTrainerClassKeys(req.user.trainer, req);
     filtered = classes.filter((cls) =>
       allowed.has(classKey(cls.department, cls.section, cls.currentSemester))
     );
@@ -125,7 +137,7 @@ export const getTestReportSubjects = async (req, res) => {
     return res.status(400).json({ message: 'department, section, and semester are required' });
   }
 
-  const hasAccess = await canAccessClass(req.user, department, section, semester);
+  const hasAccess = await canAccessClass(req.user, department, section, semester, req);
   if (!hasAccess) {
     return res.status(403).json({ message: 'Not authorized to view this class' });
   }
@@ -135,24 +147,31 @@ export const getTestReportSubjects = async (req, res) => {
     .populate('subject', 'name code')
     .lean();
 
-  let subjectIds = [...new Set(
-    schedules.map((s) => String(s.subject?._id || s.subject)).filter(Boolean)
-  )];
+  const subjectMap = new Map();
+  for (const schedule of schedules) {
+    const subjectDoc = schedule.subject;
+    if (subjectDoc?._id) {
+      subjectMap.set(String(subjectDoc._id), subjectDoc);
+    }
+  }
+
+  let subjectIds = [...subjectMap.keys()];
 
   if (!canViewAll(req.user) && req.user?.trainer) {
     const allowedSubjects = await getTrainerSubjectIdsForClass(
       req.user.trainer,
       department,
       section,
-      semester
+      semester,
+      req
     );
     subjectIds = subjectIds.filter((id) => allowedSubjects.has(id));
   }
 
-  const subjects = await Subject.find({ _id: { $in: subjectIds } })
-    .select('name code')
-    .sort({ name: 1 })
-    .lean();
+  const subjects = [...subjectIds]
+    .map((id) => subjectMap.get(id))
+    .filter(Boolean)
+    .sort((a, b) => a.name.localeCompare(b.name));
 
   res.json(subjects.map((subject) => ({
     _id: subject._id,
@@ -207,7 +226,7 @@ export const getTestReportGrid = async (req, res) => {
     return res.status(400).json({ message: 'Invalid month. Reports start from August 2026.' });
   }
 
-  const hasAccess = await canAccessClass(req.user, department, section, semester);
+  const hasAccess = await canAccessClass(req.user, department, section, semester, req);
   if (!hasAccess) {
     return res.status(403).json({ message: 'Not authorized to view this class' });
   }
@@ -217,7 +236,8 @@ export const getTestReportGrid = async (req, res) => {
     subject,
     department,
     section,
-    semester
+    semester,
+    req
   );
   if (!hasSubjectAccess) {
     return res.status(403).json({ message: 'Not authorized to view this subject' });
@@ -313,7 +333,7 @@ export const bulkUpsertTestReports = async (req, res) => {
     return res.status(400).json({ message: 'Invalid month. Reports start from August 2026.' });
   }
 
-  const hasAccess = await canAccessClass(req.user, department, section, semester);
+  const hasAccess = await canAccessClass(req.user, department, section, semester, req);
   if (!hasAccess) {
     return res.status(403).json({ message: 'Not authorized to edit this class' });
   }
@@ -323,7 +343,8 @@ export const bulkUpsertTestReports = async (req, res) => {
     subject,
     department,
     section,
-    semester
+    semester,
+    req
   );
   if (!hasSubjectAccess) {
     return res.status(403).json({ message: 'Not authorized to edit this subject' });

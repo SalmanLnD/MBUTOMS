@@ -30,11 +30,12 @@
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  background: var(--surface-glass-strong, #fff);
-  backdrop-filter: blur(20px);
-  border: 1px solid var(--border-glass, rgba(148, 163, 184, 0.25));
-  border-radius: var(--radius-lg, 16px);
-  box-shadow: 0 24px 80px rgba(10, 14, 26, 0.35);
+  background: var(--clay-bg);
+  border: 1px solid var(--clay-border);
+  border-radius: var(--radius-xl, 24px);
+  box-shadow:
+    var(--clay-shadow-out),
+    0 24px 80px rgba(10, 14, 26, 0.2);
   animation: toms-modal-in 0.35s var(--transition-smooth, ease) both;
 }
 

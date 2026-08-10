@@ -22,7 +22,7 @@ import {
   ReplacementIcon,
 } from '../components/icons.jsx';
 import { getDashboardStats } from '../services/dashboardService.js';
-import { getErrorMessage, formatDate } from '../utils/helpers.js';
+import { getErrorMessage } from '../utils/helpers.js';
 import { formatTimeRange, formatScheduleClassLabel } from '../utils/scheduleUtils.js';
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, ArcElement, Title, Tooltip, Legend);
@@ -74,40 +74,40 @@ const Dashboard = () => {
         data: trainerPerformance?.map((t) => t.performanceScore) || [],
         backgroundColor: 'rgba(20, 184, 166, 0.85)',
         hoverBackgroundColor: 'rgba(6, 182, 212, 0.95)',
-        borderRadius: 8,
+        borderRadius: 12,
         borderSkipped: false,
       },
     ],
   };
 
   return (
-    <>
-      <div className="row g-3 mb-4">
-        <div className="col-6 col-xl-4">
+    <div className="spatial-stack">
+      <div className="bento-grid">
+        <div className="bento-cell bento-span-4">
           <StatCard title="Total Trainers" value={cards?.totalTrainers} icon={<TrainerIcon size={24} />} accent="teal" />
         </div>
-        <div className="col-6 col-xl-4">
+        <div className="bento-cell bento-span-4">
           <StatCard title="Total Students" value={cards?.totalStudents} icon={<StudentIcon size={24} />} accent="violet" />
         </div>
-        <div className="col-6 col-xl-4">
+        <div className="bento-cell bento-span-4">
           <StatCard title="Today's Classes" value={cards?.todaysClasses} icon={<CalendarIcon size={24} />} accent="amber" />
         </div>
-        <div className="col-6 col-xl-4">
+        <div className="bento-cell bento-span-4">
           <StatCard title="Today's Leaves" value={cards?.todaysLeaves} icon={<LeaveIcon size={24} />} accent="rose" />
         </div>
-        <div className="col-6 col-xl-4">
+        <div className="bento-cell bento-span-4">
           <StatCard title="Active Venues" value={cards?.activeVenues} icon={<VenueIcon size={24} />} accent="cyan" />
         </div>
-        <div className="col-6 col-xl-4">
+        <div className="bento-cell bento-span-4">
           <StatCard title="Pending Replacements" value={cards?.pendingReplacements} icon={<ReplacementIcon size={24} />} accent="gold" />
         </div>
       </div>
 
-      <div className="row g-4">
-        <div className="col-lg-5">
-          <div className="card table-card h-100">
+      <div className="bento-grid">
+        <div className="bento-cell bento-span-5">
+          <div className="card table-card bento-panel h-100 clay-pressable">
             <div className="card-body">
-              <h5 className="card-title mb-3">Attendance Summary</h5>
+              <h5 className="bento-panel__title">Attendance Summary</h5>
               {attendanceChartData.datasets[0].data.some((v) => v > 0) ? (
                 <Doughnut data={attendanceChartData} options={{ maintainAspectRatio: true }} />
               ) : (
@@ -118,10 +118,10 @@ const Dashboard = () => {
             </div>
           </div>
         </div>
-        <div className="col-lg-7">
-          <div className="card table-card h-100">
+        <div className="bento-cell bento-span-7">
+          <div className="card table-card bento-panel h-100 clay-pressable">
             <div className="card-body">
-              <h5 className="card-title mb-3">Top Trainer Performance</h5>
+              <h5 className="bento-panel__title">Top Trainer Performance</h5>
               {trainerPerformance?.length > 0 ? (
                 <Bar
                   data={performanceChartData}
@@ -140,9 +140,9 @@ const Dashboard = () => {
       </div>
 
       {upcomingClasses?.length > 0 && (
-        <div className="card table-card mt-4">
+        <div className="card table-card bento-panel clay-pressable spatial-layer--float">
           <div className="card-body">
-            <h5 className="card-title mb-3">Upcoming Classes</h5>
+            <h5 className="bento-panel__title">Upcoming Classes</h5>
             <div className="table-responsive">
               <table className="table table-sm table-hover mb-0">
                 <thead className="table-light">
@@ -172,7 +172,7 @@ const Dashboard = () => {
           </div>
         </div>
       )}
-    </>
+    </div>
   );
 };
 

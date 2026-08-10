@@ -23,7 +23,10 @@ export async function filterSchedulesActiveOnDate(schedules, referenceDate = new
 
 export async function getActiveSchedulesForDay(dayName, referenceDate = new Date()) {
   const [schedules, canceledScheduleIds] = await Promise.all([
-    Schedule.find({ day: dayName }).lean(),
+    Schedule.find({ day: dayName })
+      .select('day startTime endTime department section subjectCode trainerCode subject semester')
+      .sort({ startTime: 1 })
+      .lean(),
     getCanceledScheduleIdsForDate(referenceDate),
   ]);
   const started = await filterSchedulesActiveOnDate(schedules, referenceDate);

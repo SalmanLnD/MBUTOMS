@@ -63,25 +63,25 @@ const TrainerSchedule = () => {
       </div>
 
       {trainer && (
-        <div className="row g-3 mb-4">
-          <div className="col-md-4">
-            <div className="card table-card h-100">
+        <div className="bento-grid mb-4">
+          <div className="bento-cell bento-span-4">
+            <div className="card table-card bento-panel h-100 clay-pressable">
               <div className="card-body">
-                <h5 className="card-title">{trainer.name}</h5>
+                <h5 className="bento-panel__title">{trainer.name}</h5>
                 <p className="text-muted mb-0">{trainer.employeeId}</p>
               </div>
             </div>
           </div>
-          <div className="col-md-4">
-            <div className="card table-card h-100">
+          <div className="bento-cell bento-span-4">
+            <div className="card table-card bento-panel h-100 clay-pressable">
               <div className="card-body text-center">
                 <p className="text-muted mb-1">Weekly Classes</p>
                 <h3 className="mb-0">{schedules.length}</h3>
               </div>
             </div>
           </div>
-          <div className="col-md-4">
-            <div className="card table-card h-100">
+          <div className="bento-cell bento-span-4">
+            <div className="card table-card bento-panel h-100 clay-pressable">
               <div className="card-body text-center">
                 <p className="text-muted mb-1">Hours / Week</p>
                 <h3 className="mb-0">{totalHours.toFixed(1)} hrs</h3>

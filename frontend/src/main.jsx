@@ -10,6 +10,7 @@ import { LoginModalProvider } from './context/LoginModalContext.jsx';
 import { purgeModalOverlaysOnBoot, resetAllModalArtifacts } from './utils/modalCleanup.js';
 import './styles/global.css';
 import './styles/theme.css';
+import './styles/clay-bento.css';
 import './styles/modal.css';
 
 purgeModalOverlaysOnBoot();

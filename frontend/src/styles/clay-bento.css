@@ -1,0 +1,237 @@
+/*
+ * Claymorphism + Bento Grid + Spatial UI
+ * Shared surface utilities applied across admin and trainer pages.
+ */
+
+/* ─── Clay surfaces ─── */
+
+.clay-surface,
+.stat-card,
+.table-card,
+.card:not(.border-0),
+.toms-toolbar,
+.topbar,
+.toms-modal-content,
+.notification-panel {
+  background: var(--clay-bg);
+  border: 1px solid var(--clay-border);
+  box-shadow: var(--clay-shadow-out);
+}
+
+.clay-surface::before,
+.stat-card::after,
+.table-card::before {
+  content: '';
+  pointer-events: none;
+}
+
+.clay-surface::before {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  box-shadow: var(--clay-shadow-in);
+}
+
+.clay-surface {
+  position: relative;
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+}
+
+.clay-pressable {
+  transition:
+    transform var(--transition-base),
+    box-shadow var(--transition-base);
+}
+
+.clay-pressable:hover {
+  box-shadow: var(--clay-shadow-hover);
+}
+
+.clay-pressable:active {
+  transform: scale(0.985);
+  box-shadow: var(--clay-shadow-pressed);
+}
+
+/* ─── Spatial depth layers ─── */
+
+.spatial-page {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+  isolation: isolate;
+}
+
+.spatial-page::before {
+  content: '';
+  position: absolute;
+  top: -2rem;
+  right: -1rem;
+  width: min(420px, 55vw);
+  height: min(420px, 55vw);
+  border-radius: 50%;
+  background: radial-gradient(circle, var(--spatial-orb-1) 0%, transparent 70%);
+  filter: blur(40px);
+  opacity: 0.55;
+  z-index: -1;
+  pointer-events: none;
+}
+
+.spatial-page::after {
+  content: '';
+  position: absolute;
+  bottom: 10%;
+  left: -2rem;
+  width: min(360px, 45vw);
+  height: min(360px, 45vw);
+  border-radius: 50%;
+  background: radial-gradient(circle, var(--spatial-orb-2) 0%, transparent 70%);
+  filter: blur(48px);
+  opacity: 0.45;
+  z-index: -1;
+  pointer-events: none;
+}
+
+.spatial-layer {
+  position: relative;
+  z-index: 1;
+}
+
+.spatial-layer--float {
+  transform: translateZ(0);
+  will-change: transform;
+}
+
+.spatial-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+/* ─── Bento grid ─── */
+
+.bento-grid {
+  display: grid;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  gap: var(--bento-gap, 1rem);
+  width: 100%;
+}
+
+.bento-cell {
+  min-width: 0;
+  grid-column: span var(--bento-span, 12);
+  grid-row: span var(--bento-row-span, 1);
+}
+
+.bento-span-3 { --bento-span: 3; }
+.bento-span-4 { --bento-span: 4; }
+.bento-span-5 { --bento-span: 5; }
+.bento-span-6 { --bento-span: 6; }
+.bento-span-7 { --bento-span: 7; }
+.bento-span-8 { --bento-span: 8; }
+.bento-span-12 { --bento-span: 12; }
+
+.bento-row-2 { --bento-row-span: 2; }
+
+.bento-hero {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 0.35rem;
+  padding: 1.25rem 1.35rem;
+  border-radius: var(--radius-xl);
+  background: linear-gradient(145deg, var(--clay-bg) 0%, var(--clay-bg-muted) 100%);
+  border: 1px solid var(--clay-border);
+  box-shadow: var(--clay-shadow-out);
+}
+
+.bento-hero__title {
+  margin: 0;
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.bento-hero__value {
+  margin: 0;
+  font-size: clamp(1.5rem, 4vw, 2rem);
+  font-weight: 800;
+  color: var(--text-primary);
+  line-height: 1.1;
+}
+
+.bento-panel {
+  height: 100%;
+  border-radius: var(--radius-xl);
+  overflow: hidden;
+}
+
+.bento-panel .card-body {
+  padding: 1.15rem 1.25rem;
+}
+
+.bento-panel__title {
+  margin: 0 0 0.85rem;
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+/* Tablet: 6-column bento */
+@media (max-width: 991.98px) {
+  .bento-grid {
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+  }
+
+  .bento-span-3,
+  .bento-span-4 {
+    --bento-span: 3;
+  }
+
+  .bento-span-5,
+  .bento-span-6,
+  .bento-span-7,
+  .bento-span-8 {
+    --bento-span: 6;
+  }
+}
+
+/* Mobile: single column stack */
+@media (max-width: 767.98px) {
+  .bento-grid {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0.75rem;
+  }
+
+  .bento-span-3,
+  .bento-span-4,
+  .bento-span-5,
+  .bento-span-6,
+  .bento-span-7,
+  .bento-span-8,
+  .bento-span-12 {
+    --bento-span: 1;
+  }
+
+  .bento-row-2 {
+    --bento-row-span: 1;
+  }
+
+  .bento-hero {
+    padding: 1rem;
+    border-radius: var(--radius-lg);
+  }
+
+  .spatial-page {
+    gap: 0.85rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .clay-pressable:active {
+    transform: none;
+  }
+}

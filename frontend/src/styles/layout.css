@@ -1,14 +1,15 @@
 .topbar {
-  background: var(--surface-glass);
+  background: var(--clay-bg);
   padding: 0.85rem 1.5rem;
-  border-radius: var(--radius-md);
-  border: 1px solid var(--border-glass);
-  box-shadow: var(--shadow-soft);
+  border-radius: var(--radius-xl);
+  border: 1px solid var(--clay-border);
+  box-shadow: var(--clay-shadow-out);
   transition: box-shadow var(--transition-base);
+  margin-bottom: 1rem;
 }
 
 .topbar:hover {
-  box-shadow: var(--shadow-lift);
+  box-shadow: var(--clay-shadow-hover);
 }
 
 .topbar-view-as {

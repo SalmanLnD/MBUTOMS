@@ -23,6 +23,13 @@ const studentSchema = new mongoose.Schema(
 
 studentSchema.index({ status: 1, branch: 1, sectionLabel: 1 });
 studentSchema.index({ status: 1, py: 1, semesterLabel: 1 });
+studentSchema.index({
+  status: 1,
+  branch: 1,
+  sectionLabel: 1,
+  semesterLabel: 1,
+  rollNumber: 1,
+});
 
 const Student = mongoose.model('Student', studentSchema);
 export default Student;
