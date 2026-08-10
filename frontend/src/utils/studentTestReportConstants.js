@@ -4,10 +4,32 @@ export const ATTENDANCE_PRESENT = 'P';
 export const ATTENDANCE_ABSENT = 'A';
 export const DEFAULT_ATTENDANCE = ATTENDANCE_PRESENT;
 
-const ABSENT_REMARK_VALUES = new Set(['a', 'abs', 'absent']);
+const ABSENT_TOKENS = new Set(['a', 'ab', 'abs', 'absent', 'absence', 'absentee']);
+const LONG_AB_PATTERN = /\blong[\s._\-–—]*ab\b/i;
+const ABSENT_SHORT_PATTERN = /^ab$/i;
 
-export const isLegacyAbsentRemark = (value) =>
-  ABSENT_REMARK_VALUES.has(String(value || '').trim().toLowerCase());
+const normalizeLegacyRemark = (value) => String(value || '').trim().toLowerCase();
+
+export const isLegacyAbsentRemark = (value) => {
+  const trimmed = String(value || '').trim();
+  const raw = normalizeLegacyRemark(value);
+  if (!raw) return false;
+
+  if (ABSENT_SHORT_PATTERN.test(trimmed) || LONG_AB_PATTERN.test(trimmed)) return true;
+
+  const compact = raw.replace(/[^a-z]/g, '');
+  if (ABSENT_TOKENS.has(compact) || compact.startsWith('absent')) return true;
+
+  const tokens = raw.split(/[^a-z]+/).filter(Boolean);
+  if (tokens.some(
+    (token) => ABSENT_TOKENS.has(token) || token.startsWith('absent')
+  )) {
+    return true;
+  }
+
+  // Hyphenated or spaced forms like "long-ab", "long -ab", "long_ab"
+  return /^long[\s._\-–—]+ab$/i.test(trimmed);
+};
 
 export const resolveAttendance = (reportOrValue, legacyRemarks) => {
   if (reportOrValue && typeof reportOrValue === 'object') {

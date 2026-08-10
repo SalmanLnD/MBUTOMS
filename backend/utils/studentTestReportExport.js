@@ -186,15 +186,6 @@ export const buildTestReportExportPayload = async (month, { reportFilter = {} } 
   };
 };
 
-export const buildTestReportExcelSheets = async (month, options = {}) => {
-  const payload = await buildTestReportExportPayload(month, options);
-  return {
-    summary: payload.summaryRows,
-    marks: payload.marksRows,
-    monthLabel: payload.monthLabel,
-  };
-};
-
 export const getAccessibleReportFilter = async (user, helpers) => {
   if (helpers.canViewAll(user)) return {};
   if (!user?.trainer) return { _id: null };
