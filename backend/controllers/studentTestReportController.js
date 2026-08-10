@@ -10,10 +10,16 @@ import { isValidReportMonth, formatMonthLabel } from '../utils/studentTestReport
 import {
   DEFAULT_MAX_MARKS,
   PASS_PERCENTAGE,
+  DEFAULT_ATTENDANCE,
   computePercentage,
+  createEmptyStats,
+  finalizeStats,
   formatPassStatus,
+  resolveAttendance,
+  accumulateReportStats,
 } from '../utils/studentTestReportConstants.js';
 import {
+  buildClassSubjectSummaryRows,
   buildSubjectSummaryRows,
   buildTestReportExportPayload,
   getAccessibleReportFilter,
@@ -171,11 +177,12 @@ export const getTestReportSummary = async (req, res) => {
       monthLabel: formatMonthLabel(Number(month.slice(0, 4)), Number(month.slice(5, 7))),
       passThreshold: PASS_PERCENTAGE,
       subjects: [],
+      classes: [],
     });
   }
 
   const reports = await StudentMonthlyTestReport.find({ month, ...reportFilter })
-    .select('subject subjectCode subjectName marksObtained maxMarks')
+    .select('subject subjectCode subjectName department section semester marksObtained maxMarks attendance remarks')
     .lean();
 
   res.json({
@@ -183,6 +190,7 @@ export const getTestReportSummary = async (req, res) => {
     monthLabel: formatMonthLabel(Number(month.slice(0, 4)), Number(month.slice(5, 7))),
     passThreshold: PASS_PERCENTAGE,
     subjects: buildSubjectSummaryRows(reports),
+    classes: buildClassSubjectSummaryRows(reports),
   });
 };
 
@@ -244,6 +252,8 @@ export const getTestReportGrid = async (req, res) => {
   const studentRows = students.map((s) => {
     const report = reportByStudent.get(String(s._id));
     const maxMarks = report?.maxMarks ?? DEFAULT_MAX_MARKS;
+    const attendance = report ? resolveAttendance(report) : DEFAULT_ATTENDANCE;
+    const absent = attendance === 'A';
     return {
       _id: s._id,
       rollNumber: s.rollNumber,
@@ -252,11 +262,15 @@ export const getTestReportGrid = async (req, res) => {
       report: report
         ? {
             _id: report._id,
-            marksObtained: report.marksObtained,
+            attendance,
+            marksObtained: absent ? null : report.marksObtained,
             maxMarks,
-            percentage: computePercentage(report.marksObtained, maxMarks),
-            result: formatPassStatus(report.marksObtained, maxMarks),
-            remarks: report.remarks,
+            percentage: absent ? null : computePercentage(report.marksObtained, maxMarks),
+            result: formatPassStatus(
+              absent ? null : report.marksObtained,
+              maxMarks,
+              report
+            ),
             enteredBy: report.enteredBy?.name || null,
             updatedAt: report.updatedAt,
           }
@@ -264,8 +278,12 @@ export const getTestReportGrid = async (req, res) => {
     };
   });
 
-  const entered = studentRows.filter((row) => row.report?.marksObtained != null);
-  const passed = entered.filter((row) => row.report?.result === 'Pass');
+  const classStats = createEmptyStats();
+  reports.forEach((report) => accumulateReportStats(classStats, report));
+  const classSummary = {
+    totalStudents: studentRows.length,
+    ...finalizeStats(classStats),
+  };
 
   res.json({
     month,
@@ -277,15 +295,7 @@ export const getTestReportGrid = async (req, res) => {
       code: subjectDoc.code,
     },
     class: { department, section, semester, py: py ? Number(py) : null },
-    classSummary: {
-      totalStudents: studentRows.length,
-      entered: entered.length,
-      passed: passed.length,
-      failed: entered.length - passed.length,
-      passPercentage: entered.length
-        ? Math.round((passed.length / entered.length) * 1000) / 10
-        : null,
-    },
+    classSummary,
     students: studentRows,
   });
 };
@@ -344,12 +354,14 @@ export const bulkUpsertTestReports = async (req, res) => {
       continue;
     }
 
-    const marksObtained = entry.marksObtained === '' || entry.marksObtained == null
+    const attendance = resolveAttendance(entry.attendance, entry.remarks);
+    const absent = attendance === 'A';
+    const marksObtained = absent || entry.marksObtained === '' || entry.marksObtained == null
       ? null
       : Number(entry.marksObtained);
     const maxMarks = Number(entry.maxMarks) || DEFAULT_MAX_MARKS;
 
-    if (marksObtained != null && (marksObtained < 0 || marksObtained > maxMarks)) {
+    if (!absent && marksObtained != null && (marksObtained < 0 || marksObtained > maxMarks)) {
       skipped += 1;
       continue;
     }
@@ -365,11 +377,12 @@ export const bulkUpsertTestReports = async (req, res) => {
             py: py ? Number(py) : undefined,
             subjectCode: subjectDoc.code,
             subjectName: subjectDoc.name,
+            attendance,
             marksObtained,
             maxMarks,
-            remarks: String(entry.remarks || '').trim(),
             enteredBy: req.user._id,
           },
+          $unset: { remarks: '' },
         },
         upsert: true,
       },

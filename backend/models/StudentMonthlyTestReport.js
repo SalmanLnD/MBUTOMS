@@ -26,6 +26,11 @@ const studentMonthlyTestReportSchema = new mongoose.Schema(
     semester: { type: String, required: true, trim: true },
     marksObtained: { type: Number, min: 0, default: null },
     maxMarks: { type: Number, min: 1, default: 10 },
+    attendance: {
+      type: String,
+      enum: ['P', 'A'],
+      default: 'P',
+    },
     remarks: { type: String, trim: true, default: '' },
     enteredBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
   },

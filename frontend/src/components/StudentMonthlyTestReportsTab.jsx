@@ -27,8 +27,12 @@ import {
 import {
   DEFAULT_MAX_MARKS,
   PASS_PERCENTAGE,
+  DEFAULT_ATTENDANCE,
+  ATTENDANCE_ABSENT,
+  ATTENDANCE_PRESENT,
   computePercentage,
   formatPassStatus,
+  resolveAttendance,
 } from '../utils/studentTestReportConstants.js';
 import StudentTestReportSheetSetupModal from './StudentTestReportSheetSetupModal.jsx';
 import { DownloadIcon, ExternalLinkIcon, SheetIcon } from './icons.jsx';
@@ -220,10 +224,15 @@ const StudentMonthlyTestReportsTab = () => {
       setGrid(data);
       const nextDrafts = {};
       (data.students || []).forEach((row) => {
+        const attendance = row.report
+          ? resolveAttendance(row.report)
+          : DEFAULT_ATTENDANCE;
         nextDrafts[row._id] = {
-          marksObtained: row.report?.marksObtained ?? '',
+          attendance,
+          marksObtained: attendance === ATTENDANCE_ABSENT
+            ? ''
+            : (row.report?.marksObtained ?? ''),
           maxMarks: row.report?.maxMarks ?? DEFAULT_MAX_MARKS,
-          remarks: row.report?.remarks ?? '',
         };
       });
       setDrafts(nextDrafts);
@@ -241,10 +250,14 @@ const StudentMonthlyTestReportsTab = () => {
   }, [loadGrid]);
 
   const updateDraft = (studentId, field, value) => {
-    setDrafts((prev) => ({
-      ...prev,
-      [studentId]: { ...prev[studentId], [field]: value },
-    }));
+    setDrafts((prev) => {
+      const current = prev[studentId] || {};
+      const next = { ...current, [field]: value };
+      if (field === 'attendance' && value === ATTENDANCE_ABSENT) {
+        next.marksObtained = '';
+      }
+      return { ...prev, [studentId]: next };
+    });
   };
 
   const handleSave = async () => {
@@ -252,12 +265,18 @@ const StudentMonthlyTestReportsTab = () => {
 
     setSaving(true);
     try {
-      const entries = grid.students.map((row) => ({
-        studentId: row._id,
-        marksObtained: drafts[row._id]?.marksObtained ?? '',
-        maxMarks: drafts[row._id]?.maxMarks ?? DEFAULT_MAX_MARKS,
-        remarks: drafts[row._id]?.remarks ?? '',
-      }));
+      const entries = grid.students.map((row) => {
+        const draft = drafts[row._id] || {};
+        const attendance = resolveAttendance(draft.attendance);
+        return {
+          studentId: row._id,
+          attendance,
+          marksObtained: attendance === ATTENDANCE_ABSENT
+            ? ''
+            : (draft.marksObtained ?? ''),
+          maxMarks: draft.maxMarks ?? DEFAULT_MAX_MARKS,
+        };
+      });
 
       const result = await bulkUpsertTestReports({
         month: monthKey,
@@ -358,7 +377,7 @@ const StudentMonthlyTestReportsTab = () => {
           )
         )}
         <span className="text-muted small">
-          Pass threshold: {PASS_PERCENTAGE}% · Default marks: out of {DEFAULT_MAX_MARKS}
+          Pass threshold: {PASS_PERCENTAGE}% (absent excluded) · Default marks: out of {DEFAULT_MAX_MARKS} · P/A default: Present
         </span>
       </div>
 
@@ -379,16 +398,17 @@ const StudentMonthlyTestReportsTab = () => {
                   <tr>
                     <th>Subject</th>
                     <th>Code</th>
-                    <th>Entered</th>
+                    <th>Graded</th>
                     <th>Passed</th>
                     <th>Failed</th>
+                    <th>Absent</th>
                     <th>Pass %</th>
                   </tr>
                 </thead>
                 <tbody>
                   {!summary?.subjects?.length ? (
                     <tr>
-                      <td colSpan="6" className="text-center text-muted py-3">
+                      <td colSpan="7" className="text-center text-muted py-3">
                         No marks entered for this month yet
                       </td>
                     </tr>
@@ -400,6 +420,59 @@ const StudentMonthlyTestReportsTab = () => {
                         <td>{row.entered}</td>
                         <td>{row.passed}</td>
                         <td>{row.failed}</td>
+                        <td>{row.absent ?? 0}</td>
+                        <td>
+                          {row.passPercentage != null ? (
+                            <span className={row.passPercentage >= PASS_PERCENTAGE ? 'text-success' : 'text-danger'}>
+                              {row.passPercentage}%
+                            </span>
+                          ) : (
+                            '—'
+                          )}
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          )}
+
+          <div className="d-flex justify-content-between align-items-center mb-2 mt-4">
+            <h6 className="mb-0">Class-wise summary</h6>
+          </div>
+          {loadingSummary && !summary ? (
+            <LoadingSpinner />
+          ) : (
+            <div className="table-responsive">
+              <table className="table table-sm table-hover align-middle mb-0">
+                <thead className="table-light">
+                  <tr>
+                    <th>Class</th>
+                    <th>Subject</th>
+                    <th>Graded</th>
+                    <th>Passed</th>
+                    <th>Failed</th>
+                    <th>Absent</th>
+                    <th>Pass %</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {!summary?.classes?.length ? (
+                    <tr>
+                      <td colSpan="7" className="text-center text-muted py-3">
+                        No class data for this month yet
+                      </td>
+                    </tr>
+                  ) : (
+                    summary.classes.map((row) => (
+                      <tr key={`${row.department}-${row.section}-${row.semester}-${row.subjectCode}`}>
+                        <td>{row.department} {row.section} · Sem {row.semester}</td>
+                        <td>{row.subjectName}</td>
+                        <td>{row.entered}</td>
+                        <td>{row.passed}</td>
+                        <td>{row.failed}</td>
+                        <td>{row.absent ?? 0}</td>
                         <td>
                           {row.passPercentage != null ? (
                             <span className={row.passPercentage >= PASS_PERCENTAGE ? 'text-success' : 'text-danger'}>
@@ -615,7 +688,8 @@ const StudentMonthlyTestReportsTab = () => {
                     '—'
                   )}
                   {' '}
-                  ({grid.classSummary.passed}/{grid.classSummary.entered} entered)
+                  ({grid.classSummary.passed}/{grid.classSummary.entered} graded
+                  {grid.classSummary.absent ? ` · ${grid.classSummary.absent} absent` : ''})
                 </div>
               )}
             </div>
@@ -624,11 +698,11 @@ const StudentMonthlyTestReportsTab = () => {
                 <tr>
                   <th>Roll No.</th>
                   <th>Name</th>
+                  <th style={{ width: '80px' }}>P/A</th>
                   <th style={{ width: '100px' }}>Marks</th>
                   <th style={{ width: '90px' }}>Out of</th>
                   <th style={{ width: '90px' }}>%</th>
                   <th style={{ width: '80px' }}>Result</th>
-                  <th>Remarks</th>
                   <th>Last updated</th>
                 </tr>
               </thead>
@@ -642,13 +716,26 @@ const StudentMonthlyTestReportsTab = () => {
                 ) : (
                   grid.students.map((row) => {
                     const draft = drafts[row._id] || {};
+                    const attendance = resolveAttendance(draft.attendance);
+                    const absent = attendance === ATTENDANCE_ABSENT;
                     const maxMarks = draft.maxMarks ?? DEFAULT_MAX_MARKS;
-                    const pct = computePercentage(draft.marksObtained, maxMarks);
-                    const result = formatPassStatus(draft.marksObtained, maxMarks);
+                    const pct = computePercentage(draft.marksObtained, maxMarks, attendance);
+                    const result = formatPassStatus(draft.marksObtained, maxMarks, attendance);
                     return (
                       <tr key={row._id}>
                         <td>{row.rollNumber}</td>
                         <td>{row.name}</td>
+                        <td>
+                          <select
+                            className="form-select form-select-sm"
+                            value={attendance}
+                            onChange={(e) => updateDraft(row._id, 'attendance', e.target.value)}
+                            aria-label={`Attendance for ${row.name}`}
+                          >
+                            <option value={ATTENDANCE_PRESENT}>P</option>
+                            <option value={ATTENDANCE_ABSENT}>A</option>
+                          </select>
+                        </td>
                         <td>
                           <input
                             type="number"
@@ -659,6 +746,7 @@ const StudentMonthlyTestReportsTab = () => {
                             value={draft.marksObtained ?? ''}
                             onChange={(e) => updateDraft(row._id, 'marksObtained', e.target.value)}
                             placeholder="—"
+                            disabled={absent}
                             aria-label={`Marks for ${row.name}`}
                           />
                         </td>
@@ -669,6 +757,7 @@ const StudentMonthlyTestReportsTab = () => {
                             min="1"
                             value={maxMarks}
                             onChange={(e) => updateDraft(row._id, 'maxMarks', e.target.value)}
+                            disabled={absent}
                             aria-label={`Max marks for ${row.name}`}
                           />
                         </td>
@@ -679,21 +768,13 @@ const StudentMonthlyTestReportsTab = () => {
                               ? 'badge bg-success'
                               : result === 'Fail'
                                 ? 'badge bg-danger'
-                                : 'badge bg-secondary'
+                                : result === 'Absent'
+                                  ? 'badge bg-warning text-dark'
+                                  : 'badge bg-secondary'
                           }
                           >
                             {result}
                           </span>
-                        </td>
-                        <td>
-                          <input
-                            type="text"
-                            className="form-control form-control-sm"
-                            value={draft.remarks ?? ''}
-                            onChange={(e) => updateDraft(row._id, 'remarks', e.target.value)}
-                            placeholder="Optional"
-                            aria-label={`Remarks for ${row.name}`}
-                          />
                         </td>
                         <td className="text-muted small">
                           {row.report?.enteredBy ? (

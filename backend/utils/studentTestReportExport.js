@@ -3,9 +3,12 @@ import { formatMonthLabel } from './studentTestReportDates.js';
 import {
   DEFAULT_MAX_MARKS,
   PASS_PERCENTAGE,
+  accumulateReportStats,
   computePercentage,
+  createEmptyStats,
+  finalizeStats,
   formatPassStatus,
-  isPassingMark,
+  resolveAttendance,
 } from './studentTestReportConstants.js';
 
 const MARKS_HEADERS = [
@@ -18,20 +21,36 @@ const MARKS_HEADERS = [
   'PY',
   'Roll No.',
   'Student Name',
+  'P/A',
   'Marks',
   'Out of',
   'Percentage',
   'Result',
-  'Remarks',
 ];
 
-const SUMMARY_HEADERS = [
+const SUBJECT_SUMMARY_HEADERS = [
   'Month',
   'Subject',
   'Subject Code',
-  'Students Entered',
+  'Present (graded)',
   'Passed',
   'Failed',
+  'Absent',
+  'Pass %',
+  'Pass Threshold %',
+];
+
+const CLASS_SUMMARY_HEADERS = [
+  'Month',
+  'Department',
+  'Section',
+  'Semester',
+  'Subject',
+  'Subject Code',
+  'Present (graded)',
+  'Passed',
+  'Failed',
+  'Absent',
   'Pass %',
   'Pass Threshold %',
 ];
@@ -45,30 +64,61 @@ export const buildSubjectSummaryRows = (reports) => {
       bySubject.set(subjectKey, {
         subjectName: report.subjectName || report.subject?.name || 'Unknown',
         subjectCode: report.subjectCode || report.subject?.code || '',
-        entered: 0,
-        passed: 0,
-        failed: 0,
+        ...createEmptyStats(),
       });
     }
-    const bucket = bySubject.get(subjectKey);
-    if (report.marksObtained == null) return;
-    bucket.entered += 1;
-    if (isPassingMark(report.marksObtained, report.maxMarks || DEFAULT_MAX_MARKS)) {
-      bucket.passed += 1;
-    } else {
-      bucket.failed += 1;
-    }
+    accumulateReportStats(bySubject.get(subjectKey), report);
   });
 
   return [...bySubject.values()]
     .sort((a, b) => a.subjectName.localeCompare(b.subjectName))
-    .map((row) => ({
-      ...row,
-      passPercentage: row.entered
-        ? Math.round((row.passed / row.entered) * 1000) / 10
-        : null,
-    }));
+    .map(finalizeStats);
 };
+
+export const buildClassSubjectSummaryRows = (reports) => {
+  const byClassSubject = new Map();
+
+  reports.forEach((report) => {
+    const key = [
+      report.department,
+      report.section,
+      report.semester,
+      report.subject || report.subjectCode,
+    ].join('|');
+    if (!byClassSubject.has(key)) {
+      byClassSubject.set(key, {
+        department: report.department,
+        section: report.section,
+        semester: report.semester,
+        subjectName: report.subjectName || report.subject?.name || 'Unknown',
+        subjectCode: report.subjectCode || report.subject?.code || '',
+        ...createEmptyStats(),
+      });
+    }
+    accumulateReportStats(byClassSubject.get(key), report);
+  });
+
+  return [...byClassSubject.values()]
+    .sort((a, b) =>
+      a.department.localeCompare(b.department)
+      || a.section.localeCompare(b.section, undefined, { numeric: true })
+      || a.semester.localeCompare(b.semester)
+      || a.subjectName.localeCompare(b.subjectName))
+    .map(finalizeStats);
+};
+
+const formatSummaryRow = (monthLabel, row, classFields = []) => [
+  monthLabel,
+  ...classFields,
+  row.subjectName,
+  row.subjectCode,
+  row.entered,
+  row.passed,
+  row.failed,
+  row.absent,
+  row.passPercentage != null ? `${row.passPercentage}%` : '—',
+  `${PASS_PERCENTAGE}%`,
+];
 
 export const buildTestReportExportPayload = async (month, { reportFilter = {} } = {}) => {
   const reports = await StudentMonthlyTestReport.find({ month, ...reportFilter })
@@ -82,25 +132,26 @@ export const buildTestReportExportPayload = async (month, { reportFilter = {} } 
     Number(month.slice(5, 7))
   );
 
-  const summaryRows = buildSubjectSummaryRows(reports);
+  const subjectSummary = buildSubjectSummaryRows(reports);
+  const classSummary = buildClassSubjectSummaryRows(reports);
+
   const summarySheetRows = [
-    SUMMARY_HEADERS,
-    ...summaryRows.map((row) => [
-      monthLabel,
-      row.subjectName,
-      row.subjectCode,
-      row.entered,
-      row.passed,
-      row.failed,
-      row.passPercentage != null ? `${row.passPercentage}%` : '—',
-      `${PASS_PERCENTAGE}%`,
-    ]),
+    SUBJECT_SUMMARY_HEADERS,
+    ...subjectSummary.map((row) => formatSummaryRow(monthLabel, row)),
+    [],
+    CLASS_SUMMARY_HEADERS,
+    ...classSummary.map((row) => formatSummaryRow(monthLabel, row, [
+      row.department,
+      row.section,
+      row.semester,
+    ])),
   ];
 
   const marksSheetRows = [
     MARKS_HEADERS,
     ...reports.map((report) => {
       const maxMarks = report.maxMarks ?? DEFAULT_MAX_MARKS;
+      const attendance = resolveAttendance(report);
       const pct = computePercentage(report.marksObtained, maxMarks);
       return [
         monthLabel,
@@ -112,11 +163,11 @@ export const buildTestReportExportPayload = async (month, { reportFilter = {} } 
         report.py || report.student?.py || '',
         report.student?.rollNumber || '',
         report.student?.name || '',
-        report.marksObtained ?? '',
+        attendance,
+        attendance === 'A' ? '' : (report.marksObtained ?? ''),
         maxMarks,
-        pct != null ? `${pct}%` : '',
-        formatPassStatus(report.marksObtained, maxMarks),
-        report.remarks || '',
+        attendance === 'A' || pct == null ? '' : `${pct}%`,
+        formatPassStatus(report.marksObtained, maxMarks, report),
       ];
     }),
   ];
@@ -130,7 +181,8 @@ export const buildTestReportExportPayload = async (month, { reportFilter = {} } 
     marksSheetName: 'Monthly Test Marks',
     summaryRows: summarySheetRows,
     marksRows: marksSheetRows,
-    summary: summaryRows,
+    subjects: subjectSummary,
+    classes: classSummary,
   };
 };
 
