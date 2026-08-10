@@ -81,7 +81,7 @@ const StudentTestReportSheetSetupModal = ({
           ) : setup && (
             <>
               <p className="text-muted small">
-                Syncs Summary and Monthly Test Marks tabs every five minutes from TOMS.
+                Syncs a Summary tab plus one tab per month (P/A and marks) every five minutes from TOMS.
               </p>
               <ol className="small mb-3">
                 {setup.steps.map((step) => (

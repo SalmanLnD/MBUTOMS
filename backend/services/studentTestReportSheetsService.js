@@ -75,13 +75,14 @@ export const getTestReportAppsScriptSetup = async (req) => {
       'Create one Google Sheet for monthly test reports.',
       'Extensions → Apps Script, delete sample code, paste the script below, and save.',
       'Run installTriggers once and authorize access when Google asks.',
-      'Use menu TOMS Test Reports → Refresh now to sync Summary and Marks tabs.',
+      'Use menu TOMS Test Reports → Refresh now to sync the Summary tab plus one tab per month.',
       'Paste the Google Sheet URL below and click Save link.',
     ],
     note:
-      'The sheet refreshes every 5 minutes. Each refresh pulls the selected month from TOMS '
-      + '(defaults to the current month). Google Apps Script cannot call localhost; use the '
-      + 'deployed API URL or a tunnel for local testing.',
+      'The sheet refreshes every 5 minutes. Summary aggregates all months; each month tab '
+      + 'lists student marks with P/A (Present/Absent). Re-paste the Apps Script after '
+      + 'deployments if the sync format changed. Google Apps Script cannot call localhost; '
+      + 'use the deployed API URL or a tunnel for local testing.',
   };
 };
 

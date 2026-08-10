@@ -1,15 +1,17 @@
 /**
  * MBU TOMS Monthly Test Reports sync — Extensions → Apps Script
  * Run installTriggers() once after pasting this script.
+ *
+ * Writes:
+ *   1) Summary tab with subject-wise and class-wise pass rates (all months)
+ *   2) One tab per month (e.g. "August 2026") with P/A and marks
  */
 const EXPORT_URL = '__EXPORT_URL__';
 const API_KEY = '__API_KEY__';
 const SUMMARY_SHEET_NAME = 'Summary';
-const MARKS_SHEET_NAME = 'Monthly Test Marks';
 
 function syncStudentTestReports() {
-  const month = Utilities.formatDate(new Date(), 'Asia/Kolkata', 'yyyy-MM');
-  const url = EXPORT_URL + '?key=' + encodeURIComponent(API_KEY) + '&month=' + encodeURIComponent(month);
+  const url = EXPORT_URL + '?key=' + encodeURIComponent(API_KEY);
   const response = UrlFetchApp.fetch(url, {
     muteHttpExceptions: true,
     headers: { 'ngrok-skip-browser-warning': 'true' },
@@ -22,14 +24,25 @@ function syncStudentTestReports() {
 
   const payload = JSON.parse(response.getContentText());
   const spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
+  const managedNames = {};
+
+  const summaryName = payload.summarySheetName || SUMMARY_SHEET_NAME;
+  managedNames[summaryName] = true;
   writeSheetValues(
-    ensureSheet(spreadsheet, payload.summarySheetName || SUMMARY_SHEET_NAME),
+    ensureSheet(spreadsheet, summaryName),
     payload.summaryRows || []
   );
-  writeSheetValues(
-    ensureSheet(spreadsheet, payload.marksSheetName || MARKS_SHEET_NAME),
-    payload.marksRows || []
-  );
+
+  (payload.monthSheets || []).forEach(function (monthSheet) {
+    const sheetName = sanitizeSheetName(monthSheet.sheetName || monthSheet.month || 'Unknown');
+    managedNames[sheetName] = true;
+    writeSheetValues(
+      ensureSheet(spreadsheet, sheetName),
+      monthSheet.rows || []
+    );
+  });
+
+  cleanupStaleMonthSheets(spreadsheet, managedNames, summaryName);
   SpreadsheetApp.flush();
 }
 
@@ -39,6 +52,26 @@ function ensureSheet(spreadsheet, name) {
     sheet = spreadsheet.insertSheet(name);
   }
   return sheet;
+}
+
+function sanitizeSheetName(name) {
+  var cleaned = String(name || 'Unknown')
+    .replace(/[:\\\/\?\*\[\]]/g, '-')
+    .replace(/\s+/g, ' ')
+    .trim();
+  if (!cleaned) cleaned = 'Unknown';
+  if (cleaned.length > 100) cleaned = cleaned.substring(0, 100);
+  return cleaned;
+}
+
+function cleanupStaleMonthSheets(spreadsheet, managedNames, summaryName) {
+  spreadsheet.getSheets().forEach(function (sheet) {
+    const name = sheet.getName();
+    if (managedNames[name]) return;
+    if (name === summaryName) return;
+    if (spreadsheet.getSheets().length <= 1) return;
+    spreadsheet.deleteSheet(sheet);
+  });
 }
 
 function writeSheetValues(sheet, rows) {
@@ -66,9 +99,24 @@ function writeSheetValues(sheet, rows) {
     return copy;
   });
   sheet.getRange(1, 1, maxRows, maxColumns).setValues(padded);
-  sheet.getRange(1, 1, 1, maxColumns).setFontWeight('bold').setBackground('#d9ead3');
-  sheet.setFrozenRows(1);
+
+  const headerRow = findHeaderRowIndex(rows);
+  if (headerRow >= 0) {
+    sheet.getRange(headerRow + 1, 1, 1, maxColumns)
+      .setFontWeight('bold')
+      .setBackground('#d9ead3');
+    sheet.setFrozenRows(headerRow + 1);
+  }
+
   sheet.autoResizeColumns(1, maxColumns);
+}
+
+function findHeaderRowIndex(rows) {
+  for (var i = 0; i < rows.length; i += 1) {
+    const firstCell = String(rows[i][0] || '').trim().toLowerCase();
+    if (firstCell === 'month' || firstCell === 'subject') return i;
+  }
+  return rows.length ? 0 : -1;
 }
 
 function installTriggers() {

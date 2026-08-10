@@ -22,6 +22,7 @@ import {
   buildClassSubjectSummaryRows,
   buildSubjectSummaryRows,
   buildTestReportExportPayload,
+  buildTestReportSheetsExportPayload,
   getAccessibleReportFilter,
 } from '../utils/studentTestReportExport.js';
 
@@ -434,12 +435,12 @@ export const downloadTestReportExcel = async (req, res) => {
 
 export const exportTestReportsForSheets = async (req, res) => {
   const month = req.query.month;
-  if (!month) {
-    return res.status(400).json({ message: 'month query parameter is required' });
-  }
-  if (!isValidReportMonth(month)) {
-    return res.status(400).json({ message: 'Invalid month. Reports start from August 2026.' });
+  if (month) {
+    if (!isValidReportMonth(month)) {
+      return res.status(400).json({ message: 'Invalid month. Reports start from August 2026.' });
+    }
+    return res.json(await buildTestReportExportPayload(month));
   }
 
-  res.json(await buildTestReportExportPayload(month));
+  res.json(await buildTestReportSheetsExportPayload());
 };

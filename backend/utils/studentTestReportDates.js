@@ -40,3 +40,26 @@ export const isValidReportMonth = (monthKey) => {
   const latestIndex = latest.year * 12 + latest.month - 1;
   return monthIndex >= trackingIndex && monthIndex <= latestIndex;
 };
+
+export const getReportMonthKeys = (referenceDate = new Date()) => {
+  const tracking = getTrackingStartParts();
+  const latest = getCurrentMonthParts(referenceDate);
+  const keys = [];
+  let { year, month } = tracking;
+
+  while (year < latest.year || (year === latest.year && month <= latest.month)) {
+    keys.push(formatMonthKey(year, month));
+    month += 1;
+    if (month > 12) {
+      month = 1;
+      year += 1;
+    }
+  }
+
+  return keys;
+};
+
+export const getMonthLabelFromKey = (monthKey) => {
+  const { year, month } = parseMonthKey(monthKey);
+  return formatMonthLabel(year, month);
+};

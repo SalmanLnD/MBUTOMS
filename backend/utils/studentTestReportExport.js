@@ -1,5 +1,8 @@
 import StudentMonthlyTestReport from '../models/StudentMonthlyTestReport.js';
-import { formatMonthLabel } from './studentTestReportDates.js';
+import {
+  getMonthLabelFromKey,
+  getReportMonthKeys,
+} from './studentTestReportDates.js';
 import {
   DEFAULT_MAX_MARKS,
   PASS_PERCENTAGE,
@@ -27,6 +30,8 @@ const MARKS_HEADERS = [
   'Percentage',
   'Result',
 ];
+
+const MONTH_MARKS_HEADERS = MARKS_HEADERS.filter((header) => header !== 'Month');
 
 const SUBJECT_SUMMARY_HEADERS = [
   'Month',
@@ -120,57 +125,83 @@ const formatSummaryRow = (monthLabel, row, classFields = []) => [
   `${PASS_PERCENTAGE}%`,
 ];
 
-export const buildTestReportExportPayload = async (month, { reportFilter = {} } = {}) => {
-  const reports = await StudentMonthlyTestReport.find({ month, ...reportFilter })
+const mapReportToMarksRow = (report, { includeMonth = true, monthLabel = '' } = {}) => {
+  const maxMarks = report.maxMarks ?? DEFAULT_MAX_MARKS;
+  const attendance = resolveAttendance(report);
+  const pct = computePercentage(report.marksObtained, maxMarks);
+  const row = [
+    report.subjectName || report.subject?.name || '',
+    report.subjectCode || report.subject?.code || '',
+    report.department,
+    report.section,
+    report.semester,
+    report.py || report.student?.py || '',
+    report.student?.rollNumber || '',
+    report.student?.name || '',
+    attendance,
+    attendance === 'A' ? '' : (report.marksObtained ?? ''),
+    maxMarks,
+    attendance === 'A' || pct == null ? '' : `${pct}%`,
+    formatPassStatus(report.marksObtained, maxMarks, report),
+  ];
+  return includeMonth ? [monthLabel, ...row] : row;
+};
+
+const buildMarksSheetRows = (reports, monthLabel, { includeMonth = true } = {}) => {
+  const headers = includeMonth ? MARKS_HEADERS : MONTH_MARKS_HEADERS;
+  return [
+    headers,
+    ...reports.map((report) => mapReportToMarksRow(report, { includeMonth, monthLabel })),
+  ];
+};
+
+const buildSummarySheetRows = (monthSummaries) => {
+  const summaryRows = [
+    ['Subject-wise summary'],
+    SUBJECT_SUMMARY_HEADERS,
+  ];
+
+  monthSummaries.forEach(({ monthLabel, subjectSummary }) => {
+    summaryRows.push(
+      ...subjectSummary.map((row) => formatSummaryRow(monthLabel, row))
+    );
+  });
+
+  summaryRows.push([]);
+  summaryRows.push(['Class-wise summary']);
+  summaryRows.push(CLASS_SUMMARY_HEADERS);
+
+  monthSummaries.forEach(({ monthLabel, classSummary }) => {
+    summaryRows.push(
+      ...classSummary.map((row) => formatSummaryRow(monthLabel, row, [
+        row.department,
+        row.section,
+        row.semester,
+      ]))
+    );
+  });
+
+  return summaryRows;
+};
+
+const loadReports = (filter = {}) =>
+  StudentMonthlyTestReport.find(filter)
     .populate('student', 'rollNumber name py')
     .populate('subject', 'name code')
-    .sort({ subjectName: 1, department: 1, section: 1, semester: 1 })
+    .sort({ month: 1, subjectName: 1, department: 1, section: 1, semester: 1 })
     .lean();
 
-  const monthLabel = formatMonthLabel(
-    Number(month.slice(0, 4)),
-    Number(month.slice(5, 7))
-  );
-
+export const buildTestReportExportPayload = async (month, { reportFilter = {} } = {}) => {
+  const reports = await loadReports({ month, ...reportFilter });
+  const monthLabel = getMonthLabelFromKey(month);
   const subjectSummary = buildSubjectSummaryRows(reports);
   const classSummary = buildClassSubjectSummaryRows(reports);
 
-  const summarySheetRows = [
-    SUBJECT_SUMMARY_HEADERS,
-    ...subjectSummary.map((row) => formatSummaryRow(monthLabel, row)),
-    [],
-    CLASS_SUMMARY_HEADERS,
-    ...classSummary.map((row) => formatSummaryRow(monthLabel, row, [
-      row.department,
-      row.section,
-      row.semester,
-    ])),
-  ];
-
-  const marksSheetRows = [
-    MARKS_HEADERS,
-    ...reports.map((report) => {
-      const maxMarks = report.maxMarks ?? DEFAULT_MAX_MARKS;
-      const attendance = resolveAttendance(report);
-      const pct = computePercentage(report.marksObtained, maxMarks);
-      return [
-        monthLabel,
-        report.subjectName || report.subject?.name || '',
-        report.subjectCode || report.subject?.code || '',
-        report.department,
-        report.section,
-        report.semester,
-        report.py || report.student?.py || '',
-        report.student?.rollNumber || '',
-        report.student?.name || '',
-        attendance,
-        attendance === 'A' ? '' : (report.marksObtained ?? ''),
-        maxMarks,
-        attendance === 'A' || pct == null ? '' : `${pct}%`,
-        formatPassStatus(report.marksObtained, maxMarks, report),
-      ];
-    }),
-  ];
+  const summarySheetRows = buildSummarySheetRows([{
+    monthLabel,
+    subjectSummary,
+    classSummary,
+  }]);
 
   return {
     month,
@@ -178,11 +209,48 @@ export const buildTestReportExportPayload = async (month, { reportFilter = {} } 
     passThreshold: PASS_PERCENTAGE,
     defaultMaxMarks: DEFAULT_MAX_MARKS,
     summarySheetName: 'Summary',
-    marksSheetName: 'Monthly Test Marks',
     summaryRows: summarySheetRows,
-    marksRows: marksSheetRows,
+    marksRows: buildMarksSheetRows(reports, monthLabel),
     subjects: subjectSummary,
     classes: classSummary,
+  };
+};
+
+export const buildTestReportSheetsExportPayload = async () => {
+  const monthKeys = getReportMonthKeys();
+  const allReports = await loadReports({ month: { $in: monthKeys } });
+  const reportsByMonth = new Map(monthKeys.map((monthKey) => [monthKey, []]));
+
+  allReports.forEach((report) => {
+    const bucket = reportsByMonth.get(report.month);
+    if (bucket) bucket.push(report);
+  });
+
+  const monthSummaries = monthKeys.map((monthKey) => {
+    const reports = reportsByMonth.get(monthKey) || [];
+    const monthLabel = getMonthLabelFromKey(monthKey);
+    return {
+      month: monthKey,
+      monthLabel,
+      subjectSummary: buildSubjectSummaryRows(reports),
+      classSummary: buildClassSubjectSummaryRows(reports),
+      reports,
+    };
+  });
+
+  const monthSheets = monthSummaries.map(({ month, monthLabel, reports }) => ({
+    month,
+    sheetName: monthLabel,
+    rows: buildMarksSheetRows(reports, monthLabel, { includeMonth: false }),
+  }));
+
+  return {
+    passThreshold: PASS_PERCENTAGE,
+    defaultMaxMarks: DEFAULT_MAX_MARKS,
+    summarySheetName: 'Summary',
+    summaryRows: buildSummarySheetRows(monthSummaries),
+    monthSheets,
+    managedSheetNames: ['Summary', ...monthSheets.map((sheet) => sheet.sheetName)],
   };
 };
 
