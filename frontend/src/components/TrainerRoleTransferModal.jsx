@@ -135,12 +135,13 @@ const TrainerRoleTransferModal = ({ trainer, mode, onClose, onComplete }) => {
               <span className="text-danger"> *</span>
             </label>
             <StyledSelect
-              inputId="successor-trainer"
+              id="successor-trainer"
               value={successorTrainerId}
-              onChange={setSuccessorTrainerId}
+              onChange={(event) => setSuccessorTrainerId(event.target.value)}
               options={successorOptions}
               placeholder={loadingOptions ? 'Loading trainers…' : 'Select replacement trainer'}
               disabled={loadingOptions || submitting}
+              required
             />
           </div>
 
