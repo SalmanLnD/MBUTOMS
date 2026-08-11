@@ -44,3 +44,8 @@ export const permanentReplaceTrainer = async (id, payload) => {
   const { data } = await api.post(`/trainers/${id}/permanent-replacement`, payload);
   return data;
 };
+
+export const getReplacementCandidates = async (params = {}) => {
+  const { data } = await api.get('/trainers/replacement-candidates', { params });
+  return data;
+};

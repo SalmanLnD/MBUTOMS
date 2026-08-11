@@ -1,6 +1,10 @@
 import Trainer from '../models/Trainer.js';
 import { transferTrainerRole } from '../utils/trainerPermanentTransfer.js';
 import { normalizeAttendanceDate } from '../utils/attendanceDates.js';
+import {
+  listReplacementCandidates,
+  trainerHasOwnedSlots,
+} from '../utils/trainerSlotCounts.js';
 
 const loadTrainerPair = async (sourceId, successorId) => {
   const [sourceTrainer, successorTrainer] = await Promise.all([
@@ -17,8 +21,33 @@ const loadTrainerPair = async (sourceId, successorId) => {
   if (sourceTrainer.employmentStatus === 'resigned') {
     throw Object.assign(new Error('This trainer has already resigned'), { statusCode: 409 });
   }
+  if (await trainerHasOwnedSlots(successorTrainer)) {
+    throw Object.assign(
+      new Error('Replacement trainer must not have any timetable slots assigned'),
+      { statusCode: 400 }
+    );
+  }
 
   return { sourceTrainer, successorTrainer };
+};
+
+export const getReplacementCandidates = async (req, res) => {
+  const excludeId = req.query.excludeId;
+  if (!excludeId) {
+    return res.status(400).json({ message: 'excludeId is required' });
+  }
+
+  const slotFreeOnly = req.query.slotFree !== 'false';
+  const trainers = await listReplacementCandidates({ excludeId, slotFreeOnly });
+
+  res.json({
+    trainers: trainers.map((trainer) => ({
+      _id: trainer._id,
+      name: trainer.name,
+      employeeId: trainer.employeeId,
+      label: `${trainer.name} (${trainer.employeeId})`,
+    })),
+  });
 };
 
 export const resignTrainer = async (req, res) => {

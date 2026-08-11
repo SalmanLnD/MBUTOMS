@@ -3,7 +3,7 @@ import Modal from './Modal.jsx';
 import StyledSelect from './StyledSelect.jsx';
 import AlertMessage from './AlertMessage.jsx';
 import {
-  getTrainers,
+  getReplacementCandidates,
   resignTrainer,
   permanentReplaceTrainer,
 } from '../services/trainerService.js';
@@ -24,15 +24,19 @@ const TrainerRoleTransferModal = ({ trainer, mode, onClose, onComplete }) => {
     const load = async () => {
       setLoadingOptions(true);
       try {
-        const data = await getTrainers({ limit: 200, sortBy: 'name', sortOrder: 'asc' });
+        const data = await getReplacementCandidates({
+          excludeId: trainer._id,
+          slotFree: 'true',
+        });
         if (cancelled) return;
-        const options = (data.trainers || [])
-          .filter((row) => row._id !== trainer._id && row.employmentStatus !== 'resigned')
-          .map((row) => ({
-            value: row._id,
-            label: `${row.name} (${row.employeeId})`,
-          }));
+        const options = (data.trainers || []).map((row) => ({
+          value: row._id,
+          label: row.label || `${row.name} (${row.employeeId})`,
+        }));
         setSuccessorOptions(options);
+        if (!options.length) {
+          setError('No trainers without timetable slots are available for replacement.');
+        }
       } catch (err) {
         if (!cancelled) setError(getErrorMessage(err));
       } finally {
@@ -48,9 +52,9 @@ const TrainerRoleTransferModal = ({ trainer, mode, onClose, onComplete }) => {
 
   const helperText = useMemo(() => {
     if (isResignation) {
-      return 'Schedules, subjects, and CAMU credentials move to the replacement immediately. Attendance marks Exit from the resignation date through the month end in UI and Google Sheets; after that month the trainer is hidden in UI but Sheets keeps marking Exit.';
+      return 'Only trainers with no timetable slots are listed. Schedules, subjects, and CAMU credentials move to the replacement immediately. Attendance marks Exit from the resignation date through the month end in UI and Google Sheets; after that month the trainer is hidden in UI but Sheets keeps marking Exit.';
     }
-    return 'The current trainer stays active in the system with no timetable slots. From the selected date, schedules, subjects, and CAMU credentials transfer to the replacement trainer.';
+    return 'Only trainers with no timetable slots are listed. The current trainer stays active in the system with no slots after transfer. Schedules, subjects, and CAMU credentials move to the replacement from the selected date.';
   }, [isResignation]);
 
   const handleSubmit = async (event) => {
