@@ -286,29 +286,28 @@ const validateParsedRow = (row) => {
   };
 };
 
-export const importStudentsFromRows = async (rows, { updateExisting = false } = {}) => {
+export const BULK_IMPORT_BATCH_SIZE = 50;
+const INSERT_CHUNK_SIZE = 500;
+const UPDATE_CHUNK_SIZE = 200;
+
+export const validateStudentBulkRows = (rows) => {
   const validated = rows.map(validateParsedRow);
-  const invalid = validated.filter((row) => !row.ok).map((row) => ({
-    row: row.rowNumber,
-    errors: row.errors,
-  }));
-  const validPayloads = validated.filter((row) => row.ok);
+  return {
+    validRows: validated.filter((row) => row.ok),
+    errors: validated
+      .filter((row) => !row.ok)
+      .map((row) => ({ row: row.rowNumber, errors: row.errors })),
+  };
+};
 
-  if (!validPayloads.length) {
-    return {
-      created: 0,
-      updated: 0,
-      skipped: 0,
-      failed: invalid.length,
-      errors: invalid,
-    };
-  }
-
-  const semesterNumbers = [...new Set(
-    validPayloads
-      .map((row) => row.semesterNumber)
-      .filter((number) => Number.isInteger(number))
-  )];
+const resolveSemesterRefs = async (validRows) => {
+  const semesterNumbers = [
+    ...new Set(
+      validRows
+        .map((row) => row.semesterNumber)
+        .filter((number) => Number.isInteger(number))
+    ),
+  ];
   const semesters = semesterNumbers.length
     ? await Semester.find({ number: { $in: semesterNumbers } }).select('_id number').lean()
     : [];
@@ -316,27 +315,101 @@ export const importStudentsFromRows = async (rows, { updateExisting = false } = 
     semesters.map((semester) => [semester.number, semester._id])
   );
 
-  const withSemesterRefs = validPayloads.map((row) => {
+  return validRows.map((row) => {
     const payload = { ...row.payload };
     if (row.semesterNumber && semesterIdByNumber.has(row.semesterNumber)) {
       payload.semester = semesterIdByNumber.get(row.semesterNumber);
     }
     return { ...row, payload };
   });
+};
 
+const insertStudentPayloads = async (payloads) => {
+  let created = 0;
+  const errors = [];
+
+  for (let index = 0; index < payloads.length; index += INSERT_CHUNK_SIZE) {
+    const chunk = payloads.slice(index, index + INSERT_CHUNK_SIZE);
+    try {
+      const inserted = await Student.insertMany(chunk, { ordered: false });
+      created += inserted.length;
+    } catch (error) {
+      if (error?.insertedDocs) {
+        created += error.insertedDocs.length;
+      }
+      const writeErrors = error?.writeErrors || [];
+      writeErrors.forEach((writeError) => {
+        errors.push({
+          row: null,
+          errors: [writeError.errmsg || writeError.message || 'Failed to insert row'],
+        });
+      });
+      if (!error?.insertedDocs && !writeErrors.length) {
+        throw error;
+      }
+    }
+  }
+
+  return { created, errors };
+};
+
+const updateStudentPayloads = async (rows) => {
+  let updated = 0;
+  const errors = [];
+
+  for (let index = 0; index < rows.length; index += UPDATE_CHUNK_SIZE) {
+    const chunk = rows.slice(index, index + UPDATE_CHUNK_SIZE);
+    const ops = chunk.map((row) => ({
+      updateOne: {
+        filter: { rollNumber: row.payload.rollNumber },
+        update: { $set: row.payload },
+      },
+    }));
+
+    try {
+      await Student.bulkWrite(ops, { ordered: false });
+      updated += chunk.length;
+    } catch (error) {
+      const writeErrors = error?.writeErrors || [];
+      if (writeErrors.length) {
+        writeErrors.forEach((writeError, writeIndex) => {
+          const row = chunk[writeError.index ?? writeIndex];
+          errors.push({
+            row: row?.rowNumber ?? null,
+            errors: [writeError.errmsg || writeError.message || 'Failed to update row'],
+          });
+        });
+      } else {
+        throw error;
+      }
+    }
+  }
+
+  return { updated, errors };
+};
+
+export const importValidatedStudentRows = async (validRows, { updateExisting = false } = {}) => {
+  if (!validRows.length) {
+    return {
+      created: 0,
+      updated: 0,
+      skipped: 0,
+      failed: 0,
+      errors: [],
+    };
+  }
+
+  const withSemesterRefs = await resolveSemesterRefs(validRows);
   const rollNumbers = withSemesterRefs.map((row) => row.payload.rollNumber);
   const existing = await Student.find({ rollNumber: { $in: rollNumbers } })
     .select('rollNumber')
     .lean();
   const existingSet = new Set(existing.map((student) => student.rollNumber));
 
-  let created = 0;
-  let updated = 0;
-  let skipped = 0;
-  const errors = [...invalid];
-
   const toCreate = [];
   const toUpdate = [];
+  let skipped = 0;
+  const errors = [];
 
   for (const row of withSemesterRefs) {
     if (existingSet.has(row.payload.rollNumber)) {
@@ -354,47 +427,31 @@ export const importStudentsFromRows = async (rows, { updateExisting = false } = 
     }
   }
 
-  if (toCreate.length) {
-    try {
-      const inserted = await Student.insertMany(toCreate, { ordered: false });
-      created = inserted.length;
-    } catch (error) {
-      if (error?.insertedDocs) {
-        created = error.insertedDocs.length;
-      }
-      const writeErrors = error?.writeErrors || [];
-      writeErrors.forEach((writeError) => {
-        errors.push({
-          row: null,
-          errors: [writeError.errmsg || writeError.message || 'Failed to insert row'],
-        });
-      });
-      if (!error?.insertedDocs && !writeErrors.length) {
-        throw error;
-      }
-    }
-  }
+  const insertResult = toCreate.length
+    ? await insertStudentPayloads(toCreate)
+    : { created: 0, errors: [] };
+  const updateResult = toUpdate.length
+    ? await updateStudentPayloads(toUpdate)
+    : { updated: 0, errors: [] };
 
-  for (const row of toUpdate) {
-    try {
-      await Student.updateOne(
-        { rollNumber: row.payload.rollNumber },
-        { $set: row.payload }
-      );
-      updated += 1;
-    } catch (error) {
-      errors.push({
-        row: row.rowNumber,
-        errors: [error.message || 'Failed to update row'],
-      });
-    }
-  }
+  const allErrors = [...errors, ...insertResult.errors, ...updateResult.errors];
 
   return {
-    created,
-    updated,
+    created: insertResult.created,
+    updated: updateResult.updated,
     skipped,
-    failed: errors.length,
-    errors: errors.slice(0, 100),
+    failed: allErrors.length,
+    errors: allErrors.slice(0, 100),
+  };
+};
+
+export const importStudentsFromRows = async (rows, { updateExisting = false } = {}) => {
+  const { validRows, errors: invalid } = validateStudentBulkRows(rows);
+  const result = await importValidatedStudentRows(validRows, { updateExisting });
+
+  return {
+    ...result,
+    failed: result.failed + invalid.length,
+    errors: [...invalid, ...result.errors].slice(0, 100),
   };
 };

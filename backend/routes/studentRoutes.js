@@ -8,6 +8,8 @@ import {
   deleteStudent,
   downloadStudentBulkTemplate,
   bulkUploadStudents,
+  parseBulkUploadStudents,
+  importBulkStudentBatch,
 } from '../controllers/studentController.js';
 import { protect, authorize } from '../middleware/auth.js';
 import { validate } from '../middleware/validate.js';
@@ -54,6 +56,26 @@ router.post(
     });
   },
   asyncHandler(bulkUploadStudents)
+);
+
+router.post(
+  '/bulk/parse',
+  authorize('admin', 'campus_manager'),
+  (req, res, next) => {
+    upload.single('file')(req, res, (error) => {
+      if (error) {
+        return res.status(400).json({ message: error.message || 'File upload failed' });
+      }
+      return next();
+    });
+  },
+  asyncHandler(parseBulkUploadStudents)
+);
+
+router.post(
+  '/bulk/import-batch',
+  authorize('admin', 'campus_manager'),
+  asyncHandler(importBulkStudentBatch)
 );
 
 router

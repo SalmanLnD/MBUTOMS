@@ -14,6 +14,7 @@ const StudentBulkUploadModal = ({ show, onClose, onImported }) => {
   const [downloading, setDownloading] = useState(false);
   const [error, setError] = useState('');
   const [result, setResult] = useState(null);
+  const [progress, setProgress] = useState(null);
 
   const resetState = () => {
     setFile(null);
@@ -22,6 +23,7 @@ const StudentBulkUploadModal = ({ show, onClose, onImported }) => {
     setDownloading(false);
     setError('');
     setResult(null);
+    setProgress(null);
   };
 
   const handleClose = () => {
@@ -59,12 +61,24 @@ const StudentBulkUploadModal = ({ show, onClose, onImported }) => {
     setLoading(true);
     setError('');
     setResult(null);
+    setProgress({ phase: 'uploading', percent: 0, label: 'Starting upload…' });
     try {
-      const data = await bulkUploadStudents(file, { updateExisting });
+      const data = await bulkUploadStudents(file, {
+        updateExisting,
+        onProgress: setProgress,
+      });
+      setProgress({ phase: 'done', percent: 100, label: 'Import complete' });
       setResult(data);
       onImported?.(data);
     } catch (err) {
-      setError(getErrorMessage(err));
+      setProgress(null);
+      if (err.code === 'ERR_NETWORK' || !err.response) {
+        setError(
+          'Upload failed due to a network or timeout error. Try again with a smaller file, or check that the API is reachable.'
+        );
+      } else {
+        setError(getErrorMessage(err));
+      }
     } finally {
       setLoading(false);
     }
@@ -139,6 +153,7 @@ const StudentBulkUploadModal = ({ show, onClose, onImported }) => {
                 setFile(event.target.files?.[0] || null);
                 setResult(null);
                 setError('');
+                setProgress(null);
               }}
             />
             {file && (
@@ -163,6 +178,37 @@ const StudentBulkUploadModal = ({ show, onClose, onImported }) => {
               Update existing students when roll number already exists
             </label>
           </div>
+
+          {progress && (
+            <div className="mb-3" aria-live="polite">
+              <div className="d-flex justify-content-between align-items-center small mb-1">
+                <span>{progress.label || 'Processing…'}</span>
+                <span className="fw-semibold">{progress.percent}%</span>
+              </div>
+              <div className="progress" style={{ height: '10px' }}>
+                <div
+                  className={`progress-bar ${loading ? 'progress-bar-striped progress-bar-animated' : ''}`}
+                  role="progressbar"
+                  style={{ width: `${progress.percent}%` }}
+                  aria-valuenow={progress.percent}
+                  aria-valuemin={0}
+                  aria-valuemax={100}
+                  aria-label="Bulk upload progress"
+                />
+              </div>
+              {progress.phase === 'importing' && progress.totalBatches > 1 && (
+                <div className="form-text mt-1">
+                  Batch
+                  {' '}
+                  {progress.batch}
+                  {' '}
+                  of
+                  {' '}
+                  {progress.totalBatches}
+                </div>
+              )}
+            </div>
+          )}
 
           {result && (
             <div className="alert alert-secondary mb-0">
@@ -212,7 +258,7 @@ const StudentBulkUploadModal = ({ show, onClose, onImported }) => {
           </button>
           <button type="submit" className="btn btn-primary d-inline-flex align-items-center gap-2" disabled={loading || !file}>
             <UploadIcon size={16} />
-            {loading ? 'Uploading...' : 'Upload'}
+            {loading ? 'Uploading…' : 'Upload'}
           </button>
         </div>
       </form>

@@ -6,8 +6,11 @@ import '../models/Section.js';
 import '../models/Semester.js';
 import {
   buildStudentBulkTemplateBuffer,
+  BULK_IMPORT_BATCH_SIZE,
   importStudentsFromRows,
+  importValidatedStudentRows,
   parseStudentBulkFile,
+  validateStudentBulkRows,
 } from '../utils/studentBulkImport.js';
 import { expandAllowedClassDepartments } from '../utils/subjectClassEligibility.js';
 import { invalidateStudentCountCache } from './classController.js';
@@ -166,4 +169,67 @@ export const bulkUploadStudents = async (req, res) => {
     message: `Import complete: ${result.created} created, ${result.updated} updated, ${result.skipped} skipped, ${result.failed} failed`,
     ...result,
   });
+};
+
+export const parseBulkUploadStudents = async (req, res) => {
+  if (!req.file?.buffer) {
+    return res.status(400).json({ message: 'Upload a .xlsx or .csv file' });
+  }
+
+  let rows;
+  try {
+    rows = await parseStudentBulkFile(req.file);
+  } catch (error) {
+    return res.status(error.statusCode || 400).json({
+      message: error.message || 'Could not read the uploaded file',
+    });
+  }
+
+  if (!rows.length) {
+    return res.status(400).json({ message: 'No student rows found in the file' });
+  }
+
+  const { validRows, errors } = validateStudentBulkRows(rows);
+  res.json({
+    total: rows.length,
+    validCount: validRows.length,
+    invalidCount: errors.length,
+    batchSize: BULK_IMPORT_BATCH_SIZE,
+    validRows: validRows.map((row) => ({
+      rowNumber: row.rowNumber,
+      semesterNumber: row.semesterNumber,
+      payload: row.payload,
+    })),
+    errors: errors.slice(0, 100),
+  });
+};
+
+export const importBulkStudentBatch = async (req, res) => {
+  const rows = Array.isArray(req.body?.rows) ? req.body.rows : [];
+  if (!rows.length) {
+    return res.status(400).json({ message: 'No student rows provided' });
+  }
+  if (rows.length > BULK_IMPORT_BATCH_SIZE) {
+    return res.status(400).json({
+      message: `Import at most ${BULK_IMPORT_BATCH_SIZE} rows per batch`,
+    });
+  }
+
+  const updateExisting = String(req.body?.updateExisting || '').toLowerCase() === 'true'
+    || req.body?.updateExisting === true
+    || req.body?.updateExisting === '1';
+
+  const normalizedRows = rows.map((row, index) => ({
+    ok: true,
+    rowNumber: row.rowNumber ?? index + 2,
+    semesterNumber: row.semesterNumber,
+    payload: row.payload,
+  }));
+
+  const result = await importValidatedStudentRows(normalizedRows, { updateExisting });
+  if (result.created || result.updated) {
+    invalidateStudentCountCache();
+  }
+
+  res.json(result);
 };
