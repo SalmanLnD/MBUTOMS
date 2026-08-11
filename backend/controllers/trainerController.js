@@ -6,6 +6,7 @@ import { applyTrainerSubjectsChange, toIdStrings } from '../utils/syncTrainerSub
 import { syncTrainerUser, removeTrainerUser } from '../utils/trainerUserSync.js';
 import { INITIAL_TRAINER_PASSWORD } from '../constants/trainerAuth.js';
 import { mergeRosterFilter, shouldApplyRosterFilter } from '../utils/rosterFilter.js';
+import { mergeUiTrainerFilter } from '../utils/trainerEmployment.js';
 import {
   buildTrainerFilterForCoordinatorSubjects,
   coordinatorCanAccessTrainer,
@@ -82,6 +83,7 @@ export const getTrainers = async (req, res) => {
   const filter = await buildTrainerQuery(req.query);
   const rosterOnly = shouldApplyRosterFilter(req.query);
   let finalFilter = await mergeRosterFilter(filter, { rosterOnly });
+  finalFilter = await mergeUiTrainerFilter(finalFilter);
 
   if (isSubjectCoordinator(req.user)) {
     const coordinatorSubjectIds = getCoordinatorSubjectIds(req.user);
@@ -96,7 +98,9 @@ export const getTrainers = async (req, res) => {
   // skipping the heavy department/subjects populates.
   const liteFields = req.query.fields === 'lite';
   const trainerQuery = liteFields
-    ? Trainer.find(finalFilter).select('name employeeId scheduleTrainerCodes status')
+    ? Trainer.find(finalFilter).select(
+      'name employeeId scheduleTrainerCodes status employmentStatus resignationDate includeInAttendanceUntilMonth'
+    )
     : Trainer.find(finalFilter)
       .populate('department', 'name code')
       .populate('subjects', 'name code slotCount slotTimings');
@@ -136,7 +140,8 @@ const mergeTrainerSubjects = async (trainer) => {
 export const getTrainerById = async (req, res) => {
   const trainer = await Trainer.findById(req.params.id)
     .populate('department', 'name code')
-    .populate('subjects', 'name code hours');
+    .populate('subjects', 'name code hours')
+    .populate('successorTrainer', 'name employeeId');
 
   if (!trainer) {
     return res.status(404).json({ message: 'Trainer not found' });

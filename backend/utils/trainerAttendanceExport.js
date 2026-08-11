@@ -11,6 +11,7 @@ import {
 } from './attendanceDates.js';
 import { computeClassHandlingHoursBatch } from './trainerClassHoursBatch.js';
 import { mergeRosterFilter } from './rosterFilter.js';
+import { mergeAttendanceExportTrainerFilter } from './trainerEmployment.js';
 import { resolveTrainerScheduleCodes } from './trainerMappings.js';
 import { getLeaveOverlapFilter, isDateWithinLeave } from './leaveDateRange.js';
 import { getLeaveWeekdayScheduleIds, isFullDayLeave } from './leaveScope.js';
@@ -22,6 +23,7 @@ import {
   TRAINER_ATTENDANCE_TYPES,
 } from './trainerAttendanceTypes.js';
 import { formatFoodAllowance } from './foodAllowanceTypes.js';
+import { shouldAutoMarkTrainerExit } from './trainerEmployment.js';
 
 const TRACKING_START_MONTH = '2026-07';
 const INITIAL_EXPORT_END_MONTH = '2027-01';
@@ -69,9 +71,9 @@ export const buildTrainerAttendanceExportPayload = async () => {
   const dateKeys = dates.map(toAttendanceDateKey);
 
   const trainerRows = await Trainer.find(
-    await mergeRosterFilter({}, { rosterOnly: true })
+    await mergeAttendanceExportTrainerFilter({})
   )
-    .select('name employeeId scheduleTrainerCodes')
+    .select('name employeeId scheduleTrainerCodes employmentStatus resignationDate')
     .sort({ name: 1 })
     .lean();
   const trainerIds = trainerRows.map((trainer) => trainer._id);
@@ -159,7 +161,12 @@ export const buildTrainerAttendanceExportPayload = async () => {
         let mockPrepHours = log?.mockPrepHours || 0;
         let classHandlingHours = classHours.get(key) || 0;
 
-        if (onLeave) {
+        if (shouldAutoMarkTrainerExit(trainer, date)) {
+          attendanceType = TRAINER_ATTENDANCE_TYPES.EXIT;
+          oifNumber = '';
+          mockPrepHours = 0;
+          classHandlingHours = 0;
+        } else if (onLeave) {
           attendanceType = isLeaveAttendanceType(log?.attendanceType)
             ? log.attendanceType
             : TRAINER_ATTENDANCE_TYPES.LEAVE;

@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import LoadingSpinner from './LoadingSpinner.jsx';
 import AlertMessage from './AlertMessage.jsx';
 import TrainerFormModal from './TrainerFormModal.jsx';
+import TrainerRoleTransferModal from './TrainerRoleTransferModal.jsx';
 import { showSuccess } from '../utils/toast.js';
 import { getTrainerById } from '../services/trainerService.js';
 import { formatDate, getErrorMessage, resolveLinkedTrainerId } from '../utils/helpers.js';
@@ -19,6 +20,7 @@ const TrainerDetailsPanel = ({ trainerId, canEdit = false }) => {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState('');
   const [showEditModal, setShowEditModal] = useState(false);
+  const [transferMode, setTransferMode] = useState(null);
 
   const fetchTrainer = useCallback(async () => {
     if (!resolvedTrainerId) {
@@ -51,15 +53,45 @@ const TrainerDetailsPanel = ({ trainerId, canEdit = false }) => {
     }
   };
 
+  const handleTransferComplete = (result) => {
+    setTransferMode(null);
+    showSuccess(result?.message || 'Trainer updated successfully');
+    fetchTrainer();
+  };
+
   if (loading) return <LoadingSpinner message="Loading trainer details..." />;
   if (loadError && !trainer) return <AlertMessage message={loadError} />;
   if (!trainer) return <AlertMessage message="Trainer not found" />;
 
   return (
     <>
-      {canEdit && (
+      {canEdit && trainer.employmentStatus !== 'resigned' && (
+        <div className="mb-3 d-flex flex-wrap justify-content-end gap-2">
+          <button type="button" className="btn btn-outline-secondary btn-sm" onClick={() => setShowEditModal(true)}>
+            Edit Profile
+          </button>
+          <button type="button" className="btn btn-outline-primary btn-sm" onClick={() => setTransferMode('replacement')}>
+            Permanent Replacement
+          </button>
+          <button type="button" className="btn btn-outline-danger btn-sm" onClick={() => setTransferMode('resign')}>
+            Resignation / Exit
+          </button>
+        </div>
+      )}
+
+      {trainer.employmentStatus === 'resigned' && (
+        <div className="alert alert-warning mb-3">
+          Resigned
+          {trainer.resignationDate ? ` — last working day ${formatDate(trainer.resignationDate)}` : ''}
+          {trainer.successorTrainer?.name
+            ? `. Replaced by ${trainer.successorTrainer.name} (${trainer.successorTrainer.employeeId}).`
+            : '.'}
+        </div>
+      )}
+
+      {canEdit && trainer.employmentStatus === 'resigned' && (
         <div className="mb-3 d-flex justify-content-end">
-          <button type="button" className="btn btn-primary btn-sm" onClick={() => setShowEditModal(true)}>
+          <button type="button" className="btn btn-outline-secondary btn-sm" onClick={() => setShowEditModal(true)}>
             Edit Profile
           </button>
         </div>
@@ -176,6 +208,15 @@ const TrainerDetailsPanel = ({ trainerId, canEdit = false }) => {
 
       {showEditModal && (
         <TrainerFormModal trainer={trainer} onClose={handleEditClose} />
+      )}
+
+      {transferMode && (
+        <TrainerRoleTransferModal
+          trainer={trainer}
+          mode={transferMode}
+          onClose={() => setTransferMode(null)}
+          onComplete={handleTransferComplete}
+        />
       )}
     </>
   );

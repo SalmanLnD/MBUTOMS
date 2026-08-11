@@ -29,6 +29,20 @@ const trainerSchema = new mongoose.Schema(
     performanceScore: { type: Number, default: 0, min: 0, max: 100 },
     scheduleTrainerCodes: [{ type: String, trim: true }],
     showInRoster: { type: Boolean, default: true },
+    employmentStatus: {
+      type: String,
+      enum: ['active', 'resigned'],
+      default: 'active',
+    },
+    resignationDate: { type: Date, default: null },
+    /** YYYY-MM — last month the resigned trainer appears in UI attendance/lists. */
+    includeInAttendanceUntilMonth: { type: String, trim: true, default: '' },
+    successorTrainer: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Trainer',
+      default: null,
+    },
+    roleTransferEffectiveDate: { type: Date, default: null },
   },
   { timestamps: true }
 );
@@ -37,6 +51,7 @@ trainerSchema.index({ department: 1, name: 1 });
 trainerSchema.index({ subjects: 1 });
 trainerSchema.index({ scheduleTrainerCodes: 1 });
 trainerSchema.index({ phoneKey: 1 });
+trainerSchema.index({ employmentStatus: 1, includeInAttendanceUntilMonth: 1 });
 
 trainerSchema.pre('save', function deriveTrainerPhoneKey(next) {
   if (this.isModified('phone') || this.isNew) {

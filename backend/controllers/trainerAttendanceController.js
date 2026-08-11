@@ -30,6 +30,7 @@ import {
   resolveMockPrepHoursForOif,
 } from '../utils/attendanceOifRules.js';
 import { mergeRosterFilter } from '../utils/rosterFilter.js';
+import { mergeAttendanceUiTrainerFilter, shouldAutoMarkTrainerExit } from '../utils/trainerEmployment.js';
 import { getLeaveOverlapFilter, isDateWithinLeave } from '../utils/leaveDateRange.js';
 import {
   getLeaveWeekdayScheduleIds,
@@ -123,10 +124,12 @@ export const buildTrainerAttendanceGridPayload = async ({
     trainerFilter._id = user.trainer;
   }
 
-  const finalTrainerFilter = await mergeRosterFilter(trainerFilter, { rosterOnly: true });
+  const finalTrainerFilter = await mergeAttendanceUiTrainerFilter(
+    await mergeRosterFilter(trainerFilter, { rosterOnly: true })
+  );
 
   const trainers = await Trainer.find(finalTrainerFilter)
-    .select('name employeeId scheduleTrainerCodes')
+    .select('name employeeId scheduleTrainerCodes employmentStatus resignationDate includeInAttendanceUntilMonth')
     .sort({ name: 1 })
     .lean();
 
@@ -216,6 +219,25 @@ export const buildTrainerAttendanceGridPayload = async ({
       const cacheKey = `${trainer._id}|${dateKey}`;
       const log = logMap.get(cacheKey);
       const isOnLeave = fullDayLeaveKeys.has(cacheKey);
+      if (shouldAutoMarkTrainerExit(trainer, date)) {
+        days[dateKey] = {
+          id: log?._id || null,
+          attendanceType: TRAINER_ATTENDANCE_TYPES.EXIT,
+          oifNumber: '',
+          oifDisplay: formatTrainerAttendanceOifDisplay(TRAINER_ATTENDANCE_TYPES.EXIT, ''),
+          foodAllowance: log?.foodAllowance || '',
+          mockPrepHours: 0,
+          classHandlingHours: 0,
+          isOnLeave: true,
+          isDefaultWeekOff: false,
+          isSundayWeekOff: false,
+          classHoursEditable: false,
+          isReplacementRequired: false,
+          isFuture: date > today,
+          isAutoExit: true,
+        };
+        return;
+      }
       if (isOnLeave) {
         const attendanceType = isLeaveAttendanceType(log?.attendanceType)
           ? log.attendanceType

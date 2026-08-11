@@ -34,3 +34,13 @@ export const resetTrainerPassword = async (id) => {
   const { data } = await api.post(`/trainers/${id}/reset-password`);
   return data;
 };
+
+export const resignTrainer = async (id, payload) => {
+  const { data } = await api.post(`/trainers/${id}/resign`, payload);
+  return data;
+};
+
+export const permanentReplaceTrainer = async (id, payload) => {
+  const { data } = await api.post(`/trainers/${id}/permanent-replacement`, payload);
+  return data;
+};
