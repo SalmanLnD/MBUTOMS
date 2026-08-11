@@ -183,6 +183,38 @@ export const ChevronRightIcon = (props) => (
   </IconBase>
 );
 
+export const ChevronDownIcon = (props) => (
+  <IconBase {...props}>
+    <path d="m6 9 6 6 6-6" />
+  </IconBase>
+);
+
+export const FilterIcon = (props) => (
+  <IconBase {...props}>
+    <path d="M22 3H2l8 9.46V19l4 2v-8.54L22 3z" />
+  </IconBase>
+);
+
+export const SunIcon = (props) => (
+  <IconBase {...props}>
+    <circle cx="12" cy="12" r="4" />
+    <path d="M12 2v2" />
+    <path d="M12 20v2" />
+    <path d="m4.93 4.93 1.41 1.41" />
+    <path d="m17.66 17.66 1.41 1.41" />
+    <path d="M2 12h2" />
+    <path d="M20 12h2" />
+    <path d="m6.34 17.66-1.41 1.41" />
+    <path d="m19.07 4.93-1.41 1.41" />
+  </IconBase>
+);
+
+export const MoonIcon = (props) => (
+  <IconBase {...props}>
+    <path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z" />
+  </IconBase>
+);
+
 export const PlusIcon = (props) => (
   <IconBase {...props}>
     <path d="M12 5v14" />

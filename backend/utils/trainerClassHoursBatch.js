@@ -4,6 +4,7 @@ import Trainer from '../models/Trainer.js';
 import { normalizeAttendanceDate, toAttendanceDateKey } from './attendanceTracking.js';
 import { getAttendanceWeekdayName } from './attendanceDates.js';
 import { resolveTrainerScheduleCodes } from './trainerMappings.js';
+import { isBeforeTrainerJoiningDate } from './trainerEmployment.js';
 import { computeHours } from './trainerClassHours.js';
 import {
   buildSubjectStartDateMap,
@@ -113,7 +114,7 @@ export const computeClassHandlingHoursBatch = async (
   const trainers = trainersInput?.length
     ? trainersInput
     : await Trainer.find({ _id: { $in: trainerIds } })
-      .select('name employeeId scheduleTrainerCodes')
+      .select('name employeeId scheduleTrainerCodes joiningDate')
       .lean();
 
   const { trainerById, codeToTrainerId, allCodes } = buildTrainerLookup(trainers);
@@ -234,6 +235,10 @@ export const computeClassHandlingHoursBatch = async (
 
     trainers.forEach((trainer) => {
       const trainerId = trainer._id.toString();
+      if (isBeforeTrainerJoiningDate(trainer, date)) {
+        result.set(`${trainerId}|${dateKey}`, 0);
+        return;
+      }
       const replacedOwnedIds =
         replacedOwnedScheduleIdsByTrainerDate.get(`${trainerId}|${dateKey}`) || new Set();
       const owned = (schedulesByTrainerDay.get(trainerId)?.get(dayName) || []).filter(

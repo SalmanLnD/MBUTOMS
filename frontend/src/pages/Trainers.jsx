@@ -13,6 +13,7 @@ import { usePagination } from '../hooks/usePagination.js';
 import { getTrainers, deleteTrainer, resetTrainerPassword } from '../services/trainerService.js';
 import { EditIcon, EyeIcon, KeyIcon, TrashIcon } from '../components/icons.jsx';
 import ActionIconButton from '../components/ActionIconButton.jsx';
+import CollapsibleFilters from '../components/CollapsibleFilters.jsx';
 import TrainerDetailsPanel from '../components/TrainerDetailsPanel.jsx';
 import { getErrorMessage } from '../utils/helpers.js';
 import { ROLES } from '../utils/roles.js';
@@ -220,6 +221,7 @@ const Trainers = () => {
       ) : (
         <div className="card table-card">
           <div className="card-body">
+            <CollapsibleFilters label="Trainer filters">
             <div className="row g-2 mb-3 align-items-center">
               <div className="col-md-4">
                 <input
@@ -249,6 +251,7 @@ const Trainers = () => {
                 </div>
               )}
             </div>
+            </CollapsibleFilters>
 
             {loading ? (
               <LoadingSpinner />

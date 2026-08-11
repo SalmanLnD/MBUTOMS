@@ -73,7 +73,7 @@
   border-radius: 50%;
   background: radial-gradient(circle, var(--spatial-orb-1) 0%, transparent 70%);
   filter: blur(40px);
-  opacity: 0.55;
+  opacity: 0.35;
   z-index: -1;
   pointer-events: none;
 }
@@ -88,7 +88,7 @@
   border-radius: 50%;
   background: radial-gradient(circle, var(--spatial-orb-2) 0%, transparent 70%);
   filter: blur(48px);
-  opacity: 0.45;
+  opacity: 0.28;
   z-index: -1;
   pointer-events: none;
 }

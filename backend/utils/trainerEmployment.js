@@ -58,4 +58,12 @@ export const shouldAutoMarkTrainerExit = (trainer, date) => {
   return day >= resignDate;
 };
 
+/** Days before a trainer's joining date should not inherit timetable class hours. */
+export const isBeforeTrainerJoiningDate = (trainer, date) => {
+  if (!trainer?.joiningDate) return false;
+  const joinDate = normalizeAttendanceDate(trainer.joiningDate);
+  const day = normalizeAttendanceDate(date);
+  return day < joinDate;
+};
+
 export const resignationMonthKeyFromDate = (date) => formatEmploymentMonthKey(date);

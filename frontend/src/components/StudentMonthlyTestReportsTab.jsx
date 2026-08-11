@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import LoadingSpinner from './LoadingSpinner.jsx';
+import CollapsibleFilters from './CollapsibleFilters.jsx';
 import { showError, showSuccess } from '../utils/toast.js';
 import { getErrorMessage } from '../utils/helpers.js';
 import { useAuth } from '../context/AuthContext.jsx';
@@ -500,6 +501,7 @@ const StudentMonthlyTestReportsTab = () => {
 
       {activeSubTab === 'summary' && (
         <>
+          <CollapsibleFilters label="Report filters">
           <div className="row g-2 mb-3 align-items-end">
             <div className="col-md-4">
               <label className="form-label small text-muted mb-1">Month</label>
@@ -514,6 +516,7 @@ const StudentMonthlyTestReportsTab = () => {
               />
             </div>
           </div>
+          </CollapsibleFilters>
 
           <div className="card table-card mb-3">
             <div className="card-body">
@@ -630,6 +633,7 @@ const StudentMonthlyTestReportsTab = () => {
 
       {activeSubTab === 'marks' && (
         <>
+          <CollapsibleFilters label="Mark entry filters">
           <div className="row g-2 mb-3 align-items-end">
             <div className="col-md-2">
               <label className="form-label small text-muted mb-1">Month</label>
@@ -762,6 +766,7 @@ const StudentMonthlyTestReportsTab = () => {
               </button>
             </div>
           </div>
+          </CollapsibleFilters>
 
           {!canLoadGrid && (
             <div className="alert alert-info">

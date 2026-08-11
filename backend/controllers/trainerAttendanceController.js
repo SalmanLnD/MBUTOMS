@@ -30,7 +30,7 @@ import {
   resolveMockPrepHoursForOif,
 } from '../utils/attendanceOifRules.js';
 import { mergeRosterFilter } from '../utils/rosterFilter.js';
-import { mergeAttendanceUiTrainerFilter, shouldAutoMarkTrainerExit } from '../utils/trainerEmployment.js';
+import { mergeAttendanceUiTrainerFilter, shouldAutoMarkTrainerExit, isBeforeTrainerJoiningDate } from '../utils/trainerEmployment.js';
 import { getLeaveOverlapFilter, isDateWithinLeave } from '../utils/leaveDateRange.js';
 import {
   getLeaveWeekdayScheduleIds,
@@ -129,7 +129,7 @@ export const buildTrainerAttendanceGridPayload = async ({
   );
 
   const trainers = await Trainer.find(finalTrainerFilter)
-    .select('name employeeId scheduleTrainerCodes employmentStatus resignationDate includeInAttendanceUntilMonth')
+    .select('name employeeId scheduleTrainerCodes employmentStatus resignationDate includeInAttendanceUntilMonth joiningDate')
     .sort({ name: 1 })
     .lean();
 
@@ -235,6 +235,25 @@ export const buildTrainerAttendanceGridPayload = async ({
           isReplacementRequired: false,
           isFuture: date > today,
           isAutoExit: true,
+        };
+        return;
+      }
+      if (isBeforeTrainerJoiningDate(trainer, date)) {
+        days[dateKey] = {
+          id: log?._id || null,
+          attendanceType: TRAINER_ATTENDANCE_TYPES.OIF,
+          oifNumber: '',
+          oifDisplay: formatTrainerAttendanceOifDisplay(TRAINER_ATTENDANCE_TYPES.OIF, ''),
+          foodAllowance: '',
+          mockPrepHours: 0,
+          classHandlingHours: 0,
+          isOnLeave: false,
+          isDefaultWeekOff: false,
+          isSundayWeekOff: false,
+          classHoursEditable: false,
+          isReplacementRequired: false,
+          isFuture: date > today,
+          isBeforeJoin: true,
         };
         return;
       }
@@ -387,13 +406,21 @@ export const upsertTrainerDailyAttendance = async (req, res) => {
     return res.status(403).json({ message: 'Not authorized to update this trainer attendance' });
   }
 
-  const trainerRecord = await Trainer.exists({ _id: trainer });
+  const trainerRecord = await Trainer.findById(trainer)
+    .select('joiningDate employmentStatus resignationDate employeeId scheduleTrainerCodes')
+    .lean();
   if (!trainerRecord) {
     return res.status(404).json({ message: 'Trainer not found' });
   }
 
   const day = normalizeAttendanceDate(date);
   const today = getAttendanceToday();
+
+  if (isBeforeTrainerJoiningDate(trainerRecord, day)) {
+    return res.status(400).json({
+      message: 'Attendance cannot be recorded before the trainer joining date.',
+    });
+  }
 
   if (day < TRAINER_ATTENDANCE_TRACKING_START) {
     return res.status(400).json({
@@ -411,9 +438,7 @@ export const upsertTrainerDailyAttendance = async (req, res) => {
 
   let isOnFullDayLeave = false;
   if (approvedLeaves.length) {
-    const trainerDoc = await Trainer.findById(trainer)
-      .select('employeeId scheduleTrainerCodes')
-      .lean();
+    const trainerDoc = trainerRecord;
     const trainerSchedules = trainerDoc
       ? await Schedule.find({
         trainerCode: { $in: resolveTrainerScheduleCodes(trainerDoc) },

@@ -59,6 +59,17 @@ export async function transferTrainerRole({
     (code) => code !== successorTrainer.employeeId
   );
 
+  const normalizedEffective = effectiveDate
+    ? normalizeAttendanceDate(effectiveDate)
+    : normalizeAttendanceDate(new Date());
+
+  const existingJoinDate = successorTrainer.joiningDate
+    ? normalizeAttendanceDate(successorTrainer.joiningDate)
+    : null;
+  const successorJoiningDate = !existingJoinDate || existingJoinDate > normalizedEffective
+    ? normalizedEffective
+    : existingJoinDate;
+
   if (ownedSchedules.length) {
     await Schedule.updateMany(
       { _id: { $in: ownedSchedules.map((schedule) => schedule._id) } },
@@ -72,6 +83,7 @@ export async function transferTrainerRole({
       $set: {
         ...camuPayload,
         subjects: mergedSubjectIds,
+        joiningDate: successorJoiningDate,
       },
       ...(legacyCodesForSuccessor.length
         ? { $addToSet: { scheduleTrainerCodes: { $each: legacyCodesForSuccessor } } }
@@ -90,9 +102,7 @@ export async function transferTrainerRole({
     camuErpId: '',
     camuPassword: '',
     successorTrainer: successorTrainer._id,
-    roleTransferEffectiveDate: effectiveDate
-      ? normalizeAttendanceDate(effectiveDate)
-      : new Date(),
+    roleTransferEffectiveDate: normalizedEffective,
   };
 
   if (mode === 'resignation') {

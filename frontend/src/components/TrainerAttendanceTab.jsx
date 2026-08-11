@@ -1,6 +1,7 @@
 import { useState, useEffect, useLayoutEffect, useCallback, Fragment, useMemo, useRef } from 'react';
 import LoadingSpinner from '../components/LoadingSpinner.jsx';
-import TrainerAttendanceRow from '../components/TrainerAttendanceRow.jsx';
+import TrainerAttendanceRow from './TrainerAttendanceRow.jsx';
+import CollapsibleFilters from './CollapsibleFilters.jsx';
 import { showError, showSuccess } from '../utils/toast.js';
 import { useAuth } from '../context/AuthContext.jsx';
 import {
@@ -391,6 +392,7 @@ const TrainerAttendanceTab = () => {
       )}
 
       {canManageAll && !loading && grid?.rows?.length > 0 && (
+        <CollapsibleFilters label="Filter trainers">
         <div className="row g-2 mb-3">
           <div className="col-md-4">
             <input
@@ -403,6 +405,7 @@ const TrainerAttendanceTab = () => {
             />
           </div>
         </div>
+        </CollapsibleFilters>
       )}
 
       {loading && (!grid || grid.month !== monthKey) ? (

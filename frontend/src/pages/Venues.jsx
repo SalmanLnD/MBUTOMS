@@ -6,6 +6,7 @@ import VenueLiveTab from '../components/VenueLiveTab.jsx';
 import { showError, showSuccess } from '../utils/toast.js';
 import VenueFormModal from '../components/VenueFormModal.jsx';
 import ConfirmModal from '../components/ConfirmModal.jsx';
+import CollapsibleFilters from '../components/CollapsibleFilters.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
 import { useDebounce } from '../hooks/useDebounce.js';
 import { usePagination } from '../hooks/usePagination.js';
@@ -172,6 +173,7 @@ const Venues = () => {
       {activeTab === 'rooms' && (
         <div className="card table-card">
           <div className="card-body">
+            <CollapsibleFilters label="Venue filters">
             <div className="row g-2 mb-3 align-items-center">
               <div className="col-md-4">
                 <input
@@ -202,6 +204,7 @@ const Venues = () => {
                 </div>
               )}
             </div>
+            </CollapsibleFilters>
 
             {loading ? (
               <LoadingSpinner />

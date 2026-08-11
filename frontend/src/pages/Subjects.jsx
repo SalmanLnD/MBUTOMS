@@ -6,6 +6,7 @@ import SubjectFormModal from '../components/SubjectFormModal.jsx';
 import SubjectResourceLinkModal from '../components/SubjectResourceLinkModal.jsx';
 import SubjectTopicsModal from '../components/SubjectTopicsModal.jsx';
 import ConfirmModal from '../components/ConfirmModal.jsx';
+import CollapsibleFilters from '../components/CollapsibleFilters.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
 import { useDebounce } from '../hooks/useDebounce.js';
 import { usePagination } from '../hooks/usePagination.js';
@@ -280,6 +281,7 @@ const Subjects = () => {
     <>
       <div className="card table-card mb-3">
         <div className="card-body">
+          <CollapsibleFilters label="Subject filters">
           <div className="row g-2 mb-3 align-items-center">
             <div className="col-md-6">
               <input
@@ -298,6 +300,7 @@ const Subjects = () => {
               </div>
             )}
           </div>
+          </CollapsibleFilters>
           <p className="text-muted small mb-3">
             {canManage
               ? 'Click a subject row to view details, or use Edit to manage syllabus, CHO, practice portal, and topic tracker topics.'

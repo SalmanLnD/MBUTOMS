@@ -18,6 +18,7 @@ import {
 import { getSchools, getDepartments } from '../services/subjectService.js';
 import { formatStatus, getErrorMessage } from '../utils/helpers.js';
 import StudentMonthlyTestReportsTab from '../components/StudentMonthlyTestReportsTab.jsx';
+import CollapsibleFilters from '../components/CollapsibleFilters.jsx';
 import { EditIcon, EyeIcon, TrashIcon, UploadIcon } from '../components/icons.jsx';
 import ActionIconButton from '../components/ActionIconButton.jsx';
 
@@ -365,6 +366,7 @@ const ClassesStudents = () => {
 
       {activeTab === 'classes' && (
         <>
+          <CollapsibleFilters label="Class filters">
           <div className="row g-2 mb-3 align-items-center">
             <div className="col-md-2">
               <select
@@ -460,6 +462,7 @@ const ClassesStudents = () => {
               )}
             </div>
           </div>
+          </CollapsibleFilters>
 
           {classesLoading ? (
             <LoadingSpinner />
@@ -557,6 +560,7 @@ const ClassesStudents = () => {
 
       {activeTab === 'students' && (
         <>
+          <CollapsibleFilters label="Student filters">
           <div className="row g-2 mb-3 align-items-center">
             <div className="col-md-3">
               <input
@@ -639,6 +643,7 @@ const ClassesStudents = () => {
               )}
             </div>
           </div>
+          </CollapsibleFilters>
 
           {studentsLoading ? (
             <LoadingSpinner />

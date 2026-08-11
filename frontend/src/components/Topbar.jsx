@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.jsx';
+import { useTheme } from '../context/ThemeContext.jsx';
 import { useLoginModal } from '../context/LoginModalContext.jsx';
 import StyledSelect from './StyledSelect.jsx';
 import NotificationBell from './NotificationBell.jsx';
-import { CalendarIcon } from './icons.jsx';
+import { CalendarIcon, MoonIcon, SunIcon } from './icons.jsx';
 import { formatRole, getErrorMessage } from '../utils/helpers.js';
 import { ROLES } from '../utils/roles.js';
 import { showError } from '../utils/toast.js';
@@ -20,6 +21,7 @@ const Topbar = ({ title }) => {
     startImpersonation,
     stopImpersonation,
   } = useAuth();
+  const { isDark, toggleTheme } = useTheme();
   const { openLoginModal } = useLoginModal();
   const navigate = useNavigate();
   const location = useLocation();
@@ -147,6 +149,16 @@ const Topbar = ({ title }) => {
 
               <NotificationBell />
 
+              <button
+                type="button"
+                className="btn btn-outline-secondary btn-sm theme-toggle-btn d-inline-flex align-items-center justify-content-center"
+                onClick={toggleTheme}
+                aria-label={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
+                title={isDark ? 'Light mode' : 'Dark mode'}
+              >
+                {isDark ? <SunIcon size={16} /> : <MoonIcon size={16} />}
+              </button>
+
               <span className="topbar-user small">
                 {user.name} · {formatRole(user.role)}
               </span>
@@ -156,9 +168,20 @@ const Topbar = ({ title }) => {
               </button>
             </>
           ) : (
-            <button type="button" className="btn btn-primary btn-sm" onClick={handleLogin}>
-              Login
-            </button>
+            <>
+              <button
+                type="button"
+                className="btn btn-outline-secondary btn-sm theme-toggle-btn d-inline-flex align-items-center justify-content-center"
+                onClick={toggleTheme}
+                aria-label={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
+                title={isDark ? 'Light mode' : 'Dark mode'}
+              >
+                {isDark ? <SunIcon size={16} /> : <MoonIcon size={16} />}
+              </button>
+              <button type="button" className="btn btn-primary btn-sm" onClick={handleLogin}>
+                Login
+              </button>
+            </>
           )}
         </div>
       </header>
