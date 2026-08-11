@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import LoadingSpinner from './LoadingSpinner.jsx';
 import { showError, showSuccess } from '../utils/toast.js';
 import { getErrorMessage } from '../utils/helpers.js';
@@ -33,6 +33,13 @@ import {
   computePercentage,
   formatPassStatus,
   resolveAttendance,
+  sanitizeWholeNumberInput,
+  validateMarkEntryDrafts,
+  buildMarkEntryFieldKey,
+  blockNumberInputWheel,
+  blockDecimalNumberKeys,
+  roundUpStoredMark,
+  normalizeStoredMarkDraft,
 } from '../utils/studentTestReportConstants.js';
 import StudentTestReportSheetSetupModal from './StudentTestReportSheetSetupModal.jsx';
 import { DownloadIcon, ExternalLinkIcon, SheetIcon } from './icons.jsx';
@@ -117,6 +124,8 @@ const StudentMonthlyTestReportsTab = () => {
   const [downloading, setDownloading] = useState(false);
   const [sheetStatus, setSheetStatus] = useState(null);
   const [showSheetSetup, setShowSheetSetup] = useState(false);
+  const [fieldErrors, setFieldErrors] = useState({});
+  const markEntryTableRef = useRef(null);
 
   const monthKey = formatMonthKey(monthParts.year, monthParts.month);
   const monthOptions = useMemo(() => buildMonthOptions(), []);
@@ -277,15 +286,19 @@ const StudentMonthlyTestReportsTab = () => {
         const attendance = row.report
           ? resolveAttendance(row.report)
           : DEFAULT_ATTENDANCE;
+        const normalized = normalizeStoredMarkDraft({
+          attendance,
+          marksObtained: row.report?.marksObtained,
+          maxMarks: row.report?.maxMarks ?? DEFAULT_MAX_MARKS,
+        });
         nextDrafts[row._id] = {
           attendance,
-          marksObtained: attendance === ATTENDANCE_ABSENT
-            ? ''
-            : (row.report?.marksObtained ?? ''),
-          maxMarks: row.report?.maxMarks ?? DEFAULT_MAX_MARKS,
+          marksObtained: attendance === ATTENDANCE_ABSENT ? '' : normalized.marksObtained,
+          maxMarks: normalized.maxMarks,
         };
       });
       setDrafts(nextDrafts);
+      setFieldErrors({});
     } catch (err) {
       showError(getErrorMessage(err));
       setGrid(null);
@@ -301,9 +314,21 @@ const StudentMonthlyTestReportsTab = () => {
   }, [activeSubTab, loadGrid]);
 
   const updateDraft = (studentId, field, value) => {
+    const nextValue = field === 'marksObtained' || field === 'maxMarks'
+      ? sanitizeWholeNumberInput(value)
+      : value;
+
+    setFieldErrors((prev) => {
+      const key = buildMarkEntryFieldKey(studentId, field);
+      if (!prev[key]) return prev;
+      const next = { ...prev };
+      delete next[key];
+      return next;
+    });
+
     setDrafts((prev) => {
       const current = prev[studentId] || {};
-      const next = { ...current, [field]: value };
+      const next = { ...current, [field]: nextValue };
       if (field === 'attendance' && value === ATTENDANCE_ABSENT) {
         next.marksObtained = '';
       }
@@ -311,21 +336,45 @@ const StudentMonthlyTestReportsTab = () => {
     });
   };
 
+  const focusMarkEntryField = (studentId, field) => {
+    const selector = `[data-mark-entry-id="${studentId}"][data-mark-field="${field}"]`;
+    const input = markEntryTableRef.current?.querySelector(selector);
+    if (!input) return;
+    input.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    input.focus({ preventScroll: true });
+  };
+
   const handleSave = async () => {
     if (!canLoadGrid || !grid?.students?.length) return;
 
+    const { errors, firstTarget } = validateMarkEntryDrafts(grid.students, drafts);
+    if (Object.keys(errors).length) {
+      setFieldErrors(errors);
+      if (firstTarget) {
+        focusMarkEntryField(firstTarget.studentId, firstTarget.field);
+      }
+      const leadMessage = firstTarget
+        ? `${firstTarget.studentName}: ${errors[buildMarkEntryFieldKey(firstTarget.studentId, firstTarget.field)]}`
+        : 'Fix the highlighted mark fields before saving.';
+      showError(leadMessage);
+      return;
+    }
+
+    setFieldErrors({});
     setSaving(true);
     try {
       const entries = grid.students.map((row) => {
         const draft = drafts[row._id] || {};
         const attendance = resolveAttendance(draft.attendance);
+        const normalizedMarks = attendance === ATTENDANCE_ABSENT
+          ? ''
+          : roundUpStoredMark(draft.marksObtained);
+        const normalizedMax = roundUpStoredMark(draft.maxMarks) || DEFAULT_MAX_MARKS;
         return {
           studentId: row._id,
           attendance,
-          marksObtained: attendance === ATTENDANCE_ABSENT
-            ? ''
-            : (draft.marksObtained ?? ''),
-          maxMarks: draft.maxMarks ?? DEFAULT_MAX_MARKS,
+          marksObtained: normalizedMarks,
+          maxMarks: normalizedMax,
         };
       });
 
@@ -736,7 +785,7 @@ const StudentMonthlyTestReportsTab = () => {
             <LoadingSpinner />
           ) : canLoadGrid && grid ? (
             <div className="card table-card">
-              <div className="card-body table-responsive">
+              <div className="card-body table-responsive" ref={markEntryTableRef}>
                 <div className="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
                   <div className="text-muted small">
                     {grid.subject?.name} ({grid.subject?.code})
@@ -788,6 +837,8 @@ const StudentMonthlyTestReportsTab = () => {
                         const maxMarks = draft.maxMarks ?? DEFAULT_MAX_MARKS;
                         const pct = computePercentage(draft.marksObtained, maxMarks, attendance);
                         const result = formatPassStatus(draft.marksObtained, maxMarks, attendance);
+                        const marksError = fieldErrors[buildMarkEntryFieldKey(row._id, 'marksObtained')];
+                        const maxMarksError = fieldErrors[buildMarkEntryFieldKey(row._id, 'maxMarks')];
                         return (
                           <tr key={row._id}>
                             <td>{row.rollNumber}</td>
@@ -805,28 +856,44 @@ const StudentMonthlyTestReportsTab = () => {
                             </td>
                             <td>
                               <input
-                                type="number"
-                                className="form-control form-control-sm"
-                                min="0"
-                                max={maxMarks}
-                                step="0.5"
+                                type="text"
+                                inputMode="numeric"
+                                pattern="[0-9]*"
+                                className={`form-control form-control-sm ${marksError ? 'is-invalid' : ''}`}
                                 value={draft.marksObtained ?? ''}
                                 onChange={(e) => updateDraft(row._id, 'marksObtained', e.target.value)}
+                                onKeyDown={blockDecimalNumberKeys}
+                                onWheel={blockNumberInputWheel}
                                 placeholder="—"
                                 disabled={absent}
                                 aria-label={`Marks for ${row.name}`}
+                                aria-invalid={Boolean(marksError)}
+                                data-mark-entry-id={row._id}
+                                data-mark-field="marksObtained"
                               />
+                              {marksError && (
+                                <div className="invalid-feedback d-block">{marksError}</div>
+                              )}
                             </td>
                             <td>
                               <input
-                                type="number"
-                                className="form-control form-control-sm"
-                                min="1"
+                                type="text"
+                                inputMode="numeric"
+                                pattern="[0-9]*"
+                                className={`form-control form-control-sm ${maxMarksError ? 'is-invalid' : ''}`}
                                 value={maxMarks}
                                 onChange={(e) => updateDraft(row._id, 'maxMarks', e.target.value)}
+                                onKeyDown={blockDecimalNumberKeys}
+                                onWheel={blockNumberInputWheel}
                                 disabled={absent}
                                 aria-label={`Max marks for ${row.name}`}
+                                aria-invalid={Boolean(maxMarksError)}
+                                data-mark-entry-id={row._id}
+                                data-mark-field="maxMarks"
                               />
+                              {maxMarksError && (
+                                <div className="invalid-feedback d-block">{maxMarksError}</div>
+                              )}
                             </td>
                             <td>{pct != null ? `${pct}%` : '—'}</td>
                             <td>

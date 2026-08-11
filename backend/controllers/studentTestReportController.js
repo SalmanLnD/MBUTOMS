@@ -17,6 +17,7 @@ import {
   formatPassStatus,
   resolveAttendance,
   accumulateReportStats,
+  roundUpStoredMark,
 } from '../utils/studentTestReportConstants.js';
 import {
   buildClassSubjectSummaryRows,
@@ -272,9 +273,12 @@ export const getTestReportGrid = async (req, res) => {
 
   const studentRows = students.map((s) => {
     const report = reportByStudent.get(String(s._id));
-    const maxMarks = report?.maxMarks ?? DEFAULT_MAX_MARKS;
+    const maxMarks = roundUpStoredMark(report?.maxMarks, DEFAULT_MAX_MARKS);
     const attendance = report ? resolveAttendance(report) : DEFAULT_ATTENDANCE;
     const absent = attendance === 'A';
+    const marksObtained = absent
+      ? null
+      : roundUpStoredMark(report?.marksObtained, null);
     return {
       _id: s._id,
       rollNumber: s.rollNumber,
@@ -284,11 +288,11 @@ export const getTestReportGrid = async (req, res) => {
         ? {
             _id: report._id,
             attendance,
-            marksObtained: absent ? null : report.marksObtained,
+            marksObtained,
             maxMarks,
-            percentage: absent ? null : computePercentage(report.marksObtained, maxMarks),
+            percentage: absent ? null : computePercentage(marksObtained, maxMarks),
             result: formatPassStatus(
-              absent ? null : report.marksObtained,
+              absent ? null : marksObtained,
               maxMarks,
               report
             ),
@@ -380,8 +384,8 @@ export const bulkUpsertTestReports = async (req, res) => {
     const absent = attendance === 'A';
     const marksObtained = absent || entry.marksObtained === '' || entry.marksObtained == null
       ? null
-      : Number(entry.marksObtained);
-    const maxMarks = Number(entry.maxMarks) || DEFAULT_MAX_MARKS;
+      : roundUpStoredMark(entry.marksObtained, null);
+    const maxMarks = roundUpStoredMark(entry.maxMarks, DEFAULT_MAX_MARKS);
 
     if (!absent && marksObtained != null && (marksObtained < 0 || marksObtained > maxMarks)) {
       skipped += 1;

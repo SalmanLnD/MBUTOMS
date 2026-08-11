@@ -98,3 +98,10 @@ export const finalizeStats = (bucket) => ({
     ? Math.round((bucket.passed / bucket.entered) * 1000) / 10
     : null,
 });
+
+export const roundUpStoredMark = (value, fallback = null) => {
+  if (value == null || value === '') return fallback;
+  const numeric = Number(value);
+  if (Number.isNaN(numeric) || !Number.isFinite(numeric)) return fallback;
+  return Math.ceil(numeric);
+};

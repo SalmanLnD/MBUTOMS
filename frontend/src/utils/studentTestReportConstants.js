@@ -63,3 +63,108 @@ export const formatPassStatus = (marksObtained, maxMarks, attendance) => {
   if (pct == null) return 'Pending';
   return pct >= PASS_PERCENTAGE ? 'Pass' : 'Fail';
 };
+
+const WHOLE_NUMBER_PATTERN = /^\d+$/;
+
+export const sanitizeWholeNumberInput = (value) => {
+  const trimmed = String(value ?? '').trim();
+  if (!trimmed) return '';
+  return trimmed.replace(/\D/g, '');
+};
+
+/** Round stored decimal marks up to the next whole number for display and save. */
+export const roundUpStoredMark = (value) => {
+  if (value === '' || value == null) return '';
+  const numeric = Number(value);
+  if (Number.isNaN(numeric) || !Number.isFinite(numeric)) return '';
+  return String(Math.ceil(numeric));
+};
+
+export const normalizeStoredMarkDraft = ({ marksObtained, maxMarks, attendance }) => {
+  if (resolveAttendance(attendance) === ATTENDANCE_ABSENT) {
+    return {
+      marksObtained: '',
+      maxMarks: roundUpStoredMark(maxMarks) || String(DEFAULT_MAX_MARKS),
+    };
+  }
+  return {
+    marksObtained: roundUpStoredMark(marksObtained),
+    maxMarks: roundUpStoredMark(maxMarks) || String(DEFAULT_MAX_MARKS),
+  };
+};
+
+export const validateWholeNumberMark = (
+  value,
+  { required = true, min = 0, max = null, label = 'Marks' } = {}
+) => {
+  const trimmed = String(value ?? '').trim();
+  if (!trimmed) {
+    return required
+      ? { valid: false, message: `${label} required for present students` }
+      : { valid: true, value: '' };
+  }
+  if (!WHOLE_NUMBER_PATTERN.test(trimmed)) {
+    return { valid: false, message: `${label} must be a whole number (no decimals)` };
+  }
+  const numeric = Number(trimmed);
+  if (numeric < min) {
+    return { valid: false, message: `${label} must be at least ${min}` };
+  }
+  if (max != null && numeric > max) {
+    return { valid: false, message: `${label} cannot exceed ${max}` };
+  }
+  return { valid: true, value: numeric };
+};
+
+export const buildMarkEntryFieldKey = (studentId, field) => `${studentId}:${field}`;
+
+export const validateMarkEntryDrafts = (students, drafts) => {
+  const errors = {};
+  let firstTarget = null;
+
+  students.forEach((row) => {
+    const draft = drafts[row._id] || {};
+    const attendance = resolveAttendance(draft.attendance);
+    if (attendance === ATTENDANCE_ABSENT) return;
+
+    const maxResult = validateWholeNumberMark(draft.maxMarks, {
+      required: true,
+      min: 1,
+      label: 'Out of',
+    });
+    if (!maxResult.valid) {
+      const key = buildMarkEntryFieldKey(row._id, 'maxMarks');
+      errors[key] = maxResult.message;
+      if (!firstTarget) {
+        firstTarget = { studentId: row._id, field: 'maxMarks', studentName: row.name };
+      }
+    }
+
+    const maxMarks = maxResult.valid ? maxResult.value : Number(draft.maxMarks) || DEFAULT_MAX_MARKS;
+    const marksResult = validateWholeNumberMark(draft.marksObtained, {
+      required: true,
+      min: 0,
+      max: maxMarks,
+      label: 'Marks',
+    });
+    if (!marksResult.valid) {
+      const key = buildMarkEntryFieldKey(row._id, 'marksObtained');
+      errors[key] = marksResult.message;
+      if (!firstTarget) {
+        firstTarget = { studentId: row._id, field: 'marksObtained', studentName: row.name };
+      }
+    }
+  });
+
+  return { errors, firstTarget };
+};
+
+export const blockNumberInputWheel = (event) => {
+  event.currentTarget.blur();
+};
+
+export const blockDecimalNumberKeys = (event) => {
+  if (['.', ',', 'e', 'E', '+', '-'].includes(event.key)) {
+    event.preventDefault();
+  }
+};
