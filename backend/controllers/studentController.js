@@ -13,6 +13,10 @@ import {
   validateStudentBulkRows,
 } from '../utils/studentBulkImport.js';
 import { expandAllowedClassDepartments } from '../utils/subjectClassEligibility.js';
+import {
+  canAccessStudentRecord,
+  mergeWithStudentAccessFilter,
+} from '../utils/trainerClassAccess.js';
 import { invalidateStudentCountCache } from './classController.js';
 
 const populateStudent = (query) =>
@@ -57,7 +61,16 @@ export const getStudents = async (req, res) => {
   const limit = Math.min(50, Math.max(1, parseInt(req.query.limit, 10) || 10));
   const skip = (page - 1) * limit;
 
-  const filter = await buildStudentQuery(req.query);
+  const baseFilter = await buildStudentQuery(req.query);
+  const filter = await mergeWithStudentAccessFilter(baseFilter, req.user, req);
+
+  if (filter._id === null) {
+    return res.json({
+      students: [],
+      pagination: { page: 1, limit, total: 0, pages: 0 },
+    });
+  }
+
   const sortField = ['name', 'rollNumber', 'branch', 'createdAt'].includes(req.query.sortBy)
     ? req.query.sortBy
     : 'name';
@@ -82,6 +95,12 @@ export const getStudents = async (req, res) => {
 export const getStudentById = async (req, res) => {
   const student = await populateStudent(Student.findById(req.params.id));
   if (!student) return res.status(404).json({ message: 'Student not found' });
+
+  const hasAccess = await canAccessStudentRecord(req.user, student, req);
+  if (!hasAccess) {
+    return res.status(403).json({ message: 'Not authorized to view this student' });
+  }
+
   res.json(student);
 };
 

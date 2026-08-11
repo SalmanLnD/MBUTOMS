@@ -7,6 +7,10 @@ import {
   buildStudentCountKey,
   getStudentCountForClass,
 } from '../utils/studentCountByClass.js';
+import {
+  canAccessClass,
+  filterClassesForUser,
+} from '../utils/trainerClassAccess.js';
 
 const STUDENT_COUNT_CACHE_TTL_MS = 60_000;
 let studentCountCache = { map: null, expiresAt: 0 };
@@ -84,12 +88,25 @@ export const getClasses = async (req, res) => {
     .sort({ department: 1, section: 1, py: 1 })
     .lean();
 
-  res.json(await attachStudentCounts(classes));
+  const scopedClasses = await filterClassesForUser(classes, req.user, req);
+  res.json(await attachStudentCounts(scopedClasses));
 };
 
 export const getClassById = async (req, res) => {
   const cls = await ClassGroup.findById(req.params.id).lean();
   if (!cls) return res.status(404).json({ message: 'Class not found' });
+
+  const hasAccess = await canAccessClass(
+    req.user,
+    cls.department,
+    cls.section,
+    cls.currentSemester,
+    req
+  );
+  if (!hasAccess) {
+    return res.status(403).json({ message: 'Not authorized to view this class' });
+  }
+
   const [withCount] = await attachStudentCounts([cls]);
   res.json(withCount);
 };

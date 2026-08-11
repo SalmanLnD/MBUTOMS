@@ -6,6 +6,7 @@ import ConfirmModal from '../components/ConfirmModal.jsx';
 import StudentFormModal from '../components/StudentFormModal.jsx';
 import StudentBulkUploadModal from '../components/StudentBulkUploadModal.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
+import { ROLES } from '../utils/roles.js';
 import { useDebounce } from '../hooks/useDebounce.js';
 import { usePagination } from '../hooks/usePagination.js';
 import ClassFormModal from '../components/ClassFormModal.jsx';
@@ -29,8 +30,10 @@ const tabs = [
 ];
 
 const ClassesStudents = () => {
-  const { hasManagementRole } = useAuth();
+  const { hasManagementRole, user } = useAuth();
   const canManage = hasManagementRole();
+  const isTrainerScopedView = user?.role === ROLES.TRAINER || user?.role === ROLES.EVALUATOR;
+  const trainerEmptyMessage = 'No classes assigned to your timetable. Contact an administrator if this looks wrong.';
 
   const [activeTab, setActiveTab] = useState('classes');
 
@@ -492,7 +495,9 @@ const ClassesStudents = () => {
                     {filteredClasses.length === 0 ? (
                       <tr>
                         <td colSpan="7" className="text-center text-muted py-4">
-                          {hasClassFilters ? 'No classes match the selected filters' : 'No classes found'}
+                          {hasClassFilters
+                            ? 'No classes match the selected filters'
+                            : (isTrainerScopedView ? trainerEmptyMessage : 'No classes found')}
                         </td>
                       </tr>
                     ) : (
@@ -658,7 +663,9 @@ const ClassesStudents = () => {
                     {students.length === 0 ? (
                       <tr>
                         <td colSpan={canManage ? 9 : 8} className="text-center text-muted py-4">
-                          No students found
+                          {isTrainerScopedView && !classFilter
+                            ? trainerEmptyMessage
+                            : 'No students found'}
                         </td>
                       </tr>
                     ) : (

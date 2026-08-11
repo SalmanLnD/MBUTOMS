@@ -2,10 +2,8 @@ import ExcelJS from 'exceljs';
 import Student from '../models/Student.js';
 import Schedule from '../models/Schedule.js';
 import Subject from '../models/Subject.js';
-import Trainer from '../models/Trainer.js';
 import ClassGroup from '../models/ClassGroup.js';
 import StudentMonthlyTestReport from '../models/StudentMonthlyTestReport.js';
-import { FULL_ACCESS_ROLES, isAuthorizedRole } from '../utils/roles.js';
 import { isValidReportMonth, formatMonthLabel } from '../utils/studentTestReportDates.js';
 import {
   DEFAULT_MAX_MARKS,
@@ -26,88 +24,17 @@ import {
   buildTestReportSheetsExportPayload,
   getAccessibleReportFilter,
 } from '../utils/studentTestReportExport.js';
-
-const MANAGEMENT_ROLES = [...FULL_ACCESS_ROLES, 'subject_coordinator'];
-
-const canViewAll = (user) => isAuthorizedRole(user?.role, MANAGEMENT_ROLES);
-
-const getTrainerScheduleCodes = async (trainerId) => {
-  if (!trainerId) return [];
-  const trainer = await Trainer.findById(trainerId)
-    .select('employeeId scheduleTrainerCodes')
-    .lean();
-  if (!trainer) return [];
-  const codes = new Set([trainer.employeeId, ...(trainer.scheduleTrainerCodes || [])]);
-  return [...codes].filter(Boolean);
-};
-
-const getTrainerScheduleCodesCached = async (req, trainerId) => {
-  if (!req?._trainerScheduleCodes) {
-    req._trainerScheduleCodes = await getTrainerScheduleCodes(trainerId);
-  }
-  return req._trainerScheduleCodes;
-};
-
-const getTrainerClassKeys = async (trainerId, req) => {
-  const codes = req
-    ? await getTrainerScheduleCodesCached(req, trainerId)
-    : await getTrainerScheduleCodes(trainerId);
-  if (!codes.length) return new Set();
-
-  const schedules = await Schedule.find({ trainerCode: { $in: codes } })
-    .select('department section semester')
-    .lean();
-
-  return new Set(
-    schedules.map((s) => `${s.department}|${s.section}|${s.semester}`)
-  );
-};
-
-const classKey = (department, section, semester) =>
-  `${department}|${section}|${semester}`;
-
-const canAccessClass = async (user, department, section, semester, req) => {
-  if (canViewAll(user)) return true;
-  if (!user?.trainer) return false;
-  const allowed = await getTrainerClassKeys(user.trainer, req);
-  return allowed.has(classKey(department, section, semester));
-};
-
-const getTrainerSubjectIdsForClass = async (trainerId, department, section, semester, req) => {
-  const codes = req
-    ? await getTrainerScheduleCodesCached(req, trainerId)
-    : await getTrainerScheduleCodes(trainerId);
-  if (!codes.length) return new Set();
-
-  const schedules = await Schedule.find({
-    trainerCode: { $in: codes },
-    department,
-    section,
-    semester,
-  }).select('subject').lean();
-
-  return new Set(
-    schedules.map((s) => String(s.subject)).filter(Boolean)
-  );
-};
-
-const canAccessSubject = async (user, subjectId, department, section, semester, req) => {
-  if (canViewAll(user)) return true;
-  if (!user?.trainer || !subjectId) return false;
-  const allowed = await getTrainerSubjectIdsForClass(
-    user.trainer,
-    department,
-    section,
-    semester,
-    req
-  );
-  return allowed.has(String(subjectId));
-};
-
-const accessHelpers = {
-  canViewAll,
+import {
+  canViewAllClasses,
+  canAccessClass,
+  canAccessSubject,
+  classAccessHelpers,
   getTrainerClassKeys,
-};
+  getTrainerSubjectIdsForClass,
+  buildClassKey,
+} from '../utils/trainerClassAccess.js';
+
+const canViewAll = canViewAllClasses;
 
 export const getTestReportFilterOptions = async (req, res) => {
   const classes = await ClassGroup.find({ status: 'active' })
@@ -118,7 +45,7 @@ export const getTestReportFilterOptions = async (req, res) => {
   if (!canViewAll(req.user) && req.user?.trainer) {
     const allowed = await getTrainerClassKeys(req.user.trainer, req);
     filtered = classes.filter((cls) =>
-      allowed.has(classKey(cls.department, cls.section, cls.currentSemester))
+      allowed.has(buildClassKey(cls.department, cls.section, cls.currentSemester))
     );
   }
 
@@ -191,7 +118,7 @@ export const getTestReportSummary = async (req, res) => {
     return res.status(400).json({ message: 'Invalid month. Reports start from August 2026.' });
   }
 
-  const reportFilter = await getAccessibleReportFilter(req.user, accessHelpers);
+  const reportFilter = await getAccessibleReportFilter(req.user, classAccessHelpers);
   if (reportFilter._id === null) {
     return res.json({
       month,
@@ -432,7 +359,7 @@ export const downloadTestReportExcel = async (req, res) => {
     return res.status(400).json({ message: 'Invalid month. Reports start from August 2026.' });
   }
 
-  const reportFilter = await getAccessibleReportFilter(req.user, accessHelpers);
+  const reportFilter = await getAccessibleReportFilter(req.user, classAccessHelpers);
 
   const { summaryRows, marksRows, monthLabel } = await buildTestReportExportPayload(
     month,
