@@ -7,10 +7,11 @@ import { resolveTrainerScheduleCodes } from '../utils/trainerMappings.js';
 import { isTrainerAvailableForReplacement } from '../utils/leaveStatus.js';
 import { buildTrainerAvailabilityForRange } from '../utils/trainerAvailability.js';
 import { clearAttendanceGridCache } from '../utils/attendanceGridCache.js';
-import { notifyReplacementAssignment } from '../utils/replacementNotifications.js';
+import { notifyReplacementAssignment, notifyReplacementCancellation } from '../utils/replacementNotifications.js';
 import { LEAVE_SCOPES } from '../utils/leaveScope.js';
 import {
   getCancellationMapForRange,
+  getEffectiveAffectedSchedules,
   getUncancelledScheduleDateKeys,
 } from '../utils/leaveAffectedClasses.js';
 import { getCanceledScheduleIdsForDate } from '../utils/classCancellations.js';
@@ -570,7 +571,7 @@ export const assignReplacement = async (req, res) => {
   });
 };
 
-export const removeReplacement = async (req, res) => {
+export const cancelReplacement = async (req, res) => {
   const { leaveId, scheduleId } = req.body;
 
   if (!leaveId || !scheduleId) {
@@ -581,28 +582,77 @@ export const removeReplacement = async (req, res) => {
     _id: leaveId,
     status: 'approved',
     affectedSchedules: scheduleId,
-  });
+  })
+    .populate('trainer', 'name employeeId')
+    .populate({
+      path: 'affectedSchedules',
+      select: 'department section startTime endTime day',
+    })
+    .populate({
+      path: 'replacements.schedule',
+      select: 'department section startTime endTime day',
+    })
+    .populate({
+      path: 'replacements.replacementTrainer',
+      select: 'name employeeId',
+    });
 
   if (!leave) {
     return res.status(404).json({ message: 'Replacement record not found' });
   }
 
   const scheduleIdStr = scheduleId.toString();
-  const beforeCount = leave.replacements?.length || 0;
-  leave.replacements = (leave.replacements || []).filter(
-    (entry) => entry.schedule.toString() !== scheduleIdStr
+  const revokedReplacement = (leave.replacements || []).find(
+    (entry) => getScheduleId(entry.schedule) === scheduleIdStr
   );
 
-  if (leave.replacements.length === beforeCount) {
-    return res.status(404).json({ message: 'No replacement assigned for this schedule' });
-  }
+  leave.replacements = (leave.replacements || []).filter(
+    (entry) => getScheduleId(entry.schedule) !== scheduleIdStr
+  );
+  leave.affectedSchedules = (leave.affectedSchedules || []).filter(
+    (schedule) => getScheduleId(schedule) !== scheduleIdStr
+  );
 
   leave.markModified('replacements');
+  leave.markModified('affectedSchedules');
+
+  if (!leave.affectedSchedules.length) {
+    leave.status = 'cancelled';
+    leave.replacementNeeded = false;
+    leave.replacements = [];
+  } else {
+    const cancellationMap = await getCancellationMapForRange(leave.startDate, leave.endDate);
+    const effectiveSchedules = getEffectiveAffectedSchedules(
+      leave,
+      leave.affectedSchedules,
+      cancellationMap
+    );
+    leave.replacementNeeded = effectiveSchedules.length > 0;
+  }
+
   await leave.save();
   clearAttendanceGridCache();
 
-  res.json({ message: 'Replacement removed' });
+  if (revokedReplacement) {
+    try {
+      await notifyReplacementCancellation({
+        actor: req.user,
+        leave,
+        originalTrainer: leave.trainer,
+        replacements: [revokedReplacement],
+      });
+    } catch (error) {
+      console.error('Failed to send replacement cancellation notifications:', error.message);
+    }
+  }
+
+  res.json({
+    message: 'Replacement cancelled. The original trainer will handle this class.',
+  });
 };
+
+/** @deprecated Use cancelReplacement */
+export const removeReplacement = cancelReplacement;
 
 export const getTrainerAvailability = async (req, res) => {
   const { start, end, trainerId, subjectId, slotStart, slotEnd } = req.query;

@@ -35,9 +35,11 @@ export const assignReplacement = async (leaveId, scheduleId, options = {}) => {
 };
 
 export const removeReplacement = async (leaveId, scheduleId) => {
-  const { data } = await api.post('/replacements/remove', { leaveId, scheduleId });
+  const { data } = await api.post('/replacements/cancel', { leaveId, scheduleId });
   return data;
 };
+
+export const cancelReplacement = removeReplacement;
 
 export const getTrainerSlotsForReplacement = async (params = {}) => {
   const { data } = await api.get('/replacements/trainer-slots', { params });

@@ -7,6 +7,7 @@ import {
   getTrainerSlotsForReplacement,
   createSlotReplacementRequest,
   removeReplacement,
+  cancelReplacement,
 } from '../controllers/replacementController.js';
 import { protect, authorize } from '../middleware/auth.js';
 import { asyncHandler } from '../middleware/asyncHandler.js';
@@ -24,5 +25,6 @@ router.get('/suggestions/:scheduleId', asyncHandler(getReplacementSuggestions));
 router.post('/slot-request', asyncHandler(createSlotReplacementRequest));
 router.post('/assign', asyncHandler(assignReplacement));
 router.post('/remove', asyncHandler(removeReplacement));
+router.post('/cancel', asyncHandler(cancelReplacement));
 
 export default router;

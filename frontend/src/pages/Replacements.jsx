@@ -15,7 +15,7 @@ import {
   getAllReplacements,
   getReplacementSuggestions,
   assignReplacement,
-  removeReplacement,
+  cancelReplacement,
 } from '../services/replacementService.js';
 
 const REPLACEMENT_STATUS = {
@@ -50,7 +50,7 @@ const Replacements = () => {
   const [showAddSlotModal, setShowAddSlotModal] = useState(false);
   const [externalTrainerName, setExternalTrainerName] = useState('');
   const [assigningExternal, setAssigningExternal] = useState(false);
-  const [pendingDelete, setPendingDelete] = useState(null);
+  const [pendingCancel, setPendingCancel] = useState(null);
 
   const fetchReplacements = async () => {
     setLoading(true);
@@ -136,12 +136,12 @@ const Replacements = () => {
     }
   };
 
-  const handleConfirmDelete = async () => {
-    if (!pendingDelete) return;
+  const handleConfirmCancel = async () => {
+    if (!pendingCancel) return;
     try {
-      await removeReplacement(pendingDelete.leaveId, pendingDelete.scheduleId);
-      showSuccess('Replacement removed');
-      setPendingDelete(null);
+      await cancelReplacement(pendingCancel.leaveId, pendingCancel.scheduleId);
+      showSuccess('Replacement cancelled. Original trainer will handle this class.');
+      setPendingCancel(null);
       fetchReplacements();
     } catch (err) {
       showError(getErrorMessage(err));
@@ -296,12 +296,13 @@ const Replacements = () => {
                                 <ActionIconButton
                                   variant="delete"
                                   icon={TrashIcon}
-                                  title="Remove replacement"
-                                  aria-label={`Remove replacement for ${schedule.department} ${schedule.section}`}
-                                  onClick={() => setPendingDelete({
+                                  title="Cancel replacement"
+                                  aria-label={`Cancel replacement for ${schedule.department} ${schedule.section}`}
+                                  onClick={() => setPendingCancel({
                                     leaveId: leave._id,
                                     scheduleId: schedule._id,
-                                    trainerName: replacement.name,
+                                    originalTrainerName: leave.trainer?.name,
+                                    replacementName: replacement.name,
                                     classLabel: `${schedule.department} ${schedule.section}`,
                                   })}
                                 />
@@ -309,13 +310,28 @@ const Replacements = () => {
                             )}
                           </div>
                         ) : canAssign ? (
-                          <button
-                            type="button"
-                            className="btn btn-sm btn-primary"
-                            onClick={() => handleViewSuggestions(leave._id, schedule)}
-                          >
-                            Find Replacements
-                          </button>
+                          <div className="d-flex align-items-center gap-2">
+                            <button
+                              type="button"
+                              className="btn btn-sm btn-primary"
+                              onClick={() => handleViewSuggestions(leave._id, schedule)}
+                            >
+                              Find Replacements
+                            </button>
+                            <ActionIconButton
+                              variant="delete"
+                              icon={TrashIcon}
+                              title="Cancel replacement"
+                              aria-label={`Cancel replacement for ${schedule.department} ${schedule.section}`}
+                              onClick={() => setPendingCancel({
+                                leaveId: leave._id,
+                                scheduleId: schedule._id,
+                                originalTrainerName: leave.trainer?.name,
+                                replacementName: null,
+                                classLabel: `${schedule.department} ${schedule.section}`,
+                              })}
+                            />
+                          </div>
                         ) : (
                           <span className="text-muted small">
                             {timelineStatus === 'pending_approval' ? 'Awaiting approval' : 'Not assigned'}
@@ -345,15 +361,19 @@ const Replacements = () => {
         onCreated={fetchReplacements}
       />
 
-      {pendingDelete && (
+      {pendingCancel && (
         <ConfirmModal
           show
-          title="Remove Replacement"
-          message={`Remove "${pendingDelete.trainerName}" as replacement for ${pendingDelete.classLabel}?`}
-          confirmLabel="Remove"
+          title="Cancel Replacement"
+          message={
+            pendingCancel.replacementName
+              ? `Cancel replacement by "${pendingCancel.replacementName}" for ${pendingCancel.classLabel}? ${pendingCancel.originalTrainerName || 'The original trainer'} will handle this class as originally allocated.`
+              : `Cancel replacement requirement for ${pendingCancel.classLabel}? ${pendingCancel.originalTrainerName || 'The original trainer'} will handle this class as originally allocated.`
+          }
+          confirmLabel="Cancel replacement"
           confirmVariant="danger"
-          onConfirm={handleConfirmDelete}
-          onClose={() => setPendingDelete(null)}
+          onConfirm={handleConfirmCancel}
+          onClose={() => setPendingCancel(null)}
         />
       )}
 
