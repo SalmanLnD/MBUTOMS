@@ -570,6 +570,40 @@ export const assignReplacement = async (req, res) => {
   });
 };
 
+export const removeReplacement = async (req, res) => {
+  const { leaveId, scheduleId } = req.body;
+
+  if (!leaveId || !scheduleId) {
+    return res.status(400).json({ message: 'Leave and schedule are required' });
+  }
+
+  const leave = await Leave.findOne({
+    _id: leaveId,
+    status: 'approved',
+    affectedSchedules: scheduleId,
+  });
+
+  if (!leave) {
+    return res.status(404).json({ message: 'Replacement record not found' });
+  }
+
+  const scheduleIdStr = scheduleId.toString();
+  const beforeCount = leave.replacements?.length || 0;
+  leave.replacements = (leave.replacements || []).filter(
+    (entry) => entry.schedule.toString() !== scheduleIdStr
+  );
+
+  if (leave.replacements.length === beforeCount) {
+    return res.status(404).json({ message: 'No replacement assigned for this schedule' });
+  }
+
+  leave.markModified('replacements');
+  await leave.save();
+  clearAttendanceGridCache();
+
+  res.json({ message: 'Replacement removed' });
+};
+
 export const getTrainerAvailability = async (req, res) => {
   const { start, end, trainerId, subjectId, slotStart, slotEnd } = req.query;
 

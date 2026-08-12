@@ -1,20 +1,22 @@
 import { useState, useEffect } from 'react';
 import LoadingSpinner from '../components/LoadingSpinner.jsx';
 import { showError, showSuccess } from '../utils/toast.js';
+import { formatDate, getErrorMessage } from '../utils/helpers.js';
+import { formatTimeRange } from '../utils/scheduleUtils.js';
+import Modal from '../components/Modal.jsx';
+import ConfirmModal from '../components/ConfirmModal.jsx';
+import TrainerAvailabilityPanel from '../components/TrainerAvailabilityPanel.jsx';
+import AddSlotReplacementModal from '../components/AddSlotReplacementModal.jsx';
+import { EditIcon, TrashIcon } from '../components/icons.jsx';
+import ActionIconButton from '../components/ActionIconButton.jsx';
+import Pagination from '../components/Pagination.jsx';
+import { usePagination } from '../hooks/usePagination.js';
 import {
   getAllReplacements,
   getReplacementSuggestions,
   assignReplacement,
+  removeReplacement,
 } from '../services/replacementService.js';
-import { formatDate, getErrorMessage } from '../utils/helpers.js';
-import { formatTimeRange } from '../utils/scheduleUtils.js';
-import Modal from '../components/Modal.jsx';
-import TrainerAvailabilityPanel from '../components/TrainerAvailabilityPanel.jsx';
-import AddSlotReplacementModal from '../components/AddSlotReplacementModal.jsx';
-import { EditIcon } from '../components/icons.jsx';
-import ActionIconButton from '../components/ActionIconButton.jsx';
-import Pagination from '../components/Pagination.jsx';
-import { usePagination } from '../hooks/usePagination.js';
 
 const REPLACEMENT_STATUS = {
   current: { label: 'Current', className: 'bg-success' },
@@ -48,6 +50,7 @@ const Replacements = () => {
   const [showAddSlotModal, setShowAddSlotModal] = useState(false);
   const [externalTrainerName, setExternalTrainerName] = useState('');
   const [assigningExternal, setAssigningExternal] = useState(false);
+  const [pendingDelete, setPendingDelete] = useState(null);
 
   const fetchReplacements = async () => {
     setLoading(true);
@@ -130,6 +133,18 @@ const Replacements = () => {
       showError(getErrorMessage(err));
     } finally {
       setAssigningExternal(false);
+    }
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!pendingDelete) return;
+    try {
+      await removeReplacement(pendingDelete.leaveId, pendingDelete.scheduleId);
+      showSuccess('Replacement removed');
+      setPendingDelete(null);
+      fetchReplacements();
+    } catch (err) {
+      showError(getErrorMessage(err));
     }
   };
 
@@ -270,13 +285,27 @@ const Replacements = () => {
                               )}
                             </span>
                             {canAssign && (
-                              <ActionIconButton
-                                variant="edit"
-                                icon={EditIcon}
-                                title="Change replacement"
-                                aria-label={`Change replacement for ${schedule.department} ${schedule.section}`}
-                                onClick={() => handleViewSuggestions(leave._id, schedule, replacement)}
-                              />
+                              <>
+                                <ActionIconButton
+                                  variant="edit"
+                                  icon={EditIcon}
+                                  title="Change replacement"
+                                  aria-label={`Change replacement for ${schedule.department} ${schedule.section}`}
+                                  onClick={() => handleViewSuggestions(leave._id, schedule, replacement)}
+                                />
+                                <ActionIconButton
+                                  variant="delete"
+                                  icon={TrashIcon}
+                                  title="Remove replacement"
+                                  aria-label={`Remove replacement for ${schedule.department} ${schedule.section}`}
+                                  onClick={() => setPendingDelete({
+                                    leaveId: leave._id,
+                                    scheduleId: schedule._id,
+                                    trainerName: replacement.name,
+                                    classLabel: `${schedule.department} ${schedule.section}`,
+                                  })}
+                                />
+                              </>
                             )}
                           </div>
                         ) : canAssign ? (
@@ -315,6 +344,18 @@ const Replacements = () => {
         onClose={() => setShowAddSlotModal(false)}
         onCreated={fetchReplacements}
       />
+
+      {pendingDelete && (
+        <ConfirmModal
+          show
+          title="Remove Replacement"
+          message={`Remove "${pendingDelete.trainerName}" as replacement for ${pendingDelete.classLabel}?`}
+          confirmLabel="Remove"
+          confirmVariant="danger"
+          onConfirm={handleConfirmDelete}
+          onClose={() => setPendingDelete(null)}
+        />
+      )}
 
       {activeTab === 'all' && selectedSchedule && (
         <Modal

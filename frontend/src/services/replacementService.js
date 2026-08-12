@@ -34,6 +34,11 @@ export const assignReplacement = async (leaveId, scheduleId, options = {}) => {
   return data;
 };
 
+export const removeReplacement = async (leaveId, scheduleId) => {
+  const { data } = await api.post('/replacements/remove', { leaveId, scheduleId });
+  return data;
+};
+
 export const getTrainerSlotsForReplacement = async (params = {}) => {
   const { data } = await api.get('/replacements/trainer-slots', { params });
   return data;
