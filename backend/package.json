@@ -23,7 +23,6 @@
     "import:venue-locations": "node scripts/apply-venue-building-mappings.mjs",
     "cleanup:pedh": "node scripts/remove-all-pedh-data.mjs",
     "seed:legacy": "node utils/seed.js",
-    "seed:bhargavi-aug": "node scripts/seed-bhargavi-attendance-aug-2026.mjs",
     "parse:workbook": "node utils/parseWorkbook.js"
   },
   "dependencies": {

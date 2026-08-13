@@ -5,13 +5,14 @@ Live URLs:
 | App | URL |
 |-----|-----|
 | Frontend | https://mbutoms.vercel.app |
-| API | https://mbutoms-api.vercel.app |
-| Health | https://mbutoms-api.vercel.app/api/health |
+| API | https://mbutoms-api.onrender.com |
+| Health | https://mbutoms-api.onrender.com/api/health |
 
 | App | Platform | Directory |
 |-----|----------|-----------|
 | React frontend | **Vercel** | `frontend/` |
-| Express API | **Vercel** (serverless) | `backend/` |
+| Express API | **Render** (Node web service) | `backend/` |
+| WhatsApp bridge | **AWS EC2** | `whatsapp-bridge/` |
 | Database | **MongoDB Atlas** | external |
 
 ## 1. MongoDB Atlas
@@ -20,28 +21,28 @@ Live URLs:
 2. Allow network access (`0.0.0.0/0` for Vercel serverless).
 3. Copy the connection string into `MONGODB_URI`.
 
-## 2. Backend (Vercel)
+## 2. Backend (Render)
 
-### Dashboard setup
+`render.yaml` defines the `mbutoms-api` web service (`rootDir: backend`, health `/api/health`). Auto-deploy is on for pushes to `main`.
 
-1. Go to [vercel.com/new](https://vercel.com/new) and import **SalmanLnD/MBUTOMS**.
-2. Create a **second Vercel project** for the API (or use CLI below).
-3. Set **Root Directory** to `backend`.
-4. Framework preset: **Other** (uses `backend/vercel.json`).
-5. Add environment variables:
+### Dashboard / Blueprint setup
+
+1. Create the service from `render.yaml` (or the Render CLI).
+2. Set **Root Directory** to `backend`.
+3. Add environment variables:
 
 | Variable | Value |
 |----------|-------|
 | `MONGODB_URI` | `mongodb+srv://...` |
 | `JWT_SECRET` | long random string |
 | `JWT_EXPIRES_IN` | `7d` |
-| `CLIENT_URL` | `https://mbutoms.vercel.app,http://localhost:5173` |
-| `API_PUBLIC_URL` | `https://mbutoms-api.vercel.app` |
-| `VERCEL` | `1` (set automatically on Vercel) |
-| `RUN_STARTUP_SYNC` | `false` (recommended on serverless; run sync locally once) |
+| `CLIENT_URL` | `https://mbutoms.vercel.app,http://localhost:5173,http://localhost:5174` |
+| `API_PUBLIC_URL` | `https://mbutoms-api.onrender.com` |
+| `NODE_ENV` | `production` |
+| `RUN_STARTUP_SYNC` | `false` |
 | `WHATSAPP_WEBHOOK_SECRET` | long random string (only if using the WhatsApp punch-in bridge) |
 
-6. Deploy. Health check: `https://YOUR-API.vercel.app/api/health`
+4. Deploy. Health check: `https://mbutoms-api.onrender.com/api/health`
 
 ## WhatsApp punch-in automation
 
@@ -59,22 +60,9 @@ The group-reading half runs as a separate always-on service in
 Set the same secret value in both the backend `WHATSAPP_WEBHOOK_SECRET` and the
 bridge `WEBHOOK_SECRET`.
 
-### CLI deploy
-
-```bash
-cd backend
-npm install -g vercel
-vercel login
-vercel link
-vercel env add MONGODB_URI
-vercel env add JWT_SECRET
-vercel env add CLIENT_URL
-vercel --prod
-```
-
 ### GitHub Actions (auto-deploy on push to `main`)
 
-Every push to `main` runs `.github/workflows/vercel-production.yml` and deploys **both** the frontend and API.
+Every push to `main` runs `.github/workflows/vercel-production.yml` and deploys the **frontend** to Vercel. Render auto-deploys the API from the same `main` push.
 
 Add this repository secret in GitHub (**Settings → Secrets and variables → Actions**):
 
@@ -82,13 +70,13 @@ Add this repository secret in GitHub (**Settings → Secrets and variables → A
 |--------|----------------|
 | `VERCEL_TOKEN` | [vercel.com/account/tokens](https://vercel.com/account/tokens) → Create Token |
 
-`VERCEL_ORG_ID` and both project IDs are already set in the workflow file. You do **not** need `VERCEL_PROJECT_ID` or `VERCEL_BACKEND_PROJECT_ID` secrets anymore.
+`VERCEL_ORG_ID` and the frontend `VERCEL_PROJECT_ID` are already set in the workflow file. You do **not** need those as GitHub secrets.
 
 If deploys still fail with authentication errors, regenerate `VERCEL_TOKEN` and update the GitHub secret.
 
 ### Optional: Vercel Git integration
 
-You can also connect each Vercel project to `SalmanLnD/MBUTOMS` in the Vercel dashboard (**Project → Settings → Git**) with root directories `frontend` and `backend`. GitHub Actions remains the source of truth for production deploys in this repo.
+You can also connect the Vercel frontend project to `SalmanLnD/MBUTOMS` in the Vercel dashboard (**Project → Settings → Git**) with root directory `frontend`. GitHub Actions remains the source of truth for frontend production deploys. The API deploys from Render's GitHub integration.
 
 ## 3. Frontend (Vercel)
 
@@ -98,7 +86,7 @@ You can also connect each Vercel project to `SalmanLnD/MBUTOMS` in the Vercel da
 
 | Variable | Value |
 |----------|-------|
-| `VITE_API_URL` | `https://mbutoms-api.vercel.app/api` |
+| `VITE_API_URL` | `https://mbutoms-api.onrender.com/api` |
 
 4. Deploy.
 
@@ -124,6 +112,6 @@ Set `CLIENT_URL` on the backend to your frontend Vercel URL (comma-separated for
 
 ## Notes
 
-- Vercel uses a cached MongoDB connection per serverless instance (`backend/config/db.js`).
-- Heavy startup sync (IDSA/PEDH seed) is skipped on Vercel by default. Run locally against Atlas once if needed: `npm run dev` with `RUN_STARTUP_SYNC` unset.
-- Render deployment (`render.yaml`) remains available as an alternative for a always-on Node server.
+- The API runs as a persistent Node process on Render (`backend/server.js`). Free instances sleep after idle time; the first request may be slow.
+- Heavy startup sync (IDSA/PEDH seed) is skipped in production by default (`RUN_STARTUP_SYNC=false`). Run locally against Atlas once if needed.
+- The old Vercel API project is no longer used by the frontend.

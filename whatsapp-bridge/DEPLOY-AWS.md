@@ -51,7 +51,7 @@ aws sts get-caller-identity
 In `whatsapp-bridge/.env`:
 
 ```env
-WEBHOOK_URL=https://mbutoms-api.vercel.app/api/webhooks/whatsapp-punch
+WEBHOOK_URL=https://mbutoms-api.onrender.com/api/webhooks/whatsapp-punch
 WEBHOOK_SECRET=<same as Vercel WHATSAPP_WEBHOOK_SECRET>
 GROUP_ID=<your group id from npm run list-groups>
 ```

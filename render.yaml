@@ -1,24 +1,30 @@
-# Optional: deploy the Express API on Render (frontend stays on Vercel).
-# Import this blueprint at https://dashboard.render.com/blueprints
-
+# Render Blueprint for the TOMS API.
+# Frontend stays on Vercel. WhatsApp bridge stays on AWS.
 services:
   - type: web
     name: mbutoms-api
     runtime: node
+    plan: free
+    region: singapore
     rootDir: backend
     buildCommand: npm install
     startCommand: npm start
     healthCheckPath: /api/health
+    autoDeploy: true
     envVars:
-      - key: NODE_VERSION
-        value: 20
-      - key: PORT
-        value: 10000
+      - key: NODE_ENV
+        value: production
+      - key: RUN_STARTUP_SYNC
+        value: "false"
+      - key: JWT_EXPIRES_IN
+        value: 7d
+      - key: CLIENT_URL
+        value: https://mbutoms.vercel.app,http://localhost:5173,http://localhost:5174
       - key: MONGODB_URI
         sync: false
       - key: JWT_SECRET
         sync: false
-      - key: JWT_EXPIRES_IN
-        value: 7d
-      - key: CLIENT_URL
+      - key: API_PUBLIC_URL
+        value: https://mbutoms-api.onrender.com
+      - key: WHATSAPP_WEBHOOK_SECRET
         sync: false
