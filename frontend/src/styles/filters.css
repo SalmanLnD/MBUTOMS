@@ -21,6 +21,71 @@
   margin-bottom: 0 !important;
 }
 
+.mark-entry-filters {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(12.5rem, 1fr));
+  gap: 0.75rem 0.85rem;
+  align-items: end;
+  margin-bottom: 0.75rem;
+}
+
+.mark-entry-filters__field {
+  min-width: 0;
+}
+
+.mark-entry-filters__month > .d-flex {
+  min-width: 0;
+  width: 100%;
+}
+
+.mark-entry-filters__month .btn {
+  flex: 0 0 auto;
+}
+
+.mark-entry-filters__month .trainer-attendance-month-select {
+  min-width: 0;
+  width: 100%;
+  flex: 1 1 auto;
+}
+
+.mark-entry-filters__actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.mark-entry-filters__actions .btn {
+  flex: 1 1 auto;
+  min-width: 6.5rem;
+}
+
+.mark-entry-score-filter {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  min-width: 11.5rem;
+  font-weight: 400;
+}
+
+.mark-entry-score-filter .toms-styled-select {
+  flex: 1 1 7.25rem;
+  min-width: 7.25rem;
+}
+
+.mark-entry-score-filter__value {
+  width: 4.25rem;
+  flex: 0 0 4.25rem;
+}
+
+.mark-entry-marks-heading {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0.35rem;
+  min-width: 12.5rem;
+}
+
 @media (max-width: 767.98px) {
   .toms-collapsible-filters__content {
     padding: 0.65rem 0.75rem 0.85rem;

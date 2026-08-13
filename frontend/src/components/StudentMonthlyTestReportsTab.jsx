@@ -37,6 +37,9 @@ import {
   resolveAttendance,
   sanitizeWholeNumberInput,
   validateMarkEntryDrafts,
+  isMarkEntryComplete,
+  matchesMarksFilter,
+  MARKS_FILTER_OPTIONS,
   buildMarkEntryFieldKey,
   blockNumberInputWheel,
   blockDecimalNumberKeys,
@@ -125,6 +128,8 @@ const StudentMonthlyTestReportsTab = () => {
   const [sheetStatus, setSheetStatus] = useState(null);
   const [showSheetSetup, setShowSheetSetup] = useState(false);
   const [fieldErrors, setFieldErrors] = useState({});
+  const [marksFilterOp, setMarksFilterOp] = useState('any');
+  const [marksFilterValue, setMarksFilterValue] = useState('');
   const markEntryTableRef = useRef(null);
 
   const monthKey = formatMonthKey(monthParts.year, monthParts.month);
@@ -347,7 +352,13 @@ const StudentMonthlyTestReportsTab = () => {
   const handleSave = async () => {
     if (!canLoadGrid || !grid?.students?.length) return;
 
-    const { errors, firstTarget } = validateMarkEntryDrafts(grid.students, drafts);
+    const completedRows = grid.students.filter((row) => isMarkEntryComplete(drafts[row._id]));
+    if (!completedRows.length) {
+      showError('Enter marks for at least one student, or mark them absent, then save. The rest stay pending.');
+      return;
+    }
+
+    const { errors, firstTarget } = validateMarkEntryDrafts(completedRows, drafts);
     if (Object.keys(errors).length) {
       setFieldErrors(errors);
       if (firstTarget) {
@@ -363,7 +374,7 @@ const StudentMonthlyTestReportsTab = () => {
     setFieldErrors({});
     setSaving(true);
     try {
-      const entries = grid.students.map((row) => {
+      const entries = completedRows.map((row) => {
         const draft = drafts[row._id] || {};
         const attendance = resolveAttendance(draft.attendance);
         const normalizedMarks = attendance === ATTENDANCE_ABSENT
@@ -387,7 +398,13 @@ const StudentMonthlyTestReportsTab = () => {
         subject: subjectFilter,
         entries,
       });
-      showSuccess(result.message || 'Test reports saved');
+      const pendingCount = grid.students.length - completedRows.length;
+      const savedLabel = result.message || `Saved ${completedRows.length} test report(s)`;
+      showSuccess(
+        pendingCount > 0
+          ? `${savedLabel}. ${pendingCount} student${pendingCount === 1 ? '' : 's'} left pending.`
+          : savedLabel
+      );
       await loadGrid();
       await loadSummary();
     } catch (err) {
@@ -423,10 +440,32 @@ const StudentMonthlyTestReportsTab = () => {
     setPyFilter('');
     setSemFilter('');
     setSubjectFilter('');
+    setMarksFilterOp('any');
+    setMarksFilterValue('');
   };
 
+  const visibleStudents = useMemo(() => {
+    const rows = grid?.students || [];
+    return rows.filter((row) => matchesMarksFilter(drafts[row._id], marksFilterOp, marksFilterValue));
+  }, [grid?.students, drafts, marksFilterOp, marksFilterValue]);
+
+  const completedCount = useMemo(
+    () => (grid?.students || []).filter((row) => isMarkEntryComplete(drafts[row._id])).length,
+    [grid?.students, drafts]
+  );
+
+  const pendingCount = (grid?.students?.length || 0) - completedCount;
+  const marksFilterNeedsValue = marksFilterOp !== 'any' && marksFilterOp !== 'pending';
+
   const hasFilters = Boolean(
-    schoolFilter || deptFilter || sectionFilter || pyFilter || semFilter || subjectFilter
+    schoolFilter
+    || deptFilter
+    || sectionFilter
+    || pyFilter
+    || semFilter
+    || subjectFilter
+    || marksFilterOp !== 'any'
+    || marksFilterValue
   );
 
   const shiftMonthParts = (delta) => setMonthParts((prev) => shiftMonth(prev, delta));
@@ -633,8 +672,8 @@ const StudentMonthlyTestReportsTab = () => {
       {activeSubTab === 'marks' && (
         <>
           <CollapsibleFilters label="Mark entry filters">
-          <div className="row g-2 mb-3 align-items-end">
-            <div className="col-md-2">
+          <div className="mark-entry-filters">
+            <div className="mark-entry-filters__field mark-entry-filters__month">
               <label className="form-label small text-muted mb-1">Month</label>
               <MonthPicker
                 monthKey={monthKey}
@@ -646,7 +685,7 @@ const StudentMonthlyTestReportsTab = () => {
                 onNext={() => shiftMonthParts(1)}
               />
             </div>
-            <div className="col-md-2">
+            <div className="mark-entry-filters__field">
               <label className="form-label small text-muted mb-1">School</label>
               <StyledSelect
                 size="sm"
@@ -668,7 +707,7 @@ const StudentMonthlyTestReportsTab = () => {
                 ]}
               />
             </div>
-            <div className="col-md-2">
+            <div className="mark-entry-filters__field">
               <label className="form-label small text-muted mb-1">Department</label>
               <StyledSelect
                 size="sm"
@@ -689,7 +728,7 @@ const StudentMonthlyTestReportsTab = () => {
                 ]}
               />
             </div>
-            <div className="col-md-1">
+            <div className="mark-entry-filters__field">
               <label className="form-label small text-muted mb-1">Section</label>
               <StyledSelect
                 size="sm"
@@ -699,10 +738,10 @@ const StudentMonthlyTestReportsTab = () => {
                   setSubjectFilter('');
                 }}
                 aria-label="Filter by section"
-                placeholder="Section"
+                placeholder="Select section"
                 disabled={!deptFilter}
                 options={[
-                  { value: '', label: 'Section' },
+                  { value: '', label: 'Select section' },
                   ...filterOptions.sections.map((section) => ({
                     value: section,
                     label: section,
@@ -710,7 +749,7 @@ const StudentMonthlyTestReportsTab = () => {
                 ]}
               />
             </div>
-            <div className="col-md-1">
+            <div className="mark-entry-filters__field">
               <label className="form-label small text-muted mb-1">PY</label>
               <StyledSelect
                 size="sm"
@@ -727,7 +766,7 @@ const StudentMonthlyTestReportsTab = () => {
                 ]}
               />
             </div>
-            <div className="col-md-1">
+            <div className="mark-entry-filters__field">
               <label className="form-label small text-muted mb-1">Semester</label>
               <StyledSelect
                 size="sm"
@@ -737,9 +776,9 @@ const StudentMonthlyTestReportsTab = () => {
                   setSubjectFilter('');
                 }}
                 aria-label="Filter by semester"
-                placeholder="Sem"
+                placeholder="Select semester"
                 options={[
-                  { value: '', label: 'Sem' },
+                  { value: '', label: 'Select semester' },
                   ...filterOptions.semesters.map((sem) => ({
                     value: sem,
                     label: sem,
@@ -747,7 +786,7 @@ const StudentMonthlyTestReportsTab = () => {
                 ]}
               />
             </div>
-            <div className="col-md-2">
+            <div className="mark-entry-filters__field">
               <label className="form-label small text-muted mb-1">Subject</label>
               <StyledSelect
                 size="sm"
@@ -768,7 +807,7 @@ const StudentMonthlyTestReportsTab = () => {
                 ]}
               />
             </div>
-            <div className="col-md-2 d-flex gap-2">
+            <div className="mark-entry-filters__actions">
               {hasFilters && (
                 <button type="button" className="btn btn-sm btn-outline-secondary" onClick={clearFilters}>
                   Clear
@@ -776,7 +815,7 @@ const StudentMonthlyTestReportsTab = () => {
               )}
               <button
                 type="button"
-                className="btn btn-sm btn-primary ms-auto"
+                className="btn btn-sm btn-primary"
                 disabled={!canLoadGrid || !grid?.students?.length || saving}
                 onClick={handleSave}
               >
@@ -813,7 +852,12 @@ const StudentMonthlyTestReportsTab = () => {
                   <div className="text-muted small">
                     {grid.subject?.name} ({grid.subject?.code})
                     {' · '}
-                    {grid.students.length} student{grid.students.length === 1 ? '' : 's'}
+                    {visibleStudents.length === grid.students.length
+                      ? `${grid.students.length} student${grid.students.length === 1 ? '' : 's'}`
+                      : `${visibleStudents.length} of ${grid.students.length} students`}
+                    {' · '}
+                    {completedCount} entered
+                    {pendingCount > 0 ? ` · ${pendingCount} pending` : ''}
                     {' · '}
                     {deptFilter} {sectionFilter} · Sem {semFilter}
                     {pyFilter ? ` · PY ${pyFilter}` : ''}
@@ -838,7 +882,39 @@ const StudentMonthlyTestReportsTab = () => {
                       <th>Roll No.</th>
                       <th>Name</th>
                       <th style={{ width: '80px' }}>P/A</th>
-                      <th style={{ width: '100px' }}>Marks</th>
+                      <th>
+                        <div className="mark-entry-marks-heading">
+                          <span>Marks</span>
+                          <div className="mark-entry-score-filter">
+                            <StyledSelect
+                              size="sm"
+                              value={marksFilterOp}
+                              onChange={(e) => {
+                                setMarksFilterOp(e.target.value);
+                                if (e.target.value === 'any' || e.target.value === 'pending') {
+                                  setMarksFilterValue('');
+                                }
+                              }}
+                              aria-label="Filter students by marks"
+                              options={MARKS_FILTER_OPTIONS}
+                            />
+                            {marksFilterNeedsValue && (
+                              <input
+                                type="text"
+                                inputMode="numeric"
+                                pattern="[0-9]*"
+                                className="form-control form-control-sm mark-entry-score-filter__value"
+                                value={marksFilterValue}
+                                onChange={(e) => setMarksFilterValue(sanitizeWholeNumberInput(e.target.value))}
+                                onKeyDown={blockDecimalNumberKeys}
+                                onWheel={blockNumberInputWheel}
+                                placeholder="Score"
+                                aria-label="Marks filter value"
+                              />
+                            )}
+                          </div>
+                        </div>
+                      </th>
                       <th style={{ width: '90px' }}>Out of</th>
                       <th style={{ width: '90px' }}>%</th>
                       <th style={{ width: '80px' }}>Result</th>
@@ -852,8 +928,14 @@ const StudentMonthlyTestReportsTab = () => {
                           No active students in this class
                         </td>
                       </tr>
+                    ) : visibleStudents.length === 0 ? (
+                      <tr>
+                        <td colSpan="8" className="text-center text-muted py-4">
+                          No students match this marks filter
+                        </td>
+                      </tr>
                     ) : (
-                      grid.students.map((row) => {
+                      visibleStudents.map((row) => {
                         const draft = drafts[row._id] || {};
                         const attendance = resolveAttendance(draft.attendance);
                         const absent = attendance === ATTENDANCE_ABSENT;

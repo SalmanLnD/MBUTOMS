@@ -76,11 +76,19 @@ const StyledSelect = ({
     const preferredMax = 280;
     const openUp = spaceBelow < 180 && spaceAbove > spaceBelow;
     const maxHeight = Math.max(120, Math.min(preferredMax, openUp ? spaceAbove - gap : spaceBelow - gap));
+    const width = Math.min(
+      Math.max(rect.width, 180),
+      Math.max(rect.width, window.innerWidth - viewportPadding * 2)
+    );
+    const left = Math.min(
+      Math.max(viewportPadding, rect.left),
+      Math.max(viewportPadding, window.innerWidth - width - viewportPadding)
+    );
 
     setMenuStyle({
       top: openUp ? rect.top - gap : rect.bottom + gap,
-      left: rect.left,
-      width: rect.width,
+      left,
+      width,
       maxHeight,
       transform: openUp ? 'translateY(-100%)' : 'none',
     });

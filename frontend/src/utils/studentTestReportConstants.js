@@ -118,6 +118,43 @@ export const validateWholeNumberMark = (
 
 export const buildMarkEntryFieldKey = (studentId, field) => `${studentId}:${field}`;
 
+export const isMarkEntryComplete = (draft) => {
+  const attendance = resolveAttendance(draft?.attendance);
+  if (attendance === ATTENDANCE_ABSENT) return true;
+  return String(draft?.marksObtained ?? '').trim() !== '';
+};
+
+export const MARKS_FILTER_OPTIONS = [
+  { value: 'any', label: 'All scores' },
+  { value: 'pending', label: 'Pending' },
+  { value: 'eq', label: 'Equal to' },
+  { value: 'gt', label: 'Greater than' },
+  { value: 'gte', label: 'At least' },
+  { value: 'lt', label: 'Less than' },
+  { value: 'lte', label: 'At most' },
+];
+
+export const matchesMarksFilter = (draft, operator, rawValue) => {
+  if (!operator || operator === 'any') return true;
+  const attendance = resolveAttendance(draft?.attendance);
+  const marksObtained = draft?.marksObtained;
+  if (operator === 'pending') {
+    return attendance !== ATTENDANCE_ABSENT && String(marksObtained ?? '').trim() === '';
+  }
+  const trimmed = String(rawValue ?? '').trim();
+  if (!trimmed) return true;
+  if (attendance === ATTENDANCE_ABSENT || marksObtained === '' || marksObtained == null) return false;
+  const marks = Number(marksObtained);
+  const target = Number(trimmed);
+  if (Number.isNaN(marks) || Number.isNaN(target)) return false;
+  if (operator === 'eq') return marks === target;
+  if (operator === 'gt') return marks > target;
+  if (operator === 'gte') return marks >= target;
+  if (operator === 'lt') return marks < target;
+  if (operator === 'lte') return marks <= target;
+  return true;
+};
+
 export const validateMarkEntryDrafts = (students, drafts) => {
   const errors = {};
   let firstTarget = null;
@@ -126,6 +163,7 @@ export const validateMarkEntryDrafts = (students, drafts) => {
     const draft = drafts[row._id] || {};
     const attendance = resolveAttendance(draft.attendance);
     if (attendance === ATTENDANCE_ABSENT) return;
+    if (!isMarkEntryComplete(draft)) return;
 
     const maxResult = validateWholeNumberMark(draft.maxMarks, {
       required: true,
