@@ -6,11 +6,13 @@ A MERN stack web application to manage trainers, schedules, attendance, venues, 
 
 **Current version:** 2.0.1 — see [CHANGELOG.md](./CHANGELOG.md) for release notes.
 
+**App:** https://mbutoms.onrender.com
+
 **API:** https://mbutoms-api.onrender.com
 
 ## Deployment
 
-See [DEPLOYMENT.md](./DEPLOYMENT.md) for Vercel (frontend) and Render (backend) setup.
+See [DEPLOYMENT.md](./DEPLOYMENT.md) for Render (frontend + API) setup.
 
 ## Tech Stack
 

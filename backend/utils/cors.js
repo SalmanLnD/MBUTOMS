@@ -11,6 +11,7 @@ export const isOriginAllowed = (origin) => {
   const allowed = getAllowedOrigins();
   if (allowed.includes(origin)) return true;
   if (/^https:\/\/[\w-]+\.vercel\.app$/.test(origin)) return true;
+  if (/^https:\/\/[\w-]+\.onrender\.com$/.test(origin)) return true;
   return false;
 };
 

@@ -1,6 +1,25 @@
-# Render Blueprint for the TOMS API.
-# Frontend stays on Vercel. WhatsApp bridge stays on AWS.
+# Render Blueprint: static frontend + Node API.
+# WhatsApp bridge stays on AWS.
 services:
+  - type: web
+    name: mbutoms
+    runtime: static
+    rootDir: frontend
+    buildCommand: npm install && npm run build
+    staticPublishPath: ./frontend/dist
+    autoDeploy: true
+    envVars:
+      - key: VITE_API_URL
+        value: https://mbutoms-api.onrender.com/api
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
+    headers:
+      - path: /assets/*
+        name: Cache-Control
+        value: public, max-age=31536000, immutable
+
   - type: web
     name: mbutoms-api
     runtime: node
@@ -19,7 +38,7 @@ services:
       - key: JWT_EXPIRES_IN
         value: 7d
       - key: CLIENT_URL
-        value: https://mbutoms.vercel.app,http://localhost:5173,http://localhost:5174
+        value: https://mbutoms.onrender.com,https://mbutoms.vercel.app,http://localhost:5173,http://localhost:5174
       - key: MONGODB_URI
         sync: false
       - key: JWT_SECRET
