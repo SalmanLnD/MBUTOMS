@@ -160,10 +160,10 @@ body {
 
 .stat-card h3 {
   font-size: 1.75rem;
-  background: linear-gradient(135deg, var(--toms-navy-900) 0%, var(--toms-navy-700) 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
+  color: var(--text-heading);
+  background: none;
+  -webkit-text-fill-color: currentColor;
+  background-clip: border-box;
 }
 
 .table-card {
@@ -460,7 +460,7 @@ body {
 }
 
 .trainer-attendance-oif-sheet-value {
-  color: var(--bs-body-color);
+  color: var(--text-value);
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
   line-height: 1.2;
   word-break: break-all;
@@ -512,8 +512,8 @@ body {
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
   font-size: 0.75rem;
   font-weight: 600;
-  color: #334155;
-  background: rgba(148, 163, 184, 0.12);
+  color: var(--text-input-muted);
+  background: var(--surface-input-muted);
   border: 1px solid rgba(148, 163, 184, 0.28);
   border-radius: 0.3rem;
 }
@@ -588,7 +588,8 @@ body {
   align-items: center;
   padding: 0.35rem 0.75rem;
   border-radius: 999px;
-  background: rgba(148, 163, 184, 0.12);
+  background: var(--surface-attendance-pill);
+  color: var(--text-attendance-pill);
   font-size: 0.82rem;
   font-weight: 600;
 }
@@ -616,7 +617,7 @@ body {
 .trainer-attendance-totals-col {
   min-width: 8.5rem;
   width: 8.5rem;
-  background: #ffffff;
+  background: var(--surface-attendance-totals);
   border-left: 2px solid rgba(20, 184, 166, 0.35) !important;
   box-shadow: none;
 }

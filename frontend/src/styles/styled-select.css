@@ -153,7 +153,7 @@
   border: 0;
   border-radius: calc(var(--radius-md, 12px) - 4px);
   background: transparent;
-  color: var(--toms-navy-900, #0f1729);
+  color: var(--text-primary);
   font-size: 0.92rem;
   font-weight: 500;
   text-align: left;
@@ -168,7 +168,7 @@
 .toms-styled-multi-select__option:hover,
 .toms-styled-multi-select__option.is-highlighted {
   background: rgba(20, 184, 166, 0.1);
-  color: var(--toms-navy-900, #0f1729);
+  color: var(--text-primary);
 }
 
 .toms-styled-select__option.is-selected,
