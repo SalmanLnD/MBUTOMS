@@ -4,7 +4,8 @@ A MERN stack web application to manage trainers, schedules, attendance, venues, 
 
 **GitHub:** [MBUTOMS](https://github.com/SalmanLnD/MBUTOMS)
 
-**Live app:** https://mbutoms.vercel.app  
+**Current version:** 2.0.1 — see [CHANGELOG.md](./CHANGELOG.md) for release notes.
+
 **API:** https://mbutoms-api.vercel.app
 
 ## Deployment
