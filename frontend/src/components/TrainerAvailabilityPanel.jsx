@@ -3,6 +3,7 @@ import FullCalendar from '@fullcalendar/react';
 import timeGridPlugin from '@fullcalendar/timegrid';
 import interactionPlugin from '@fullcalendar/interaction';
 import LoadingSpinner from './LoadingSpinner.jsx';
+import StyledSelect from './StyledSelect.jsx';
 import { getTrainerAvailability } from '../services/replacementService.js';
 import { getTrainers } from '../services/trainerService.js';
 import { getSubjects } from '../services/subjectService.js';
@@ -147,35 +148,33 @@ const TrainerAvailabilityPanel = () => {
       <div className="row g-3 mb-3">
         <div className="col-md-4">
           <label className="form-label" htmlFor="availability-trainer-select">Trainer</label>
-          <select
+          <StyledSelect
             id="availability-trainer-select"
-            className="form-select"
             value={selectedTrainerId}
             onChange={(e) => setSelectedTrainerId(e.target.value)}
-          >
-            <option value={ALL_TRAINERS}>All trainers (overview)</option>
-            {trainers.map((trainer) => (
-              <option key={trainer._id} value={trainer._id}>
-                {trainer.name} ({trainer.employeeId})
-              </option>
-            ))}
-          </select>
+            options={[
+              { value: ALL_TRAINERS, label: 'All trainers (overview)' },
+              ...trainers.map((trainer) => ({
+                value: trainer._id,
+                label: `${trainer.name} (${trainer.employeeId})`,
+              })),
+            ]}
+          />
         </div>
         <div className="col-md-4">
           <label className="form-label" htmlFor="availability-subject-select">Subject</label>
-          <select
+          <StyledSelect
             id="availability-subject-select"
-            className="form-select"
             value={selectedSubjectId}
             onChange={(e) => setSelectedSubjectId(e.target.value)}
-          >
-            <option value={ALL_SUBJECTS}>All subjects</option>
-            {subjects.map((subject) => (
-              <option key={subject._id} value={subject._id}>
-                {subject.name} ({subject.code})
-              </option>
-            ))}
-          </select>
+            options={[
+              { value: ALL_SUBJECTS, label: 'All subjects' },
+              ...subjects.map((subject) => ({
+                value: subject._id,
+                label: `${subject.name} (${subject.code})`,
+              })),
+            ]}
+          />
         </div>
         <div className="col-md-2">
           <label className="form-label" htmlFor="availability-slot-start">Start time</label>

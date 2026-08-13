@@ -15,6 +15,7 @@ import { EditIcon, TrashIcon } from '../components/icons.jsx';
 import ActionIconButton from '../components/ActionIconButton.jsx';
 import { getErrorMessage } from '../utils/helpers.js';
 import { usePageTitle } from '../context/PageTitleContext.jsx';
+import StyledSelect from '../components/StyledSelect.jsx';
 
 const venueTypes = {
   classroom: 'Classroom',
@@ -185,16 +186,18 @@ const Venues = () => {
                 />
               </div>
               <div className="col-md-3">
-                <select
-                  className="form-select"
+                <StyledSelect
                   value={typeFilter}
                   onChange={(e) => { setTypeFilter(e.target.value); resetPage(); }}
-                >
-                  <option value="">All Types</option>
-                  {Object.entries(venueTypes).map(([key, label]) => (
-                    <option key={key} value={key}>{label}</option>
-                  ))}
-                </select>
+                  aria-label="Filter by venue type"
+                  options={[
+                    { value: '', label: 'All Types' },
+                    ...Object.entries(venueTypes).map(([key, label]) => ({
+                      value: key,
+                      label,
+                    })),
+                  ]}
+                />
               </div>
               {canManage && (
                 <div className="col-md-5 text-md-end">

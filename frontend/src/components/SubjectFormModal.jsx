@@ -11,6 +11,7 @@ import { getTrainers } from '../services/trainerService.js';
 import { getErrorMessage, toInputDate } from '../utils/helpers.js';
 import Modal from './Modal.jsx';
 import StyledSelect from './StyledSelect.jsx';
+import StyledMultiSelect from './StyledMultiSelect.jsx';
 import { SLOT_FIELD_KEYS, groupSubjectsBySlotTimings, findSubjectsWithSimilarTimings, formatSlotTimingsSummary, normalizeSlotTimings, areSlotTimingsEqual } from '../utils/timetableSlots.js';
 import { getSubjectSlotProfile } from '../utils/subjectSlotTimings.js';
 
@@ -244,6 +245,23 @@ const SubjectFormModal = ({ subject, onClose, onManageResource, onManageTopics }
 
   const selectedSchools = schools.filter((s) => form.schools.includes(s._id));
 
+  const departmentGroups = useMemo(
+    () => selectedSchools
+      .map((school) => {
+        const schoolDepts = departments.filter((d) => toId(d.school) === school._id);
+        if (!schoolDepts.length) return null;
+        return {
+          label: `${school.code} — ${school.name}`,
+          options: schoolDepts.map((d) => ({
+            value: d._id,
+            label: `${d.name} (${d.code})`,
+          })),
+        };
+      })
+      .filter(Boolean),
+    [selectedSchools, departments]
+  );
+
   return (
     <Modal
       show
@@ -292,18 +310,15 @@ const SubjectFormModal = ({ subject, onClose, onManageResource, onManageTopics }
               </div>
               <div className="col-md-6">
                 <label className="form-label">Schools</label>
-                <select
-                  multiple
-                  className="form-select"
+                <StyledMultiSelect
                   value={form.schools}
                   onChange={handleSchoolsChange}
-                  size={Math.min(4, Math.max(3, schools.length))}
-                >
-                  {schools.map((s) => (
-                    <option key={s._id} value={s._id}>{s.name} ({s.code})</option>
-                  ))}
-                </select>
-                <small className="text-muted">Hold Ctrl/Cmd to select multiple schools</small>
+                  placeholder="Select schools"
+                  options={schools.map((s) => ({
+                    value: s._id,
+                    label: `${s.name} (${s.code})`,
+                  }))}
+                />
               </div>
               <div className="col-md-6">
                 <label className="form-label">Semester</label>
@@ -336,29 +351,16 @@ const SubjectFormModal = ({ subject, onClose, onManageResource, onManageTopics }
                     All departments in selected schools
                   </label>
                 </div>
-                <select
-                  multiple
-                  className="form-select"
+                <StyledMultiSelect
                   value={form.departments}
                   onChange={handleDepartmentsChange}
+                  placeholder="Select departments"
                   disabled={!form.schools.length || form.allDepartments}
-                  size={Math.min(8, Math.max(4, departments.length + 1))}
-                >
-                  {selectedSchools.map((school) => {
-                    const schoolDepts = departments.filter((d) => toId(d.school) === school._id);
-                    if (!schoolDepts.length) return null;
-                    return (
-                      <optgroup key={school._id} label={`${school.code} — ${school.name}`}>
-                        {schoolDepts.map((d) => (
-                          <option key={d._id} value={d._id}>{d.name} ({d.code})</option>
-                        ))}
-                      </optgroup>
-                    );
-                  })}
-                </select>
+                  groups={departmentGroups}
+                />
                 <small className="text-muted">
                   {form.schools.length
-                    ? 'Departments are grouped by selected school. Hold Ctrl/Cmd to select multiple.'
+                    ? 'Departments are grouped by selected school.'
                     : 'Select one or more schools first'}
                 </small>
               </div>
@@ -368,12 +370,15 @@ const SubjectFormModal = ({ subject, onClose, onManageResource, onManageTopics }
               </div>
               <div className="col-md-6">
                 <label className="form-label">Trainer Eligible</label>
-                <select multiple className="form-select" value={form.trainerEligible} onChange={handleTrainerChange} size="4">
-                  {trainers.map((t) => (
-                    <option key={t._id} value={t._id}>{t.name} ({t.employeeId})</option>
-                  ))}
-                </select>
-                <small className="text-muted">Hold Ctrl/Cmd to select multiple</small>
+                <StyledMultiSelect
+                  value={form.trainerEligible}
+                  onChange={handleTrainerChange}
+                  placeholder="Select trainers"
+                  options={trainers.map((t) => ({
+                    value: t._id,
+                    label: `${t.name} (${t.employeeId})`,
+                  }))}
+                />
               </div>
               <div className="col-12">
                 <label className="form-label" htmlFor="slot-count">Number of periods</label>

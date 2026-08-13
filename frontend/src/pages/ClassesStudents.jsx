@@ -21,6 +21,7 @@ import StudentMonthlyTestReportsTab from '../components/StudentMonthlyTestReport
 import CollapsibleFilters from '../components/CollapsibleFilters.jsx';
 import { EditIcon, EyeIcon, TrashIcon, UploadIcon } from '../components/icons.jsx';
 import ActionIconButton from '../components/ActionIconButton.jsx';
+import StyledSelect from '../components/StyledSelect.jsx';
 
 const SEMESTER_ORDER = { I: 1, II: 2, III: 3, IV: 4, V: 5, VI: 6, VII: 7, VIII: 8 };
 const semesterSortKey = (sem) => SEMESTER_ORDER[String(sem || '').trim()] ?? 99;
@@ -369,76 +370,86 @@ const ClassesStudents = () => {
           <CollapsibleFilters label="Class filters">
           <div className="row g-2 mb-3 align-items-center">
             <div className="col-md-2">
-              <select
-                className="form-select"
+              <StyledSelect
                 value={classSchoolFilter}
                 onChange={(e) => {
                   setClassSchoolFilter(e.target.value);
                   setClassDeptFilter('');
                   setClassSectionFilter('');
                 }}
+                placeholder="All Schools"
                 aria-label="Filter by school"
-              >
-                <option value="">All Schools</option>
-                {schools.map((school) => (
-                  <option key={school._id} value={school._id}>{school.name}</option>
-                ))}
-              </select>
+                options={[
+                  { value: '', label: 'All Schools' },
+                  ...schools.map((school) => ({
+                    value: school._id,
+                    label: school.name,
+                  })),
+                ]}
+              />
             </div>
             <div className="col-md-2">
-              <select
-                className="form-select"
+              <StyledSelect
                 value={classPyFilter}
                 onChange={(e) => setClassPyFilter(e.target.value)}
+                placeholder="All PY"
                 aria-label="Filter by PY"
-              >
-                <option value="">All PY</option>
-                {classFilterOptions.pys.map((py) => (
-                  <option key={py} value={py}>{py}</option>
-                ))}
-              </select>
+                options={[
+                  { value: '', label: 'All PY' },
+                  ...classFilterOptions.pys.map((py) => ({
+                    value: String(py),
+                    label: String(py),
+                  })),
+                ]}
+              />
             </div>
             <div className="col-md-2">
-              <select
-                className="form-select"
+              <StyledSelect
                 value={classDeptFilter}
                 onChange={(e) => {
                   setClassDeptFilter(e.target.value);
                   setClassSectionFilter('');
                 }}
+                placeholder="All Departments"
                 aria-label="Filter by department"
-              >
-                <option value="">All Departments</option>
-                {classFilterOptions.depts.map((dept) => (
-                  <option key={dept} value={dept}>{dept}</option>
-                ))}
-              </select>
+                options={[
+                  { value: '', label: 'All Departments' },
+                  ...classFilterOptions.depts.map((dept) => ({
+                    value: dept,
+                    label: dept,
+                  })),
+                ]}
+              />
             </div>
             <div className="col-md-1">
-              <select
-                className="form-select"
+              <StyledSelect
                 value={classSectionFilter}
                 onChange={(e) => setClassSectionFilter(e.target.value)}
+                placeholder="All Sections"
                 aria-label="Filter by section"
-              >
-                <option value="">All Sections</option>
-                {classFilterOptions.sections.map((section) => (
-                  <option key={section} value={section}>{section}</option>
-                ))}
-              </select>
+                options={[
+                  { value: '', label: 'All Sections' },
+                  ...classFilterOptions.sections.map((section) => ({
+                    value: section,
+                    label: section,
+                  })),
+                ]}
+              />
             </div>
             <div className="col-md-2">
-              <select
-                className="form-select"
+              <StyledSelect
                 value={classSemFilter}
                 onChange={(e) => setClassSemFilter(e.target.value)}
+                placeholder="All Semesters"
                 aria-label="Filter by semester"
-              >
-                <option value="">All Semesters</option>
-                {classFilterOptions.semesters.map((sem) => (
-                  <option key={sem} value={sem}>{sem}</option>
-                ))}
-              </select>
+                options={[
+                  { value: '', label: 'All Semesters' },
+                  ...classFilterOptions.semesters.map((sem) => ({
+                    value: sem,
+                    label: sem,
+                  })),
+                ]}
+              />
             </div>
             <div className="col-md-1">
               {hasClassFilters && (
@@ -575,36 +586,40 @@ const ClassesStudents = () => {
               />
             </div>
             <div className="col-md-2">
-              <select
-                className="form-select"
+              <StyledSelect
                 value={studentSchoolFilter}
                 onChange={(e) => {
                   setStudentSchoolFilter(e.target.value);
                   if (classFilter) clearClassFilter();
                   resetStudentPage();
                 }}
+                placeholder="All Schools"
                 aria-label="Filter by school"
-              >
-                <option value="">All Schools</option>
-                {schools.map((school) => (
-                  <option key={school._id} value={school._id}>{school.name}</option>
-                ))}
-              </select>
+                options={[
+                  { value: '', label: 'All Schools' },
+                  ...schools.map((school) => ({
+                    value: school._id,
+                    label: school.name,
+                  })),
+                ]}
+              />
             </div>
             <div className="col-md-2">
-              <select
-                className="form-select"
+              <StyledSelect
                 value={studentStatusFilter}
                 onChange={(e) => {
                   setStudentStatusFilter(e.target.value);
                   resetStudentPage();
                 }}
-              >
-                <option value="">All Status</option>
-                <option value="active">Active</option>
-                <option value="inactive">Inactive</option>
-                <option value="graduated">Graduated</option>
-              </select>
+                placeholder="All Status"
+                aria-label="Filter by status"
+                options={[
+                  { value: '', label: 'All Status' },
+                  { value: 'active', label: 'Active' },
+                  { value: 'inactive', label: 'Inactive' },
+                  { value: 'graduated', label: 'Graduated' },
+                ]}
+              />
             </div>
             <div className="col-md-2">
               {classFilter && (

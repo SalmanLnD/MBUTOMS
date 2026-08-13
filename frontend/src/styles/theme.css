@@ -1307,7 +1307,8 @@ body {
   color: #cbd5e1;
 }
 
-[data-theme='dark'] .toms-styled-select__trigger {
+[data-theme='dark'] .toms-styled-select__trigger,
+[data-theme='dark'] .toms-styled-multi-select__trigger {
   color: var(--text-primary);
   background-color: var(--surface-glass-strong);
   border-color: rgba(148, 163, 184, 0.28);
@@ -1319,27 +1320,38 @@ body {
   border-color: rgba(20, 184, 166, 0.35);
 }
 
-[data-theme='dark'] .toms-styled-select__value.is-placeholder {
+[data-theme='dark'] .toms-styled-select__value.is-placeholder,
+[data-theme='dark'] .toms-styled-multi-select__value.is-placeholder {
   color: #94a3b8;
 }
 
-[data-theme='dark'] .toms-styled-select__menu {
+[data-theme='dark'] .toms-styled-select__menu,
+[data-theme='dark'] .toms-styled-multi-select__menu {
   background: #1e293b;
   border-color: rgba(148, 163, 184, 0.28);
 }
 
-[data-theme='dark'] .toms-styled-select__option {
+[data-theme='dark'] .toms-styled-select__option,
+[data-theme='dark'] .toms-styled-multi-select__option {
   color: #e2e8f0;
 }
 
 [data-theme='dark'] .toms-styled-select__option:hover,
-[data-theme='dark'] .toms-styled-select__option.is-highlighted {
+[data-theme='dark'] .toms-styled-select__option.is-highlighted,
+[data-theme='dark'] .toms-styled-multi-select__option:hover,
+[data-theme='dark'] .toms-styled-multi-select__option.is-highlighted {
   background: rgba(20, 184, 166, 0.12);
   color: #f8fafc;
 }
 
-[data-theme='dark'] .toms-styled-select__group-label {
+[data-theme='dark'] .toms-styled-select__group-label,
+[data-theme='dark'] .toms-styled-multi-select__group-label {
   color: #94a3b8;
+}
+
+[data-theme='dark'] .toms-styled-multi-select__option-box {
+  background: #0f172a;
+  border-color: rgba(148, 163, 184, 0.45);
 }
 
 [data-theme='dark'] .timetable-cell-filled {

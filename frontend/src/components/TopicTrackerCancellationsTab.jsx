@@ -11,6 +11,7 @@ import {
   SESSION_STATUS_LABELS,
   getSessionStatusBadgeClass,
 } from '../utils/topicTrackerConstants.js';
+import StyledSelect from './StyledSelect.jsx';
 
 const TopicTrackerCancellationsTab = ({ highlightEntryId, onHighlightComplete }) => {
   const [statusFilter, setStatusFilter] = useState('pending');
@@ -82,17 +83,19 @@ const TopicTrackerCancellationsTab = ({ highlightEntryId, onHighlightComplete })
         </div>
         <div style={{ minWidth: '10rem' }}>
           <label className="form-label mb-1" htmlFor="cancel-approval-filter">Show</label>
-          <select
+          <StyledSelect
             id="cancel-approval-filter"
-            className="form-select form-select-sm"
+            size="sm"
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
-          >
-            <option value="pending">Pending approval</option>
-            <option value="approved">Approved</option>
-            <option value="rejected">Rejected</option>
-            <option value="all">All</option>
-          </select>
+            aria-label="Filter by approval status"
+            options={[
+              { value: 'pending', label: 'Pending approval' },
+              { value: 'approved', label: 'Approved' },
+              { value: 'rejected', label: 'Rejected' },
+              { value: 'all', label: 'All' },
+            ]}
+          />
         </div>
       </div>
 

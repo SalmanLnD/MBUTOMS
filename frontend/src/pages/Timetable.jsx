@@ -21,6 +21,7 @@ import { isAbortError } from '../services/api.js';
 import { scheduleMatchesSubject, resolveScheduleTrainerCode } from '../utils/scheduleSubject.js';
 import { getSubjectSemesterRoman } from '../utils/classPy.js';
 import { resolveTrainerTimetableGridOptions } from '../utils/trainerTimetableDisplay.js';
+import StyledSelect from '../components/StyledSelect.jsx';
 
 const trainerLabel = (trainer) =>
   trainer.name && trainer.name !== trainer.employeeId
@@ -367,19 +368,19 @@ const Timetable = () => {
           <label htmlFor="subject-filter" className="form-label fw-semibold">
             Subject
           </label>
-          <select
+          <StyledSelect
             id="subject-filter"
-            className="form-select"
             value={selectedSubjectId}
             onChange={(e) => setSelectedSubjectId(e.target.value)}
-          >
-            <option value="">All subjects</option>
-            {allSubjects.map((subject) => (
-              <option key={subject._id} value={subject._id}>
-                {subject.name} ({subject.code})
-              </option>
-            ))}
-          </select>
+            aria-label="Filter by subject"
+            options={[
+              { value: '', label: 'All subjects' },
+              ...allSubjects.map((subject) => ({
+                value: subject._id,
+                label: `${subject.name} (${subject.code})`,
+              })),
+            ]}
+          />
         </div>
 
         <div className="col-md-3">

@@ -8,6 +8,7 @@ import { getSubjects } from '../services/subjectService.js';
 import { getErrorMessage, toInputDate } from '../utils/helpers.js';
 import Modal from './Modal.jsx';
 import StyledSelect from './StyledSelect.jsx';
+import StyledMultiSelect from './StyledMultiSelect.jsx';
 
 const toSubjectId = (subject) => {
   if (!subject) return '';
@@ -203,12 +204,15 @@ const TrainerFormModal = ({ trainer, onClose }) => {
                 </div>
                 <div className="col-12">
                   <label className="form-label">Subjects</label>
-                  <select multiple className="form-select" value={form.subjects} onChange={handleSubjectChange} size="4">
-                    {subjects.map((s) => (
-                      <option key={s._id} value={s._id}>{s.name} ({s.code})</option>
-                    ))}
-                  </select>
-                  <small className="text-muted">Hold Ctrl/Cmd to select multiple</small>
+                  <StyledMultiSelect
+                    value={form.subjects}
+                    onChange={handleSubjectChange}
+                    placeholder="Select subjects"
+                    options={subjects.map((s) => ({
+                      value: s._id,
+                      label: `${s.name} (${s.code})`,
+                    }))}
+                  />
                 </div>
               </div>
         </div>

@@ -1,5 +1,6 @@
 import { useId } from 'react';
 import { DEFAULT_PAGE_SIZE_OPTIONS } from '../hooks/usePagination.js';
+import StyledSelect from './StyledSelect.jsx';
 import '../styles/pagination.css';
 
 /**
@@ -126,17 +127,15 @@ const Pagination = ({
           <label className="toms-pagination__size-label" htmlFor={sizeSelectId}>
             {sizeLabel}
           </label>
-          <select
+          <StyledSelect
             id={sizeSelectId}
-            className="form-select form-select-sm toms-pagination__size-select"
+            size="sm"
+            className="toms-pagination__size-select"
             value={currentPageSize}
             onChange={(e) => onPageSizeChange(Number(e.target.value))}
             aria-label={sizeLabel}
-          >
-            {options.map((size) => (
-              <option key={size} value={size}>{size}</option>
-            ))}
-          </select>
+            options={options.map((size) => ({ value: size, label: String(size) }))}
+          />
         </div>
       )}
     </nav>

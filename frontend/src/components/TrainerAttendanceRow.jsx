@@ -7,6 +7,7 @@ import {
   TRAINER_ATTENDANCE_TYPES,
 } from '../utils/trainerAttendanceTypes.js';
 import { FOOD_ALLOWANCE_OPTIONS } from '../utils/foodAllowanceTypes.js';
+import StyledSelect from './StyledSelect.jsx';
 
 const TrainerAttendanceRow = memo(({
   row,
@@ -68,14 +69,24 @@ const TrainerAttendanceRow = memo(({
       const typeSelectValue = cell.isOnLeave
         ? (cell.attendanceType || '')
         : (cell.attendanceType || TRAINER_ATTENDANCE_TYPES.WEEK_OFF);
+      const leaveTypeOptions = cell.isOnLeave
+        ? [
+            { value: '', label: 'Leave type...' },
+            ...LEAVE_TYPE_OPTIONS,
+          ]
+        : [
+            { value: TRAINER_ATTENDANCE_TYPES.OIF, label: 'OIF (Present)' },
+            ...LEAVE_TYPE_OPTIONS,
+          ];
 
       return (
         <Fragment key={`${row.trainer._id}-${date.key}`}>
           <td className={`trainer-attendance-oif-cell ${cellClass}`}>
             {showTypeSelect ? (
               <div className="trainer-attendance-leave-controls">
-                <select
-                  className="form-select form-select-sm trainer-attendance-leave-select"
+                <StyledSelect
+                  size="sm"
+                  className="toms-styled-select--table-cell"
                   value={typeSelectValue}
                   disabled={!canEditCell || isSaving}
                   onChange={(e) => {
@@ -90,20 +101,10 @@ const TrainerAttendanceRow = memo(({
                     }
                     window.setTimeout(() => onSave(row.trainer._id, date.key), 0);
                   }}
+                  placeholder={cell.isOnLeave ? 'Leave type...' : 'W.O'}
                   aria-label={cell.isOnLeave ? 'Leave type' : 'Sunday attendance type'}
-                  title={cell.isOnLeave ? 'Select leave type' : 'Sunday defaults to W.O'}
-                >
-                  {cell.isOnLeave ? (
-                    <option value="">Leave type...</option>
-                  ) : (
-                    <option value={TRAINER_ATTENDANCE_TYPES.OIF}>OIF (Present)</option>
-                  )}
-                  {LEAVE_TYPE_OPTIONS.map((option) => (
-                    <option key={option.value} value={option.value}>
-                      {option.label}
-                    </option>
-                  ))}
-                </select>
+                  options={leaveTypeOptions}
+                />
                 {showOifInput && (
                   <>
                     {oifSheetValue && cell.attendanceType !== TRAINER_ATTENDANCE_TYPES.OIF && (
@@ -193,8 +194,9 @@ const TrainerAttendanceRow = memo(({
             )}
           </td>
           <td className={`trainer-attendance-food-cell ${cellClass}`}>
-            <select
-              className="form-select form-select-sm trainer-attendance-food-select"
+            <StyledSelect
+              size="sm"
+              className="toms-styled-select--table-cell"
               value={cell.foodAllowance || ''}
               disabled={!canEditCell || isSaving || treatAsNonWorking}
               onChange={(e) => {
@@ -206,16 +208,13 @@ const TrainerAttendanceRow = memo(({
                 );
                 window.setTimeout(() => onSave(row.trainer._id, date.key), 0);
               }}
+              placeholder="None"
               aria-label={`Food allowance for ${date.label}`}
-              title="Food allowance"
-            >
-              <option value="">None</option>
-              {FOOD_ALLOWANCE_OPTIONS.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
+              options={[
+                { value: '', label: 'None' },
+                ...FOOD_ALLOWANCE_OPTIONS,
+              ]}
+            />
           </td>
         </Fragment>
       );

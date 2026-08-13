@@ -1,5 +1,6 @@
 import { Fragment, useCallback, useEffect, useMemo, useState } from 'react';
 import LoadingSpinner from './LoadingSpinner.jsx';
+import StyledSelect from './StyledSelect.jsx';
 import { getTopicTrackerClassSummary } from '../services/topicTrackerService.js';
 import { showError } from '../utils/toast.js';
 import { getErrorMessage } from '../utils/helpers.js';
@@ -56,40 +57,36 @@ const TopicTrackerClassSummaryTab = ({
         <div className="row g-2 mb-3 align-items-end">
           <div className="col-md-4">
             <label className="form-label mb-1" htmlFor="class-summary-subject">Subject</label>
-            <select
+            <StyledSelect
               id="class-summary-subject"
-              className="form-select"
               value={selectedSubjectId}
               onChange={(e) => {
                 setSelectedSubjectId(e.target.value);
                 setSelectedTrainerKey('');
                 setExpandedClass('');
               }}
-            >
-              <option value="">All subjects</option>
-              {subjects.map((subject) => (
-                <option key={subject.subjectId} value={subject.subjectId}>
-                  {subject.subjectName} ({subject.subjectCode})
-                </option>
-              ))}
-            </select>
+              placeholder="All subjects"
+              options={subjects.map((subject) => ({
+                value: subject.subjectId,
+                label: `${subject.subjectName} (${subject.subjectCode})`,
+              }))}
+            />
           </div>
           <div className="col-md-4">
             <label className="form-label mb-1" htmlFor="class-summary-trainer">Trainer</label>
-            <select
+            <StyledSelect
               id="class-summary-trainer"
-              className="form-select"
               value={selectedTrainerKey}
               onChange={(e) => {
                 setSelectedTrainerKey(e.target.value);
                 setExpandedClass('');
               }}
-            >
-              <option value="">All trainers</option>
-              {trainerOptions.map((trainer) => (
-                <option key={trainer.key} value={trainer.key}>{trainer.name}</option>
-              ))}
-            </select>
+              placeholder="All trainers"
+              options={trainerOptions.map((trainer) => ({
+                value: trainer.key,
+                label: trainer.name,
+              }))}
+            />
           </div>
         </div>
       )}

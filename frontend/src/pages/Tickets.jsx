@@ -3,6 +3,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import LoadingSpinner from '../components/LoadingSpinner.jsx';
 import Pagination from '../components/Pagination.jsx';
 import Modal from '../components/Modal.jsx';
+import StyledSelect from '../components/StyledSelect.jsx';
 import { showError, showSuccess } from '../utils/toast.js';
 import { useAuth } from '../context/AuthContext.jsx';
 import { usePagination } from '../hooks/usePagination.js';
@@ -158,8 +159,8 @@ const Tickets = () => {
     <>
       <div className="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
         <div className="d-flex flex-wrap gap-2">
-          <select
-            className="form-select w-auto"
+          <StyledSelect
+            className="toms-styled-select--auto"
             value={statusFilter}
             onChange={(e) => {
               setStatusFilter(e.target.value);
@@ -167,14 +168,14 @@ const Tickets = () => {
               setPage(1);
             }}
             aria-label="Filter by status"
-          >
-            <option value="">All Status</option>
-            {TICKET_STATUSES.map((status) => (
-              <option key={status} value={status}>{TICKET_STATUS_LABELS[status]}</option>
-            ))}
-          </select>
-          <select
-            className="form-select w-auto"
+            placeholder="All Status"
+            options={TICKET_STATUSES.map((status) => ({
+              value: status,
+              label: TICKET_STATUS_LABELS[status],
+            }))}
+          />
+          <StyledSelect
+            className="toms-styled-select--auto"
             value={typeFilter}
             onChange={(e) => {
               setTypeFilter(e.target.value);
@@ -182,12 +183,12 @@ const Tickets = () => {
               setPage(1);
             }}
             aria-label="Filter by type"
-          >
-            <option value="">All Types</option>
-            {TICKET_TYPES.map((type) => (
-              <option key={type} value={type}>{TICKET_TYPE_LABELS[type]}</option>
-            ))}
-          </select>
+            placeholder="All Types"
+            options={TICKET_TYPES.map((type) => ({
+              value: type,
+              label: TICKET_TYPE_LABELS[type],
+            }))}
+          />
         </div>
         <button type="button" className="btn btn-primary" onClick={openCreateForm}>
           Raise Ticket
@@ -286,21 +287,20 @@ const Tickets = () => {
               {isAdmin && (
                 <div className="mb-3">
                   <label className="form-label" htmlFor="ticket-raised-by">Raised By</label>
-                  <select
+                  <StyledSelect
                     id="ticket-raised-by"
-                    className="form-select"
                     value={createForm.raisedByTrainer}
                     onChange={(e) => setCreateForm({ ...createForm, raisedByTrainer: e.target.value })}
                     required
-                  >
-                    <option value="">Select who this ticket is for</option>
-                    <option value="self">{user?.name || 'Admin'} (Myself)</option>
-                    {trainers.map((trainer) => (
-                      <option key={trainer._id} value={trainer._id}>
-                        {trainer.name} ({trainer.employeeId})
-                      </option>
-                    ))}
-                  </select>
+                    placeholder="Select who this ticket is for"
+                    options={[
+                      { value: 'self', label: `${user?.name || 'Admin'} (Myself)` },
+                      ...trainers.map((trainer) => ({
+                        value: trainer._id,
+                        label: `${trainer.name} (${trainer.employeeId})`,
+                      })),
+                    ]}
+                  />
                   <div className="form-text">
                     Choose yourself to raise on your behalf, or select a trainer you are representing.
                   </div>
@@ -308,18 +308,17 @@ const Tickets = () => {
               )}
               <div className="mb-3">
                 <label className="form-label" htmlFor="ticket-type">Issue Type</label>
-                <select
+                <StyledSelect
                   id="ticket-type"
-                  className="form-select"
                   value={createForm.type}
                   onChange={(e) => setCreateForm({ ...createForm, type: e.target.value })}
                   required
-                >
-                  <option value="">Select issue type</option>
-                  {TICKET_TYPES.map((type) => (
-                    <option key={type} value={type}>{TICKET_TYPE_LABELS[type]}</option>
-                  ))}
-                </select>
+                  placeholder="Select issue type"
+                  options={TICKET_TYPES.map((type) => ({
+                    value: type,
+                    label: TICKET_TYPE_LABELS[type],
+                  }))}
+                />
               </div>
               <div className="mb-3">
                 <label className="form-label" htmlFor="ticket-description">Detailed Comments</label>
@@ -445,17 +444,16 @@ const Tickets = () => {
 
               <div className="mb-3">
                 <label className="form-label" htmlFor="ticket-status">New Status</label>
-                <select
+                <StyledSelect
                   id="ticket-status"
-                  className="form-select"
                   value={updateForm.status}
                   onChange={(e) => setUpdateForm({ ...updateForm, status: e.target.value })}
                   required
-                >
-                  {TICKET_STATUSES.map((status) => (
-                    <option key={status} value={status}>{TICKET_STATUS_LABELS[status]}</option>
-                  ))}
-                </select>
+                  options={TICKET_STATUSES.map((status) => ({
+                    value: status,
+                    label: TICKET_STATUS_LABELS[status],
+                  }))}
+                />
               </div>
 
               <div className="mb-3">

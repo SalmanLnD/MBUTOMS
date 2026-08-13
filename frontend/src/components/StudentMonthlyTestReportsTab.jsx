@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import LoadingSpinner from './LoadingSpinner.jsx';
 import CollapsibleFilters from './CollapsibleFilters.jsx';
+import StyledSelect from './StyledSelect.jsx';
 import { showError, showSuccess } from '../utils/toast.js';
 import { getErrorMessage } from '../utils/helpers.js';
 import { useAuth } from '../context/AuthContext.jsx';
@@ -72,16 +73,14 @@ const MonthPicker = ({
     >
       &lt;
     </button>
-    <select
-      className="form-select form-select-sm"
+    <StyledSelect
+      size="sm"
+      className="trainer-attendance-month-select"
       value={monthKey}
       onChange={(e) => onChange(parseMonthKey(e.target.value))}
       aria-label="Select month"
-    >
-      {monthOptions.map((opt) => (
-        <option key={opt.value} value={opt.value}>{opt.label}</option>
-      ))}
-    </select>
+      options={monthOptions}
+    />
     <button
       type="button"
       className="btn btn-sm btn-outline-secondary"
@@ -649,8 +648,8 @@ const StudentMonthlyTestReportsTab = () => {
             </div>
             <div className="col-md-2">
               <label className="form-label small text-muted mb-1">School</label>
-              <select
-                className="form-select form-select-sm"
+              <StyledSelect
+                size="sm"
                 value={schoolFilter}
                 onChange={(e) => {
                   setSchoolFilter(e.target.value);
@@ -659,17 +658,20 @@ const StudentMonthlyTestReportsTab = () => {
                   setSubjectFilter('');
                 }}
                 aria-label="Filter by school"
-              >
-                <option value="">All Schools</option>
-                {schools.map((school) => (
-                  <option key={school._id} value={school._id}>{school.name}</option>
-                ))}
-              </select>
+                placeholder="All Schools"
+                options={[
+                  { value: '', label: 'All Schools' },
+                  ...schools.map((school) => ({
+                    value: school._id,
+                    label: school.name,
+                  })),
+                ]}
+              />
             </div>
             <div className="col-md-2">
               <label className="form-label small text-muted mb-1">Department</label>
-              <select
-                className="form-select form-select-sm"
+              <StyledSelect
+                size="sm"
                 value={deptFilter}
                 onChange={(e) => {
                   setDeptFilter(e.target.value);
@@ -677,78 +679,94 @@ const StudentMonthlyTestReportsTab = () => {
                   setSubjectFilter('');
                 }}
                 aria-label="Filter by department"
-              >
-                <option value="">Select department</option>
-                {filterOptions.depts.map((dept) => (
-                  <option key={dept} value={dept}>{dept}</option>
-                ))}
-              </select>
+                placeholder="Select department"
+                options={[
+                  { value: '', label: 'Select department' },
+                  ...filterOptions.depts.map((dept) => ({
+                    value: dept,
+                    label: dept,
+                  })),
+                ]}
+              />
             </div>
             <div className="col-md-1">
               <label className="form-label small text-muted mb-1">Section</label>
-              <select
-                className="form-select form-select-sm"
+              <StyledSelect
+                size="sm"
                 value={sectionFilter}
                 onChange={(e) => {
                   setSectionFilter(e.target.value);
                   setSubjectFilter('');
                 }}
                 aria-label="Filter by section"
+                placeholder="Section"
                 disabled={!deptFilter}
-              >
-                <option value="">Section</option>
-                {filterOptions.sections.map((section) => (
-                  <option key={section} value={section}>{section}</option>
-                ))}
-              </select>
+                options={[
+                  { value: '', label: 'Section' },
+                  ...filterOptions.sections.map((section) => ({
+                    value: section,
+                    label: section,
+                  })),
+                ]}
+              />
             </div>
             <div className="col-md-1">
               <label className="form-label small text-muted mb-1">PY</label>
-              <select
-                className="form-select form-select-sm"
+              <StyledSelect
+                size="sm"
                 value={pyFilter}
                 onChange={(e) => setPyFilter(e.target.value)}
                 aria-label="Filter by PY"
-              >
-                <option value="">All PY</option>
-                {filterOptions.pys.map((py) => (
-                  <option key={py} value={py}>{py}</option>
-                ))}
-              </select>
+                placeholder="All PY"
+                options={[
+                  { value: '', label: 'All PY' },
+                  ...filterOptions.pys.map((py) => ({
+                    value: String(py),
+                    label: String(py),
+                  })),
+                ]}
+              />
             </div>
             <div className="col-md-1">
               <label className="form-label small text-muted mb-1">Semester</label>
-              <select
-                className="form-select form-select-sm"
+              <StyledSelect
+                size="sm"
                 value={semFilter}
                 onChange={(e) => {
                   setSemFilter(e.target.value);
                   setSubjectFilter('');
                 }}
                 aria-label="Filter by semester"
-              >
-                <option value="">Sem</option>
-                {filterOptions.semesters.map((sem) => (
-                  <option key={sem} value={sem}>{sem}</option>
-                ))}
-              </select>
+                placeholder="Sem"
+                options={[
+                  { value: '', label: 'Sem' },
+                  ...filterOptions.semesters.map((sem) => ({
+                    value: sem,
+                    label: sem,
+                  })),
+                ]}
+              />
             </div>
             <div className="col-md-2">
               <label className="form-label small text-muted mb-1">Subject</label>
-              <select
-                className="form-select form-select-sm"
+              <StyledSelect
+                size="sm"
                 value={subjectFilter}
                 onChange={(e) => setSubjectFilter(e.target.value)}
                 aria-label="Filter by subject"
+                placeholder={loadingSubjects ? 'Loading...' : 'Select subject'}
                 disabled={!deptFilter || !sectionFilter || !semFilter || loadingSubjects}
-              >
-                <option value="">
-                  {loadingSubjects ? 'Loading...' : 'Select subject'}
-                </option>
-                {subjects.map((subject) => (
-                  <option key={subject._id} value={subject._id}>{subject.label}</option>
-                ))}
-              </select>
+                options={[
+                  {
+                    value: '',
+                    label: loadingSubjects ? 'Loading...' : 'Select subject',
+                  },
+                  ...subjects.map((subject) => ({
+                    value: subject._id,
+                    label: subject.label,
+                  })),
+                ]}
+              />
             </div>
             <div className="col-md-2 d-flex gap-2">
               {hasFilters && (
@@ -849,15 +867,17 @@ const StudentMonthlyTestReportsTab = () => {
                             <td>{row.rollNumber}</td>
                             <td>{row.name}</td>
                             <td>
-                              <select
-                                className="form-select form-select-sm"
+                              <StyledSelect
+                                size="sm"
+                                className="toms-styled-select--table-cell"
                                 value={attendance}
                                 onChange={(e) => updateDraft(row._id, 'attendance', e.target.value)}
                                 aria-label={`Attendance for ${row.name}`}
-                              >
-                                <option value={ATTENDANCE_PRESENT}>P</option>
-                                <option value={ATTENDANCE_ABSENT}>A</option>
-                              </select>
+                                options={[
+                                  { value: ATTENDANCE_PRESENT, label: 'P' },
+                                  { value: ATTENDANCE_ABSENT, label: 'A' },
+                                ]}
+                              />
                             </td>
                             <td>
                               <input

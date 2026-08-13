@@ -15,6 +15,7 @@ import './styles/theme.css';
 import './styles/clay-bento.css';
 import './styles/filters.css';
 import './styles/modal.css';
+import './styles/styled-select.css';
 
 initTheme();
 

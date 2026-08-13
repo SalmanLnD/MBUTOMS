@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import LoadingSpinner from './LoadingSpinner.jsx';
+import StyledSelect from './StyledSelect.jsx';
 import { getObservations, upsertObservation } from '../services/observationService.js';
 import {
   buildMonthOptions,
@@ -178,19 +179,18 @@ const ObservationsTab = () => {
           </button>
         </div>
         <div className="col-md-3">
-          <select
-            className="form-select"
+          <StyledSelect
             value={monthKey}
             onChange={(e) => {
               const [year, month] = e.target.value.split('-').map(Number);
               setMonthParts(clampMonthParts({ year, month }));
             }}
             aria-label="Observation month"
-          >
-            {monthOptions.map((option) => (
-              <option key={option.value} value={option.value}>{option.label}</option>
-            ))}
-          </select>
+            options={monthOptions.map((option) => ({
+              value: option.value,
+              label: option.label,
+            }))}
+          />
         </div>
         <div className="col-auto">
           <button
@@ -241,19 +241,18 @@ const ObservationsTab = () => {
                       <td>{row.employeeId}</td>
                       {isClass && (
                         <td>
-                          <select
-                            className="form-select form-select-sm"
+                          <StyledSelect
+                            size="sm"
+                            className="toms-styled-select--table-cell"
                             value={draft.scheduleId}
                             onChange={(e) => updateDraft(row.trainerId, 'scheduleId', e.target.value)}
                             aria-label={`Class and slot for ${row.name}`}
-                          >
-                            <option value="">Select class / slot</option>
-                            {(row.scheduleOptions || []).map((option) => (
-                              <option key={option.scheduleId} value={option.scheduleId}>
-                                {option.label}
-                              </option>
-                            ))}
-                          </select>
+                            placeholder="Select class / slot"
+                            options={(row.scheduleOptions || []).map((option) => ({
+                              value: option.scheduleId,
+                              label: option.label,
+                            }))}
+                          />
                         </td>
                       )}
                       <td>
@@ -278,17 +277,18 @@ const ObservationsTab = () => {
                         </td>
                       )}
                       <td>
-                        <select
-                          className="form-select form-select-sm"
+                        <StyledSelect
+                          size="sm"
+                          className="toms-styled-select--table-cell"
                           value={draft.rating}
                           onChange={(e) => updateDraft(row.trainerId, 'rating', e.target.value)}
                           aria-label={`Rating for ${row.name}`}
-                        >
-                          <option value="">—</option>
-                          {RATING_OPTIONS.map((value) => (
-                            <option key={value} value={value}>{value}</option>
-                          ))}
-                        </select>
+                          placeholder="—"
+                          options={RATING_OPTIONS.map((rating) => ({
+                            value: String(rating),
+                            label: String(rating),
+                          }))}
+                        />
                       </td>
                       <td>
                         <input

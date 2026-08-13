@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import Modal from './Modal.jsx';
+import StyledSelect from './StyledSelect.jsx';
 import ConfirmModal from './ConfirmModal.jsx';
 import LoadingSpinner from './LoadingSpinner.jsx';
 import { TrashIcon } from './icons.jsx';
@@ -258,20 +259,17 @@ const ClassCancellationModal = ({ show, initialDate, onClose, onChanged }) => {
               {scope === 'school' && (
                 <div className="mb-3">
                   <label htmlFor="class-cancellation-school" className="form-label fw-semibold">School</label>
-                  <select
+                  <StyledSelect
                     id="class-cancellation-school"
-                    className="form-select"
                     value={schoolId}
                     onChange={(event) => setSchoolId(event.target.value)}
                     required
-                  >
-                    <option value="">Select school...</option>
-                    {(data?.schools || []).map((school) => (
-                      <option key={school._id} value={school._id}>
-                        {school.name} ({school.code})
-                      </option>
-                    ))}
-                  </select>
+                    placeholder="Select school..."
+                    options={(data?.schools || []).map((school) => ({
+                      value: school._id,
+                      label: `${school.name} (${school.code})`,
+                    }))}
+                  />
                 </div>
               )}
 

@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import LoadingSpinner from './LoadingSpinner.jsx';
+import StyledSelect from './StyledSelect.jsx';
 import { FeedbackFieldPreview } from './FeedbackFieldInput.jsx';
 import { CopyIcon } from './icons.jsx';
 import {
@@ -259,18 +260,19 @@ const FeedbackFormTab = () => {
                     onChange={(e) => updateField(index, { label: e.target.value })}
                     aria-label="Question label"
                   />
-                  <select
-                    className="form-select form-select-sm mb-2"
+                  <StyledSelect
+                    size="sm"
+                    className="mb-2"
                     value={field.type}
                     onChange={(e) => updateField(index, {
                       type: e.target.value,
                       options: e.target.value === 'multiple_choice' ? ['Option 1'] : [],
                     })}
-                  >
-                    {FIELD_TYPES.map((type) => (
-                      <option key={type.value} value={type.value}>{type.label}</option>
-                    ))}
-                  </select>
+                    options={FIELD_TYPES.map((type) => ({
+                      value: type.value,
+                      label: type.label,
+                    }))}
+                  />
                   {field.type === 'multiple_choice' && (
                     <textarea
                       className="form-control form-control-sm"

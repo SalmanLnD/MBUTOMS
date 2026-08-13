@@ -43,6 +43,7 @@ const StyledSelect = ({
   placeholder = 'Select an option',
   disabled = false,
   required = false,
+  size,
   className = '',
   'aria-label': ariaLabel,
 }) => {
@@ -270,7 +271,13 @@ const StyledSelect = ({
   return (
     <div
       ref={rootRef}
-      className={['toms-styled-select', open ? 'is-open' : '', disabled ? 'is-disabled' : '', className].filter(Boolean).join(' ')}
+      className={[
+        'toms-styled-select',
+        size === 'sm' ? 'toms-styled-select--sm' : '',
+        open ? 'is-open' : '',
+        disabled ? 'is-disabled' : '',
+        className,
+      ].filter(Boolean).join(' ')}
     >
       {required && (
         <input

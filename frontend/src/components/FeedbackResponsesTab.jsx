@@ -9,6 +9,7 @@ import { getErrorMessage } from '../utils/helpers.js';
 import { usePagination } from '../hooks/usePagination.js';
 import { SheetIcon, ExternalLinkIcon } from './icons.jsx';
 import '../styles/feedback-forms.css';
+import StyledSelect from './StyledSelect.jsx';
 
 const FeedbackResponsesTab = () => {
   const {
@@ -92,21 +93,19 @@ const FeedbackResponsesTab = () => {
           </div>
           <div className="feedback-filter-field feedback-filter-field--trainer">
             <label className="form-label mb-1" htmlFor="feedback-trainer-filter">Filter by trainer</label>
-            <select
+            <StyledSelect
               id="feedback-trainer-filter"
-              className="form-select"
               value={trainerFilter}
               onChange={(e) => { setTrainerFilter(e.target.value); resetPage(); }}
               aria-label="Filter by trainer"
-            >
-              <option value="">All trainers</option>
-              {trainers.map((trainer) => (
-                <option key={trainer._id} value={trainer._id}>
-                  {trainer.name}
-                  {trainer.employeeId ? ` (${trainer.employeeId})` : ''}
-                </option>
-              ))}
-            </select>
+              options={[
+                { value: '', label: 'All trainers' },
+                ...trainers.map((trainer) => ({
+                  value: trainer._id,
+                  label: `${trainer.name}${trainer.employeeId ? ` (${trainer.employeeId})` : ''}`,
+                })),
+              ]}
+            />
           </div>
         </div>
 

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import LoadingSpinner from './LoadingSpinner.jsx';
+import StyledSelect from './StyledSelect.jsx';
 import { getLiveTrainerVenues } from '../services/scheduleService.js';
 import { getVenueMappingReference } from '../services/venueService.js';
 import { getErrorMessage } from '../utils/helpers.js';
@@ -163,30 +164,28 @@ const VenueLiveTab = () => {
             />
           </div>
           <div className="col-md-2">
-            <select
-              className="form-select"
+            <StyledSelect
+              className="toms-styled-select--auto"
               value={blockFilter}
               onChange={(e) => setBlockFilter(e.target.value)}
               aria-label="Filter by block"
-            >
-              <option value="">All blocks</option>
-              {availableBlocks.map((block) => (
-                <option key={block} value={block}>{block}</option>
-              ))}
-            </select>
+              placeholder="All blocks"
+              options={availableBlocks.map((block) => ({ value: block, label: block }))}
+            />
           </div>
           <div className="col-md-2">
-            <select
-              className="form-select"
+            <StyledSelect
+              className="toms-styled-select--auto"
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
               aria-label="Filter by status"
-            >
-              <option value="">All statuses</option>
-              <option value="in_class">In class</option>
-              <option value="free">Free</option>
-              <option value="not_available">Not available</option>
-            </select>
+              placeholder="All statuses"
+              options={[
+                { value: 'in_class', label: 'In class' },
+                { value: 'free', label: 'Free' },
+                { value: 'not_available', label: 'Not available' },
+              ]}
+            />
           </div>
           <div className="col-md-3">
             <div className="text-muted small">

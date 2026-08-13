@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import Modal from './Modal.jsx';
+import StyledSelect from './StyledSelect.jsx';
 import LoadingSpinner from './LoadingSpinner.jsx';
 import { getTrainers } from '../services/trainerService.js';
 import {
@@ -116,20 +117,17 @@ const AddSlotReplacementModal = ({ show, onClose, onCreated }) => {
             <>
               <div className="mb-3">
                 <label className="form-label" htmlFor="slot-replacement-trainer">Trainer</label>
-                <select
+                <StyledSelect
                   id="slot-replacement-trainer"
-                  className="form-select"
                   value={form.trainer}
                   onChange={(e) => setForm({ ...form, trainer: e.target.value, scheduleId: '' })}
                   required
-                >
-                  <option value="">Select trainer</option>
-                  {trainers.map((trainer) => (
-                    <option key={trainer._id} value={trainer._id}>
-                      {trainer.name} ({trainer.employeeId})
-                    </option>
-                  ))}
-                </select>
+                  placeholder="Select trainer"
+                  options={trainers.map((trainer) => ({
+                    value: trainer._id,
+                    label: `${trainer.name} (${trainer.employeeId})`,
+                  }))}
+                />
               </div>
 
               <div className="mb-3">
@@ -149,27 +147,24 @@ const AddSlotReplacementModal = ({ show, onClose, onCreated }) => {
                 {loadingSlots ? (
                   <LoadingSpinner message="Loading class slots..." />
                 ) : (
-                  <select
+                  <StyledSelect
                     id="slot-replacement-slot"
-                    className="form-select"
                     value={form.scheduleId}
                     onChange={(e) => setForm({ ...form, scheduleId: e.target.value })}
                     required
                     disabled={!form.trainer || !slots.length}
-                  >
-                    <option value="">
-                      {!form.trainer
+                    placeholder={
+                      !form.trainer
                         ? 'Select a trainer first'
                         : slots.length
                           ? 'Select class slot'
-                          : `No available classes on ${slotDay || 'this day'}`}
-                    </option>
-                    {slots.map((schedule) => (
-                      <option key={schedule._id} value={schedule._id}>
-                        {formatSlotLabel(schedule)}
-                      </option>
-                    ))}
-                  </select>
+                          : `No available classes on ${slotDay || 'this day'}`
+                    }
+                    options={slots.map((schedule) => ({
+                      value: schedule._id,
+                      label: formatSlotLabel(schedule),
+                    }))}
+                  />
                 )}
                 {form.trainer && form.date && slotDay && !loadingSlots && (
                   <div className="form-text">

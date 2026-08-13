@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import Modal from './Modal.jsx';
 import { createCompliance } from '../services/plpService.js';
 import { getErrorMessage, toInputDate } from '../utils/helpers.js';
+import StyledSelect from './StyledSelect.jsx';
 
 const ComplianceFormModal = ({
   show,
@@ -62,21 +63,21 @@ const ComplianceFormModal = ({
 
           <div className="mb-3">
             <label className="form-label" htmlFor="compliance-trainer">Trainer</label>
-            <select
+            <StyledSelect
               id="compliance-trainer"
-              className="form-select"
+              name="trainerId"
               value={trainerId}
               onChange={(e) => setTrainerId(e.target.value)}
+              placeholder="Select trainer"
               required
-            >
-              <option value="">Select trainer</option>
-              {trainers.map((trainer) => (
-                <option key={trainer._id} value={trainer._id}>
-                  {trainer.name}
-                  {trainer.employeeId ? ` (${trainer.employeeId})` : ''}
-                </option>
-              ))}
-            </select>
+              options={[
+                { value: '', label: 'Select trainer' },
+                ...trainers.map((trainer) => ({
+                  value: trainer._id,
+                  label: `${trainer.name}${trainer.employeeId ? ` (${trainer.employeeId})` : ''}`,
+                })),
+              ]}
+            />
           </div>
 
           <div className="mb-3">

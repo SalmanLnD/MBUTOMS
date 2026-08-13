@@ -14,6 +14,7 @@ import Modal from '../components/Modal.jsx';
 import ConfirmModal from '../components/ConfirmModal.jsx';
 import { TrashIcon } from '../components/icons.jsx';
 import ActionIconButton from '../components/ActionIconButton.jsx';
+import StyledSelect from '../components/StyledSelect.jsx';
 import {
   FULL_ACCESS_ROLES,
   canCreateLeaveForOthers,
@@ -178,13 +179,19 @@ const Leaves = () => {
   return (
     <>
       <div className="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
-        <select className="form-select w-auto" value={statusFilter} onChange={(e) => { setStatusFilter(e.target.value); resetPage(); }}>
-          <option value="">All Status</option>
-          <option value="pending">Pending</option>
-          <option value="approved">Approved</option>
-          <option value="rejected">Rejected</option>
-          <option value="cancelled">Cancelled</option>
-        </select>
+        <StyledSelect
+          className="toms-styled-select--auto"
+          value={statusFilter}
+          onChange={(e) => { setStatusFilter(e.target.value); resetPage(); }}
+          aria-label="Filter by status"
+          options={[
+            { value: '', label: 'All Status' },
+            { value: 'pending', label: 'Pending' },
+            { value: 'approved', label: 'Approved' },
+            { value: 'rejected', label: 'Rejected' },
+            { value: 'cancelled', label: 'Cancelled' },
+          ]}
+        />
         <button type="button" className="btn btn-primary" onClick={openLeaveForm}>Apply Leave</button>
       </div>
 
@@ -256,19 +263,20 @@ const Leaves = () => {
               {canApplyForOthers && (
                 <div className="mb-3">
                   <label className="form-label">Trainer</label>
-                  <select
-                    className="form-select"
+                  <StyledSelect
+                    name="trainer"
                     value={form.trainer}
                     onChange={(e) => setForm({ ...form, trainer: e.target.value })}
+                    placeholder="Select trainer"
                     required
-                  >
-                    <option value="">Select trainer</option>
-                    {trainers.map((t) => (
-                      <option key={t._id} value={t._id}>
-                        {t.name} ({t.employeeId})
-                      </option>
-                    ))}
-                  </select>
+                    options={[
+                      { value: '', label: 'Select trainer' },
+                      ...trainers.map((t) => ({
+                        value: t._id,
+                        label: `${t.name} (${t.employeeId})`,
+                      })),
+                    ]}
+                  />
                 </div>
               )}
               <div className="mb-3">

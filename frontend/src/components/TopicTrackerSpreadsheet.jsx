@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import Modal from './Modal.jsx';
+import StyledSelect from './StyledSelect.jsx';
 import LoadingSpinner from './LoadingSpinner.jsx';
 import {
   getTopicTrackerSessions,
@@ -248,23 +249,22 @@ const TopicTrackerSpreadsheet = ({
       const valueNotInList = value && !SESSION_STATUS_VALUES.includes(value);
 
       return (
-        <select
-          className="form-select form-select-sm topic-tracker-cell-input"
+        <StyledSelect
+          size="sm"
+          className="topic-tracker-cell-input"
           value={value}
           onChange={(e) => updateRow(index, column.key, e.target.value)}
           disabled={isSaving}
           aria-label="Session Status"
-        >
-          <option value="">Select status...</option>
-          {valueNotInList && (
-            <option value={value}>{value}</option>
-          )}
-          {SESSION_STATUS_VALUES.map((status) => (
-            <option key={status} value={status}>
-              {SESSION_STATUS_LABELS[status]}
-            </option>
-          ))}
-        </select>
+          placeholder="Select status..."
+          options={[
+            ...(valueNotInList ? [{ value, label: value }] : []),
+            ...SESSION_STATUS_VALUES.map((status) => ({
+              value: status,
+              label: SESSION_STATUS_LABELS[status],
+            })),
+          ]}
+        />
       );
     }
 
@@ -279,25 +279,23 @@ const TopicTrackerSpreadsheet = ({
             return (
               <div className="topic-tracker-topic-row" key={`${topicIndex}-${topic}`}>
                 {options.length ? (
-                  <select
-                    className="form-select form-select-sm topic-tracker-cell-input topic-tracker-topic-select"
+                  <StyledSelect
+                    size="sm"
+                    className="topic-tracker-cell-input topic-tracker-topic-select"
                     value={topic}
                     onChange={(e) => updateTopic(index, topicIndex, e.target.value)}
                     disabled={isSaving}
                     aria-label={`Topic / Module Covered ${topicIndex + 1}`}
-                  >
-                    <option value="">Select topic...</option>
-                    {valueNotInList && <option value={topic}>{topic}</option>}
-                    {options.map((option) => (
-                      <option
-                        key={option}
-                        value={option}
-                        disabled={option !== topic && selectedTopics.has(option)}
-                      >
-                        {option}
-                      </option>
-                    ))}
-                  </select>
+                    placeholder="Select topic..."
+                    options={[
+                      ...(valueNotInList ? [{ value: topic, label: topic }] : []),
+                      ...options.map((option) => ({
+                        value: option,
+                        label: option,
+                        disabled: option !== topic && selectedTopics.has(option),
+                      })),
+                    ]}
+                  />
                 ) : (
                   <input
                     type="text"

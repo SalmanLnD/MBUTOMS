@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import LoadingSpinner from './LoadingSpinner.jsx';
+import StyledSelect from './StyledSelect.jsx';
 import PlpSheetSetupModal from './PlpSheetSetupModal.jsx';
 import { ExternalLinkIcon, SheetIcon } from './icons.jsx';
 import {
@@ -317,25 +318,21 @@ const PlpTab = () => {
                   <td className="fw-medium">{formatScore(row.calculatedRaw)}</td>
                   <td>
                     <div className="d-flex flex-wrap align-items-center gap-1">
-                      <select
-                        className="form-select form-select-sm"
-                        style={{ maxWidth: 100 }}
+                      <StyledSelect
+                        size="sm"
+                        className="toms-styled-select--table-cell"
                         value={finalDrafts[row.trainerId] ?? ''}
                         aria-label={`Final PLP for ${row.name}`}
                         onChange={(e) => setFinalDrafts((prev) => ({
                           ...prev,
                           [row.trainerId]: e.target.value,
                         }))}
-                      >
-                        <option value="">
-                          Rounded {row.calculatedFinal == null ? '—' : row.calculatedFinal}
-                        </option>
-                        {FINAL_OPTIONS.map((value) => (
-                          <option key={value} value={String(value)}>
-                            {value === 0 ? '0 (break/leave)' : value}
-                          </option>
-                        ))}
-                      </select>
+                        placeholder={`Rounded ${row.calculatedFinal == null ? '—' : row.calculatedFinal}`}
+                        options={FINAL_OPTIONS.map((value) => ({
+                          value: String(value),
+                          label: value === 0 ? '0 (break/leave)' : String(value),
+                        }))}
+                      />
                       <button
                         type="button"
                         className="btn btn-outline-secondary btn-sm"

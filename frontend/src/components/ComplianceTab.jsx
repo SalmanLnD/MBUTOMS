@@ -21,6 +21,7 @@ import { showError, showSuccess } from '../utils/toast.js';
 import { useDebounce } from '../hooks/useDebounce.js';
 import { usePagination } from '../hooks/usePagination.js';
 import { isAbortError } from '../services/api.js';
+import StyledSelect from './StyledSelect.jsx';
 
 const ComplianceTab = () => {
   const monthOptions = useMemo(() => buildMonthOptions(), []);
@@ -104,18 +105,13 @@ const ComplianceTab = () => {
       <div className="row g-2 mb-3 align-items-end">
         <div className="col-md-3">
           <label className="form-label" htmlFor="compliance-month-filter">Month</label>
-          <select
+          <StyledSelect
             id="compliance-month-filter"
-            className="form-select"
             value={monthKey}
             onChange={(e) => setMonthKey(e.target.value)}
-          >
-            {monthOptions.map((option) => (
-              <option key={option.value} value={option.value}>
-                {option.label}
-              </option>
-            ))}
-          </select>
+            aria-label="Filter by month"
+            options={monthOptions}
+          />
         </div>
         <div className="col-md-5">
           <label className="form-label" htmlFor="compliance-trainer-filter">Trainer</label>

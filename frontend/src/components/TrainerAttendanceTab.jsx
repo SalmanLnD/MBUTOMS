@@ -1,6 +1,7 @@
 import { useState, useEffect, useLayoutEffect, useCallback, Fragment, useMemo, useRef } from 'react';
 import LoadingSpinner from '../components/LoadingSpinner.jsx';
 import TrainerAttendanceRow from './TrainerAttendanceRow.jsx';
+import StyledSelect from './StyledSelect.jsx';
 import CollapsibleFilters from './CollapsibleFilters.jsx';
 import { showError, showSuccess } from '../utils/toast.js';
 import { useAuth } from '../context/AuthContext.jsx';
@@ -292,18 +293,17 @@ const TrainerAttendanceTab = () => {
           >
             Previous Month
           </button>
-          <select
-            className="form-select form-select-sm trainer-attendance-month-select"
+          <StyledSelect
+            size="sm"
+            className="trainer-attendance-month-select"
             value={monthKey}
             onChange={(e) => setMonthParts(parseMonthKey(e.target.value))}
             aria-label="Select month"
-          >
-            {monthOptions.map((option) => (
-              <option key={option.value} value={option.value}>
-                {option.label}
-              </option>
-            ))}
-          </select>
+            options={monthOptions.map((option) => ({
+              value: option.value,
+              label: option.label,
+            }))}
+          />
           <button
             type="button"
             className="btn btn-outline-secondary btn-sm"

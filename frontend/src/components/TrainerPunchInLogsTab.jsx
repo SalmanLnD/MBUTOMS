@@ -11,6 +11,7 @@ import { useDebounce } from '../hooks/useDebounce.js';
 import { usePagination } from '../hooks/usePagination.js';
 import { deleteTrainerPunchInLog, getTrainerPunchInLogs } from '../services/attendanceService.js';
 import { formatDate, formatDateTime, formatStatus, getErrorMessage } from '../utils/helpers.js';
+import StyledSelect from './StyledSelect.jsx';
 
 const SOURCE_BADGE = {
   whatsapp: 'bg-success',
@@ -130,20 +131,20 @@ const TrainerPunchInLogsTab = () => {
           <label className="form-label small text-muted mb-1" htmlFor="punch-log-source">
             Source
           </label>
-          <select
+          <StyledSelect
             id="punch-log-source"
-            className="form-select"
             value={sourceFilter}
             onChange={(e) => {
               setSourceFilter(e.target.value);
               resetPage();
             }}
             aria-label="Filter by punch-in source"
-          >
-            <option value="">All sources</option>
-            <option value="whatsapp">WhatsApp</option>
-            <option value="manual">Manual</option>
-          </select>
+            options={[
+              { value: '', label: 'All sources' },
+              { value: 'whatsapp', label: 'WhatsApp' },
+              { value: 'manual', label: 'Manual' },
+            ]}
+          />
         </div>
         <div className="col-md-2">
           <label className="form-label small text-muted mb-1" htmlFor="punch-log-from">
