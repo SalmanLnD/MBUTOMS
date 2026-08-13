@@ -8,77 +8,65 @@ Previous release: **1.1.2** (2026-07-16)
 
 ### UI and experience
 
-- Claymorphism / bento spatial UI redesign across admin and trainer pages
-- Dark mode with persistent theme toggle in the top bar
-- Semantic theme color variables for readable text in light and dark modes
-- Collapsible filter panels on mobile across major list pages
-- Styled single- and multi-select dropdowns replacing native selects app-wide
-- Softer card shadows and improved timetable cell contrast
-- Fixed styled-select chevron alignment in production builds
+- Refreshed interface with cleaner layout and easier navigation
+- Dark mode with theme toggle in the top bar
+- Improved text readability in dark mode across dashboard, profile, timetable, and reports
+- Collapsible filter panels on mobile for easier browsing on phones
+- Modern styled dropdowns across the app
+- Clearer timetable cells and softer visual styling
 
-### Students and classes
+### Classes and students (trainer view)
 
-- Student bulk upload from Excel/CSV with template download
-- Chunked bulk import with progress bar (fixes production timeouts and CORS)
-- School filter on Classes and Students tabs; school shown on each class row
-- Passed-out year and semester on student list and bulk upload
-- Semester-aware student counts (fixes III-sem uploads inflating V-sem classes)
-- Trainers/evaluators see only timetable-allocated classes and students
+- Trainers and evaluators see only classes and students assigned to their timetable
+- School name shown on each class row
+- Filter classes by school, department, section, and semester
 
 ### Monthly test reports
 
-- Replaced student attendance tab with Monthly Test Reports for trainers
-- Subject-wise and class-wise summaries with pass threshold (50%)
-- P/A attendance in mark entry; absentees excluded from pass rates
-- Excel export and Google Sheets sync with per-month tabs
-- Mark entry scroll stability, whole-number validation, and decimal rounding fixes
+- New Monthly Test Reports tab for entering and reviewing student test marks
+- Subject-wise and class-wise pass summaries (50% pass threshold)
+- Present/Absent (P/A) mark entry; absent students excluded from pass rate
+- Download reports to Excel
+- Smoother mark entry on mobile and improved mark validation
 
 ### Trainer attendance
 
-- Leave count and RRD (Replacement Required Days) in month totals
-- Sunday defaults to W.O; manual class hours for non-campus OIF numbers
-- Pre-join attendance defaults (0 hours before trainer joining date)
-- Cancelled-session approval queue deducts trainer attendance hours
-- Google Sheet sync: master tab formatting preserved; food allowance exports as none
-- External replacement trainers supported in replacement workflow
+- Monthly attendance grid with OIF, mock hours, class hours, and food allowance
+- Leave count and RRD (Replacement Required Days) shown in month summary
+- Sundays default to week off; manual hours for non-campus OIF numbers
+- Correct hours before trainer joining date (no pre-join timetable defaults)
+- Google Sheet sync keeps formatting; empty food allowance shown as none
 
 ### Leaves and replacements
 
-- Trainer resignation and permanent replacement workflows
-- Cancel replacement restores original trainer on the affected slot
-- Remove/cancel replacement option on the replacement register
-- Assign replacements for completed leave days and past slot dates
-- Deduped replacement schedule entries (fixes triple-counted class hours)
-- Replacement suggestions exclude trainers already covering overlapping slots
-- Live venues show trainers on leave as unavailable and external cover trainers
+- View replacement status on live venue board (trainer on leave / external cover)
+- Replacement suggestions skip trainers already covering another slot that day
 
-### Performance module
+### Performance module (Feedback, Observations, PLP)
 
-- Restructured into Feedback, Observations, PLP, and Compliance tabs
-- Evaluator role with PLP/compliance scoring
-- PLP tracked on 21–20 cycle with demo and class observations
-- Half-step observation ratings; PLP final can be 0 for break/long leave
-- PLP Google Sheet export: one tab per cycle with formatted headers
-- Observation notifications with class slot details; coordinator/evaluator access fixes
-- PLP and Compliance limited to full-access staff; Feedback available to coordinators
+- Performance area split into Feedback, Observations, and PLP tabs
+- Submit and view feedback forms
+- Record class and demo observations with half-step ratings
+- PLP scoring on 21–20 cycle with demo and class observation components
+- PLP final can be set to 0 for break or long leave
+- Export PLP to Google Sheets (one tab per cycle)
+- Notification when an observation comment is added
 
 ### Topic tracker and venues
 
-- Venues Live tab with trainer-wise current venue from schedule
-- Topic tracker Google Sheet: master tab plus one tab per trainer
-- Auto-filled class counts; block filter; external live trainer listing
-- III-sem venue updates for assigned trainers
+- Venues Live tab shows where each trainer is currently scheduled
+- Topic tracker: update daily slots, view class-wise coverage, sync to Google Sheet
+- Auto-filled class counts and block filter in topic tracker
 
-### Trainer profile and access
+### Profile
 
-- CAMU ERP credentials on trainer profile (user sees own password)
-- Session bound to app version — users re-login after deploy to load latest UI
+- View your CAMU ERP ID and password on your trainer profile
 
-### Backend and deployment
+### Performance and reliability
 
-- Optimized read APIs; removed obsolete one-off maintenance scripts
-- Coordinator/evaluator role sync on serverless cold starts
-- GitHub Actions CI plus Vercel production deploy on push to `main`
+- Performance optimization for faster page loads and smoother navigation
+- Database optimization for quicker lists, reports, and timetable views
+- App prompts re-login after update to ensure you are on the latest version
 
 ---
 
@@ -88,5 +76,5 @@ Previous release: **1.1.2** (2026-07-16)
 
 ## [1.1.0] - 2026-07-15
 
-- Session tokens bound to deployed app version
-- Forced re-login prompt when app version changes (`APP_VERSION_UPDATED`)
+- App update notification when a new version is deployed
+- Sign in again after update to load the latest interface
