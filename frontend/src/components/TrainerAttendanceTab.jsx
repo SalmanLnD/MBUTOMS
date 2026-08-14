@@ -22,7 +22,7 @@ import {
   isFutureDateKey,
   parseMonthKey,
   shiftMonth,
-  toInputDate,
+  toAttendanceDateKey,
   TRAINER_ATTENDANCE_TRACKING_START,
 } from '../utils/monthDates.js';
 import { allowsManualClassHandlingHours, countsAsOifDay } from '../utils/trainerAttendanceTypes.js';
@@ -72,7 +72,9 @@ const TrainerAttendanceTab = () => {
 
   const fetchGrid = useCallback(async ({ forceRefresh = false } = {}) => {
     const requestParams = { month: monthKey };
-    const cachedMonth = monthCacheRef.current.get(monthKey);
+    const todayKey = toAttendanceDateKey();
+    const cacheRecord = monthCacheRef.current.get(monthKey);
+    const cachedMonth = cacheRecord?.todayKey === todayKey ? cacheRecord.data : null;
 
     if (cachedMonth && !forceRefresh) {
       gridDataRef.current = cachedMonth;
@@ -95,7 +97,7 @@ const TrainerAttendanceTab = () => {
         preferCache: !forceRefresh,
         forceRefresh,
       });
-      monthCacheRef.current.set(monthKey, data);
+      monthCacheRef.current.set(monthKey, { todayKey, data });
       gridDataRef.current = data;
       setGrid(data);
     } catch (err) {
@@ -127,7 +129,7 @@ const TrainerAttendanceTab = () => {
     const container = scrollContainerRef.current;
     if (!container || !grid?.dates?.length) return;
 
-    const todayKey = toInputDate(new Date());
+    const todayKey = toAttendanceDateKey();
     const anchor = container.querySelector(`[data-date-scroll-anchor="${todayKey}"]`);
     if (!anchor) {
       container.scrollLeft = 0;
@@ -210,7 +212,7 @@ const TrainerAttendanceTab = () => {
         }),
       };
       gridDataRef.current = next;
-      monthCacheRef.current.set(prev.month, next);
+      monthCacheRef.current.set(prev.month, { todayKey: toAttendanceDateKey(), data: next });
       return next;
     });
   }, []);
@@ -266,7 +268,7 @@ const TrainerAttendanceTab = () => {
           }),
         };
         gridDataRef.current = next;
-        monthCacheRef.current.set(next.month, next);
+        monthCacheRef.current.set(next.month, { todayKey: toAttendanceDateKey(), data: next });
         return next;
       });
     } catch (err) {

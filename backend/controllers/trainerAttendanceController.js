@@ -100,7 +100,12 @@ export const buildTrainerAttendanceGridPayload = async ({
   ({ year, month } = clampAttendanceMonthToTrackingStart({ year, month }));
 
   const monthKey = formatAttendanceMonthKey(year, month);
-  const cacheKey = buildAttendanceGridCacheKey(monthKey, semester, user);
+  const cacheKey = buildAttendanceGridCacheKey(
+    monthKey,
+    semester,
+    user,
+    toAttendanceDateKey(today)
+  );
   const bypassCache = refresh === true || refresh === '1' || refresh === 'true';
 
   if (!bypassCache) {

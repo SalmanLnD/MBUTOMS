@@ -26,6 +26,8 @@ const {
   PUNCH_POLL_MS = '45000',
   SYNC_FAIL_RECONNECT_AFTER = '3',
   HISTORY_LOAD_ROUNDS = '12',
+  API_KEEPALIVE_MS = '480000',
+  WEBHOOK_TIMEOUT_MS = '60000',
 } = process.env;
 
 const LIST_GROUPS = process.argv.includes('--list-groups');
@@ -48,6 +50,8 @@ const catchupLookbackMs = (Number(CATCHUP_LOOKBACK_HOURS) || 36) * 60 * 60 * 100
 const punchPollMs = Number(PUNCH_POLL_MS) || 45000;
 const syncFailReconnectAfter = Number(SYNC_FAIL_RECONNECT_AFTER) || 3;
 const historyLoadRounds = Number(HISTORY_LOAD_ROUNDS) || 12;
+const apiKeepAliveMs = Number(API_KEEPALIVE_MS) || 480000;
+const webhookTimeoutMs = Number(WEBHOOK_TIMEOUT_MS) || 60000;
 const notReadyGraceMs = Math.max(watchdogIntervalMs, 120000);
 const PROCESSED_IDS_PATH = './.processed-message-ids.json';
 
@@ -59,6 +63,33 @@ const inFlightMessageIds = new Set();
 const log = (...args) => console.log(new Date().toISOString(), ...args);
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+const apiHealthUrl = (() => {
+  if (process.env.API_HEALTH_URL) return process.env.API_HEALTH_URL;
+  if (!WEBHOOK_URL) return '';
+  try {
+    return new URL('/api/health', WEBHOOK_URL).toString();
+  } catch {
+    return '';
+  }
+})();
+
+const isPermanentWebhookError = (error) => {
+  const status = error.response?.status;
+  const message = String(error.response?.data?.message || '');
+  if (status === 400 && message) return true;
+  if (status === 404 && /no trainer found/i.test(message)) return true;
+  return false;
+};
+
+const pingApiKeepAlive = async () => {
+  if (!apiHealthUrl) return;
+  try {
+    await axios.get(apiHealthUrl, { timeout: 45000 });
+  } catch (error) {
+    log(`API keep-alive failed: ${error.message}`);
+  }
+};
 
 const withRetries = async (label, fn, { attempts = 3, delayMs = 5000 } = {}) => {
   let lastError;
@@ -206,6 +237,7 @@ let bridgeReady = false;
 let reconnecting = false;
 let reconnectTimer = null;
 let watchdogTimer = null;
+let keepAliveTimer = null;
 let punchPollTimer = null;
 let readyTimeout = null;
 let reconnectAttempt = 0;
@@ -404,6 +436,13 @@ const startWatchdog = () => {
   watchdogTimer = setInterval(() => {
     runWatchdog().catch((error) => log('Watchdog error:', error.message));
   }, watchdogIntervalMs);
+  if (keepAliveTimer) clearInterval(keepAliveTimer);
+  if (apiHealthUrl && !ONE_SHOT_MODE) {
+    pingApiKeepAlive().catch((error) => log('API keep-alive error:', error.message));
+    keepAliveTimer = setInterval(() => {
+      pingApiKeepAlive().catch((error) => log('API keep-alive error:', error.message));
+    }, apiKeepAliveMs);
+  }
 };
 
 const shutdownBridge = async () => {
@@ -411,6 +450,7 @@ const shutdownBridge = async () => {
   shuttingDown = true;
   if (reconnectTimer) clearTimeout(reconnectTimer);
   if (watchdogTimer) clearInterval(watchdogTimer);
+  if (keepAliveTimer) clearInterval(keepAliveTimer);
   if (punchPollTimer) clearInterval(punchPollTimer);
   if (processedIdsPersistTimer) {
     clearTimeout(processedIdsPersistTimer);
@@ -609,9 +649,9 @@ const wireClient = (activeClient) => {
       () =>
         axios.post(WEBHOOK_URL, payload, {
           headers: { 'x-webhook-secret': WEBHOOK_SECRET },
-          timeout: 15000,
+          timeout: webhookTimeoutMs,
         }),
-      { attempts: 3, delayMs: 5000 }
+      { attempts: 5, delayMs: 8000 }
     );
     return data;
   };
@@ -673,7 +713,7 @@ const wireClient = (activeClient) => {
       const phoneHint = error.response?.data?.phone ? ` (normalized phone: ${error.response.data.phone})` : '';
       log(`Failed to forward punch-in (${status || 'no response'}): ${detail}${phoneHint}`);
       // Permanent client errors will not succeed on retry — avoid infinite loops.
-      if (status === 400 || status === 404) {
+      if (isPermanentWebhookError(error)) {
         rememberProcessedMessageId(messageId);
       }
       // Do not mark processed for 5xx / network — allow later catch-up / retry.
@@ -973,7 +1013,7 @@ const wireClient = (activeClient) => {
       const status = error.response?.status;
       const detail = error.response?.data?.message || error.message;
       log(`Failed to forward punch-in (${status || 'no response'}): ${detail}`);
-      if (status === 400 || status === 404) {
+      if (isPermanentWebhookError(error)) {
         rememberProcessedMessageId(messageId);
         return 'skip-client-error';
       }

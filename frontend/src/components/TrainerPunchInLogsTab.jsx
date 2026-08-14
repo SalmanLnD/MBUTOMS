@@ -10,8 +10,9 @@ import { useAuth } from '../context/AuthContext.jsx';
 import { useDebounce } from '../hooks/useDebounce.js';
 import { usePagination } from '../hooks/usePagination.js';
 import { deleteTrainerPunchInLog, getTrainerPunchInLogs } from '../services/attendanceService.js';
-import { formatDate, formatDateTime, formatStatus, getErrorMessage } from '../utils/helpers.js';
+import { formatDateTime, formatStatus, getErrorMessage } from '../utils/helpers.js';
 import StyledSelect from './StyledSelect.jsx';
+import { formatAttendanceDayLabel } from '../utils/monthDates.js';
 
 const SOURCE_BADGE = {
   whatsapp: 'bg-success',
@@ -107,9 +108,9 @@ const TrainerPunchInLogsTab = () => {
 
   return (
     <>
-      <div className="row g-2 mb-3 align-items-end">
+      <div className="mark-entry-filters mb-3">
         {canManageAll && (
-          <div className="col-md-3">
+          <div className="mark-entry-filters__field">
             <label className="form-label small text-muted mb-1" htmlFor="punch-log-search">
               Trainer
             </label>
@@ -127,7 +128,7 @@ const TrainerPunchInLogsTab = () => {
             />
           </div>
         )}
-        <div className={canManageAll ? 'col-md-2' : 'col-md-3'}>
+        <div className="mark-entry-filters__field">
           <label className="form-label small text-muted mb-1" htmlFor="punch-log-source">
             Source
           </label>
@@ -146,7 +147,7 @@ const TrainerPunchInLogsTab = () => {
             ]}
           />
         </div>
-        <div className="col-md-2">
+        <div className="mark-entry-filters__field">
           <label className="form-label small text-muted mb-1" htmlFor="punch-log-from">
             From
           </label>
@@ -162,7 +163,7 @@ const TrainerPunchInLogsTab = () => {
             aria-label="Filter from date"
           />
         </div>
-        <div className="col-md-2">
+        <div className="mark-entry-filters__field">
           <label className="form-label small text-muted mb-1" htmlFor="punch-log-to">
             To
           </label>
@@ -178,7 +179,7 @@ const TrainerPunchInLogsTab = () => {
             aria-label="Filter to date"
           />
         </div>
-        <div className="col-md-3 text-md-end">
+        <div className="mark-entry-filters__actions">
           <button type="button" className="btn btn-outline-secondary" onClick={handleClearFilters}>
             Clear filters
           </button>
@@ -214,7 +215,7 @@ const TrainerPunchInLogsTab = () => {
                   logs.map((log) => (
                     <tr key={log.id}>
                       <td className="text-nowrap fw-medium">{formatDateTime(log.punchInAt)}</td>
-                      <td className="text-nowrap">{formatDate(log.date)}</td>
+                      <td className="text-nowrap">{formatAttendanceDayLabel(log.date)}</td>
                       {canManageAll && (
                         <td>
                           {log.trainer?._id ? (
@@ -277,7 +278,7 @@ const TrainerPunchInLogsTab = () => {
         <ConfirmModal
           show
           title="Delete Punch-In Log"
-          message={`Delete the punch-in for ${pendingDelete.trainer?.name || 'this trainer'} on ${formatDate(pendingDelete.date)}? This will also remove the corresponding attendance record.`}
+          message={`Delete the punch-in for ${pendingDelete.trainer?.name || 'this trainer'} on ${formatAttendanceDayLabel(pendingDelete.date)}? This will also remove the corresponding attendance record.`}
           confirmLabel="Delete"
           confirmVariant="danger"
           onConfirm={handleConfirmDelete}

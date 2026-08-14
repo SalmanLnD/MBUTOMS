@@ -1,3 +1,4 @@
+import { toAttendanceDateKey } from '../utils/monthDates.js';
 import api from './api.js';
 
 export const getAttendance = async (params = {}) => {
@@ -25,7 +26,7 @@ const GRID_CACHE_TTL_MS = 60_000;
 
 export const getTrainerAttendanceGrid = async (params = {}, options = {}) => {
   const { preferCache = true, forceRefresh = false } = options;
-  const cacheKey = JSON.stringify(params);
+  const cacheKey = `${JSON.stringify(params)}|${toAttendanceDateKey()}`;
   const cached = gridRequestCache.get(cacheKey);
   const cacheFresh = cached && Date.now() - cached.cachedAt < GRID_CACHE_TTL_MS;
 
@@ -41,7 +42,7 @@ export const getTrainerAttendanceGrid = async (params = {}, options = {}) => {
 };
 
 export const primeTrainerAttendanceGrid = (params, data) => {
-  gridRequestCache.set(JSON.stringify(params), { data, cachedAt: Date.now() });
+  gridRequestCache.set(`${JSON.stringify(params)}|${toAttendanceDateKey()}`, { data, cachedAt: Date.now() });
 };
 
 export const invalidateTrainerAttendanceGridCache = () => {

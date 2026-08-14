@@ -1,13 +1,41 @@
 export const TRAINER_ATTENDANCE_TRACKING_START = '2026-07-01';
 export const TRAINER_ATTENDANCE_INITIAL_END = '2027-01-31';
+export const ATTENDANCE_TIMEZONE = 'Asia/Kolkata';
+
+export const toAttendanceDateKey = (dateInput = new Date()) => (
+  new Intl.DateTimeFormat('en-CA', {
+    timeZone: ATTENDANCE_TIMEZONE,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(new Date(dateInput))
+);
 
 export const toInputDate = (date) => {
   if (!date) return '';
-  const d = new Date(date);
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, '0');
-  const day = String(d.getDate()).padStart(2, '0');
-  return `${y}-${m}-${day}`;
+  if (typeof date === 'string' && /^\d{4}-\d{2}-\d{2}/.test(date)) {
+    return date.slice(0, 10);
+  }
+  return toAttendanceDateKey(date);
+};
+
+export const formatAttendanceDayLabel = (dateInput) => {
+  if (!dateInput) return '-';
+  if (typeof dateInput === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(dateInput)) {
+    const [year, month, day] = dateInput.split('-').map(Number);
+    return new Date(Date.UTC(year, month - 1, day, 6)).toLocaleDateString('en-IN', {
+      timeZone: ATTENDANCE_TIMEZONE,
+      day: '2-digit',
+      month: 'short',
+      year: 'numeric',
+    });
+  }
+  return new Date(dateInput).toLocaleDateString('en-IN', {
+    timeZone: ATTENDANCE_TIMEZONE,
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+  });
 };
 
 export const formatMonthKey = (year, month) =>
@@ -21,8 +49,8 @@ export const parseMonthKey = (monthKey) => {
 export const getTrackingStartParts = () => parseMonthKey(TRAINER_ATTENDANCE_TRACKING_START.slice(0, 7));
 
 export const getCurrentMonthParts = (referenceDate = new Date()) => {
-  const ref = new Date(referenceDate);
-  return { year: ref.getFullYear(), month: ref.getMonth() + 1 };
+  const [year, month] = toAttendanceDateKey(referenceDate).split('-').map(Number);
+  return { year, month };
 };
 
 export const getLatestAttendanceMonthParts = (referenceDate = new Date()) => {
@@ -74,4 +102,4 @@ export const buildMonthOptions = () => {
 };
 
 export const isFutureDateKey = (dateKey, referenceDate = new Date()) =>
-  dateKey > toInputDate(referenceDate);
+  dateKey > toAttendanceDateKey(referenceDate);

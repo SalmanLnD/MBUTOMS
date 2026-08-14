@@ -1,0 +1,29 @@
+name: Keep Render API awake
+
+# Free Render services sleep after idle time. Morning WhatsApp punches then
+# time out before the API finishes booting. Ping health often enough to keep
+# mbutoms-api warm, especially during the IST punch window (06:30-11:00).
+on:
+  schedule:
+    - cron: '*/10 0-7 * * *'
+    - cron: '*/20 8-23 * * *'
+  workflow_dispatch:
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Wake mbutoms-api
+        run: |
+          for i in 1 2 3 4 5; do
+            code=$(curl -sS -o /tmp/health.json -w "%{http_code}" --max-time 45 https://mbutoms-api.onrender.com/api/health || true)
+            echo "attempt=$i status=$code"
+            if [ "$code" = "200" ]; then
+              cat /tmp/health.json
+              exit 0
+            fi
+            sleep 8
+          done
+          echo "API did not become healthy"
+          exit 1

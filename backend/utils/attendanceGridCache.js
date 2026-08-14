@@ -2,12 +2,12 @@ const cache = new Map();
 // Leave/punch/replacement writes invalidate explicitly, so a longer TTL is safe.
 const CACHE_TTL_MS = 150_000;
 
-export const buildAttendanceGridCacheKey = (month, semester, user) => {
+export const buildAttendanceGridCacheKey = (month, semester, user, todayKey = '') => {
   const scope =
     user?.role === 'trainer' && user?.trainer
       ? user.trainer.toString()
       : 'all';
-  return `${month}|${semester}|${scope}`;
+  return `${month}|${semester}|${scope}|${todayKey}`;
 };
 
 export const getCachedAttendanceGrid = (key) => {
