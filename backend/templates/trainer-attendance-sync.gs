@@ -6,19 +6,31 @@ const EXPORT_URL = '__EXPORT_URL__';
 const API_KEY = '__API_KEY__';
 const DEFAULT_SHEET_NAME = 'Trainer Attendance from July 13';
 
-function syncTrainerAttendance() {
+function fetchTomsExport() {
   const url = EXPORT_URL + '?key=' + encodeURIComponent(API_KEY);
-  const response = UrlFetchApp.fetch(url, {
-    muteHttpExceptions: true,
-    headers: { 'ngrok-skip-browser-warning': 'true' },
-  });
-  if (response.getResponseCode() !== 200) {
-    throw new Error(
-      'TOMS API error (' + response.getResponseCode() + '): ' + response.getContentText()
-    );
+  const healthUrl = EXPORT_URL.replace(/\/api\/.+$/, '/api/health');
+  const headers = { 'ngrok-skip-browser-warning': 'true' };
+  let lastMessage = '';
+
+  for (let attempt = 1; attempt <= 6; attempt++) {
+    UrlFetchApp.fetch(healthUrl, { muteHttpExceptions: true, headers: headers });
+    const response = UrlFetchApp.fetch(url, { muteHttpExceptions: true, headers: headers });
+    const code = response.getResponseCode();
+    if (code === 200) {
+      return JSON.parse(response.getContentText());
+    }
+    lastMessage = 'TOMS API error (' + code + '): ' + response.getContentText();
+    if (code !== 502 && code !== 503 && code !== 504) {
+      throw new Error(lastMessage);
+    }
+    Utilities.sleep(8000);
   }
 
-  const payload = JSON.parse(response.getContentText());
+  throw new Error(lastMessage || 'TOMS API did not become ready');
+}
+
+function syncTrainerAttendance() {
+  const payload = fetchTomsExport();
   const rows = payload.rows || [];
   const spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
   const sheetName = payload.sheetName || DEFAULT_SHEET_NAME;

@@ -8,17 +8,31 @@ const EXPORT_URL = '__EXPORT_URL__';
 const API_KEY = '__API_KEY__';
 const LEGACY_SHEET_NAME = 'PLP';
 
-function syncPlp() {
+function fetchTomsExport() {
   const url = EXPORT_URL + '?key=' + encodeURIComponent(API_KEY);
-  const res = UrlFetchApp.fetch(url, {
-    muteHttpExceptions: true,
-    headers: { 'ngrok-skip-browser-warning': 'true' },
-  });
-  if (res.getResponseCode() !== 200) {
-    throw new Error('TOMS API error (' + res.getResponseCode() + '): ' + res.getContentText());
+  const healthUrl = EXPORT_URL.replace(/\/api\/.+$/, '/api/health');
+  const headers = { 'ngrok-skip-browser-warning': 'true' };
+  let lastMessage = '';
+
+  for (let attempt = 1; attempt <= 6; attempt++) {
+    UrlFetchApp.fetch(healthUrl, { muteHttpExceptions: true, headers: headers });
+    const response = UrlFetchApp.fetch(url, { muteHttpExceptions: true, headers: headers });
+    const code = response.getResponseCode();
+    if (code === 200) {
+      return JSON.parse(response.getContentText());
+    }
+    lastMessage = 'TOMS API error (' + code + '): ' + response.getContentText();
+    if (code !== 502 && code !== 503 && code !== 504) {
+      throw new Error(lastMessage);
+    }
+    Utilities.sleep(8000);
   }
 
-  const payload = JSON.parse(res.getContentText());
+  throw new Error(lastMessage || 'TOMS API did not become ready');
+}
+
+function syncPlp() {
+  const payload = fetchTomsExport();
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const sheets = payload.sheets || [];
   const managedNames = {};

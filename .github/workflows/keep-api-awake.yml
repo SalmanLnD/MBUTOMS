@@ -5,8 +5,8 @@ name: Keep Render API awake
 # mbutoms-api warm, especially during the IST punch window (06:30-11:00).
 on:
   schedule:
-    - cron: '*/10 0-7 * * *'
-    - cron: '*/20 8-23 * * *'
+    # Render free sleeps after ~15 minutes idle. Ping every 10 minutes all day.
+    - cron: '*/10 * * * *'
   workflow_dispatch:
 
 jobs:
