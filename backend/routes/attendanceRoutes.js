@@ -11,7 +11,13 @@ import {
   getTrainerPunchInLogs,
   deleteTrainerPunchInLog,
 } from '../controllers/trainerAttendanceController.js';
-import { protect, authorize } from '../middleware/auth.js';
+import { protect, authorize, authorizeExact } from '../middleware/auth.js';
+import { FULL_ACCESS_ROLES } from '../utils/roles.js';
+import {
+  listOfficialHolidays,
+  createOfficialHoliday,
+  deleteOfficialHoliday,
+} from '../controllers/officialHolidayController.js';
 import { validate } from '../middleware/validate.js';
 import { asyncHandler } from '../middleware/asyncHandler.js';
 import { attendanceValidation } from '../utils/validators.js';
@@ -37,6 +43,9 @@ router.use(protect);
 router.get('/summary', asyncHandler(getAttendanceSummary));
 router.get('/trainer-grid', asyncHandler(getTrainerAttendanceGrid));
 router.get('/trainer-punch-logs', asyncHandler(getTrainerPunchInLogs));
+router.get('/holidays', asyncHandler(listOfficialHolidays));
+router.post('/holidays', authorizeExact('admin'), asyncHandler(createOfficialHoliday));
+router.delete('/holidays/:id', authorizeExact('admin'), asyncHandler(deleteOfficialHoliday));
 router.get(
   '/sheets/status',
   authorize('admin', 'campus_manager'),
@@ -59,12 +68,12 @@ router.delete(
 );
 router.delete(
   '/trainer-punch-logs/:id',
-  authorize('admin', 'campus_manager'),
+  authorizeExact(...FULL_ACCESS_ROLES),
   asyncHandler(deleteTrainerPunchInLog)
 );
 router.put(
   '/trainer-daily',
-  authorize('admin', 'campus_manager', 'trainer'),
+  authorizeExact(...FULL_ACCESS_ROLES),
   asyncHandler(upsertTrainerDailyAttendance)
 );
 router.route('/').get(asyncHandler(getAttendance)).post(authorize('admin', 'campus_manager', 'trainer'), attendanceValidation, validate, asyncHandler(markAttendance));

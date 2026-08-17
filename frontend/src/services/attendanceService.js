@@ -85,3 +85,20 @@ export const deleteTrainerPunchInLog = async (id) => {
   invalidateTrainerAttendanceGridCache();
   return data;
 };
+
+export const listOfficialHolidays = async (params = {}) => {
+  const { data } = await api.get('/attendance/holidays', { params });
+  return data;
+};
+
+export const createOfficialHoliday = async (payload) => {
+  const { data } = await api.post('/attendance/holidays', payload);
+  invalidateTrainerAttendanceGridCache();
+  return data;
+};
+
+export const deleteOfficialHoliday = async (id) => {
+  const { data } = await api.delete(`/attendance/holidays/${id}`);
+  invalidateTrainerAttendanceGridCache();
+  return data;
+};

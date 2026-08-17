@@ -13,6 +13,7 @@ import {
   IT_MOCK_PREP_HOURS,
 } from '../utils/attendanceOifRules.js';
 import { TRAINER_ATTENDANCE_TYPES } from '../utils/trainerAttendanceTypes.js';
+import OfficialHoliday from '../models/OfficialHoliday.js';
 
 const findTrainerByPhone = async (phone) => {
   const target = normalizePhone(phone);
@@ -110,11 +111,14 @@ export const recordWhatsappPunchIn = async (req, res) => {
   }
 
   const existing = await TrainerDailyAttendance.findOne({ trainer: trainer._id, date: day });
+  const isOfficialHoliday = Boolean(await OfficialHoliday.exists({ date: day }));
 
   const update = {
     trainer: trainer._id,
     date: day,
-    attendanceType: TRAINER_ATTENDANCE_TYPES.OIF,
+    attendanceType: isOfficialHoliday
+      ? TRAINER_ATTENDANCE_TYPES.HOLIDAY_OIF
+      : TRAINER_ATTENDANCE_TYPES.OIF,
     oifNumber: trimmedOif,
     punchInSource: 'whatsapp',
     punchInRawPhone: String(phone),

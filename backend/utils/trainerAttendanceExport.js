@@ -23,6 +23,10 @@ import {
   TRAINER_ATTENDANCE_TYPES,
 } from './trainerAttendanceTypes.js';
 import { formatFoodAllowance } from './foodAllowanceTypes.js';
+import {
+  loadOfficialHolidayMap,
+  resolveOfficialHolidayAttendance,
+} from './officialHolidays.js';
 
 const TRACKING_START_MONTH = '2026-07';
 const INITIAL_EXPORT_END_MONTH = '2027-01';
@@ -84,7 +88,7 @@ export const buildTrainerAttendanceExportPayload = async () => {
   );
   const allScheduleCodes = [...new Set([...codesByTrainer.values()].flat())];
 
-  const [logs, classHours, approvedLeaves, schedules] = await Promise.all([
+  const [logs, classHours, approvedLeaves, schedules, holidayMap] = await Promise.all([
     TrainerDailyAttendance.find({
       trainer: { $in: trainerIds },
       date: { $gte: TRAINER_ATTENDANCE_TRACKING_START, $lte: endDate },
@@ -100,6 +104,7 @@ export const buildTrainerAttendanceExportPayload = async () => {
     Schedule.find({ trainerCode: { $in: allScheduleCodes } })
       .select('_id trainerCode day')
       .lean(),
+    loadOfficialHolidayMap(TRAINER_ATTENDANCE_TRACKING_START, endDate),
   ]);
 
   const logsByTrainerDate = new Map(
@@ -170,6 +175,29 @@ export const buildTrainerAttendanceExportPayload = async () => {
           oifNumber = '';
           mockPrepHours = 0;
           classHandlingHours = 0;
+        } else if (holidayMap.has(dateKey)) {
+          const resolved = resolveOfficialHolidayAttendance(log);
+          attendanceType = resolved.attendanceType;
+          oifNumber = attendanceTypeUsesOifNumber(attendanceType)
+            ? (log?.oifNumber || '')
+            : '';
+          if (resolved.isNonWorking) {
+            mockPrepHours = 0;
+            classHandlingHours = 0;
+          } else if (allowsManualClassHandlingHours(oifNumber)) {
+            mockPrepHours = Number(log?.mockPrepHours || 0);
+            classHandlingHours = log?.classHandlingHours != null
+              ? Number(log.classHandlingHours)
+              : 0;
+          } else {
+            const applied = applyItOifAttendanceRules({
+              oifNumber,
+              mockPrepHours,
+              classHandlingHours,
+            });
+            mockPrepHours = applied.mockPrepHours;
+            classHandlingHours = applied.classHandlingHours;
+          }
         } else if (onLeave) {
           attendanceType = isLeaveAttendanceType(log?.attendanceType)
             ? log.attendanceType

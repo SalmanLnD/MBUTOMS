@@ -28,12 +28,14 @@ import {
 import { allowsManualClassHandlingHours, countsAsOifDay } from '../utils/trainerAttendanceTypes.js';
 import { ROLES } from '../utils/roles.js';
 import TrainerAttendanceSheetSetupModal from './TrainerAttendanceSheetSetupModal.jsx';
-import { ExternalLinkIcon, SheetIcon } from './icons.jsx';
+import { CalendarIcon, ExternalLinkIcon, SheetIcon } from './icons.jsx';
+import OfficialHolidayModal from './OfficialHolidayModal.jsx';
 
 const TrainerAttendanceTab = () => {
-  const { user, hasManagementRole } = useAuth();
-  const canManageAll = hasManagementRole();
+  const { user, hasFullAccess } = useAuth();
+  const canManageAll = hasFullAccess();
   const canEditFutureLeave = user?.role === ROLES.ADMIN;
+  const canManageHolidays = user?.role === ROLES.ADMIN;
 
   const [monthParts, setMonthParts] = useState(() =>
     clampMonthParts(getCurrentMonthParts())
@@ -45,6 +47,7 @@ const TrainerAttendanceTab = () => {
   const [trainerSearch, setTrainerSearch] = useState('');
   const [sheetStatus, setSheetStatus] = useState(null);
   const [showSheetSetup, setShowSheetSetup] = useState(false);
+  const [showHolidays, setShowHolidays] = useState(false);
   const scrollContainerRef = useRef(null);
   const gridDataRef = useRef(null);
   const monthCacheRef = useRef(new Map());
@@ -151,8 +154,8 @@ const TrainerAttendanceTab = () => {
   }, [hasVisibleGrid, monthKey, scrollToTodayColumn]);
 
   const canEditTrainer = useCallback(
-    (trainerId) => canManageAll || user?.trainer?.toString() === trainerId?.toString(),
-    [canManageAll, user?.trainer]
+    () => canManageAll,
+    [canManageAll]
   );
 
   const updateCell = useCallback((trainerId, dateKey, field, value) => {
@@ -261,6 +264,8 @@ const TrainerAttendanceTab = () => {
                   classHoursEditable: saved.classHoursEditable,
                   isOnLeave: saved.isOnLeave,
                   isSundayWeekOff: saved.isSundayWeekOff,
+                  isOfficialHoliday: saved.isOfficialHoliday,
+                  isHolidayOff: saved.isHolidayOff,
                   isDefaultWeekOff: saved.isDefaultWeekOff,
                 },
               },
@@ -332,40 +337,56 @@ const TrainerAttendanceTab = () => {
         </div>
       </div>
 
-      {canManageAll && (
+      {!canManageAll && (
+        <p className="text-muted small mb-3">Your attendance is read-only.</p>
+      )}
+
+      {(canManageAll || canManageHolidays) && (
         <div className="d-flex flex-wrap align-items-center gap-2 mb-3">
-          {sheetStatus?.linked ? (
-            <>
-              <a
-                className="btn btn-outline-primary btn-sm d-inline-flex align-items-center gap-2"
-                href={sheetStatus.spreadsheetUrl}
-                target="_blank"
-                rel="noreferrer"
-              >
-                <ExternalLinkIcon size={16} aria-hidden="true" />
-                Open attendance sheet
-              </a>
-              <button
-                type="button"
-                className="btn btn-outline-secondary btn-sm d-inline-flex align-items-center gap-2"
-                onClick={() => setShowSheetSetup(true)}
-              >
-                <SheetIcon size={16} aria-hidden="true" />
-                Sheet setup
-              </button>
-              <span className="text-muted small">
-                Continuous attendance timeline refreshes every 5 minutes
-              </span>
-            </>
-          ) : (
+          {canManageHolidays && (
             <button
               type="button"
               className="btn btn-outline-primary btn-sm d-inline-flex align-items-center gap-2"
-              onClick={() => setShowSheetSetup(true)}
+              onClick={() => setShowHolidays(true)}
             >
-              <SheetIcon size={16} aria-hidden="true" />
-              Link attendance sheet
+              <CalendarIcon size={16} aria-hidden="true" />
+              Holidays
             </button>
+          )}
+          {canManageAll && (
+            sheetStatus?.linked ? (
+              <>
+                <a
+                  className="btn btn-outline-primary btn-sm d-inline-flex align-items-center gap-2"
+                  href={sheetStatus.spreadsheetUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  <ExternalLinkIcon size={16} aria-hidden="true" />
+                  Open attendance sheet
+                </a>
+                <button
+                  type="button"
+                  className="btn btn-outline-secondary btn-sm d-inline-flex align-items-center gap-2"
+                  onClick={() => setShowSheetSetup(true)}
+                >
+                  <SheetIcon size={16} aria-hidden="true" />
+                  Sheet setup
+                </button>
+                <span className="text-muted small">
+                  Continuous attendance timeline refreshes every 5 minutes
+                </span>
+              </>
+            ) : (
+              <button
+                type="button"
+                className="btn btn-outline-primary btn-sm d-inline-flex align-items-center gap-2"
+                onClick={() => setShowSheetSetup(true)}
+              >
+                <SheetIcon size={16} aria-hidden="true" />
+                Link attendance sheet
+              </button>
+            )
           )}
         </div>
       )}
@@ -444,9 +465,9 @@ const TrainerAttendanceTab = () => {
                     data-date-scroll-anchor={date.key}
                     className={`text-center small trainer-attendance-day-header ${
                       date.isFuture ? 'trainer-attendance-future' : ''
-                    } ${date.isWeekend ? 'trainer-attendance-weekend' : ''}`}
+                    } ${date.isHoliday ? 'trainer-attendance-holiday' : date.isWeekend ? 'trainer-attendance-weekend' : ''}`}
                     colSpan="4"
-                    title={date.key}
+                    title={date.holidayName ? `${date.key} — ${date.holidayName}` : date.key}
                   >
                     {date.label}
                   </th>
@@ -461,28 +482,28 @@ const TrainerAttendanceTab = () => {
                     <th
                       className={`text-center small trainer-attendance-subheader trainer-attendance-oif-header ${
                         date.isFuture ? 'trainer-attendance-future' : ''
-                      } ${date.isWeekend ? 'trainer-attendance-weekend' : ''}`}
+                      } ${date.isHoliday ? 'trainer-attendance-holiday' : date.isWeekend ? 'trainer-attendance-weekend' : ''}`}
                     >
                       OIF
                     </th>
                     <th
                       className={`text-center small trainer-attendance-subheader trainer-attendance-mock-header ${
                         date.isFuture ? 'trainer-attendance-future' : ''
-                      } ${date.isWeekend ? 'trainer-attendance-weekend' : ''}`}
+                      } ${date.isHoliday ? 'trainer-attendance-holiday' : date.isWeekend ? 'trainer-attendance-weekend' : ''}`}
                     >
                       Mock
                     </th>
                     <th
                       className={`text-center small trainer-attendance-subheader trainer-attendance-class-header ${
                         date.isFuture ? 'trainer-attendance-future' : ''
-                      } ${date.isWeekend ? 'trainer-attendance-weekend' : ''}`}
+                      } ${date.isHoliday ? 'trainer-attendance-holiday' : date.isWeekend ? 'trainer-attendance-weekend' : ''}`}
                     >
                       Class
                     </th>
                     <th
                       className={`text-center small trainer-attendance-subheader trainer-attendance-food-header ${
                         date.isFuture ? 'trainer-attendance-future' : ''
-                      } ${date.isWeekend ? 'trainer-attendance-weekend' : ''}`}
+                      } ${date.isHoliday ? 'trainer-attendance-holiday' : date.isWeekend ? 'trainer-attendance-weekend' : ''}`}
                     >
                       Food
                     </th>
@@ -518,6 +539,14 @@ const TrainerAttendanceTab = () => {
             loadSheetStatus();
             showSuccess('Trainer attendance Google Sheet linked.');
           }}
+        />
+      )}
+
+      {showHolidays && canManageHolidays && (
+        <OfficialHolidayModal
+          show
+          onClose={() => setShowHolidays(false)}
+          onChanged={() => fetchGrid({ forceRefresh: true })}
         />
       )}
     </>

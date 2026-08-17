@@ -29,15 +29,19 @@ const TrainerAttendanceRow = memo(({
         mockPrepHours: 0,
         classHandlingHours: 0,
         foodAllowance: '',
-        attendanceType: date.isSunday
-          ? TRAINER_ATTENDANCE_TYPES.WEEK_OFF
-          : TRAINER_ATTENDANCE_TYPES.OIF,
+        attendanceType: date.isHoliday
+          ? TRAINER_ATTENDANCE_TYPES.HOLIDAY
+          : date.isSunday
+            ? TRAINER_ATTENDANCE_TYPES.WEEK_OFF
+            : TRAINER_ATTENDANCE_TYPES.OIF,
       };
+      const isOfficialHoliday = Boolean(date.isHoliday || cell.isOfficialHoliday);
       const canEditCell = canEditTrainer(row.trainer._id) && (
         !date.isFuture || (cell.isOnLeave && canEditFutureLeave)
       );
       const sundayNonWorking = Boolean(
         date.isSunday
+        && !isOfficialHoliday
         && !cell.isOnLeave
         && cell.attendanceType !== TRAINER_ATTENDANCE_TYPES.OIF
         && (
@@ -47,16 +51,37 @@ const TrainerAttendanceRow = memo(({
           || !cell.attendanceType
         )
       );
-      const treatAsNonWorking = Boolean(cell.isOnLeave || sundayNonWorking);
-      const showTypeSelect = Boolean(cell.isOnLeave || date.isSunday);
+      const holidayNonWorking = Boolean(
+        isOfficialHoliday
+        && !cell.isOnLeave
+        && cell.attendanceType !== TRAINER_ATTENDANCE_TYPES.OIF
+        && cell.attendanceType !== TRAINER_ATTENDANCE_TYPES.HOLIDAY_OIF
+        && (
+          cell.isDefaultHoliday
+          || cell.isHolidayOff
+          || cell.attendanceType === TRAINER_ATTENDANCE_TYPES.HOLIDAY
+          || !cell.attendanceType
+        )
+      );
+      const treatAsNonWorking = Boolean(cell.isOnLeave || sundayNonWorking || holidayNonWorking);
+      const showTypeSelect = Boolean(cell.isOnLeave || date.isSunday || isOfficialHoliday);
       const sundayPresentMode = Boolean(
         date.isSunday
+        && !isOfficialHoliday
         && !cell.isOnLeave
         && cell.attendanceType === TRAINER_ATTENDANCE_TYPES.OIF
       );
+      const holidayPresentMode = Boolean(
+        isOfficialHoliday
+        && !cell.isOnLeave
+        && (
+          cell.attendanceType === TRAINER_ATTENDANCE_TYPES.OIF
+          || cell.attendanceType === TRAINER_ATTENDANCE_TYPES.HOLIDAY_OIF
+        )
+      );
       const editable = canEditCell && !treatAsNonWorking;
       const leaveTypeUsesOif = attendanceTypeUsesOifNumber(cell.attendanceType);
-      const showOifInput = leaveTypeUsesOif || sundayPresentMode;
+      const showOifInput = leaveTypeUsesOif || sundayPresentMode || holidayPresentMode;
       const oifSheetValue = formatTrainerAttendanceOifDisplay(
         cell.attendanceType,
         cell.oifNumber
@@ -64,25 +89,53 @@ const TrainerAttendanceRow = memo(({
       const saveKey = `${row.trainer._id}|${date.key}`;
       const isSaving = savingKey === saveKey;
       const futureClass = date.isFuture ? 'trainer-attendance-future' : '';
-      const weekendClass = date.isWeekend ? 'trainer-attendance-weekend' : '';
-      const cellClass = [futureClass, weekendClass].filter(Boolean).join(' ');
+      const weekendClass = !isOfficialHoliday && date.isWeekend ? 'trainer-attendance-weekend' : '';
+      const holidayClass = isOfficialHoliday ? 'trainer-attendance-holiday' : '';
+      const cellClass = [futureClass, weekendClass, holidayClass].filter(Boolean).join(' ');
       const typeSelectValue = cell.isOnLeave
         ? (cell.attendanceType || '')
-        : (cell.attendanceType || TRAINER_ATTENDANCE_TYPES.WEEK_OFF);
+        : isOfficialHoliday
+          ? (cell.attendanceType || TRAINER_ATTENDANCE_TYPES.HOLIDAY)
+          : (cell.attendanceType || TRAINER_ATTENDANCE_TYPES.WEEK_OFF);
       const leaveTypeOptions = cell.isOnLeave
         ? [
             { value: '', label: 'Leave type...' },
             ...LEAVE_TYPE_OPTIONS,
           ]
-        : [
-            { value: TRAINER_ATTENDANCE_TYPES.OIF, label: 'OIF (Present)' },
-            ...LEAVE_TYPE_OPTIONS,
-          ];
+        : isOfficialHoliday
+          ? [
+              { value: TRAINER_ATTENDANCE_TYPES.HOLIDAY, label: 'Holiday' },
+              { value: TRAINER_ATTENDANCE_TYPES.HOLIDAY_OIF, label: 'OIF Number - Holiday' },
+              { value: TRAINER_ATTENDANCE_TYPES.OIF, label: 'OIF (Present)' },
+            ]
+          : [
+              { value: TRAINER_ATTENDANCE_TYPES.OIF, label: 'OIF (Present)' },
+              ...LEAVE_TYPE_OPTIONS,
+            ];
+      const typePlaceholder = cell.isOnLeave
+        ? 'Leave type...'
+        : isOfficialHoliday
+          ? 'Holiday'
+          : 'W.O';
+      const typeAriaLabel = cell.isOnLeave
+        ? 'Leave type'
+        : isOfficialHoliday
+          ? 'Holiday attendance type'
+          : 'Sunday attendance type';
+      const readOnlyTypeLabel = oifSheetValue
+        || (isOfficialHoliday ? 'Holiday' : date.isSunday ? 'W.O' : '—');
 
       return (
         <Fragment key={`${row.trainer._id}-${date.key}`}>
           <td className={`trainer-attendance-oif-cell ${cellClass}`}>
-            {showTypeSelect ? (
+            {showTypeSelect && !canEditCell ? (
+              <div
+                className="trainer-attendance-oif-sheet-value small fw-semibold"
+                title={date.holidayName || undefined}
+              >
+                {readOnlyTypeLabel}
+              </div>
+            ) : showTypeSelect ? (
               <div className="trainer-attendance-leave-controls">
                 <StyledSelect
                   size="sm"
@@ -101,8 +154,8 @@ const TrainerAttendanceRow = memo(({
                     }
                     window.setTimeout(() => onSave(row.trainer._id, date.key), 0);
                   }}
-                  placeholder={cell.isOnLeave ? 'Leave type...' : 'W.O'}
-                  aria-label={cell.isOnLeave ? 'Leave type' : 'Sunday attendance type'}
+                  placeholder={typePlaceholder}
+                  aria-label={typeAriaLabel}
                   options={leaveTypeOptions}
                 />
                 {showOifInput && (

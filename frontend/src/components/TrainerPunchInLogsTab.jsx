@@ -20,8 +20,8 @@ const SOURCE_BADGE = {
 };
 
 const TrainerPunchInLogsTab = () => {
-  const { hasManagementRole } = useAuth();
-  const canManageAll = hasManagementRole();
+  const { hasFullAccess } = useAuth();
+  const canManageAll = hasFullAccess();
   const {
     page,
     setPage,

@@ -46,6 +46,13 @@ import {
   TRAINER_ATTENDANCE_TYPES,
 } from '../utils/trainerAttendanceTypes.js';
 import { isValidFoodAllowance } from '../utils/foodAllowanceTypes.js';
+import { isTrainerLikeRole } from '../utils/roles.js';
+import OfficialHoliday from '../models/OfficialHoliday.js';
+import {
+  loadOfficialHolidayMap,
+  resolveOfficialHolidayAttendance,
+  isWorkedOfficialHoliday,
+} from '../utils/officialHolidays.js';
 
 const buildLogMap = (logs) => {
   const map = new Map();
@@ -125,8 +132,8 @@ export const buildTrainerAttendanceGridPayload = async ({
   const editableDays = dates.filter((date) => date <= today).length;
 
   const trainerFilter = {};
-  if (user?.role === 'trainer' && user.trainer) {
-    trainerFilter._id = user.trainer;
+  if (isTrainerLikeRole(user?.role)) {
+    trainerFilter._id = user.trainer || { $in: [] };
   }
 
   const finalTrainerFilter = await mergeAttendanceUiTrainerFilter(
@@ -145,7 +152,7 @@ export const buildTrainerAttendanceGridPayload = async ({
   );
   const allScheduleCodes = [...new Set([...codesByTrainer.values()].flat())];
 
-  const [logs, classHoursCache, approvedLeaves, schedules] = await Promise.all([
+  const [logs, classHoursCache, approvedLeaves, schedules, holidayMap] = await Promise.all([
     trainerIds.length
       ? TrainerDailyAttendance.find({
         trainer: { $in: trainerIds },
@@ -169,6 +176,7 @@ export const buildTrainerAttendanceGridPayload = async ({
         .select('_id trainerCode day')
         .lean()
       : [],
+    loadOfficialHolidayMap(rangeStart, rangeEnd),
   ]);
 
   const schedulesByCode = new Map();
@@ -259,6 +267,51 @@ export const buildTrainerAttendanceGridPayload = async ({
           isReplacementRequired: false,
           isFuture: date > today,
           isBeforeJoin: true,
+        };
+        return;
+      }
+      const isHoliday = holidayMap.has(dateKey);
+      if (isHoliday) {
+        const resolved = resolveOfficialHolidayAttendance(log);
+        const attendanceType = resolved.attendanceType;
+        const isNonWorking = resolved.isNonWorking;
+        const oifNumber = attendanceTypeUsesOifNumber(attendanceType)
+          ? (log?.oifNumber || '')
+          : '';
+        const classHoursEditable = !isNonWorking && allowsManualClassHandlingHours(oifNumber);
+        let mockPrepHours = 0;
+        let classHandlingHours = 0;
+        if (!isNonWorking && classHoursEditable) {
+          mockPrepHours = resolveMockPrepHoursForOif(oifNumber, log?.mockPrepHours ?? 0);
+          classHandlingHours = log?.classHandlingHours != null
+            ? Number(log.classHandlingHours)
+            : 0;
+        } else if (!isNonWorking) {
+          const applied = applyItOifAttendanceRules({
+            oifNumber,
+            mockPrepHours: log?.mockPrepHours ?? 0,
+            classHandlingHours: classHoursCache.get(cacheKey) ?? 0,
+          });
+          mockPrepHours = applied.mockPrepHours;
+          classHandlingHours = applied.classHandlingHours;
+        }
+        days[dateKey] = {
+          id: log?._id || null,
+          attendanceType,
+          oifNumber,
+          oifDisplay: formatTrainerAttendanceOifDisplay(attendanceType, oifNumber),
+          foodAllowance: isNonWorking ? '' : (log?.foodAllowance || ''),
+          mockPrepHours,
+          classHandlingHours,
+          classHoursEditable,
+          isOnLeave: false,
+          isOfficialHoliday: true,
+          isDefaultHoliday: !isWorkedOfficialHoliday(log),
+          isHolidayOff: isNonWorking,
+          isDefaultWeekOff: false,
+          isSundayWeekOff: false,
+          isReplacementRequired: false,
+          isFuture: date > today,
         };
         return;
       }
@@ -363,17 +416,22 @@ export const buildTrainerAttendanceGridPayload = async ({
     endDate: rangeEnd,
     workingDays: dates.length,
     editableDays,
-    dates: dates.map((date) => ({
-      key: toAttendanceDateKey(date),
-      label: date.toLocaleDateString('en-IN', {
-        timeZone: 'Asia/Kolkata',
-        weekday: 'short',
-        day: '2-digit',
-      }),
-      isFuture: date > today,
-      isWeekend: isAttendanceWeekendDate(date),
-      isSunday: isAttendanceSundayDate(date),
-    })),
+    dates: dates.map((date) => {
+      const key = toAttendanceDateKey(date);
+      return {
+        key,
+        label: date.toLocaleDateString('en-IN', {
+          timeZone: 'Asia/Kolkata',
+          weekday: 'short',
+          day: '2-digit',
+        }),
+        isFuture: date > today,
+        isWeekend: isAttendanceWeekendDate(date),
+        isSunday: isAttendanceSundayDate(date),
+        isHoliday: holidayMap.has(key),
+        holidayName: holidayMap.get(key) || '',
+      };
+    }),
     rows,
   };
 
@@ -407,8 +465,8 @@ export const upsertTrainerDailyAttendance = async (req, res) => {
     return res.status(400).json({ message: 'Trainer and date are required' });
   }
 
-  if (req.user.role === 'trainer' && req.user.trainer?.toString() !== trainer.toString()) {
-    return res.status(403).json({ message: 'Not authorized to update this trainer attendance' });
+  if (isTrainerLikeRole(req.user.role)) {
+    return res.status(403).json({ message: 'Not authorized to update trainer attendance' });
   }
 
   const trainerRecord = await Trainer.findById(trainer)
@@ -487,11 +545,25 @@ export const upsertTrainerDailyAttendance = async (req, res) => {
   }
 
   const isSunday = isAttendanceSundayDate(day);
+  const isOfficialHoliday = Boolean(await OfficialHoliday.exists({ date: day }));
   const requestedType = String(attendanceType || '').trim();
   let resolvedAttendanceType;
   let isNonWorkingDay = false;
 
-  if (isOnFullDayLeave) {
+  if (isOfficialHoliday) {
+    if (!requestedType || requestedType === TRAINER_ATTENDANCE_TYPES.HOLIDAY) {
+      resolvedAttendanceType = TRAINER_ATTENDANCE_TYPES.HOLIDAY;
+      isNonWorkingDay = true;
+    } else if (
+      requestedType === TRAINER_ATTENDANCE_TYPES.OIF
+      || requestedType === TRAINER_ATTENDANCE_TYPES.HOLIDAY_OIF
+    ) {
+      resolvedAttendanceType = TRAINER_ATTENDANCE_TYPES.HOLIDAY_OIF;
+      isNonWorkingDay = false;
+    } else {
+      return res.status(400).json({ message: 'Select a valid holiday attendance type.' });
+    }
+  } else if (isOnFullDayLeave) {
     resolvedAttendanceType = requestedType || TRAINER_ATTENDANCE_TYPES.LEAVE;
     if (!isLeaveAttendanceType(resolvedAttendanceType)) {
       return res.status(400).json({ message: 'Select a valid leave type.' });
@@ -588,8 +660,10 @@ export const upsertTrainerDailyAttendance = async (req, res) => {
     mockPrepHours: resolved.mockPrepHours,
     classHandlingHours: resolved.classHandlingHours,
     classHoursEditable,
-    isOnLeave: isOnFullDayLeave,
-    isSundayWeekOff: isSunday && isNonWorkingDay && !isOnFullDayLeave,
+    isOnLeave: isOnFullDayLeave && !isOfficialHoliday,
+    isOfficialHoliday,
+    isHolidayOff: isOfficialHoliday && isNonWorkingDay,
+    isSundayWeekOff: isSunday && isNonWorkingDay && !isOnFullDayLeave && !isOfficialHoliday,
     isDefaultWeekOff: false,
   });
 };
@@ -603,7 +677,13 @@ export const getTrainerPunchInLogs = async (req, res) => {
     punchInAt: { $exists: true, $ne: null },
   };
 
-  if (req.user.role === 'trainer' && req.user.trainer) {
+  if (isTrainerLikeRole(req.user.role)) {
+    if (!req.user.trainer) {
+      return res.json({
+        logs: [],
+        pagination: { page, limit, total: 0, pages: 0 },
+      });
+    }
     filter.trainer = req.user.trainer;
   } else if (req.query.trainer) {
     filter.trainer = req.query.trainer;
@@ -623,7 +703,7 @@ export const getTrainerPunchInLogs = async (req, res) => {
     }
   }
 
-  if (req.query.search && req.user.role !== 'trainer') {
+  if (req.query.search && !isTrainerLikeRole(req.user.role)) {
     const search = String(req.query.search).trim();
     if (search) {
       const matchingTrainers = await Trainer.find({

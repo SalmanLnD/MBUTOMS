@@ -21,18 +21,16 @@ import { usePageTitle } from '../context/PageTitleContext.jsx';
 import { isAbortError } from '../services/api.js';
 
 const Trainers = () => {
-  const { user, hasRole, hasFullAccess } = useAuth();
+  const { user, hasFullAccess } = useAuth();
   const canManage = hasFullAccess();
   const isTrainerUser = user?.role === ROLES.TRAINER || user?.role === ROLES.EVALUATOR;
-  const isSubjectCoordinator = hasRole(ROLES.SUBJECT_COORDINATOR);
+  const isSubjectCoordinator = user?.role === ROLES.SUBJECT_COORDINATOR;
   usePageTitle(isTrainerUser ? 'My Profile' : isSubjectCoordinator ? 'Subject Trainers' : 'Trainer Management');
   const [searchParams, setSearchParams] = useSearchParams();
   const tabParam = searchParams.get('tab');
   const validTabs = isTrainerUser
     ? ['details', 'attendance', 'logs']
-    : isSubjectCoordinator
-      ? ['directory']
-      : ['directory', 'attendance', 'logs'];
+    : ['directory', 'attendance', 'logs'];
   const defaultTab = isTrainerUser ? 'details' : 'directory';
   const activeTab = validTabs.includes(tabParam) ? tabParam : defaultTab;
   const {
@@ -176,8 +174,6 @@ const Trainers = () => {
             </button>
           </li>
         )}
-        {!isSubjectCoordinator && (
-          <>
         <li className="nav-item">
           <button
             type="button"
@@ -196,8 +192,6 @@ const Trainers = () => {
             Logs
           </button>
         </li>
-          </>
-        )}
       </ul>
 
       {activeTab === 'attendance' ? (

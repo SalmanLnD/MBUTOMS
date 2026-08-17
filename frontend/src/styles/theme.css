@@ -1153,6 +1153,11 @@ code {
   color: #fff !important;
 }
 
+.trainer-attendance-grid thead .trainer-attendance-holiday {
+  background: linear-gradient(135deg, #b45309 0%, #d97706 100%) !important;
+  color: #fff !important;
+}
+
 .trainer-attendance-grid thead .trainer-attendance-totals-col {
   background: linear-gradient(135deg, var(--toms-navy-800) 0%, var(--toms-navy-700) 100%) !important;
   color: #f8fafc !important;

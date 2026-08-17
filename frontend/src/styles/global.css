@@ -583,12 +583,14 @@ body {
 }
 
 .trainer-attendance-month-table tbody tr:focus-within .trainer-attendance-future,
-.trainer-attendance-month-table tbody tr:focus-within .trainer-attendance-weekend {
+.trainer-attendance-month-table tbody tr:focus-within .trainer-attendance-weekend,
+.trainer-attendance-month-table tbody tr:focus-within .trainer-attendance-holiday {
   background: rgba(20, 184, 166, 0.12) !important;
 }
 
 .trainer-attendance-month-table tbody tr:hover .trainer-attendance-future,
-.trainer-attendance-month-table tbody tr:hover .trainer-attendance-weekend {
+.trainer-attendance-month-table tbody tr:hover .trainer-attendance-weekend,
+.trainer-attendance-month-table tbody tr:hover .trainer-attendance-holiday {
   background: rgba(20, 184, 166, 0.08) !important;
 }
 
@@ -627,6 +629,10 @@ body {
 
 .trainer-attendance-weekend {
   background: rgba(99, 102, 241, 0.06);
+}
+
+.trainer-attendance-holiday {
+  background: rgba(245, 158, 11, 0.12);
 }
 
 .trainer-attendance-totals-col {
