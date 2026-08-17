@@ -9,6 +9,37 @@ import {
   isBeforeTrainerJoiningDate,
 } from './trainerEmployment.js';
 import { TRAINER_ATTENDANCE_TYPES } from './trainerAttendanceTypes.js';
+import { clearAttendanceGridCache } from './attendanceGridCache.js';
+
+export const OFFICIAL_HOLIDAY_DEFS = [
+  { date: '2026-09-14', name: 'Ganesh Chaturthi' },
+  { date: '2026-10-02', name: 'Gandhi Jayanthi' },
+  { date: '2026-10-19', name: 'Vijayadashami' },
+  { date: '2026-10-20', name: 'Dusshera' },
+  { date: '2026-12-25', name: 'Christmas' },
+];
+
+export const ensureOfficialHolidays = async (defs = OFFICIAL_HOLIDAY_DEFS) => {
+  const results = [];
+  for (const def of defs) {
+    const day = normalizeAttendanceDate(def.date);
+    const name = String(def.name || 'Official leave').trim().slice(0, 80) || 'Official leave';
+    const existing = await OfficialHoliday.findOne({ date: day }).lean();
+    if (existing) {
+      if (existing.name !== name) {
+        await OfficialHoliday.updateOne({ _id: existing._id }, { $set: { name } });
+      }
+      await markRosterOfficialHoliday(day);
+      results.push({ date: toAttendanceDateKey(day), name, status: 'updated' });
+      continue;
+    }
+    await OfficialHoliday.create({ date: day, name });
+    await markRosterOfficialHoliday(day);
+    results.push({ date: toAttendanceDateKey(day), name, status: 'created' });
+  }
+  clearAttendanceGridCache();
+  return results;
+};
 
 export const loadOfficialHolidayMap = async (startDate, endDate) => {
   const holidays = await OfficialHoliday.find({

@@ -1,7 +1,7 @@
 name: Keep Render API awake
 
 # Free Render services sleep after idle time. Morning WhatsApp punches then
-# time out before the API finishes booting. Ping health often enough to keep-
+# time out before the API finishes booting. Ping health often enough to keep
 # mbutoms-api warm, especially during the IST punch window (06:30-11:00).
 on:
   schedule:

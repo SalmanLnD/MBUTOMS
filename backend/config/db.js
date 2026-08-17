@@ -21,6 +21,7 @@ import { repairMisplacedLrreVSemesterSlots } from '../utils/repairMisplacedLrreV
 import { migrateClassesFromSchedules } from '../utils/migrateClassesFromSchedules.js';
 import { repairClassIndexesAndPy } from '../utils/repairClassIndexesAndPy.js';
 import { repairTrainerScheduleCodeLinks } from '../utils/repairTrainerScheduleCodeLinks.js';
+import { ensureOfficialHolidays } from '../utils/officialHolidays.js';
 
 const getCache = () => {
   if (!globalThis._mongooseCache) {
@@ -50,9 +51,13 @@ const runEssentialStartup = async () => {
   const pedhCleanup = await removeAllPedhData();
   const coordinatorSync = await syncSubjectCoordinators();
   const evaluatorSync = await syncEvaluators();
+  const officialHolidays = await ensureOfficialHolidays();
   console.log(
     `Reference data ready: ${counts.schoolCount} schools, ${counts.semesterCount} semesters, ${counts.departmentCount} departments`
   );
+  if (officialHolidays.length) {
+    console.log(`Official holidays: ${officialHolidays.map((row) => `${row.date} ${row.name} (${row.status})`).join('; ')}`);
+  }
   if (academicYearMigration.updatedCount) {
     console.log(`Subject academic year migration: ${academicYearMigration.updatedCount} subject(s) set to ${academicYearMigration.academicYear}`);
   }
