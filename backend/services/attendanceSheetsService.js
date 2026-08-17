@@ -9,8 +9,9 @@ import { buildTrainerAttendanceExportPayload } from '../utils/trainerAttendanceE
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const SPREADSHEET_SETTING_KEY = 'trainer_attendance_spreadsheet';
 const EXPORT_KEY_SETTING = 'trainer_attendance_export_api_key_v2';
-const EXPORT_CACHE_MS = 120_000;
+const EXPORT_CACHE_MS = 300_000;
 let exportCache = { payload: null, cachedAt: 0 };
+let exportInFlight = null;
 
 const getExportKey = async () => {
   const setting = await AppSetting.findOne({ key: EXPORT_KEY_SETTING }).lean();
@@ -77,14 +78,14 @@ export const getAttendanceAppsScriptSetup = async (req) => {
     steps: [
       'Create one Google Sheet for trainer attendance.',
       'Extensions → Apps Script, delete sample code, paste the script below, and save.',
-      'Run installTriggers once to authorize Google and schedule the 5-minute refresh. Do not run it again.',
-      'Then use menu TOMS Attendance → Refresh now. Wait if Cloudflare blocks the first try.',
+      'Run installTriggers once to authorize Google and schedule the 15-minute refresh. Do not run it again.',
+      'Then use menu TOMS Attendance → Refresh now. If the API is waking up, wait 30 seconds and retry once.',
       'Paste the Google Sheet URL below and click Save link.',
     ],
     note:
-      'The sheet refreshes every 5 minutes and keeps one continuous timeline from July 2026 '
-      + 'through January 2027, extending automatically as later months arrive. Google Apps '
-      + 'Script cannot call localhost; use the deployed API URL or a tunnel for local testing.',
+      'The sheet refreshes every 15 minutes with attendance through today only, so the export '
+      + 'does not block the live TOMS app. Google Apps Script cannot call localhost; use the '
+      + 'deployed API URL or a tunnel for local testing.',
   };
 };
 
@@ -108,10 +109,26 @@ export const unlinkAttendanceSpreadsheet = async () => {
 };
 
 export const exportTrainerAttendance = async () => {
-  if (exportCache.payload && Date.now() - exportCache.cachedAt < EXPORT_CACHE_MS) {
+  const now = Date.now();
+  if (exportCache.payload && now - exportCache.cachedAt < EXPORT_CACHE_MS) {
     return exportCache.payload;
   }
-  const payload = await buildTrainerAttendanceExportPayload();
-  exportCache = { payload, cachedAt: Date.now() };
-  return payload;
+
+  if (exportInFlight) {
+    if (exportCache.payload) {
+      return exportCache.payload;
+    }
+    return exportInFlight;
+  }
+
+  exportInFlight = buildTrainerAttendanceExportPayload()
+    .then((payload) => {
+      exportCache = { payload, cachedAt: Date.now() };
+      return payload;
+    })
+    .finally(() => {
+      exportInFlight = null;
+    });
+
+  return exportInFlight;
 };

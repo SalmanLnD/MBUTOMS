@@ -9,6 +9,7 @@ import {
   toAttendanceDateKey,
   TRAINER_ATTENDANCE_TRACKING_START,
 } from './attendanceDates.js';
+import { getAttendanceToday } from './attendanceTracking.js';
 import { computeClassHandlingHoursBatch } from './trainerClassHoursBatch.js';
 import { mergeRosterFilter } from './rosterFilter.js';
 import { mergeAttendanceExportTrainerFilter, shouldAutoMarkTrainerExit, isBeforeTrainerJoiningDate } from './trainerEmployment.js';
@@ -29,7 +30,6 @@ import {
 } from './officialHolidays.js';
 
 const TRACKING_START_MONTH = '2026-07';
-const INITIAL_EXPORT_END_MONTH = '2027-01';
 const DAILY_FIELDS = ['OIF', 'Mock', 'Class', 'Food Allowance'];
 
 const monthIndex = (monthKey) => {
@@ -47,10 +47,8 @@ const currentMonthKey = () => {
 
 export const getAttendanceExportMonthKeys = () => {
   const start = monthIndex(TRACKING_START_MONTH);
-  const end = Math.max(
-    monthIndex(INITIAL_EXPORT_END_MONTH),
-    monthIndex(currentMonthKey())
-  );
+  const end = monthIndex(currentMonthKey());
+  if (end < start) return [TRACKING_START_MONTH];
   return Array.from({ length: end - start + 1 }, (_, offset) =>
     monthKeyFromIndex(start + offset)
   );
@@ -67,10 +65,12 @@ const formatDateHeader = (dateKey) => {
 };
 
 export const buildTrainerAttendanceExportPayload = async () => {
+  const today = getAttendanceToday();
   const monthKeys = getAttendanceExportMonthKeys();
   const [endYear, endMonth] = monthKeys[monthKeys.length - 1].split('-').map(Number);
-  const { endDate } = getAttendanceMonthRange(endYear, endMonth);
-  const dates = getAttendanceCalendarDates(TRAINER_ATTENDANCE_TRACKING_START, endDate);
+  const { endDate: monthEnd } = getAttendanceMonthRange(endYear, endMonth);
+  const rangeEnd = monthEnd > today ? today : monthEnd;
+  const dates = getAttendanceCalendarDates(TRAINER_ATTENDANCE_TRACKING_START, rangeEnd);
   const dateKeys = dates.map(toAttendanceDateKey);
 
   const trainerRows = await Trainer.find(
@@ -91,20 +91,20 @@ export const buildTrainerAttendanceExportPayload = async () => {
   const [logs, classHours, approvedLeaves, schedules, holidayMap] = await Promise.all([
     TrainerDailyAttendance.find({
       trainer: { $in: trainerIds },
-      date: { $gte: TRAINER_ATTENDANCE_TRACKING_START, $lte: endDate },
+      date: { $gte: TRAINER_ATTENDANCE_TRACKING_START, $lte: rangeEnd },
     }).lean(),
     computeClassHandlingHoursBatch(trainerIds, dates, null, trainerRows),
     Leave.find({
       trainer: { $in: trainerIds },
       status: 'approved',
-      ...getLeaveOverlapFilter(TRAINER_ATTENDANCE_TRACKING_START, endDate),
+      ...getLeaveOverlapFilter(TRAINER_ATTENDANCE_TRACKING_START, rangeEnd),
     })
       .select('trainer startDate endDate reason scope affectedSchedules')
       .lean(),
     Schedule.find({ trainerCode: { $in: allScheduleCodes } })
       .select('_id trainerCode day')
       .lean(),
-    loadOfficialHolidayMap(TRAINER_ATTENDANCE_TRACKING_START, endDate),
+    loadOfficialHolidayMap(TRAINER_ATTENDANCE_TRACKING_START, rangeEnd),
   ]);
 
   const logsByTrainerDate = new Map(

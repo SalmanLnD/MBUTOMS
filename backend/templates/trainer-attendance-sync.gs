@@ -7,25 +7,40 @@ const API_KEY = '__API_KEY__';
 const DEFAULT_SHEET_NAME = 'Trainer Attendance from July 13';
 
 function fetchTomsExport() {
-  const response = UrlFetchApp.fetch(EXPORT_URL, {
-    muteHttpExceptions: true,
-    headers: {
-      'x-sheets-key': API_KEY,
-      'ngrok-skip-browser-warning': 'true',
-    },
-  });
-  const code = response.getResponseCode();
-  if (code === 200) {
-    return JSON.parse(response.getContentText());
+  const headers = {
+    'x-sheets-key': API_KEY,
+    'ngrok-skip-browser-warning': 'true',
+  };
+  let lastMessage = '';
+
+  for (let attempt = 0; attempt < 2; attempt++) {
+    if (attempt > 0) {
+      Utilities.sleep(30000);
+    }
+    const response = UrlFetchApp.fetch(EXPORT_URL, {
+      muteHttpExceptions: true,
+      headers: headers,
+    });
+    const code = response.getResponseCode();
+    if (code === 200) {
+      return JSON.parse(response.getContentText());
+    }
+    const body = String(response.getContentText() || '');
+    lastMessage = 'TOMS API error (' + code + '): ' + body.slice(0, 160);
+    if (code === 429 || body.indexOf('Just a moment') !== -1) {
+      throw new Error(
+        'TOMS API error (' + code + '): Cloudflare blocked the sheet sync. '
+        + 'Wait one minute, then use Refresh now. Do not run installTriggers again.'
+      );
+    }
+    if (code !== 502 && code !== 503 && code !== 504) {
+      throw new Error(lastMessage);
+    }
   }
-  const body = String(response.getContentText() || '');
-  if (code === 429 || body.indexOf('Just a moment') !== -1) {
-    throw new Error(
-      'TOMS API error (' + code + '): Cloudflare blocked the sheet sync. '
-      + 'Wait one minute, then use Refresh now. Do not run installTriggers again.'
-    );
-  }
-  throw new Error('TOMS API error (' + code + '): ' + body.slice(0, 160));
+
+  throw new Error(
+    lastMessage + ' The API may be busy. Wait 30 seconds and use Refresh now once.'
+  );
 }
 
 function syncTrainerAttendance() {
@@ -107,6 +122,6 @@ function installTriggers() {
 
   ScriptApp.newTrigger('syncTrainerAttendance')
     .timeBased()
-    .everyMinutes(5)
+    .everyMinutes(15)
     .create();
 }

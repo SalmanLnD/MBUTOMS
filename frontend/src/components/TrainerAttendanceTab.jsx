@@ -374,7 +374,7 @@ const TrainerAttendanceTab = () => {
                   Sheet setup
                 </button>
                 <span className="text-muted small">
-                  Continuous attendance timeline refreshes every 5 minutes
+                  Continuous attendance timeline refreshes every 15 minutes
                 </span>
               </>
             ) : (
