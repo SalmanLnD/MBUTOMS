@@ -8,7 +8,9 @@ import { buildTrainerAttendanceExportPayload } from '../utils/trainerAttendanceE
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const SPREADSHEET_SETTING_KEY = 'trainer_attendance_spreadsheet';
-const EXPORT_KEY_SETTING = 'trainer_attendance_export_api_key';
+const EXPORT_KEY_SETTING = 'trainer_attendance_export_api_key_v2';
+const EXPORT_CACHE_MS = 120_000;
+let exportCache = { payload: null, cachedAt: 0 };
 
 const getExportKey = async () => {
   const setting = await AppSetting.findOne({ key: EXPORT_KEY_SETTING }).lean();
@@ -75,8 +77,8 @@ export const getAttendanceAppsScriptSetup = async (req) => {
     steps: [
       'Create one Google Sheet for trainer attendance.',
       'Extensions → Apps Script, delete sample code, paste the script below, and save.',
-      'Run installTriggers once and authorize access when Google asks.',
-      'Use menu TOMS Attendance → Refresh now to create and test the continuous attendance sheet.',
+      'Run installTriggers once to authorize Google and schedule the 5-minute refresh. Do not run it again.',
+      'Then use menu TOMS Attendance → Refresh now. Wait if Cloudflare blocks the first try.',
       'Paste the Google Sheet URL below and click Save link.',
     ],
     note:
@@ -105,4 +107,11 @@ export const unlinkAttendanceSpreadsheet = async () => {
   return { unlinked: true };
 };
 
-export const exportTrainerAttendance = async () => buildTrainerAttendanceExportPayload();
+export const exportTrainerAttendance = async () => {
+  if (exportCache.payload && Date.now() - exportCache.cachedAt < EXPORT_CACHE_MS) {
+    return exportCache.payload;
+  }
+  const payload = await buildTrainerAttendanceExportPayload();
+  exportCache = { payload, cachedAt: Date.now() };
+  return payload;
+};

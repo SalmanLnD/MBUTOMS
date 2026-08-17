@@ -11,26 +11,25 @@ const API_KEY = '__API_KEY__';
 const SUMMARY_SHEET_NAME = 'Summary';
 
 function fetchTomsExport() {
-  const url = EXPORT_URL + '?key=' + encodeURIComponent(API_KEY);
-  const healthUrl = EXPORT_URL.replace(/\/api\/.+$/, '/api/health');
-  const headers = { 'ngrok-skip-browser-warning': 'true' };
-  let lastMessage = '';
-
-  for (let attempt = 1; attempt <= 6; attempt++) {
-    UrlFetchApp.fetch(healthUrl, { muteHttpExceptions: true, headers: headers });
-    const response = UrlFetchApp.fetch(url, { muteHttpExceptions: true, headers: headers });
-    const code = response.getResponseCode();
-    if (code === 200) {
-      return JSON.parse(response.getContentText());
-    }
-    lastMessage = 'TOMS API error (' + code + '): ' + response.getContentText();
-    if (code !== 502 && code !== 503 && code !== 504) {
-      throw new Error(lastMessage);
-    }
-    Utilities.sleep(8000);
+  const response = UrlFetchApp.fetch(EXPORT_URL, {
+    muteHttpExceptions: true,
+    headers: {
+      'x-sheets-key': API_KEY,
+      'ngrok-skip-browser-warning': 'true',
+    },
+  });
+  const code = response.getResponseCode();
+  if (code === 200) {
+    return JSON.parse(response.getContentText());
   }
-
-  throw new Error(lastMessage || 'TOMS API did not become ready');
+  const body = String(response.getContentText() || '');
+  if (code === 429 || body.indexOf('Just a moment') !== -1) {
+    throw new Error(
+      'TOMS API error (' + code + '): Cloudflare blocked the sheet sync. '
+      + 'Wait one minute, then use Refresh now. Do not run installTriggers again.'
+    );
+  }
+  throw new Error('TOMS API error (' + code + '): ' + body.slice(0, 160));
 }
 
 function syncStudentTestReports() {
@@ -141,7 +140,6 @@ function installTriggers() {
     .timeBased()
     .everyMinutes(5)
     .create();
-  syncStudentTestReports();
 }
 
 function onOpen() {
