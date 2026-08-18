@@ -46,6 +46,32 @@ export const getIstNowParts = (dateInput = new Date()) => {
   };
 };
 
+/** Parse HH:mm / H:mm into IST clock parts. Returns null when invalid. */
+export const parseIstClockTime = (value) => {
+  const match = String(value || '').trim().match(/^(\d{1,2}):(\d{2})$/);
+  if (!match) return null;
+  const hour = Number(match[1]);
+  const minute = Number(match[2]);
+  if (hour > 23 || minute > 59) return null;
+  return {
+    hour,
+    minute,
+    currentTime: `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`,
+    minutes: hour * 60 + minute,
+  };
+};
+
+/** Live IST clock, or the same IST calendar day at an explicit HH:mm. */
+export const resolveLiveVenueInstant = ({ now = new Date(), time } = {}) => {
+  const live = getIstNowParts(now);
+  const parsed = parseIstClockTime(time);
+  if (!parsed) {
+    return { ...live, isLive: true };
+  }
+  const instant = new Date(`${live.dateKey}T${parsed.currentTime}:00+05:30`);
+  return { ...getIstNowParts(instant), isLive: false };
+};
+
 export const isScheduleActiveAtMinutes = (schedule, minutes) => {
   if (!schedule?.startTime || !schedule?.endTime) return false;
   const start = parseTimeToMinutes(schedule.startTime);
@@ -299,11 +325,12 @@ const resolveRosterTrainerRow = ({
 };
 
 /**
- * Trainer-wise current venue from today's schedule at the current IST time.
+ * Trainer-wise venue occupancy from today's schedule at the current IST time,
+ * or at an explicit HH:mm on the same IST day.
  * Reuses the timetable board (owned + replacement classes, cancellations).
  */
-export const buildLiveTrainerVenues = async ({ now = new Date() } = {}) => {
-  const clock = getIstNowParts(now);
+export const buildLiveTrainerVenues = async ({ now = new Date(), time } = {}) => {
+  const clock = resolveLiveVenueInstant({ now, time });
   const referenceDate = clock.dateKey
     ? new Date(`${clock.dateKey}T12:00:00+05:30`)
     : now;
@@ -409,6 +436,7 @@ export const buildLiveTrainerVenues = async ({ now = new Date() } = {}) => {
     date: clock.dateKey,
     day: clock.dayName,
     currentTime: clock.currentTime,
+    isLive: clock.isLive,
     trainers: rows,
   };
 };

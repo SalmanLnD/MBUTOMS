@@ -15,8 +15,10 @@ export const getTimetableBoard = async (params = {}, { signal } = {}) => {
   return data;
 };
 
-export const getLiveTrainerVenues = async ({ signal } = {}) => {
-  const { data } = await api.get('/schedules/live-venues', { signal });
+export const getLiveTrainerVenues = async ({ signal, time } = {}) => {
+  const params = {};
+  if (time) params.time = time;
+  const { data } = await api.get('/schedules/live-venues', { params, signal });
   return data;
 };
 

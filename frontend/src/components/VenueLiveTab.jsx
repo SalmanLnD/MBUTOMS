@@ -58,12 +58,15 @@ const VenueLiveTab = () => {
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const [blockFilter, setBlockFilter] = useState('');
+  const [timeFilter, setTimeFilter] = useState('');
 
   const fetchLive = useCallback(async ({ soft = false } = {}) => {
     if (soft) setRefreshing(true);
     else setLoading(true);
     try {
-      const data = await getLiveTrainerVenues();
+      const data = await getLiveTrainerVenues({
+        time: timeFilter || undefined,
+      });
       setPayload(data);
     } catch (err) {
       showError(getErrorMessage(err));
@@ -71,7 +74,7 @@ const VenueLiveTab = () => {
       setLoading(false);
       setRefreshing(false);
     }
-  }, []);
+  }, [timeFilter]);
 
   useEffect(() => {
     fetchLive();
@@ -152,7 +155,7 @@ const VenueLiveTab = () => {
   return (
     <div className="card table-card">
       <div className="card-body">
-        <div className="row g-2 mb-3 align-items-center">
+        <div className="row g-2 mb-3 align-items-end">
           <div className="col-md-3">
             <input
               type="search"
@@ -187,25 +190,51 @@ const VenueLiveTab = () => {
               ]}
             />
           </div>
+          <div className="col-md-2">
+            <label className="form-label small text-muted mb-1" htmlFor="live-venue-time">
+              Time
+            </label>
+            <input
+              id="live-venue-time"
+              type="time"
+              className="form-control"
+              value={timeFilter}
+              onChange={(e) => setTimeFilter(e.target.value)}
+              aria-label="Show venues at this time today"
+            />
+          </div>
           <div className="col-md-3">
-            <div className="text-muted small">
-              {payload?.day || '—'} · {payload?.currentTime || '—'} IST
-              {payload?.date ? ` · ${payload.date}` : ''}
-              {' · '}
-              {counts.inClass} in class, {counts.free} free, {counts.notAvailable} not available
-              {refreshing ? ' · Refreshing…' : ''}
+            <div className="d-flex flex-wrap align-items-center gap-2">
+              {timeFilter ? (
+                <button
+                  type="button"
+                  className="btn btn-outline-primary btn-sm"
+                  onClick={() => setTimeFilter('')}
+                >
+                  Live now
+                </button>
+              ) : null}
+              <button
+                type="button"
+                className="btn btn-outline-secondary btn-sm"
+                onClick={() => fetchLive({ soft: true })}
+                disabled={refreshing}
+              >
+                Refresh
+              </button>
             </div>
           </div>
-          <div className="col-md-2 text-md-end">
-            <button
-              type="button"
-              className="btn btn-outline-secondary btn-sm"
-              onClick={() => fetchLive({ soft: true })}
-              disabled={refreshing}
-            >
-              Refresh
-            </button>
-          </div>
+        </div>
+
+        <div className="text-muted small mb-3">
+          {payload?.isLive === false
+            ? `Today at ${payload?.currentTime || timeFilter} IST`
+            : 'Live now'}
+          {payload?.day ? ` · ${payload.day}` : ''}
+          {payload?.date ? ` · ${payload.date}` : ''}
+          {' · '}
+          {counts.inClass} in class, {counts.free} free, {counts.notAvailable} not available
+          {refreshing ? ' · Refreshing...' : ''}
         </div>
 
         <div className="table-responsive">

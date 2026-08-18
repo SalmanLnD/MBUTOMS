@@ -2,6 +2,8 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import {
   getIstNowParts,
+  parseIstClockTime,
+  resolveLiveVenueInstant,
   isScheduleActiveAtMinutes,
   buildReplacementByScheduleMap,
   isTrainerOnLeaveNow,
@@ -30,6 +32,38 @@ describe('getIstNowParts', () => {
     assert.equal(parts.dayName, 'Tuesday');
     assert.equal(parts.currentTime, '11:15');
     assert.equal(parts.minutes, 11 * 60 + 15);
+  });
+});
+
+describe('parseIstClockTime', () => {
+  it('accepts HH:mm and rejects invalid times', () => {
+    assert.equal(parseIstClockTime('09:05').minutes, 9 * 60 + 5);
+    assert.equal(parseIstClockTime('9:05').currentTime, '09:05');
+    assert.equal(parseIstClockTime('24:00'), null);
+    assert.equal(parseIstClockTime('abc'), null);
+  });
+});
+
+describe('resolveLiveVenueInstant', () => {
+  it('keeps the live clock when no time is provided', () => {
+    const instant = resolveLiveVenueInstant({
+      now: new Date('2026-07-21T05:45:00.000Z'),
+    });
+    assert.equal(instant.isLive, true);
+    assert.equal(instant.currentTime, '11:15');
+    assert.equal(instant.dateKey, '2026-07-21');
+  });
+
+  it('uses the same IST day at the selected clock time', () => {
+    const instant = resolveLiveVenueInstant({
+      now: new Date('2026-07-21T05:45:00.000Z'),
+      time: '14:30',
+    });
+    assert.equal(instant.isLive, false);
+    assert.equal(instant.dateKey, '2026-07-21');
+    assert.equal(instant.dayName, 'Tuesday');
+    assert.equal(instant.currentTime, '14:30');
+    assert.equal(instant.minutes, 14 * 60 + 30);
   });
 });
 

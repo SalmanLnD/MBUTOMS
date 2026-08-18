@@ -11,7 +11,7 @@ import ClassGroup from '../models/ClassGroup.js';
 
 import { buildTimetableBoardForDate } from '../utils/timetableBoard.js';
 import { mergeRosterFilter } from '../utils/rosterFilter.js';
-import { buildLiveTrainerVenues } from '../utils/liveTrainerVenues.js';
+import { buildLiveTrainerVenues, parseIstClockTime } from '../utils/liveTrainerVenues.js';
 import {
   sanitizeSchedulesByTrainerForPublic,
   sanitizeTrainerForPublic,
@@ -195,7 +195,14 @@ export const getTimetableBoard = async (req, res) => {
 };
 
 export const getLiveTrainerVenues = async (req, res) => {
-  const payload = await buildLiveTrainerVenues({ now: new Date() });
+  const time = String(req.query.time || '').trim();
+  if (time && !parseIstClockTime(time)) {
+    return res.status(400).json({ message: 'Enter a valid time as HH:mm.' });
+  }
+  const payload = await buildLiveTrainerVenues({
+    now: new Date(),
+    time: time || undefined,
+  });
   res.json(payload);
 };
 
