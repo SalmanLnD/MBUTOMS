@@ -16,7 +16,10 @@ import {
   getReplacementSuggestions,
   assignReplacement,
   cancelReplacement,
+  getBulkReplacementSuggestions,
+  assignBulkReplacement,
 } from '../services/replacementService.js';
+import { getTrainers } from '../services/trainerService.js';
 
 const REPLACEMENT_STATUS = {
   current: { label: 'Current', className: 'bg-success' },
@@ -51,6 +54,22 @@ const Replacements = () => {
   const [externalTrainerName, setExternalTrainerName] = useState('');
   const [assigningExternal, setAssigningExternal] = useState(false);
   const [pendingCancel, setPendingCancel] = useState(null);
+  const [showBulkModal, setShowBulkModal] = useState(false);
+  const [bulkSubmitting, setBulkSubmitting] = useState(false);
+  const [loadingBulkSuggestions, setLoadingBulkSuggestions] = useState(false);
+  const [bulkTrainerOptions, setBulkTrainerOptions] = useState([]);
+  const [bulkSuggestions, setBulkSuggestions] = useState([]);
+  const [bulkTargetCount, setBulkTargetCount] = useState(0);
+  const [bulkForm, setBulkForm] = useState({
+    sourceTrainerId: '',
+    fromDate: '',
+    toDate: '',
+    mode: 'internal',
+    replacementTrainerId: '',
+    externalTrainerName: '',
+    externalEmployeeId: '',
+    externalEmail: '',
+  });
 
   const fetchReplacements = async () => {
     setLoading(true);
@@ -66,6 +85,103 @@ const Replacements = () => {
   };
 
   useEffect(() => { fetchReplacements(); }, [page, pageSize]);
+
+  const resetBulkForm = () => {
+    setBulkForm({
+      sourceTrainerId: '',
+      fromDate: '',
+      toDate: '',
+      mode: 'internal',
+      replacementTrainerId: '',
+      externalTrainerName: '',
+      externalEmployeeId: '',
+      externalEmail: '',
+    });
+    setBulkSuggestions([]);
+    setBulkTargetCount(0);
+  };
+
+  const openBulkModal = async () => {
+    setShowBulkModal(true);
+    resetBulkForm();
+    try {
+      const data = await getTrainers({ fields: 'lite', limit: 200, sortBy: 'name', sortOrder: 'asc' });
+      setBulkTrainerOptions(data.trainers || []);
+    } catch (err) {
+      showError(getErrorMessage(err));
+    }
+  };
+
+  const loadBulkSuggestions = async () => {
+    if (!bulkForm.sourceTrainerId || !bulkForm.fromDate || !bulkForm.toDate) {
+      showError('Select trainer and date range first');
+      return;
+    }
+    setLoadingBulkSuggestions(true);
+    try {
+      const data = await getBulkReplacementSuggestions({
+        sourceTrainerId: bulkForm.sourceTrainerId,
+        fromDate: bulkForm.fromDate,
+        toDate: bulkForm.toDate,
+      });
+      setBulkSuggestions(data.suggestions || []);
+      setBulkTargetCount(data.targetCount || 0);
+    } catch (err) {
+      showError(getErrorMessage(err));
+      setBulkSuggestions([]);
+      setBulkTargetCount(0);
+    } finally {
+      setLoadingBulkSuggestions(false);
+    }
+  };
+
+  const handleBulkAssign = async () => {
+    if (!bulkForm.sourceTrainerId || !bulkForm.fromDate || !bulkForm.toDate) {
+      showError('Select trainer and date range');
+      return;
+    }
+
+    if (bulkForm.mode === 'internal' && !bulkForm.replacementTrainerId) {
+      showError('Select a replacement trainer');
+      return;
+    }
+    if (bulkForm.mode === 'external'
+      && (!bulkForm.externalTrainerName.trim()
+        || !bulkForm.externalEmployeeId.trim()
+        || !bulkForm.externalEmail.trim())) {
+      showError('Enter external trainer name, employee ID, and email');
+      return;
+    }
+
+    setBulkSubmitting(true);
+    try {
+      const payload = {
+        sourceTrainerId: bulkForm.sourceTrainerId,
+        fromDate: bulkForm.fromDate,
+        toDate: bulkForm.toDate,
+        isExternal: bulkForm.mode === 'external',
+      };
+      if (bulkForm.mode === 'internal') {
+        payload.replacementTrainerId = bulkForm.replacementTrainerId;
+      } else {
+        payload.externalTrainerName = bulkForm.externalTrainerName.trim();
+        payload.externalEmployeeId = bulkForm.externalEmployeeId.trim();
+        payload.externalEmail = bulkForm.externalEmail.trim().toLowerCase();
+      }
+      const data = await assignBulkReplacement(payload);
+      if (data?.createdExternalAccount && data?.defaultPassword) {
+        showSuccess(`Bulk replacement saved. External trainer account created. Default password: ${data.defaultPassword}`);
+      } else {
+        showSuccess('Bulk replacement saved');
+      }
+      setShowBulkModal(false);
+      fetchReplacements();
+    } catch (err) {
+      showError(getErrorMessage(err));
+    } finally {
+      setBulkSubmitting(false);
+    }
+  };
 
   const closeSuggestionsModal = () => {
     setSelectedSchedule(null);
@@ -226,13 +342,22 @@ const Replacements = () => {
           <div className="card-body">
             <div className="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
               <h5 className="card-title mb-0">Replacement Register</h5>
-              <button
-                type="button"
-                className="btn btn-primary btn-sm"
-                onClick={() => setShowAddSlotModal(true)}
-              >
-                Add Replacement
-              </button>
+              <div className="d-flex align-items-center gap-2">
+                <button
+                  type="button"
+                  className="btn btn-outline-primary btn-sm"
+                  onClick={openBulkModal}
+                >
+                  Bulk Replacement
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-primary btn-sm"
+                  onClick={() => setShowAddSlotModal(true)}
+                >
+                  Add Replacement
+                </button>
+              </div>
             </div>
             <div className="table-responsive">
               <table className="table table-hover align-middle">
@@ -360,6 +485,166 @@ const Replacements = () => {
         onClose={() => setShowAddSlotModal(false)}
         onCreated={fetchReplacements}
       />
+
+      {activeTab === 'all' && showBulkModal && (
+        <Modal show title="Bulk Replacement" onClose={() => setShowBulkModal(false)} size="toms-modal-lg">
+          <div className="toms-modal-body">
+            <div className="row g-3">
+              <div className="col-md-4">
+                <label className="form-label">Trainer on leave</label>
+                <select
+                  className="form-select"
+                  value={bulkForm.sourceTrainerId}
+                  onChange={(e) => setBulkForm((prev) => ({ ...prev, sourceTrainerId: e.target.value }))}
+                >
+                  <option value="">Select trainer</option>
+                  {bulkTrainerOptions.map((trainer) => (
+                    <option key={trainer._id} value={trainer._id}>
+                      {trainer.name} ({trainer.employeeId})
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="col-md-4">
+                <label className="form-label">From date</label>
+                <input
+                  type="date"
+                  className="form-control"
+                  value={bulkForm.fromDate}
+                  onChange={(e) => setBulkForm((prev) => ({ ...prev, fromDate: e.target.value }))}
+                />
+              </div>
+              <div className="col-md-4">
+                <label className="form-label">To date</label>
+                <input
+                  type="date"
+                  className="form-control"
+                  value={bulkForm.toDate}
+                  onChange={(e) => setBulkForm((prev) => ({ ...prev, toDate: e.target.value }))}
+                />
+              </div>
+            </div>
+
+            <div className="d-flex align-items-center gap-2 mt-3">
+              <button
+                type="button"
+                className="btn btn-outline-secondary btn-sm"
+                onClick={loadBulkSuggestions}
+                disabled={loadingBulkSuggestions}
+              >
+                {loadingBulkSuggestions ? 'Loading...' : 'Load suggestions'}
+              </button>
+              {bulkTargetCount > 0 && (
+                <span className="small text-muted">
+                  {bulkTargetCount} class slots need replacement in this range
+                </span>
+              )}
+            </div>
+
+            <div className="mt-3">
+              <div className="form-check form-check-inline">
+                <input
+                  className="form-check-input"
+                  type="radio"
+                  name="bulk-mode"
+                  id="bulk-mode-internal"
+                  checked={bulkForm.mode === 'internal'}
+                  onChange={() => setBulkForm((prev) => ({ ...prev, mode: 'internal' }))}
+                />
+                <label className="form-check-label" htmlFor="bulk-mode-internal">
+                  Existing trainer
+                </label>
+              </div>
+              <div className="form-check form-check-inline">
+                <input
+                  className="form-check-input"
+                  type="radio"
+                  name="bulk-mode"
+                  id="bulk-mode-external"
+                  checked={bulkForm.mode === 'external'}
+                  onChange={() => setBulkForm((prev) => ({ ...prev, mode: 'external' }))}
+                />
+                <label className="form-check-label" htmlFor="bulk-mode-external">
+                  External trainer (create account)
+                </label>
+              </div>
+            </div>
+
+            {bulkForm.mode === 'internal' ? (
+              <div className="mt-3">
+                <label className="form-label">Suggested trainers</label>
+                <select
+                  className="form-select"
+                  value={bulkForm.replacementTrainerId}
+                  onChange={(e) => setBulkForm((prev) => ({ ...prev, replacementTrainerId: e.target.value }))}
+                >
+                  <option value="">Select replacement trainer</option>
+                  {bulkSuggestions.map((item) => (
+                    <option key={item.trainer._id} value={item.trainer._id}>
+                      {item.trainer.name} ({item.trainer.employeeId}) · {item.weeklyHours.toFixed(1)} hrs
+                    </option>
+                  ))}
+                </select>
+              </div>
+            ) : (
+              <div className="row g-3 mt-1">
+                <div className="col-md-4">
+                  <label className="form-label">External trainer name</label>
+                  <input
+                    type="text"
+                    className="form-control"
+                    value={bulkForm.externalTrainerName}
+                    onChange={(e) => setBulkForm((prev) => ({ ...prev, externalTrainerName: e.target.value }))}
+                  />
+                </div>
+                <div className="col-md-4">
+                  <label className="form-label">Employee ID</label>
+                  <input
+                    type="text"
+                    className="form-control"
+                    value={bulkForm.externalEmployeeId}
+                    onChange={(e) => setBulkForm((prev) => ({ ...prev, externalEmployeeId: e.target.value }))}
+                  />
+                </div>
+                <div className="col-md-4">
+                  <label className="form-label">Email</label>
+                  <input
+                    type="email"
+                    className="form-control"
+                    value={bulkForm.externalEmail}
+                    onChange={(e) => setBulkForm((prev) => ({ ...prev, externalEmail: e.target.value }))}
+                  />
+                </div>
+                <div className="col-12">
+                  <div className="small text-muted">
+                    A trainer account is created with role trainer and default password Mbu#2026.
+                    CAMU credentials are copied from the original trainer.
+                  </div>
+                </div>
+              </div>
+            )}
+
+            <div className="d-flex justify-content-end gap-2 mt-4">
+              <button
+                type="button"
+                className="btn btn-outline-secondary"
+                onClick={() => setShowBulkModal(false)}
+                disabled={bulkSubmitting}
+              >
+                Close
+              </button>
+              <button
+                type="button"
+                className="btn btn-primary"
+                onClick={handleBulkAssign}
+                disabled={bulkSubmitting}
+              >
+                {bulkSubmitting ? 'Saving...' : 'Apply Bulk Replacement'}
+              </button>
+            </div>
+          </div>
+        </Modal>
+      )}
 
       {pendingCancel && (
         <ConfirmModal

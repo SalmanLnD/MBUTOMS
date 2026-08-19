@@ -20,6 +20,8 @@ import {
   trainerHasSlotConflict,
 } from '../utils/replacementSlotConflicts.js';
 import { dedupeReplacementsBySchedule } from '../utils/leaveReplacements.js';
+import { syncTrainerUser } from '../utils/trainerUserSync.js';
+import { INITIAL_TRAINER_PASSWORD } from '../constants/trainerAuth.js';
 
 const timeToMinutes = (time) => {
   const [h, m] = time.split(':').map(Number);
@@ -74,6 +76,149 @@ const resolveReplacementTrainer = (leave, schedule, trainersById) => {
       isExternal: false,
     }
     : null;
+};
+
+const toDateOnly = (value) => normalizeDate(value);
+
+const parseBulkRange = ({ fromDate, toDate }) => {
+  const start = toDateOnly(fromDate);
+  const end = toDateOnly(toDate);
+  if (!fromDate || !toDate || Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) {
+    return null;
+  }
+  if (end < start) return null;
+  return { start, end };
+};
+
+const gatherBulkTargets = async ({ sourceTrainerId, start, end }) => {
+  const leaves = await Leave.find({
+    trainer: sourceTrainerId,
+    status: 'approved',
+    affectedSchedules: { $exists: true, $not: { $size: 0 } },
+    startDate: { $lte: end },
+    endDate: { $gte: start },
+  })
+    .populate({
+      path: 'affectedSchedules',
+      select: 'day startTime endTime department section subject subjectCode',
+    })
+    .lean();
+
+  if (!leaves.length) {
+    return { leaves: [], targets: [], cancellationMap: new Map() };
+  }
+
+  const cancellationMap = await getCancellationMapForRange(start, end);
+  const dateInRange = (key) => {
+    const date = normalizeDate(key);
+    return date >= start && date <= end;
+  };
+
+  const targets = [];
+  leaves.forEach((leave) => {
+    (leave.affectedSchedules || []).forEach((schedule) => {
+      const dateKeys = getUncancelledScheduleDateKeys(leave, schedule, cancellationMap)
+        .filter(dateInRange);
+      if (!dateKeys.length) return;
+      targets.push({ leave, schedule, dateKeys });
+    });
+  });
+
+  return { leaves, targets, cancellationMap };
+};
+
+const resolveBulkReplacementTrainer = async ({
+  sourceTrainer,
+  replacementTrainerId,
+  isExternal,
+  externalTrainerName,
+  externalEmployeeId,
+  externalEmail,
+}) => {
+  if (!isExternal) {
+    const trainer = await Trainer.findById(replacementTrainerId);
+    if (!trainer || trainer.status !== 'active') {
+      return { error: 'Replacement trainer is not available' };
+    }
+    if (trainer._id.toString() === sourceTrainer._id.toString()) {
+      return { error: 'The original trainer cannot replace their own classes' };
+    }
+    return { trainer, createdExternalAccount: false };
+  }
+
+  const name = String(externalTrainerName || '').trim();
+  const employeeId = String(externalEmployeeId || '').trim();
+  const email = String(externalEmail || '').trim().toLowerCase();
+
+  if (!name || !employeeId || !email) {
+    return { error: 'External trainer name, employee ID, and email are required' };
+  }
+
+  const existingTrainer = await Trainer.findOne({
+    $or: [{ employeeId }, { email }],
+  }).lean();
+  if (existingTrainer) {
+    return { error: 'Trainer with this employee ID or email already exists' };
+  }
+
+  const trainer = await Trainer.create({
+    name,
+    employeeId,
+    email,
+    status: 'active',
+    camuErpId: sourceTrainer.camuErpId || '',
+    camuPassword: sourceTrainer.camuPassword || '',
+  });
+
+  await syncTrainerUser(trainer, { resetPassword: true });
+  return { trainer, createdExternalAccount: true };
+};
+
+const trainerCanCoverTargets = async ({
+  trainer,
+  sourceTrainerId,
+  targets,
+  start,
+  end,
+  cancellationMap,
+}) => {
+  const trainerId = trainer._id.toString();
+  if (trainerId === sourceTrainerId.toString()) return false;
+
+  const scheduleCodes = resolveTrainerScheduleCodes(trainer);
+  const [ownedSchedules, replacementBusyByTrainer] = await Promise.all([
+    Schedule.find({ trainerCode: { $in: scheduleCodes } })
+      .select('day startTime endTime')
+      .lean(),
+    loadReplacementBusySlotsByTrainer({
+      trainerIds: [trainer._id],
+      rangeStart: start,
+      rangeEnd: end,
+    }),
+  ]);
+
+  for (const target of targets) {
+    const available = await isTrainerAvailableForReplacement({
+      trainerId: trainer._id,
+      scheduleDay: target.schedule.day,
+      leaveStart: target.leave.startDate,
+      leaveEnd: target.leave.endDate,
+      status: trainer.status,
+    });
+    if (!available) return false;
+
+    const conflict = trainerHasSlotConflict({
+      ownedSchedules,
+      replacementBusySlots: replacementBusyByTrainer.get(trainerId) || [],
+      day: target.schedule.day,
+      startTime: target.schedule.startTime,
+      endTime: target.schedule.endTime,
+      dateKeys: target.dateKeys,
+      cancellationMap,
+    });
+    if (conflict) return false;
+  }
+  return true;
 };
 
 export const getReplacementSuggestions = async (req, res) => {
@@ -239,6 +384,209 @@ export const getReplacementSuggestions = async (req, res) => {
     suggestions: eligibleSuggestions,
     otherSuggestions,
     affectedDates: affectedDateKeys,
+  });
+};
+
+export const getBulkReplacementSuggestions = async (req, res) => {
+  const { sourceTrainerId, fromDate, toDate } = req.query;
+  const range = parseBulkRange({ fromDate, toDate });
+  if (!sourceTrainerId || !range) {
+    return res.status(400).json({ message: 'sourceTrainerId, fromDate, and toDate are required' });
+  }
+
+  const sourceTrainer = await Trainer.findById(sourceTrainerId)
+    .select('name employeeId')
+    .lean();
+  if (!sourceTrainer) {
+    return res.status(404).json({ message: 'Source trainer not found' });
+  }
+
+  const { targets, cancellationMap } = await gatherBulkTargets({
+    sourceTrainerId,
+    start: range.start,
+    end: range.end,
+  });
+  if (!targets.length) {
+    return res.json({
+      sourceTrainer,
+      fromDate: range.start,
+      toDate: range.end,
+      targetCount: 0,
+      suggestions: [],
+    });
+  }
+
+  const candidates = await Trainer.find({
+    _id: { $ne: sourceTrainerId },
+    status: 'active',
+  })
+    .select('name employeeId email performanceScore status scheduleTrainerCodes')
+    .lean();
+
+  const suggestions = [];
+  for (const candidate of candidates) {
+    const canCover = await trainerCanCoverTargets({
+      trainer: candidate,
+      sourceTrainerId,
+      targets,
+      start: range.start,
+      end: range.end,
+      cancellationMap,
+    });
+    if (!canCover) continue;
+
+    const scheduleCodes = resolveTrainerScheduleCodes(candidate);
+    const weeklySlots = await Schedule.find({ trainerCode: { $in: scheduleCodes } })
+      .select('startTime endTime')
+      .lean();
+    const weeklyHours = weeklySlots.reduce((sum, slot) => {
+      const diff = parseTimeToMinutes(slot.endTime) - parseTimeToMinutes(slot.startTime);
+      return sum + diff / 60;
+    }, 0);
+
+    suggestions.push({
+      trainer: {
+        _id: candidate._id,
+        name: candidate.name,
+        employeeId: candidate.employeeId,
+        email: candidate.email || '',
+      },
+      weeklyHours: Math.round(weeklyHours * 10) / 10,
+      performanceScore: candidate.performanceScore || 0,
+    });
+  }
+
+  suggestions.sort((a, b) => {
+    if (a.weeklyHours !== b.weeklyHours) return a.weeklyHours - b.weeklyHours;
+    return b.performanceScore - a.performanceScore;
+  });
+
+  res.json({
+    sourceTrainer,
+    fromDate: range.start,
+    toDate: range.end,
+    targetCount: targets.length,
+    suggestions,
+  });
+};
+
+export const assignBulkReplacement = async (req, res) => {
+  const {
+    sourceTrainerId,
+    fromDate,
+    toDate,
+    replacementTrainerId,
+    isExternal = false,
+    externalTrainerName = '',
+    externalEmployeeId = '',
+    externalEmail = '',
+  } = req.body || {};
+
+  const range = parseBulkRange({ fromDate, toDate });
+  if (!sourceTrainerId || !range) {
+    return res.status(400).json({ message: 'sourceTrainerId, fromDate, and toDate are required' });
+  }
+
+  const sourceTrainer = await Trainer.findById(sourceTrainerId)
+    .select('name employeeId camuErpId camuPassword')
+    .lean();
+  if (!sourceTrainer) {
+    return res.status(404).json({ message: 'Source trainer not found' });
+  }
+
+  if (!isExternal && !replacementTrainerId) {
+    return res.status(400).json({ message: 'Replacement trainer is required' });
+  }
+
+  const { targets, cancellationMap } = await gatherBulkTargets({
+    sourceTrainerId,
+    start: range.start,
+    end: range.end,
+  });
+  if (!targets.length) {
+    return res.status(400).json({ message: 'No replacement-required classes found in this range' });
+  }
+
+  const resolved = await resolveBulkReplacementTrainer({
+    sourceTrainer,
+    replacementTrainerId,
+    isExternal: Boolean(isExternal),
+    externalTrainerName,
+    externalEmployeeId,
+    externalEmail,
+  });
+  if (resolved.error) {
+    return res.status(400).json({ message: resolved.error });
+  }
+  const replacementTrainer = resolved.trainer;
+
+  const canCover = await trainerCanCoverTargets({
+    trainer: replacementTrainer.toObject ? replacementTrainer.toObject() : replacementTrainer,
+    sourceTrainerId,
+    targets,
+    start: range.start,
+    end: range.end,
+    cancellationMap,
+  });
+  if (!canCover) {
+    return res.status(400).json({ message: 'Selected replacement trainer has conflicts in this date range' });
+  }
+
+  const leavesById = new Map();
+  targets.forEach(({ leave }) => {
+    leavesById.set(leave._id.toString(), leave);
+  });
+
+  const updatedLeaves = [];
+  for (const leave of leavesById.values()) {
+    const doc = await Leave.findById(leave._id);
+    if (!doc) continue;
+    if (!Array.isArray(doc.replacements)) doc.replacements = [];
+
+    const leaveTargets = targets.filter((t) => t.leave._id.toString() === leave._id.toString());
+    leaveTargets.forEach((target) => {
+      const scheduleId = target.schedule._id.toString();
+      const existingIndex = doc.replacements.findIndex(
+        (entry) => entry.schedule.toString() === scheduleId
+      );
+      const payload = {
+        schedule: scheduleId,
+        replacementTrainer: replacementTrainer._id,
+        isExternal: false,
+        externalTrainerName: '',
+        assignedAt: new Date(),
+        assignedBy: req.user._id,
+      };
+      if (existingIndex >= 0) doc.replacements[existingIndex] = payload;
+      else doc.replacements.push(payload);
+    });
+
+    doc.replacements = dedupeReplacementsBySchedule(doc.replacements);
+    doc.markModified('replacements');
+    await doc.save();
+    updatedLeaves.push(doc._id.toString());
+  }
+
+  clearAttendanceGridCache();
+
+  res.json({
+    message: 'Bulk replacement applied successfully',
+    sourceTrainer: {
+      _id: sourceTrainer._id,
+      name: sourceTrainer.name,
+      employeeId: sourceTrainer.employeeId,
+    },
+    replacementTrainer: {
+      _id: replacementTrainer._id,
+      name: replacementTrainer.name,
+      employeeId: replacementTrainer.employeeId,
+      email: replacementTrainer.email || '',
+      role: 'trainer',
+    },
+    createdExternalAccount: resolved.createdExternalAccount,
+    defaultPassword: resolved.createdExternalAccount ? INITIAL_TRAINER_PASSWORD : null,
+    updatedLeaveCount: updatedLeaves.length,
+    updatedClassCount: targets.length,
   });
 };
 

@@ -50,3 +50,13 @@ export const createSlotReplacementRequest = async (payload) => {
   const { data } = await api.post('/replacements/slot-request', payload);
   return data;
 };
+
+export const getBulkReplacementSuggestions = async (params = {}) => {
+  const { data } = await api.get('/replacements/bulk-suggestions', { params });
+  return data;
+};
+
+export const assignBulkReplacement = async (payload) => {
+  const { data } = await api.post('/replacements/bulk-assign', payload);
+  return data;
+};
