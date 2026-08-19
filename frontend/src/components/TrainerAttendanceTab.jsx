@@ -11,6 +11,7 @@ import {
   upsertTrainerDailyAttendance,
   invalidateTrainerAttendanceGridCache,
 } from '../services/attendanceService.js';
+import { TRAINER_ATTENDANCE_TYPES } from '../utils/trainerAttendanceTypes.js';
 import { getErrorMessage } from '../utils/helpers.js';
 import {
   buildMonthOptions,
@@ -277,8 +278,38 @@ const TrainerAttendanceTab = () => {
         return next;
       });
     } catch (err) {
-      showError(getErrorMessage(err));
-      fetchGrid({ forceRefresh: true });
+      const payload = err?.response?.data;
+      if (payload?.code === 'INSUFFICIENT_COMP_OFF') {
+        showError(payload.message || 'Insufficient comp-off balance. Reverted to Leave.');
+        setGrid((prev) => {
+          if (!prev) return prev;
+          const revertTo = payload.revertTo || TRAINER_ATTENDANCE_TYPES.LEAVE;
+          const next = {
+            ...prev,
+            rows: prev.rows.map((entry) => {
+              if (entry.trainer._id !== trainerId) return entry;
+              return {
+                ...entry,
+                days: {
+                  ...entry.days,
+                  [dateKey]: {
+                    ...entry.days[dateKey],
+                    attendanceType: revertTo,
+                    oifNumber: '',
+                    mockPrepHours: 0,
+                  },
+                },
+              };
+            }),
+          };
+          gridDataRef.current = next;
+          monthCacheRef.current.set(next.month, { todayKey: toAttendanceDateKey(), data: next });
+          return next;
+        });
+      } else {
+        showError(getErrorMessage(err));
+        fetchGrid({ forceRefresh: true });
+      }
     } finally {
       setSavingKey('');
     }

@@ -1,0 +1,38 @@
+/**
+ * Initial pending comp-off rows (includes intentional duplicates from source data).
+ * Each row is stored as-is; duplicate flags are computed at read time.
+ */
+export const COMP_OFF_SEED_ROWS = [
+  { employeeId: '135130', name: 'Ravi Teja Naga Kumar V', base: 'Tirupati', dateWorkedOn: '2026-05-24', uniqueId: '13513046166', count: 1 },
+  { employeeId: '135130', name: 'Ravi Teja Naga Kumar V', base: 'Tirupati', dateWorkedOn: '2026-06-07', uniqueId: '13513046180', count: 1 },
+  { employeeId: '135130', name: 'Ravi Teja Naga Kumar V', base: 'Tirupati', dateWorkedOn: '2026-01-01', uniqueId: '13513046023', count: 1 },
+  { employeeId: '135130', name: 'Ravi Teja Naga Kumar V', base: 'Tirupati', dateWorkedOn: '2026-05-24', uniqueId: '13513046166', count: 1 },
+  { employeeId: '135130', name: 'Ravi Teja Naga Kumar V', base: 'Tirupati', dateWorkedOn: '2026-06-07', uniqueId: '13513046180', count: 1 },
+  { employeeId: '135130', name: 'Ravi Teja Naga Kumar V', base: 'Tirupati', dateWorkedOn: '2026-07-12', uniqueId: '13513046215', count: 1 },
+  { employeeId: '135130', name: 'Ravi Teja Naga Kumar V', base: 'Tirupati', dateWorkedOn: '2026-07-19', uniqueId: '13513046222', count: 1 },
+  { employeeId: '135314', name: 'Palla Lavanya', base: 'Tirupati', dateWorkedOn: '2026-05-01', uniqueId: '13531446143', count: 1 },
+  { employeeId: '135314', name: 'Palla Lavanya', base: 'Tirupati', dateWorkedOn: '2026-05-17', uniqueId: '13531446159', count: 1 },
+  { employeeId: '135269', name: 'Sharmila M', base: 'Tirupati', dateWorkedOn: '2026-05-01', uniqueId: '13526946143', count: 1 },
+  { employeeId: '135301', name: 'Navya Mallidi', base: 'Tirupati', dateWorkedOn: '2026-05-01', uniqueId: '13530146143', count: 1 },
+  { employeeId: '135301', name: 'Navya Mallidi', base: 'Tirupati', dateWorkedOn: '2026-06-14', uniqueId: '13530146187', count: 0.5 },
+  { employeeId: '135301', name: 'Navya Mallidi', base: 'Tirupati', dateWorkedOn: '2026-06-14', uniqueId: '13530146187', count: 0.5 },
+  { employeeId: '135301', name: 'Navya Mallidi', base: 'Tirupati', dateWorkedOn: '2026-07-12', uniqueId: '13530146215', count: 0.5 },
+  { employeeId: '801090', name: 'Akuthota Praharsha', base: 'Tirupati', dateWorkedOn: '2025-09-22', uniqueId: '80109045922', count: 1 },
+  { employeeId: '801090', name: 'Akuthota Praharsha', base: 'Tirupati', dateWorkedOn: '2025-10-05', uniqueId: '80109045935', count: 0.5 },
+  { employeeId: '801090', name: 'Akuthota Praharsha', base: 'Tirupati', dateWorkedOn: '2025-10-26', uniqueId: '80109045956', count: 0.5 },
+  { employeeId: '801090', name: 'Akuthota Praharsha', base: 'Tirupati', dateWorkedOn: '2025-11-30', uniqueId: '80109045991', count: 1 },
+  { employeeId: '136047', name: 'Akuthota Praharsha', base: 'Tirupati', dateWorkedOn: '2025-10-05', uniqueId: '13604745935', count: 0.5 },
+  { employeeId: '136047', name: 'Akuthota Praharsha', base: 'Tirupati', dateWorkedOn: '2025-10-26', uniqueId: '13604745956', count: 0.5 },
+  { employeeId: '136047', name: 'Akuthota Praharsha', base: 'Tirupati', dateWorkedOn: '2025-11-30', uniqueId: '13604745991', count: 1 },
+  { employeeId: '136047', name: 'Akuthota Praharsha', base: 'Tirupati', dateWorkedOn: '2026-01-01', uniqueId: '13604746023', count: 1 },
+  { employeeId: '136047', name: 'Akuthota Praharsha', base: 'Tirupati', dateWorkedOn: '2026-05-01', uniqueId: '13604746143', count: 1 },
+  { employeeId: '135621', name: 'Naga Sai Kamesh T', base: 'Tirupati', dateWorkedOn: '2025-09-21', uniqueId: '13562145921', count: 1 },
+  { employeeId: '135621', name: 'Naga Sai Kamesh T', base: 'Tirupati', dateWorkedOn: '2026-05-01', uniqueId: '13562146143', count: 1 },
+  { employeeId: '135621', name: 'Naga Sai Kamesh T', base: 'Tirupati', dateWorkedOn: '2026-07-19', uniqueId: '13562146222', count: 1 },
+  { employeeId: '135890', name: 'Mangalagiri Jahnavi', base: 'Tirupati', dateWorkedOn: '2026-05-01', uniqueId: '13589046143', count: 1 },
+  { employeeId: '135890', name: 'Mangalagiri Jahnavi', base: 'Tirupati', dateWorkedOn: '2026-05-31', uniqueId: '13589046173', count: 1 },
+  { employeeId: '135890', name: 'Mangalagiri Jahnavi', base: 'Tirupati', dateWorkedOn: '2026-05-01', uniqueId: '13589046143', count: 1 },
+  { employeeId: '135824', name: 'Jakka Rounak Reddy', base: 'Tirupati', dateWorkedOn: '2025-10-26', uniqueId: '13582445956', count: 1 },
+  { employeeId: '135824', name: 'Jakka Rounak Reddy', base: 'Tirupati', dateWorkedOn: '2025-11-23', uniqueId: '13582445984', count: 1 },
+  { employeeId: '135824', name: 'Jakka Rounak Reddy', base: 'Tirupati', dateWorkedOn: '2025-11-30', uniqueId: '13582445991', count: 0.5 },
+];

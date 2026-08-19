@@ -422,6 +422,7 @@ const Replacements = () => {
                     replacement,
                     timelineStatus,
                     canAssign,
+                    canChange,
                     affectedDates,
                     isBulkMerged,
                     bulkRangeStart,
@@ -454,7 +455,7 @@ const Replacements = () => {
                                 <span className="badge bg-secondary ms-1">External</span>
                               )}
                             </span>
-                            {canAssign && (
+                            {canChange && (
                               <>
                                 <ActionIconButton
                                   variant="edit"

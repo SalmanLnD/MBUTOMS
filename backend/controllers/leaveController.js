@@ -241,8 +241,17 @@ export const deleteLeave = async (req, res) => {
 
   leave.replacements = [];
   leave.replacementNeeded = false;
+  leave.bulkReplacement = {
+    groupId: '',
+    fromDate: null,
+    toDate: null,
+    replacementTrainer: null,
+    assignedAt: null,
+    assignedBy: null,
+  };
   leave.status = 'cancelled';
   leave.markModified('replacements');
+  leave.markModified('bulkReplacement');
   await leave.save();
   clearAttendanceGridCache();
 

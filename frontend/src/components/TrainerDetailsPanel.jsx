@@ -6,6 +6,7 @@ import TrainerFormModal from './TrainerFormModal.jsx';
 import TrainerRoleTransferModal from './TrainerRoleTransferModal.jsx';
 import { showSuccess } from '../utils/toast.js';
 import { getTrainerById } from '../services/trainerService.js';
+import { getCompOffSummary } from '../services/compOffService.js';
 import { formatDate, getErrorMessage, resolveLinkedTrainerId } from '../utils/helpers.js';
 import { useAuth } from '../context/AuthContext.jsx';
 
@@ -17,6 +18,7 @@ const TrainerDetailsPanel = ({ trainerId, canEdit = false }) => {
     resolvedTrainerId && ownTrainerId && resolvedTrainerId === ownTrainerId
   );
   const [trainer, setTrainer] = useState(null);
+  const [compOffSummary, setCompOffSummary] = useState(null);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState('');
   const [showEditModal, setShowEditModal] = useState(false);
@@ -31,8 +33,12 @@ const TrainerDetailsPanel = ({ trainerId, canEdit = false }) => {
 
     setLoading(true);
     try {
-      const data = await getTrainerById(resolvedTrainerId);
+      const [data, compOffData] = await Promise.all([
+        getTrainerById(resolvedTrainerId),
+        getCompOffSummary({ trainerId: resolvedTrainerId }).catch(() => null),
+      ]);
       setTrainer(data);
+      setCompOffSummary(compOffData?.summary || null);
       setLoadError('');
     } catch (err) {
       setLoadError(getErrorMessage(err));
@@ -144,6 +150,40 @@ const TrainerDetailsPanel = ({ trainerId, canEdit = false }) => {
                   <label className="text-muted small">Joining Date</label>
                   <p className="mb-0">{formatDate(trainer.joiningDate)}</p>
                 </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="card table-card mb-4">
+            <div className="card-body">
+              <h5 className="card-title mb-3">Comp Off Summary</h5>
+              <div className="row g-3">
+                <div className="col-sm-4">
+                  <label className="text-muted small">Pending Balance</label>
+                  <p className="mb-0 fw-semibold">{compOffSummary?.pendingBalance ?? 0}</p>
+                </div>
+                <div className="col-sm-4">
+                  <label className="text-muted small">Pending Records</label>
+                  <p className="mb-0">{compOffSummary?.pendingRecords ?? 0}</p>
+                </div>
+                <div className="col-sm-4">
+                  <label className="text-muted small">Closed Records</label>
+                  <p className="mb-0">{compOffSummary?.closedRecords ?? 0}</p>
+                </div>
+                {compOffSummary?.duplicateRecords > 0 && (
+                  <div className="col-12">
+                    <span className="badge bg-warning text-dark">
+                      {compOffSummary.duplicateRecords} duplicate comp-off row(s) flagged
+                    </span>
+                  </div>
+                )}
+                {compOffSummary?.hasMultipleEmployeeIds && (
+                  <div className="col-12">
+                    <span className="badge bg-info text-dark">
+                      This name appears under multiple employee IDs in comp-off data
+                    </span>
+                  </div>
+                )}
               </div>
             </div>
           </div>

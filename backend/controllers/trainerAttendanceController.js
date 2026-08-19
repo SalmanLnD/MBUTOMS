@@ -53,6 +53,10 @@ import {
   resolveOfficialHolidayAttendance,
   isWorkedOfficialHoliday,
 } from '../utils/officialHolidays.js';
+import {
+  consumeCompOffForAttendance,
+  releaseCompOffForAttendance,
+} from '../utils/compOffService.js';
 
 const buildLogMap = (logs) => {
   const map = new Map();
@@ -585,6 +589,36 @@ export const upsertTrainerDailyAttendance = async (req, res) => {
   } else {
     resolvedAttendanceType = TRAINER_ATTENDANCE_TYPES.OIF;
     isNonWorkingDay = false;
+  }
+
+  const existingRecord = await TrainerDailyAttendance.findOne({ trainer, date: day })
+    .select('attendanceType')
+    .lean();
+  const previousType = existingRecord?.attendanceType || null;
+
+  try {
+    if (
+      previousType === TRAINER_ATTENDANCE_TYPES.COMP_OFF
+      && resolvedAttendanceType !== TRAINER_ATTENDANCE_TYPES.COMP_OFF
+    ) {
+      await releaseCompOffForAttendance({ trainerId: trainer, attendanceDate: day });
+    }
+    if (
+      resolvedAttendanceType === TRAINER_ATTENDANCE_TYPES.COMP_OFF
+      && previousType !== TRAINER_ATTENDANCE_TYPES.COMP_OFF
+    ) {
+      await consumeCompOffForAttendance({ trainerId: trainer, attendanceDate: day });
+    }
+  } catch (error) {
+    if (error.code === 'INSUFFICIENT_COMP_OFF') {
+      return res.status(400).json({
+        message: error.message,
+        code: error.code,
+        availableBalance: error.availableBalance,
+        revertTo: TRAINER_ATTENDANCE_TYPES.LEAVE,
+      });
+    }
+    return res.status(error.statusCode || 500).json({ message: error.message });
   }
 
   const finalOifNumber = attendanceTypeUsesOifNumber(resolvedAttendanceType)

@@ -6,6 +6,7 @@ import { showError, showSuccess } from '../utils/toast.js';
 import TrainerFormModal from '../components/TrainerFormModal.jsx';
 import TrainerAttendanceTab from '../components/TrainerAttendanceTab.jsx';
 import TrainerPunchInLogsTab from '../components/TrainerPunchInLogsTab.jsx';
+import CompOffsTab from '../components/CompOffsTab.jsx';
 import ConfirmModal from '../components/ConfirmModal.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
 import { useDebounce } from '../hooks/useDebounce.js';
@@ -29,8 +30,8 @@ const Trainers = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const tabParam = searchParams.get('tab');
   const validTabs = isTrainerUser
-    ? ['details', 'attendance', 'logs']
-    : ['directory', 'attendance', 'logs'];
+    ? ['details', 'comp-offs', 'attendance', 'logs']
+    : ['directory', 'comp-offs', 'attendance', 'logs'];
   const defaultTab = isTrainerUser ? 'details' : 'directory';
   const activeTab = validTabs.includes(tabParam) ? tabParam : defaultTab;
   const {
@@ -177,6 +178,15 @@ const Trainers = () => {
         <li className="nav-item">
           <button
             type="button"
+            className={`nav-link ${activeTab === 'comp-offs' ? 'active' : ''}`}
+            onClick={() => setTab('comp-offs')}
+          >
+            Comp Offs
+          </button>
+        </li>
+        <li className="nav-item">
+          <button
+            type="button"
             className={`nav-link ${activeTab === 'attendance' ? 'active' : ''}`}
             onClick={() => setTab('attendance')}
           >
@@ -198,6 +208,12 @@ const Trainers = () => {
         <div className="card table-card">
           <div className="card-body">
             <TrainerAttendanceTab />
+          </div>
+        </div>
+      ) : activeTab === 'comp-offs' ? (
+        <div className="card table-card">
+          <div className="card-body">
+            <CompOffsTab />
           </div>
         </div>
       ) : activeTab === 'logs' ? (

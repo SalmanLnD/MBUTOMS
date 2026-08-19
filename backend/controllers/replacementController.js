@@ -733,6 +733,7 @@ export const getAllReplacements = async (req, res) => {
             : null,
           timelineStatus,
           canAssign: false,
+          canChange: false,
           replacementDate: bulkMeta.fromDate,
           affectedDates: [],
           isSlotReplacement: false,
@@ -762,7 +763,7 @@ export const getAllReplacements = async (req, res) => {
       );
       if (!affectedDates.length) continue;
       const replacement = resolveReplacementTrainer(leave, schedule, trainersById);
-      const canAssign = leave.status === 'approved'
+      const isEditableWindow = leave.status === 'approved'
         && (timelineStatus === 'current' || timelineStatus === 'upcoming');
       replacements.push({
         leave: {
@@ -777,7 +778,8 @@ export const getAllReplacements = async (req, res) => {
         schedule,
         replacement,
         timelineStatus,
-        canAssign,
+        canAssign: isEditableWindow && !replacement,
+        canChange: isEditableWindow && Boolean(replacement),
         replacementDate: affectedDates[0],
         affectedDates,
         isSlotReplacement:

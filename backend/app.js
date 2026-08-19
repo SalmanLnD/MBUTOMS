@@ -24,6 +24,7 @@ import notificationRoutes from './routes/notificationRoutes.js';
 import ticketRoutes from './routes/ticketRoutes.js';
 import topicTrackerRoutes from './routes/topicTrackerRoutes.js';
 import studentTestReportRoutes from './routes/studentTestReportRoutes.js';
+import compOffRoutes from './routes/compOffRoutes.js';
 
 dotenv.config();
 const app = express();
@@ -70,6 +71,7 @@ app.use('/api/notifications', notificationRoutes);
 app.use('/api/tickets', ticketRoutes);
 app.use('/api/topic-tracker', topicTrackerRoutes);
 app.use('/api/student-test-reports', studentTestReportRoutes);
+app.use('/api/comp-offs', compOffRoutes);
 
 app.use(notFound);
 app.use(errorHandler);
