@@ -163,18 +163,16 @@ export const buildRtetExportPayload = async () => {
 
         if (!isActiveOnDate(sched, date, subjectStartMap)) return;
 
-        // Mark the original slot covered.
+        // Mark the physical slot as executed (replacement can be internal or external).
+        // De-dup must use the same physical "slotKey" identity as the original-slot counting
+        // below, otherwise multiple replacement entries for the same slot can inflate totals.
         const slotKey = `${code}|${sched.startTime}|${sched.endTime}|${sched.section || ''}|${sched.department || ''}`;
+        if (countedSlotKeys.has(slotKey)) return;
         countedSlotKeys.add(slotKey);
 
-        // Mark replacement as counted so we don't re-add original below.
-        const dedupKey = `${sched._id.toString()}|${dateKey}`;
-        if (!countedSlotKeys.has(dedupKey)) {
-          countedSlotKeys.add(dedupKey);
-          totals[si][dateIdx] = Math.round(
-            (totals[si][dateIdx] + computeHours(sched.startTime, sched.endTime)) * 10
-          ) / 10;
-        }
+        totals[si][dateIdx] = Math.round(
+          (totals[si][dateIdx] + computeHours(sched.startTime, sched.endTime)) * 10
+        ) / 10;
       });
     });
 
