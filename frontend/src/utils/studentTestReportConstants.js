@@ -127,6 +127,7 @@ export const isMarkEntryComplete = (draft) => {
 export const MARKS_FILTER_OPTIONS = [
   { value: 'any', label: 'All scores' },
   { value: 'pending', label: 'Pending' },
+  { value: 'absent', label: 'Absentees' },
   { value: 'eq', label: 'Equal to' },
   { value: 'gt', label: 'Greater than' },
   { value: 'gte', label: 'At least' },
@@ -138,6 +139,9 @@ export const matchesMarksFilter = (draft, operator, rawValue) => {
   if (!operator || operator === 'any') return true;
   const attendance = resolveAttendance(draft?.attendance);
   const marksObtained = draft?.marksObtained;
+  if (operator === 'absent') {
+    return attendance === ATTENDANCE_ABSENT;
+  }
   if (operator === 'pending') {
     return attendance !== ATTENDANCE_ABSENT && String(marksObtained ?? '').trim() === '';
   }

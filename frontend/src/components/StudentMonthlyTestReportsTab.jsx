@@ -130,6 +130,7 @@ const StudentMonthlyTestReportsTab = () => {
   const [fieldErrors, setFieldErrors] = useState({});
   const [marksFilterOp, setMarksFilterOp] = useState('any');
   const [marksFilterValue, setMarksFilterValue] = useState('');
+  const [marksSortOrder, setMarksSortOrder] = useState('none');
   const markEntryTableRef = useRef(null);
 
   const monthKey = formatMonthKey(monthParts.year, monthParts.month);
@@ -442,12 +443,39 @@ const StudentMonthlyTestReportsTab = () => {
     setSubjectFilter('');
     setMarksFilterOp('any');
     setMarksFilterValue('');
+    setMarksSortOrder('none');
   };
 
   const visibleStudents = useMemo(() => {
     const rows = grid?.students || [];
-    return rows.filter((row) => matchesMarksFilter(drafts[row._id], marksFilterOp, marksFilterValue));
-  }, [grid?.students, drafts, marksFilterOp, marksFilterValue]);
+    const filtered = rows.filter((row) =>
+      matchesMarksFilter(drafts[row._id], marksFilterOp, marksFilterValue)
+    );
+    if (marksSortOrder === 'none') return filtered;
+
+    const sorted = [...filtered].sort((a, b) => {
+      const draftA = drafts[a._id] || {};
+      const draftB = drafts[b._id] || {};
+      const attA = resolveAttendance(draftA.attendance);
+      const attB = resolveAttendance(draftB.attendance);
+      const absentA = attA === ATTENDANCE_ABSENT;
+      const absentB = attB === ATTENDANCE_ABSENT;
+      if (absentA && !absentB) return 1;
+      if (!absentA && absentB) return -1;
+
+      const markA = Number(draftA.marksObtained ?? '');
+      const markB = Number(draftB.marksObtained ?? '');
+      const aMissing = Number.isNaN(markA);
+      const bMissing = Number.isNaN(markB);
+      if (aMissing && !bMissing) return 1;
+      if (!aMissing && bMissing) return -1;
+      if (aMissing && bMissing) return String(a.rollNumber).localeCompare(String(b.rollNumber));
+
+      if (marksSortOrder === 'asc') return markA - markB;
+      return markB - markA;
+    });
+    return sorted;
+  }, [grid?.students, drafts, marksFilterOp, marksFilterValue, marksSortOrder]);
 
   const completedCount = useMemo(
     () => (grid?.students || []).filter((row) => isMarkEntryComplete(drafts[row._id])).length,
@@ -455,7 +483,9 @@ const StudentMonthlyTestReportsTab = () => {
   );
 
   const pendingCount = (grid?.students?.length || 0) - completedCount;
-  const marksFilterNeedsValue = marksFilterOp !== 'any' && marksFilterOp !== 'pending';
+  const marksFilterNeedsValue = marksFilterOp !== 'any'
+    && marksFilterOp !== 'pending'
+    && marksFilterOp !== 'absent';
 
   const hasFilters = Boolean(
     schoolFilter
@@ -897,6 +927,17 @@ const StudentMonthlyTestReportsTab = () => {
                               }}
                               aria-label="Filter students by marks"
                               options={MARKS_FILTER_OPTIONS}
+                            />
+                            <StyledSelect
+                              size="sm"
+                              value={marksSortOrder}
+                              onChange={(e) => setMarksSortOrder(e.target.value)}
+                              aria-label="Sort students by marks"
+                              options={[
+                                { value: 'none', label: 'Default order' },
+                                { value: 'desc', label: 'Marks high to low' },
+                                { value: 'asc', label: 'Marks low to high' },
+                              ]}
                             />
                             {marksFilterNeedsValue && (
                               <input

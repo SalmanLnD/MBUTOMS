@@ -685,6 +685,8 @@ export const getAllReplacements = async (req, res) => {
       );
       if (!affectedDates.length) continue;
       const replacement = resolveReplacementTrainer(leave, schedule, trainersById);
+      const canAssign = leave.status === 'approved'
+        && (timelineStatus === 'current' || timelineStatus === 'upcoming');
       replacements.push({
         leave: {
           _id: leave._id,
@@ -698,9 +700,7 @@ export const getAllReplacements = async (req, res) => {
         schedule,
         replacement,
         timelineStatus,
-        // Allow assign/change even after the day is over — classes always had a
-        // trainer, and managers sometimes need to record the replacement later.
-        canAssign: leave.status === 'approved',
+        canAssign,
         replacementDate: affectedDates[0],
         affectedDates,
         isSlotReplacement:
@@ -723,10 +723,17 @@ export const getAllReplacements = async (req, res) => {
     return new Date(b.leave.startDate) - new Date(a.leave.startDate);
   });
 
+  const registerFilter = String(req.query.registerFilter || 'all').trim().toLowerCase();
+  const filtered = replacements.filter((row) => {
+    if (registerFilter === 'pending') return !row.replacement && row.canAssign;
+    if (registerFilter === 'closed') return Boolean(row.replacement) || !row.canAssign;
+    return true;
+  });
+
   const page = Math.max(1, parseInt(req.query.page, 10) || 1);
   const limit = Math.min(50, Math.max(1, parseInt(req.query.limit, 10) || 10));
-  const total = replacements.length;
-  const paged = replacements.slice((page - 1) * limit, page * limit);
+  const total = filtered.length;
+  const paged = filtered.slice((page - 1) * limit, page * limit);
 
   res.json({
     replacements: paged,

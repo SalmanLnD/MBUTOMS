@@ -54,6 +54,7 @@ const Replacements = () => {
   const [externalTrainerName, setExternalTrainerName] = useState('');
   const [assigningExternal, setAssigningExternal] = useState(false);
   const [pendingCancel, setPendingCancel] = useState(null);
+  const [registerFilter, setRegisterFilter] = useState('all');
   const [showBulkModal, setShowBulkModal] = useState(false);
   const [bulkSubmitting, setBulkSubmitting] = useState(false);
   const [loadingBulkSuggestions, setLoadingBulkSuggestions] = useState(false);
@@ -74,7 +75,11 @@ const Replacements = () => {
   const fetchReplacements = async () => {
     setLoading(true);
     try {
-      const data = await getAllReplacements({ page, limit: pageSize });
+      const data = await getAllReplacements({
+        page,
+        limit: pageSize,
+        registerFilter,
+      });
       setReplacements(data.replacements || []);
       setPagination(data.pagination || null);
     } catch (err) {
@@ -84,7 +89,7 @@ const Replacements = () => {
     }
   };
 
-  useEffect(() => { fetchReplacements(); }, [page, pageSize]);
+  useEffect(() => { fetchReplacements(); }, [page, pageSize, registerFilter]);
 
   const resetBulkForm = () => {
     setBulkForm({
@@ -343,6 +348,38 @@ const Replacements = () => {
             <div className="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
               <h5 className="card-title mb-0">Replacement Register</h5>
               <div className="d-flex align-items-center gap-2">
+                <div className="btn-group btn-group-sm" role="group" aria-label="Replacement register filter">
+                  <button
+                    type="button"
+                    className={`btn ${registerFilter === 'all' ? 'btn-secondary' : 'btn-outline-secondary'}`}
+                    onClick={() => {
+                      setRegisterFilter('all');
+                      setPage(1);
+                    }}
+                  >
+                    All
+                  </button>
+                  <button
+                    type="button"
+                    className={`btn ${registerFilter === 'pending' ? 'btn-secondary' : 'btn-outline-secondary'}`}
+                    onClick={() => {
+                      setRegisterFilter('pending');
+                      setPage(1);
+                    }}
+                  >
+                    Pending
+                  </button>
+                  <button
+                    type="button"
+                    className={`btn ${registerFilter === 'closed' ? 'btn-secondary' : 'btn-outline-secondary'}`}
+                    onClick={() => {
+                      setRegisterFilter('closed');
+                      setPage(1);
+                    }}
+                  >
+                    Closed
+                  </button>
+                </div>
                 <button
                   type="button"
                   className="btn btn-outline-primary btn-sm"
