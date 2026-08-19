@@ -4,7 +4,7 @@
  * Baseline mode intentionally uses ONLY timetable schedules:
  * - ignore cancellations
  * - ignore replacements/interventions
- * - ignore holidays
+ * - apply official holidays (0 hours)
  * - apply only subject start dates
  *
  * This yields the same recurring weekly pattern for each weekday.
@@ -21,6 +21,7 @@ import { getAttendanceToday } from './attendanceTracking.js';
 import { computeHours } from './trainerClassHours.js';
 import { SUBJECT_OIF_CATALOG } from './subjectOifCatalog.js';
 import { buildSubjectStartDateMap, DEFAULT_SUBJECT_START_DATE } from './subjectStartDate.js';
+import { loadOfficialHolidayMap } from './officialHolidays.js';
 
 /** The campus subjects in the fixed RTET display order. */
 export const RTET_SUBJECTS = SUBJECT_OIF_CATALOG.map((entry) => ({
@@ -76,9 +77,12 @@ export const buildRtetExportPayload = async () => {
   const dates = getAttendanceCalendarDates(rangeStart, rangeEnd);
   const dateKeys = dates.map(toAttendanceDateKey);
 
-  const schedules = await Schedule.find({ subjectCode: { $in: subjectCodes } })
-    .select('_id day startTime endTime subjectCode section department subject')
-    .lean();
+  const [schedules, holidayMap] = await Promise.all([
+    Schedule.find({ subjectCode: { $in: subjectCodes } })
+      .select('_id day startTime endTime subjectCode section department subject')
+      .lean(),
+    loadOfficialHolidayMap(rangeStart, rangeEnd),
+  ]);
 
   // Index schedules by subjectCode and weekday, deduping physical slot identity.
   const schedByCodeDay = new Map(); // code -> day -> [{hours, slotKey}]
@@ -111,6 +115,13 @@ export const buildRtetExportPayload = async () => {
   );
 
   dates.forEach((date, dateIdx) => {
+    const dateKey = dateKeys[dateIdx];
+    if (holidayMap.has(dateKey)) {
+      subjectIndexByCode.forEach((si) => {
+        totals[si][dateIdx] = 0;
+      });
+      return;
+    }
     const dayName = getAttendanceWeekdayName(date);
     subjectIndexByCode.forEach((si, code) => {
       const daySlots = schedByCodeDay.get(code)?.get(dayName);
