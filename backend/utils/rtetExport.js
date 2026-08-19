@@ -5,7 +5,7 @@
  * - ignore cancellations
  * - ignore replacements/interventions
  * - ignore holidays
- * - ignore subject start dates
+ * - apply only subject start dates
  *
  * This yields the same recurring weekly pattern for each weekday.
  */
@@ -20,6 +20,7 @@ import {
 import { getAttendanceToday } from './attendanceTracking.js';
 import { computeHours } from './trainerClassHours.js';
 import { SUBJECT_OIF_CATALOG } from './subjectOifCatalog.js';
+import { buildSubjectStartDateMap, DEFAULT_SUBJECT_START_DATE } from './subjectStartDate.js';
 
 /** The campus subjects in the fixed RTET display order. */
 export const RTET_SUBJECTS = SUBJECT_OIF_CATALOG.map((entry) => ({
@@ -41,18 +42,42 @@ const formatDateLabel = (dateKey) => {
 const buildSlotKey = (schedule, codeOverride) =>
   `${codeOverride || schedule.subjectCode || ''}|${schedule.startTime}|${schedule.endTime}|${schedule.section || ''}|${schedule.department || ''}`;
 
+const isActiveOnDate = (schedule, date, subjectStartMap) => {
+  const ref = normalizeAttendanceDate(date);
+  const subjectId = schedule.subject?.toString();
+  const subjectCode = schedule.subjectCode?.trim();
+  let start = null;
+  if (subjectId && subjectStartMap.byId.has(subjectId)) {
+    start = subjectStartMap.byId.get(subjectId);
+  } else if (subjectCode && subjectStartMap.byCode.has(subjectCode)) {
+    start = subjectStartMap.byCode.get(subjectCode);
+  }
+  return ref >= (start ?? DEFAULT_SUBJECT_START_DATE);
+};
+
 export const buildRtetExportPayload = async () => {
   const today = getAttendanceToday();
-  const rangeStart = TRAINER_ATTENDANCE_TRACKING_START;
+  const subjectCodes = RTET_SUBJECTS.map((s) => s.code);
+  const subjectStartMap = await buildSubjectStartDateMap();
+
+  // Show RTET only from the earliest subject start date (fallback 13 Jul 2026).
+  const subjectStartCandidates = RTET_SUBJECTS.map((subject) =>
+    subjectStartMap.byCode.get(subject.code) || DEFAULT_SUBJECT_START_DATE
+  );
+  const earliestSubjectStart = subjectStartCandidates.reduce(
+    (min, date) => (date < min ? date : min),
+    DEFAULT_SUBJECT_START_DATE
+  );
+  const rangeStart = earliestSubjectStart > TRAINER_ATTENDANCE_TRACKING_START
+    ? earliestSubjectStart
+    : TRAINER_ATTENDANCE_TRACKING_START;
   const rangeEnd = today;
 
   const dates = getAttendanceCalendarDates(rangeStart, rangeEnd);
   const dateKeys = dates.map(toAttendanceDateKey);
 
-  const subjectCodes = RTET_SUBJECTS.map((s) => s.code);
-
   const schedules = await Schedule.find({ subjectCode: { $in: subjectCodes } })
-    .select('_id day startTime endTime subjectCode section department')
+    .select('_id day startTime endTime subjectCode section department subject')
     .lean();
 
   // Index schedules by subjectCode and weekday, deduping physical slot identity.
@@ -73,6 +98,7 @@ export const buildRtetExportPayload = async () => {
       endTime: sched.endTime,
       section: sched.section || '',
       department: sched.department || '',
+      schedule: sched,
     });
   });
 
@@ -92,7 +118,10 @@ export const buildRtetExportPayload = async () => {
         totals[si][dateIdx] = 0;
         return;
       }
-      const hours = [...daySlots.values()].reduce((sum, slot) => sum + Number(slot.hours || 0), 0);
+      const hours = [...daySlots.values()].reduce((sum, slot) => {
+        if (!isActiveOnDate(slot.schedule, date, subjectStartMap)) return sum;
+        return sum + Number(slot.hours || 0);
+      }, 0);
       totals[si][dateIdx] = Math.round(hours * 10) / 10;
     });
   });
@@ -121,11 +150,13 @@ export const buildRtetDebugForSubjectDate = async ({ subjectCode, dateInput } = 
     .lean();
 
   const daySchedules = schedules.filter((sched) => sched.day === dayName);
+  const subjectStartMap = await buildSubjectStartDateMap();
 
   // Group by physical slot identity (same identity as RTET baseline de-dupe).
   const slotMap = new Map(); // slotKey -> {slot details}
 
   daySchedules.forEach((sched) => {
+    if (!isActiveOnDate(sched, day, subjectStartMap)) return;
     const slotKey = buildSlotKey(sched, code);
     const hours = computeHours(sched.startTime, sched.endTime);
 
@@ -137,6 +168,7 @@ export const buildRtetDebugForSubjectDate = async ({ subjectCode, dateInput } = 
         section: sched.section || '',
         department: sched.department || '',
         hours,
+        schedule: sched,
         scheduleIds: [],
       });
     }
