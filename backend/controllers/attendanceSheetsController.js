@@ -5,6 +5,7 @@ import {
   linkAttendanceSpreadsheet,
   unlinkAttendanceSpreadsheet,
 } from '../services/attendanceSheetsService.js';
+import { buildRtetExportPayload } from '../utils/rtetExport.js';
 
 export const exportTrainerAttendanceForSheets = async (req, res) => {
   res.json(await exportTrainerAttendance());
@@ -34,4 +35,8 @@ export const linkTrainerAttendanceSheet = async (req, res) => {
 export const unlinkTrainerAttendanceSheet = async (req, res) => {
   await unlinkAttendanceSpreadsheet();
   res.json({ linked: false });
+};
+
+export const exportRtetForSheets = async (req, res) => {
+  res.json(await buildRtetExportPayload());
 };

@@ -64,11 +64,14 @@ export const getAttendanceSheetStatus = async () => {
 
 export const getAttendanceAppsScriptSetup = async (req) => {
   const apiKey = await getOrCreateAttendanceExportKey();
-  const exportUrl = `${getPublicApiBaseUrl(req)}/api/attendance/export`;
+  const baseUrl = getPublicApiBaseUrl(req);
+  const exportUrl = `${baseUrl}/api/attendance/export`;
+  const rtetExportUrl = `${baseUrl}/api/attendance/rtet-export`;
   const templatePath = path.join(__dirname, '../templates/trainer-attendance-sync.gs');
   const template = fs.readFileSync(templatePath, 'utf8');
   const script = template
     .replaceAll('__EXPORT_URL__', exportUrl)
+    .replaceAll('__RTET_EXPORT_URL__', rtetExportUrl)
     .replaceAll('__API_KEY__', apiKey);
 
   return {

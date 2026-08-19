@@ -23,6 +23,7 @@ import { asyncHandler } from '../middleware/asyncHandler.js';
 import { attendanceValidation } from '../utils/validators.js';
 import {
   exportTrainerAttendanceForSheets,
+  exportRtetForSheets,
   getTrainerAttendanceAppsScriptSetup,
   getTrainerAttendanceSheetStatus,
   linkTrainerAttendanceSheet,
@@ -36,6 +37,12 @@ router.get(
   '/export',
   requireAttendanceExportKey,
   asyncHandler(exportTrainerAttendanceForSheets)
+);
+
+router.get(
+  '/rtet-export',
+  requireAttendanceExportKey,
+  asyncHandler(exportRtetForSheets)
 );
 
 router.use(protect);
