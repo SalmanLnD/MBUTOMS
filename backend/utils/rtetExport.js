@@ -22,6 +22,7 @@ import { computeHours } from './trainerClassHours.js';
 import { SUBJECT_OIF_CATALOG } from './subjectOifCatalog.js';
 import { buildSubjectStartDateMap, DEFAULT_SUBJECT_START_DATE } from './subjectStartDate.js';
 import { loadOfficialHolidayMap } from './officialHolidays.js';
+import { getCancellationMapForRange } from './leaveAffectedClasses.js';
 
 /** The campus subjects in the fixed RTET display order. */
 export const RTET_SUBJECTS = SUBJECT_OIF_CATALOG.map((entry) => ({
@@ -77,15 +78,16 @@ export const buildRtetExportPayload = async () => {
   const dates = getAttendanceCalendarDates(rangeStart, rangeEnd);
   const dateKeys = dates.map(toAttendanceDateKey);
 
-  const [schedules, holidayMap] = await Promise.all([
+  const [schedules, holidayMap, cancellationMap] = await Promise.all([
     Schedule.find({ subjectCode: { $in: subjectCodes } })
       .select('_id day startTime endTime subjectCode section department subject')
       .lean(),
     loadOfficialHolidayMap(rangeStart, rangeEnd),
+    getCancellationMapForRange(rangeStart, rangeEnd),
   ]);
 
   // Index schedules by subjectCode and weekday, deduping physical slot identity.
-  const schedByCodeDay = new Map(); // code -> day -> [{hours, slotKey}]
+  const schedByCodeDay = new Map(); // code -> day -> slotKey -> slot
   schedules.forEach((sched) => {
     const code = sched.subjectCode?.trim();
     if (!code) return;
@@ -94,16 +96,18 @@ export const buildRtetExportPayload = async () => {
     if (!byDay.has(sched.day)) byDay.set(sched.day, new Map());
     const daySlots = byDay.get(sched.day);
     const slotKey = buildSlotKey(sched, code);
-    if (daySlots.has(slotKey)) return;
-    daySlots.set(slotKey, {
-      slotKey,
-      hours: computeHours(sched.startTime, sched.endTime),
-      startTime: sched.startTime,
-      endTime: sched.endTime,
-      section: sched.section || '',
-      department: sched.department || '',
-      schedule: sched,
-    });
+    if (!daySlots.has(slotKey)) {
+      daySlots.set(slotKey, {
+        slotKey,
+        hours: computeHours(sched.startTime, sched.endTime),
+        startTime: sched.startTime,
+        endTime: sched.endTime,
+        section: sched.section || '',
+        department: sched.department || '',
+        schedules: [],
+      });
+    }
+    daySlots.get(slotKey).schedules.push(sched);
   });
 
   // totals[subjectIdx][dateIdx] = executed hours
@@ -116,6 +120,7 @@ export const buildRtetExportPayload = async () => {
 
   dates.forEach((date, dateIdx) => {
     const dateKey = dateKeys[dateIdx];
+    const canceledIds = cancellationMap.get(dateKey) || new Set();
     if (holidayMap.has(dateKey)) {
       subjectIndexByCode.forEach((si) => {
         totals[si][dateIdx] = 0;
@@ -130,7 +135,14 @@ export const buildRtetExportPayload = async () => {
         return;
       }
       const hours = [...daySlots.values()].reduce((sum, slot) => {
-        if (!isActiveOnDate(slot.schedule, date, subjectStartMap)) return sum;
+        const hasActiveOccurrence = slot.schedules.some((schedule) =>
+          isActiveOnDate(schedule, date, subjectStartMap)
+        );
+        if (!hasActiveOccurrence) return sum;
+        const allCanceled = slot.schedules.every((schedule) =>
+          canceledIds.has(schedule._id.toString())
+        );
+        if (allCanceled) return sum;
         return sum + Number(slot.hours || 0);
       }, 0);
       totals[si][dateIdx] = Math.round(hours * 10) / 10;
@@ -162,6 +174,8 @@ export const buildRtetDebugForSubjectDate = async ({ subjectCode, dateInput } = 
 
   const daySchedules = schedules.filter((sched) => sched.day === dayName);
   const subjectStartMap = await buildSubjectStartDateMap();
+  const cancellationMap = await getCancellationMapForRange(day, day);
+  const canceledIds = cancellationMap.get(dateKey) || new Set();
 
   // Group by physical slot identity (same identity as RTET baseline de-dupe).
   const slotMap = new Map(); // slotKey -> {slot details}
@@ -191,7 +205,10 @@ export const buildRtetDebugForSubjectDate = async ({ subjectCode, dateInput } = 
   let executedHours = 0;
 
   for (const slot of slotMap.values()) {
-    executedHours = Math.round((executedHours + slot.hours) * 10) / 10;
+    const allCanceled = slot.scheduleIds.every((row) => canceledIds.has(row.id));
+    if (!allCanceled) {
+      executedHours = Math.round((executedHours + slot.hours) * 10) / 10;
+    }
 
     physicalSlots.push({
       slotKey: slot.slotKey,
@@ -200,6 +217,7 @@ export const buildRtetDebugForSubjectDate = async ({ subjectCode, dateInput } = 
       section: slot.section,
       department: slot.department,
       hours: slot.hours,
+      canceled: allCanceled,
       scheduleIds: slot.scheduleIds,
     });
   }
