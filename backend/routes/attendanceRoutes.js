@@ -24,6 +24,7 @@ import { attendanceValidation } from '../utils/validators.js';
 import {
   exportTrainerAttendanceForSheets,
   exportRtetForSheets,
+  debugRtetForSubjectDate,
   getTrainerAttendanceAppsScriptSetup,
   getTrainerAttendanceSheetStatus,
   linkTrainerAttendanceSheet,
@@ -43,6 +44,12 @@ router.get(
   '/rtet-export',
   requireAttendanceExportKey,
   asyncHandler(exportRtetForSheets)
+);
+
+router.get(
+  '/rtet-debug',
+  requireAttendanceExportKey,
+  asyncHandler(debugRtetForSubjectDate)
 );
 
 router.use(protect);

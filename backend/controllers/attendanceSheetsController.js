@@ -5,7 +5,10 @@ import {
   linkAttendanceSpreadsheet,
   unlinkAttendanceSpreadsheet,
 } from '../services/attendanceSheetsService.js';
-import { buildRtetExportPayload } from '../utils/rtetExport.js';
+import {
+  buildRtetExportPayload,
+  buildRtetDebugForSubjectDate,
+} from '../utils/rtetExport.js';
 
 export const exportTrainerAttendanceForSheets = async (req, res) => {
   res.json(await exportTrainerAttendance());
@@ -39,4 +42,9 @@ export const unlinkTrainerAttendanceSheet = async (req, res) => {
 
 export const exportRtetForSheets = async (req, res) => {
   res.json(await buildRtetExportPayload());
+};
+
+export const debugRtetForSubjectDate = async (req, res) => {
+  const { subjectCode, date } = req.query || {};
+  res.json(await buildRtetDebugForSubjectDate({ subjectCode, dateInput: date }));
 };

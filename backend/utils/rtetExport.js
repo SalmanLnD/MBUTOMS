@@ -202,3 +202,104 @@ export const buildRtetExportPayload = async () => {
     })),
   };
 };
+
+/**
+ * Debug helper: explain RTET executed hours for a single subject + date.
+ * Returns which physical slots (de-duped by day/time/section/department) are executed,
+ * and which underlying schedule ids were cancelled.
+ */
+export const buildRtetDebugForSubjectDate = async ({ subjectCode, dateInput } = {}) => {
+  const code = String(subjectCode || '').trim();
+  if (!code) return { message: 'subjectCode is required' };
+
+  const day = normalizeAttendanceDate(dateInput || new Date());
+  const dateKey = toAttendanceDateKey(day);
+  const dayName = getAttendanceWeekdayName(day);
+
+  const [holidayMap, subjectStartMap] = await Promise.all([
+    loadOfficialHolidayMap(day, day),
+    buildSubjectStartDateMap(),
+  ]);
+
+  if (holidayMap.has(dateKey)) {
+    return {
+      subjectCode: code,
+      dateKey,
+      dayName,
+      executedHours: 0,
+      reason: 'Official holiday / non-working day',
+      physicalSlots: [],
+    };
+  }
+
+  const cancellationMap = await getCancellationMapForRange(day, day);
+  const canceledIds = cancellationMap.get(dateKey) || new Set();
+
+  const schedules = await Schedule.find({ subjectCode: code })
+    .select('_id day startTime endTime department section subjectCode')
+    .lean();
+
+  // Consider only weekday matching + active-on-date based on subjectStartDate.
+  const activeSchedules = schedules.filter((sched) => (
+    sched.day === dayName && isActiveOnDate(sched, day, subjectStartMap)
+  ));
+
+  // Group by physical slot identity (same identity as the RTET de-dupe).
+  const slotMap = new Map(); // slotKey -> { slotKey, hours, scheduleIds: [{id,canceled}] }
+
+  activeSchedules.forEach((sched) => {
+    const slotKey = `${code}|${sched.startTime}|${sched.endTime}|${sched.section || ''}|${sched.department || ''}`;
+    const id = sched._id.toString();
+    const canceled = canceledIds.has(id);
+    const hours = computeHours(sched.startTime, sched.endTime);
+
+    if (!slotMap.has(slotKey)) {
+      slotMap.set(slotKey, {
+        slotKey,
+        startTime: sched.startTime,
+        endTime: sched.endTime,
+        section: sched.section || '',
+        department: sched.department || '',
+        hours,
+        scheduleIds: [],
+      });
+    }
+
+    slotMap.get(slotKey).scheduleIds.push({ id, canceled });
+  });
+
+  const physicalSlots = [];
+  let executedHours = 0;
+
+  for (const slot of slotMap.values()) {
+    const allCanceled = slot.scheduleIds.every((x) => x.canceled);
+    const executed = !allCanceled;
+
+    if (executed) {
+      executedHours = Math.round((executedHours + slot.hours) * 10) / 10;
+    }
+
+    physicalSlots.push({
+      slotKey: slot.slotKey,
+      startTime: slot.startTime,
+      endTime: slot.endTime,
+      section: slot.section,
+      department: slot.department,
+      hours: slot.hours,
+      executed,
+      scheduleIds: slot.scheduleIds,
+    });
+  }
+
+  // Sort by start time for readability.
+  physicalSlots.sort((a, b) => String(a.startTime).localeCompare(String(b.startTime)));
+
+  return {
+    subjectCode: code,
+    subjectCodeName: RTET_SUBJECTS.find((s) => s.code === code)?.name || '',
+    dateKey,
+    dayName,
+    executedHours,
+    physicalSlots,
+  };
+};
