@@ -115,7 +115,7 @@ function syncTrainerAttendance() {
  *   Row 1  : header — "Subject" | date1 | date2 | … | "Total"
  *   Rows 2… : subject name | hours per date … | row total
  *
- * Only dates with at least one subject having executed hours are written.
+ * All dates are always written (including weekend dates) with zeros when there are no executed hours.
  * The sheet is always cleared and re-created from the API response.
  */
 function syncRTET(spreadsheet) {
@@ -142,18 +142,14 @@ function syncRTET(spreadsheet) {
     return;
   }
 
-  // Filter to dates that have at least one non-zero hour.
+  // Always include all dates (weekends included). If a subject has no hours,
+  // the value is treated as 0.
   var activeDateIndices = [];
   for (var j = 0; j < dateLabels.length; j++) {
-    for (var i = 0; i < subjects.length; i++) {
-      if ((subjects[i].hours[j] || 0) > 0) {
-        activeDateIndices.push(j);
-        break;
-      }
-    }
+    activeDateIndices.push(j);
   }
 
-  var activeDateLabels = activeDateIndices.map(function(j) { return dateLabels[j]; });
+  var activeDateLabels = dateLabels.slice();
 
   // Build output rows.
   var out = [];
