@@ -303,7 +303,10 @@ const Replacements = () => {
   const visibleOtherSuggestions = otherSuggestions.filter(matchesSuggestion);
   const hasVisibleSuggestions = visibleSuggestions.length > 0 || visibleOtherSuggestions.length > 0;
 
-  const formatReplacementDate = (leave, schedule, affectedDates = []) => {
+  const formatReplacementDate = (leave, schedule, affectedDates = [], bulkRangeStart = null, bulkRangeEnd = null, isBulkMerged = false) => {
+    if (isBulkMerged && bulkRangeStart && bulkRangeEnd) {
+      return `${formatDate(bulkRangeStart)} – ${formatDate(bulkRangeEnd)}`;
+    }
     if (affectedDates.length) {
       return affectedDates.map((date) => formatDate(date)).join(', ');
     }
@@ -420,17 +423,22 @@ const Replacements = () => {
                     timelineStatus,
                     canAssign,
                     affectedDates,
+                    isBulkMerged,
+                    bulkRangeStart,
+                    bulkRangeEnd,
                   }) => (
                     <tr key={`${leave._id}-${schedule._id}`}>
                       <td>{leave.trainer?.name}</td>
-                      <td>{formatReplacementDate(leave, schedule, affectedDates)}</td>
-                      <td>{formatTimeRange(schedule.startTime, schedule.endTime)}</td>
-                      <td>{schedule.department} {schedule.section}</td>
-                      <td>{schedule.subject?.name || schedule.subjectCode || '—'}</td>
+                      <td>{formatReplacementDate(leave, schedule, affectedDates, bulkRangeStart, bulkRangeEnd, isBulkMerged)}</td>
+                      <td>{isBulkMerged ? 'All' : formatTimeRange(schedule.startTime, schedule.endTime)}</td>
+                      <td>{isBulkMerged ? 'All' : `${schedule.department} ${schedule.section}`}</td>
+                      <td>{isBulkMerged ? 'All' : (schedule.subject?.name || schedule.subjectCode || '—')}</td>
                       <td>
-                        {schedule.venue?.name
+                        {isBulkMerged
+                          ? 'All'
+                          : (schedule.venue?.name
                           || [schedule.venue?.building, schedule.venue?.floor].filter(Boolean).join(' ')
-                          || '—'}
+                          || '—')}
                       </td>
                       <td>
                         <span className={`badge ${REPLACEMENT_STATUS[timelineStatus]?.className || 'bg-secondary'}`}>

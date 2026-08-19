@@ -37,6 +37,14 @@ const leaveSchema = new mongoose.Schema(
         assignedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
       },
     ],
+    bulkReplacement: {
+      groupId: { type: String, trim: true, default: '' },
+      fromDate: { type: Date, default: null },
+      toDate: { type: Date, default: null },
+      replacementTrainer: { type: mongoose.Schema.Types.ObjectId, ref: 'Trainer', default: null },
+      assignedAt: { type: Date, default: null },
+      assignedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
+    },
   },
   { timestamps: true }
 );

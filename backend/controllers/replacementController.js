@@ -22,6 +22,7 @@ import {
 import { dedupeReplacementsBySchedule } from '../utils/leaveReplacements.js';
 import { syncTrainerUser } from '../utils/trainerUserSync.js';
 import { INITIAL_TRAINER_PASSWORD } from '../constants/trainerAuth.js';
+import mongoose from 'mongoose';
 
 const timeToMinutes = (time) => {
   const [h, m] = time.split(':').map(Number);
@@ -538,6 +539,8 @@ export const assignBulkReplacement = async (req, res) => {
   });
 
   const updatedLeaves = [];
+  const bulkGroupId = new mongoose.Types.ObjectId().toString();
+  const assignedAt = new Date();
   for (const leave of leavesById.values()) {
     const doc = await Leave.findById(leave._id);
     if (!doc) continue;
@@ -562,6 +565,15 @@ export const assignBulkReplacement = async (req, res) => {
     });
 
     doc.replacements = dedupeReplacementsBySchedule(doc.replacements);
+    doc.bulkReplacement = {
+      groupId: bulkGroupId,
+      fromDate: range.start,
+      toDate: range.end,
+      replacementTrainer: replacementTrainer._id,
+      assignedAt,
+      assignedBy: req.user._id,
+    };
+    doc.markModified('bulkReplacement');
     doc.markModified('replacements');
     await doc.save();
     updatedLeaves.push(doc._id.toString());
@@ -644,8 +656,16 @@ export const getAllReplacements = async (req, res) => {
       )
     ),
   ];
-  const replacementTrainers = replacementTrainerIds.length
-    ? await Trainer.find({ _id: { $in: replacementTrainerIds } })
+  const bulkReplacementTrainerIds = [
+    ...new Set(
+      leaves
+        .map((leave) => leave.bulkReplacement?.replacementTrainer?.toString?.())
+        .filter(Boolean)
+    ),
+  ];
+  const allReplacementTrainerIds = [...new Set([...replacementTrainerIds, ...bulkReplacementTrainerIds])];
+  const replacementTrainers = allReplacementTrainerIds.length
+    ? await Trainer.find({ _id: { $in: allReplacementTrainerIds } })
       .select('name employeeId')
       .lean()
     : [];
@@ -654,6 +674,7 @@ export const getAllReplacements = async (req, res) => {
   );
 
   const replacements = [];
+  const bulkRowsByGroupId = new Map();
   const cancellationMap = leaves.length
     ? await getCancellationMapForRange(
       leaves.reduce(
@@ -675,6 +696,62 @@ export const getAllReplacements = async (req, res) => {
     else if (leave.status === 'cancelled') timelineStatus = 'cancelled';
     else if (endDate < today) timelineStatus = 'previous';
     else if (startDate <= today && endDate >= today) timelineStatus = 'current';
+
+    const bulkMeta = leave.bulkReplacement || null;
+    if (bulkMeta?.groupId && bulkMeta.fromDate && bulkMeta.toDate) {
+      if (!bulkRowsByGroupId.has(bulkMeta.groupId)) {
+        const replacementTrainer = bulkMeta.replacementTrainer
+          ? trainersById.get(bulkMeta.replacementTrainer.toString())
+          : null;
+        bulkRowsByGroupId.set(bulkMeta.groupId, {
+          leave: {
+            _id: leave._id,
+            trainer: leave.trainer,
+            startDate: leave.startDate,
+            endDate: leave.endDate,
+            reason: leave.reason,
+            status: leave.status,
+            replacementNeeded: leave.replacementNeeded,
+          },
+          schedule: {
+            _id: `bulk-${bulkMeta.groupId}`,
+            day: 'All',
+            startTime: null,
+            endTime: null,
+            department: 'All',
+            section: 'All',
+            subject: { name: 'All' },
+            venue: { name: 'All' },
+          },
+          replacement: replacementTrainer
+            ? {
+              _id: replacementTrainer._id,
+              name: replacementTrainer.name,
+              employeeId: replacementTrainer.employeeId || null,
+              isExternal: false,
+            }
+            : null,
+          timelineStatus,
+          canAssign: false,
+          replacementDate: bulkMeta.fromDate,
+          affectedDates: [],
+          isSlotReplacement: false,
+          isBulkMerged: true,
+          bulkRangeStart: bulkMeta.fromDate,
+          bulkRangeEnd: bulkMeta.toDate,
+        });
+      } else {
+        const row = bulkRowsByGroupId.get(bulkMeta.groupId);
+        if (normalizeDate(bulkMeta.fromDate) < normalizeDate(row.bulkRangeStart)) {
+          row.bulkRangeStart = bulkMeta.fromDate;
+          row.replacementDate = bulkMeta.fromDate;
+        }
+        if (normalizeDate(bulkMeta.toDate) > normalizeDate(row.bulkRangeEnd)) {
+          row.bulkRangeEnd = bulkMeta.toDate;
+        }
+      }
+      continue;
+    }
 
     for (const schedule of leave.affectedSchedules) {
       if (!schedule) continue;
@@ -708,6 +785,10 @@ export const getAllReplacements = async (req, res) => {
       });
     }
   }
+
+  bulkRowsByGroupId.forEach((row) => {
+    replacements.push(row);
+  });
 
   const rank = {
     current: 0,
@@ -890,6 +971,17 @@ export const assignReplacement = async (req, res) => {
   }
 
   leave.replacements = dedupeReplacementsBySchedule(leave.replacements);
+  if (leave.bulkReplacement?.groupId) {
+    leave.bulkReplacement = {
+      groupId: '',
+      fromDate: null,
+      toDate: null,
+      replacementTrainer: null,
+      assignedAt: null,
+      assignedBy: null,
+    };
+    leave.markModified('bulkReplacement');
+  }
   leave.markModified('replacements');
   await leave.save();
   clearAttendanceGridCache();
@@ -970,6 +1062,17 @@ export const cancelReplacement = async (req, res) => {
 
   leave.markModified('replacements');
   leave.markModified('affectedSchedules');
+  if (leave.bulkReplacement?.groupId) {
+    leave.bulkReplacement = {
+      groupId: '',
+      fromDate: null,
+      toDate: null,
+      replacementTrainer: null,
+      assignedAt: null,
+      assignedBy: null,
+    };
+    leave.markModified('bulkReplacement');
+  }
 
   if (!leave.affectedSchedules.length) {
     leave.status = 'cancelled';
