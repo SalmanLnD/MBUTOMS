@@ -102,3 +102,13 @@ export const deleteOfficialHoliday = async (id) => {
   invalidateTrainerAttendanceGridCache();
   return data;
 };
+
+export const requestWhatsappPunchSync = async (payload = {}) => {
+  const { data } = await api.post('/attendance/whatsapp-sync', payload);
+  return data;
+};
+
+export const getWhatsappPunchSyncStatus = async () => {
+  const { data } = await api.get('/attendance/whatsapp-sync/status');
+  return data;
+};

@@ -22,12 +22,14 @@ const {
   PUNCH_WATCH_END = '11:00',
   PROCESSED_IDS_MAX = '5000',
   CATCHUP_MESSAGE_LIMIT = '400',
-  CATCHUP_LOOKBACK_HOURS = '36',
+  CATCHUP_LOOKBACK_HOURS = '48',
   PUNCH_POLL_MS = '45000',
   SYNC_FAIL_RECONNECT_AFTER = '3',
   HISTORY_LOAD_ROUNDS = '12',
   API_KEEPALIVE_MS = '480000',
   WEBHOOK_TIMEOUT_MS = '60000',
+  CONTROL_PORT = '8787',
+  BRIDGE_CONTROL_SECRET = '',
 } = process.env;
 
 const LIST_GROUPS = process.argv.includes('--list-groups');
@@ -52,8 +54,14 @@ const syncFailReconnectAfter = Number(SYNC_FAIL_RECONNECT_AFTER) || 3;
 const historyLoadRounds = Number(HISTORY_LOAD_ROUNDS) || 12;
 const apiKeepAliveMs = Number(API_KEEPALIVE_MS) || 480000;
 const webhookTimeoutMs = Number(WEBHOOK_TIMEOUT_MS) || 60000;
+const controlPort = Number(CONTROL_PORT) || 8787;
+const bridgeControlSecret = String(BRIDGE_CONTROL_SECRET || WEBHOOK_SECRET || '').trim();
 const notReadyGraceMs = Math.max(watchdogIntervalMs, 120000);
 const PROCESSED_IDS_PATH = './.processed-message-ids.json';
+
+let syncGroupPunchesFn = null;
+let lastManualSyncAt = 0;
+let lastManualSyncResult = null;
 
 const oifPattern = new RegExp(OIF_REGEX, 'i');
 const processedMessageIds = new Set();
@@ -69,6 +77,24 @@ const apiHealthUrl = (() => {
   if (!WEBHOOK_URL) return '';
   try {
     return new URL('/api/health', WEBHOOK_URL).toString();
+  } catch {
+    return '';
+  }
+})();
+
+const syncClaimUrl = (() => {
+  if (!WEBHOOK_URL) return '';
+  try {
+    return new URL('/api/webhooks/whatsapp-sync/claim', WEBHOOK_URL).toString();
+  } catch {
+    return '';
+  }
+})();
+
+const syncCompleteUrl = (() => {
+  if (!WEBHOOK_URL) return '';
+  try {
+    return new URL('/api/webhooks/whatsapp-sync/complete', WEBHOOK_URL).toString();
   } catch {
     return '';
   }
@@ -95,6 +121,45 @@ const pingApiKeepAlive = async () => {
     await axios.get(apiHealthUrl, { timeout: 45000 });
   } catch (error) {
     log(`API keep-alive failed: ${error.message}`);
+  }
+};
+
+const pollQueuedSyncJobs = async () => {
+  if (!syncClaimUrl || !syncCompleteUrl || !WEBHOOK_SECRET) return;
+  if (!bridgeReady || typeof syncGroupPunchesFn !== 'function') return;
+
+  try {
+    const { data } = await axios.get(syncClaimUrl, {
+      headers: { 'x-webhook-secret': WEBHOOK_SECRET },
+      timeout: 30000,
+    });
+    const job = data?.job;
+    if (!job?._id) return;
+
+    log(`Claimed queued sync job ${job._id} lookback=${job.lookbackHours}h force=${Boolean(job.force)}`);
+    const result = await syncGroupPunchesFn('Queued-sync', {
+      lookbackMs: Math.max(1, Number(job.lookbackHours) || 48) * 60 * 60 * 1000,
+      force: job.force !== false,
+    });
+    lastManualSyncAt = Date.now();
+    lastManualSyncResult = result;
+
+    await axios.post(
+      syncCompleteUrl,
+      {
+        jobId: job._id,
+        ok: Boolean(result?.ok),
+        result,
+        error: result?.ok ? '' : (result?.reason || 'Sync failed'),
+      },
+      {
+        headers: { 'x-webhook-secret': WEBHOOK_SECRET },
+        timeout: 30000,
+      }
+    );
+    log(`Completed queued sync job ${job._id}: ${result?.ok ? 'ok' : result?.reason || 'failed'}`);
+  } catch (error) {
+    log(`Queued sync poll failed: ${error.response?.data?.message || error.message}`);
   }
 };
 
@@ -202,6 +267,14 @@ const rememberProcessedMessageId = (messageId) => {
   schedulePersistProcessedMessageIds();
 };
 
+const forgetProcessedMessageId = (messageId) => {
+  if (!messageId || !processedMessageIds.has(messageId)) return;
+  processedMessageIds.delete(messageId);
+  const index = processedMessageIdOrder.indexOf(messageId);
+  if (index >= 0) processedMessageIdOrder.splice(index, 1);
+  schedulePersistProcessedMessageIds();
+};
+
 const ensureSingleBridgeInstance = async () => {
   const lockPath = './.bridge-instance.lock';
   const fs = await import('node:fs/promises');
@@ -260,6 +333,7 @@ let reconnecting = false;
 let reconnectTimer = null;
 let watchdogTimer = null;
 let keepAliveTimer = null;
+let syncJobPollTimer = null;
 let punchPollTimer = null;
 let readyTimeout = null;
 let reconnectAttempt = 0;
@@ -465,6 +539,12 @@ const startWatchdog = () => {
       pingApiKeepAlive().catch((error) => log('API keep-alive error:', error.message));
     }, apiKeepAliveMs);
   }
+  if (syncJobPollTimer) clearInterval(syncJobPollTimer);
+  if (syncClaimUrl && !ONE_SHOT_MODE) {
+    syncJobPollTimer = setInterval(() => {
+      pollQueuedSyncJobs().catch((error) => log('Queued sync poll error:', error.message));
+    }, 20000);
+  }
 };
 
 const shutdownBridge = async () => {
@@ -473,6 +553,7 @@ const shutdownBridge = async () => {
   if (reconnectTimer) clearTimeout(reconnectTimer);
   if (watchdogTimer) clearInterval(watchdogTimer);
   if (keepAliveTimer) clearInterval(keepAliveTimer);
+  if (syncJobPollTimer) clearInterval(syncJobPollTimer);
   if (punchPollTimer) clearInterval(punchPollTimer);
   if (processedIdsPersistTimer) {
     clearTimeout(processedIdsPersistTimer);
@@ -962,18 +1043,21 @@ const wireClient = (activeClient) => {
 
       rows.sort((a, b) => a.timestamp - b.timestamp);
 
-      // Never drop older in-window media punches when the chat is busy.
-      // Keep all media in the lookback window, then fill remaining slots with
-      // newest non-media rows only if we still have budget.
-      const mediaRows = rows.filter((row) => row.hasMedia
-        || ['image', 'video', 'document', 'album', 'gif'].includes(row.type));
-      let selected = mediaRows;
+      // Prefer punches that include media OR an OIF caption/body so text-only
+      // punches are not dropped when the lookback window is busy.
+      const oifLike = (body) => /\bOIF[\s:_-]*/i.test(String(body || ''));
+      const priorityRows = rows.filter((row) => row.hasMedia
+        || ['image', 'video', 'document', 'album', 'gif'].includes(row.type)
+        || oifLike(row.body));
+      let selected = priorityRows;
       if (selected.length > limit) {
-        selected = mediaRows.slice(-limit);
+        selected = priorityRows.slice(-limit);
       } else {
-        const mediaIds = new Set(mediaRows.map((row) => row.id));
-        const extras = rows.filter((row) => !mediaIds.has(row.id)).slice(-(limit - mediaRows.length));
-        selected = [...mediaRows, ...extras].sort((a, b) => a.timestamp - b.timestamp);
+        const selectedIds = new Set(priorityRows.map((row) => row.id));
+        const extras = rows
+          .filter((row) => !selectedIds.has(row.id))
+          .slice(-(limit - priorityRows.length));
+        selected = [...priorityRows, ...extras].sort((a, b) => a.timestamp - b.timestamp);
       }
 
       return {
@@ -981,16 +1065,19 @@ const wireClient = (activeClient) => {
         msgCount: msgs.length,
         oldestTs: selected[0]?.timestamp || rows[0]?.timestamp || 0,
         newestTs: selected[selected.length - 1]?.timestamp || rows[rows.length - 1]?.timestamp || 0,
-        mediaCount: mediaRows.length,
-        truncated: mediaRows.length > limit,
+        mediaCount: priorityRows.filter((row) => row.hasMedia
+          || ['image', 'video', 'document', 'album', 'gif'].includes(row.type)).length,
+        oifCount: priorityRows.filter((row) => oifLike(row.body)).length,
+        truncated: priorityRows.length > limit,
         messages: selected,
       };
     }, GROUP_ID, Math.floor(cutoffMs / 1000), catchupMessageLimit, historyLoadRounds);
   };
 
-  const processScrapedPunch = async (raw, { fromCatchUp = false } = {}) => {
+  const processScrapedPunch = async (raw, { fromCatchUp = false, force = false } = {}) => {
     const messageId = resolveStableMessageId(raw);
     if (!messageId) return 'skip-no-id';
+    if (force) forgetProcessedMessageId(messageId);
     if (processedMessageIds.has(messageId) || inFlightMessageIds.has(messageId)) return 'skip-dup';
     inFlightMessageIds.add(messageId);
     try {
@@ -1042,14 +1129,19 @@ const wireClient = (activeClient) => {
     }
   };
 
-  const syncGroupPunches = async (label = 'Sync') => {
-    if (!GROUP_ID || !bridgeReady || !activeClient?.pupPage) return;
+  const syncGroupPunches = async (label = 'Sync', { lookbackMs = catchupLookbackMs, force = false } = {}) => {
+    if (!GROUP_ID || !bridgeReady || !activeClient?.pupPage) {
+      return {
+        ok: false,
+        reason: !GROUP_ID ? 'missing-group' : !bridgeReady ? 'bridge-not-ready' : 'no-page',
+      };
+    }
     if (syncInFlight) {
       log(`${label}: skipped overlapping sync`);
-      return;
+      return { ok: false, reason: 'sync-in-flight' };
     }
     syncInFlight = true;
-    const cutoffMs = Date.now() - catchupLookbackMs;
+    const cutoffMs = Date.now() - lookbackMs;
     try {
       const scraped = await scrapeGroupMediaMessages(cutoffMs);
       if (scraped?.error) {
@@ -1058,13 +1150,13 @@ const wireClient = (activeClient) => {
         if (scraped.sampleIds?.length) {
           log(`${label}: sample chat ids: ${scraped.sampleIds.slice(0, 8).join(', ')}`);
         }
-        return;
+        return { ok: false, reason: scraped.error, fails: consecutiveSyncFailures };
       }
 
       const recent = (scraped.messages || []).filter((row) => (row.timestamp || 0) * 1000 >= cutoffMs);
       const oldest = scraped.oldestTs ? new Date(scraped.oldestTs * 1000).toISOString() : '-';
       const newest = scraped.newestTs ? new Date(scraped.newestTs * 1000).toISOString() : '-';
-      log(`${label}: scanned ${recent.length}/${scraped.msgCount || 0} msgs media=${scraped.mediaCount || 0} truncated=${Boolean(scraped.truncated)} range=${oldest}..${newest}`);
+      log(`${label}: scanned ${recent.length}/${scraped.msgCount || 0} msgs media=${scraped.mediaCount || 0} oif=${scraped.oifCount || 0} truncated=${Boolean(scraped.truncated)} force=${Boolean(force)} range=${oldest}..${newest}`);
 
       const sample = recent.slice(-8).map((row) => ({
         t: new Date((row.timestamp || 0) * 1000).toISOString().slice(11, 19),
@@ -1087,7 +1179,7 @@ const wireClient = (activeClient) => {
       };
       for (const row of recent) {
         // eslint-disable-next-line no-await-in-loop
-        const result = await processScrapedPunch(row, { fromCatchUp: true });
+        const result = await processScrapedPunch(row, { fromCatchUp: true, force });
         if (counts[result] !== undefined) counts[result] += 1;
       }
       log(`${label}: results ${JSON.stringify(counts)}`);
@@ -1097,13 +1189,25 @@ const wireClient = (activeClient) => {
       if (counts['skip-no-id'] > 0) {
         log(`${label}: WARNING ${counts['skip-no-id']} messages still lacked stable ids`);
       }
+      return {
+        ok: true,
+        scanned: recent.length,
+        msgCount: scraped.msgCount || 0,
+        oldest,
+        newest,
+        counts,
+        force: Boolean(force),
+        lookbackHours: Math.round(lookbackMs / 3600000),
+      };
     } catch (error) {
       consecutiveSyncFailures += 1;
       log(`${label} failed: ${error?.message || error} fails=${consecutiveSyncFailures}`);
+      return { ok: false, reason: error?.message || String(error), fails: consecutiveSyncFailures };
     } finally {
       syncInFlight = false;
     }
   };
+  syncGroupPunchesFn = syncGroupPunches;
 
   let localPunchPollTimer = null;
   const startPunchPoller = () => {
@@ -1243,11 +1347,108 @@ const wireClient = (activeClient) => {
   });
 };
 
+const readJsonBody = async (req) => {
+  const chunks = [];
+  for await (const chunk of req) chunks.push(chunk);
+  if (!chunks.length) return {};
+  try {
+    return JSON.parse(Buffer.concat(chunks).toString('utf8') || '{}');
+  } catch {
+    return {};
+  }
+};
+
+const isAuthorizedControlRequest = (req) => {
+  if (!bridgeControlSecret) return false;
+  const headerSecret = req.headers['x-bridge-secret']
+    || req.headers['x-webhook-secret']
+    || '';
+  const auth = String(req.headers.authorization || '');
+  const bearer = auth.toLowerCase().startsWith('bearer ')
+    ? auth.slice(7).trim()
+    : '';
+  return headerSecret === bridgeControlSecret || bearer === bridgeControlSecret;
+};
+
+const startControlServer = () => {
+  if (ONE_SHOT_MODE) return;
+  if (!bridgeControlSecret) {
+    log('Control server disabled: missing BRIDGE_CONTROL_SECRET/WEBHOOK_SECRET');
+    return;
+  }
+
+  import('node:http').then(({ createServer }) => {
+    const server = createServer(async (req, res) => {
+      const send = (status, body) => {
+        res.writeHead(status, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify(body));
+      };
+
+      try {
+        const url = new URL(req.url || '/', `http://${req.headers.host || 'localhost'}`);
+        if (req.method === 'GET' && url.pathname === '/health') {
+          return send(200, {
+            ok: true,
+            bridgeReady,
+            groupId: GROUP_ID || null,
+            lastSuccessfulSyncAt: lastSuccessfulSyncAt || null,
+            lastManualSyncAt: lastManualSyncAt || null,
+            lastManualSyncResult,
+          });
+        }
+
+        if (req.method === 'POST' && url.pathname === '/sync') {
+          if (!isAuthorizedControlRequest(req)) {
+            return send(401, { message: 'Invalid bridge control secret' });
+          }
+
+          const body = await readJsonBody(req);
+          const lookbackHours = Math.min(
+            168,
+            Math.max(1, Number(body.lookbackHours || url.searchParams.get('lookbackHours') || 48))
+          );
+          const force = body.force !== false && url.searchParams.get('force') !== '0';
+
+          if (typeof syncGroupPunchesFn !== 'function') {
+            return send(503, { message: 'Bridge sync is not ready yet' });
+          }
+
+          log(`Manual sync requested lookbackHours=${lookbackHours} force=${force}`);
+          const result = await syncGroupPunchesFn('Manual-sync', {
+            lookbackMs: lookbackHours * 60 * 60 * 1000,
+            force,
+          });
+          lastManualSyncAt = Date.now();
+          lastManualSyncResult = result;
+          return send(result?.ok ? 200 : 503, {
+            message: result?.ok
+              ? 'WhatsApp punch sync completed'
+              : `WhatsApp punch sync failed: ${result?.reason || 'unknown'}`,
+            result,
+          });
+        }
+
+        return send(404, { message: 'Not found' });
+      } catch (error) {
+        log(`Control server error: ${error.message}`);
+        return send(500, { message: error.message || 'Control server error' });
+      }
+    });
+
+    server.listen(controlPort, '0.0.0.0', () => {
+      log(`Bridge control server listening on :${controlPort}`);
+    });
+  }).catch((error) => {
+    log(`Failed to start control server: ${error.message}`);
+  });
+};
+
 const startBridge = async () => {
   if (!ONE_SHOT_MODE) {
     await loadProcessedMessageIds();
     await ensureSingleBridgeInstance();
     startWatchdog();
+    startControlServer();
     process.once('SIGINT', () => {
       shutdownBridge().finally(() => process.exit(0));
     });

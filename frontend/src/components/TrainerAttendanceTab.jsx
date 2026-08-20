@@ -10,6 +10,8 @@ import {
   getTrainerAttendanceSheetStatus,
   upsertTrainerDailyAttendance,
   invalidateTrainerAttendanceGridCache,
+  requestWhatsappPunchSync,
+  getWhatsappPunchSyncStatus,
 } from '../services/attendanceService.js';
 import { TRAINER_ATTENDANCE_TYPES } from '../utils/trainerAttendanceTypes.js';
 import { getErrorMessage } from '../utils/helpers.js';
@@ -48,6 +50,7 @@ const TrainerAttendanceTab = () => {
   const [trainerSearch, setTrainerSearch] = useState('');
   const [sheetStatus, setSheetStatus] = useState(null);
   const [showSheetSetup, setShowSheetSetup] = useState(false);
+  const [whatsappSyncing, setWhatsappSyncing] = useState(false);
   const [showHolidays, setShowHolidays] = useState(false);
   const scrollContainerRef = useRef(null);
   const gridDataRef = useRef(null);
@@ -315,6 +318,53 @@ const TrainerAttendanceTab = () => {
     }
   }, [canEditFutureLeave, fetchGrid]);
 
+  const pollWhatsappSyncJob = useCallback(async (jobId) => {
+    const started = Date.now();
+    while (Date.now() - started < 180000) {
+      // eslint-disable-next-line no-await-in-loop
+      await new Promise((resolve) => setTimeout(resolve, 5000));
+      // eslint-disable-next-line no-await-in-loop
+      const status = await getWhatsappPunchSyncStatus();
+      const job = status?.job;
+      if (!job || (jobId && job._id !== jobId)) continue;
+      if (job.status === 'completed') {
+        return job;
+      }
+      if (job.status === 'failed') {
+        throw new Error(job.error || 'WhatsApp punch sync failed');
+      }
+    }
+    throw new Error('WhatsApp punch sync is still running. Refresh attendance in a minute.');
+  }, []);
+
+  const handleWhatsappSync = useCallback(async () => {
+    setWhatsappSyncing(true);
+    try {
+      const data = await requestWhatsappPunchSync({
+        lookbackHours: 48,
+        force: true,
+      });
+      if (data?.transport === 'direct' && data?.job?.status === 'completed') {
+        showSuccess(
+          `WhatsApp punches synced (${data.job.result?.counts?.recorded || 0} recorded). Refreshing attendance...`
+        );
+        await fetchGrid({ forceRefresh: true });
+        return;
+      }
+
+      showSuccess(data?.message || 'WhatsApp punch sync queued');
+      const job = await pollWhatsappSyncJob(data?.job?._id);
+      showSuccess(
+        `WhatsApp punches synced (${job?.result?.counts?.recorded || 0} recorded). Refreshing attendance...`
+      );
+      await fetchGrid({ forceRefresh: true });
+    } catch (err) {
+      showError(getErrorMessage(err));
+    } finally {
+      setWhatsappSyncing(false);
+    }
+  }, [fetchGrid, pollWhatsappSyncJob]);
+
   const monthLabel = grid?.monthLabel || formatMonthLabel(monthParts.year, monthParts.month);
 
   return (
@@ -365,6 +415,17 @@ const TrainerAttendanceTab = () => {
           >
             Refresh
           </button>
+          {canManageAll && (
+            <button
+              type="button"
+              className="btn btn-outline-primary btn-sm"
+              disabled={loading || refreshing || whatsappSyncing}
+              onClick={handleWhatsappSync}
+              title="Re-fetch recent WhatsApp group punches into attendance"
+            >
+              {whatsappSyncing ? 'Fetching WhatsApp...' : 'Fetch WhatsApp Punches'}
+            </button>
+          )}
         </div>
       </div>
 

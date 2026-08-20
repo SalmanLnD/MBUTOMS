@@ -1,0 +1,5 @@
+{
+  "commands": [
+    "sudo -u ubuntu bash -lc 'cd /opt/MBUTOMS/whatsapp-bridge && node --input-type=module -e \"import axios from \\\"axios\\\"; import dotenv from \\\"dotenv\\\"; dotenv.config(); const url=(process.env.WEBHOOK_URL||\\\"\\\").replace(/whatsapp-punch.*/,\\\"whatsapp-sync/claim\\\"); const secret=process.env.WEBHOOK_SECRET; const {data}=await axios.get(url,{headers:{\\\"x-webhook-secret\\\":secret},timeout:20000}); console.log(JSON.stringify(data));\"'"
+  ]
+}
