@@ -13,6 +13,11 @@ const EXPORT_CACHE_MS = 300_000;
 let exportCache = { payload: null, cachedAt: 0 };
 let exportInFlight = null;
 
+export const clearAttendanceExportCache = () => {
+  exportCache = { payload: null, cachedAt: 0 };
+  exportInFlight = null;
+};
+
 const getExportKey = async () => {
   const setting = await AppSetting.findOne({ key: EXPORT_KEY_SETTING }).lean();
   return setting?.value || null;

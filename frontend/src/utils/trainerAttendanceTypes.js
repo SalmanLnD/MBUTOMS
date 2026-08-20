@@ -11,6 +11,7 @@ export const TRAINER_ATTENDANCE_TYPES = {
   E_LEAVE: 'e_leave',
   HOLIDAY_OIF: 'holiday_oif',
   HOLIDAY: 'holiday',
+  OTHER_BASE: 'other_base',
 };
 
 export const LEAVE_TYPE_OPTIONS = [
@@ -68,6 +69,10 @@ const OIF_NUMBER_TOKEN = 'OIF Number';
 /** Google Sheet / grid display for leave OIF cells — preserves the full OIF number. */
 export const formatTrainerAttendanceOifDisplay = (attendanceType, oifNumber) => {
   const number = String(oifNumber ?? '').trim();
+
+  if (attendanceType === TRAINER_ATTENDANCE_TYPES.OTHER_BASE) {
+    return 'Other base';
+  }
 
   const leaveOption = LEAVE_TYPE_OPTIONS.find((option) => option.value === attendanceType);
   if (leaveOption) {

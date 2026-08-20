@@ -7,6 +7,7 @@ import { resolveTrainerScheduleCodes } from '../utils/trainerMappings.js';
 import { isTrainerAvailableForReplacement } from '../utils/leaveStatus.js';
 import { buildTrainerAvailabilityForRange } from '../utils/trainerAvailability.js';
 import { clearAttendanceGridCache } from '../utils/attendanceGridCache.js';
+import { clearAttendanceExportCache } from '../services/attendanceSheetsService.js';
 import { notifyReplacementAssignment, notifyReplacementCancellation } from '../utils/replacementNotifications.js';
 import { LEAVE_SCOPES } from '../utils/leaveScope.js';
 import {
@@ -135,6 +136,7 @@ const resolveBulkReplacementTrainer = async ({
   externalTrainerName,
   externalEmployeeId,
   externalEmail,
+  range,
 }) => {
   if (!isExternal) {
     const trainer = await Trainer.findById(replacementTrainerId);
@@ -162,6 +164,10 @@ const resolveBulkReplacementTrainer = async ({
     return { error: 'Trainer with this employee ID or email already exists' };
   }
 
+  const fromDate = range?.start || normalizeDate(new Date());
+  const toDate = range?.end || fromDate;
+  const untilMonth = `${toDate.getUTCFullYear()}-${String(toDate.getUTCMonth() + 1).padStart(2, '0')}`;
+
   const trainer = await Trainer.create({
     name,
     employeeId,
@@ -169,6 +175,11 @@ const resolveBulkReplacementTrainer = async ({
     status: 'active',
     camuErpId: sourceTrainer.camuErpId || '',
     camuPassword: sourceTrainer.camuPassword || '',
+    joiningDate: fromDate,
+    createdAsBulkReplacement: true,
+    replacementAttendanceFrom: fromDate,
+    replacementAttendanceTo: toDate,
+    includeInAttendanceUntilMonth: untilMonth,
   });
 
   await syncTrainerUser(trainer, { resetPassword: true });
@@ -515,6 +526,7 @@ export const assignBulkReplacement = async (req, res) => {
     externalTrainerName,
     externalEmployeeId,
     externalEmail,
+    range,
   });
   if (resolved.error) {
     return res.status(400).json({ message: resolved.error });
@@ -580,6 +592,7 @@ export const assignBulkReplacement = async (req, res) => {
   }
 
   clearAttendanceGridCache();
+  clearAttendanceExportCache();
 
   res.json({
     message: 'Bulk replacement applied successfully',

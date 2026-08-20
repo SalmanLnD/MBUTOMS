@@ -13,6 +13,11 @@ import { getAttendanceToday } from './attendanceTracking.js';
 import { computeClassHandlingHoursBatch } from './trainerClassHoursBatch.js';
 import { mergeRosterFilter } from './rosterFilter.js';
 import { mergeAttendanceExportTrainerFilter, shouldAutoMarkTrainerExit, isBeforeTrainerJoiningDate } from './trainerEmployment.js';
+import {
+  isBulkReplacementOnlyTrainer,
+  isDateInsideReplacementWindow,
+  loadBulkReplacementAttendanceWindows,
+} from './bulkReplacementAttendance.js';
 import { resolveTrainerScheduleCodes } from './trainerMappings.js';
 import { getLeaveOverlapFilter, isDateWithinLeave } from './leaveDateRange.js';
 import { getLeaveWeekdayScheduleIds, isFullDayLeave } from './leaveScope.js';
@@ -73,12 +78,22 @@ export const buildTrainerAttendanceExportPayload = async () => {
   const dates = getAttendanceCalendarDates(TRAINER_ATTENDANCE_TRACKING_START, rangeEnd);
   const dateKeys = dates.map(toAttendanceDateKey);
 
-  const trainerRows = await Trainer.find(
+  const trainerRowsRaw = await Trainer.find(
     await mergeAttendanceExportTrainerFilter({})
   )
-    .select('name employeeId scheduleTrainerCodes employmentStatus resignationDate joiningDate')
+    .select('name employeeId scheduleTrainerCodes employmentStatus resignationDate joiningDate createdAsBulkReplacement replacementAttendanceFrom replacementAttendanceTo')
     .sort({ name: 1 })
     .lean();
+  const replacementWindows = await loadBulkReplacementAttendanceWindows();
+  // Keep bulk-replacement-only trainers for months that intersect their window;
+  // for other months they are still present in the continuous sheet, with
+  // out-of-window dates marked "Other base".
+  const trainerRows = trainerRowsRaw.filter((trainer) => {
+    if (!isBulkReplacementOnlyTrainer(trainer, replacementWindows)) return true;
+    const window = replacementWindows.get(trainer._id.toString());
+    if (!window) return false;
+    return window.from <= rangeEnd && window.to >= TRAINER_ATTENDANCE_TRACKING_START;
+  });
   const trainerIds = trainerRows.map((trainer) => trainer._id);
   const codesByTrainer = new Map(
     trainerRows.map((trainer) => [
@@ -164,6 +179,16 @@ export const buildTrainerAttendanceExportPayload = async () => {
         let oifNumber = log?.oifNumber || '';
         let mockPrepHours = log?.mockPrepHours || 0;
         let classHandlingHours = classHours.get(key) || 0;
+        const replacementWindow = replacementWindows.get(trainer._id.toString());
+
+        if (
+          isBulkReplacementOnlyTrainer(trainer, replacementWindows)
+          && replacementWindow
+          && !isDateInsideReplacementWindow(replacementWindow, date)
+        ) {
+          values.push('Other base', 0, 0, formatFoodAllowance(''));
+          return;
+        }
 
         if (shouldAutoMarkTrainerExit(trainer, date)) {
           attendanceType = TRAINER_ATTENDANCE_TYPES.EXIT;

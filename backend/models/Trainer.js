@@ -43,6 +43,10 @@ const trainerSchema = new mongoose.Schema(
       default: null,
     },
     roleTransferEffectiveDate: { type: Date, default: null },
+    /** True when this trainer account was created for a bulk external replacement. */
+    createdAsBulkReplacement: { type: Boolean, default: false },
+    replacementAttendanceFrom: { type: Date, default: null },
+    replacementAttendanceTo: { type: Date, default: null },
   },
   { timestamps: true }
 );
@@ -52,6 +56,7 @@ trainerSchema.index({ subjects: 1 });
 trainerSchema.index({ scheduleTrainerCodes: 1 });
 trainerSchema.index({ phoneKey: 1 });
 trainerSchema.index({ employmentStatus: 1, includeInAttendanceUntilMonth: 1 });
+trainerSchema.index({ createdAsBulkReplacement: 1, replacementAttendanceFrom: 1, replacementAttendanceTo: 1 });
 
 trainerSchema.pre('save', function deriveTrainerPhoneKey(next) {
   if (this.isModified('phone') || this.isNew) {

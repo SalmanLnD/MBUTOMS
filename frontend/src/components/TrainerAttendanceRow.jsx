@@ -63,7 +63,13 @@ const TrainerAttendanceRow = memo(({
           || !cell.attendanceType
         )
       );
-      const treatAsNonWorking = Boolean(cell.isOnLeave || sundayNonWorking || holidayNonWorking);
+      const isOtherBase = Boolean(
+        cell.isOtherBase
+        || cell.attendanceType === TRAINER_ATTENDANCE_TYPES.OTHER_BASE
+      );
+      const treatAsNonWorking = Boolean(
+        cell.isOnLeave || sundayNonWorking || holidayNonWorking || isOtherBase
+      );
       const showTypeSelect = Boolean(cell.isOnLeave || date.isSunday || isOfficialHoliday);
       const sundayPresentMode = Boolean(
         date.isSunday
@@ -194,6 +200,13 @@ const TrainerAttendanceRow = memo(({
                     {oifSheetValue}
                   </div>
                 )}
+              </div>
+            ) : isOtherBase ? (
+              <div
+                className="trainer-attendance-oif-sheet-value small fw-semibold"
+                title="Outside bulk replacement working dates"
+              >
+                Other base
               </div>
             ) : (
               <input

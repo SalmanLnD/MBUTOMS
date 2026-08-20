@@ -57,6 +57,13 @@ import {
   consumeCompOffForAttendance,
   releaseCompOffForAttendance,
 } from '../utils/compOffService.js';
+import {
+  buildOtherBaseAttendanceCell,
+  filterTrainersForBulkReplacementWindows,
+  isBulkReplacementOnlyTrainer,
+  isDateInsideReplacementWindow,
+  loadBulkReplacementAttendanceWindows,
+} from '../utils/bulkReplacementAttendance.js';
 
 const buildLogMap = (logs) => {
   const map = new Map();
@@ -144,10 +151,18 @@ export const buildTrainerAttendanceGridPayload = async ({
     await mergeRosterFilter(trainerFilter, { rosterOnly: true })
   );
 
-  const trainers = await Trainer.find(finalTrainerFilter)
-    .select('name employeeId scheduleTrainerCodes employmentStatus resignationDate includeInAttendanceUntilMonth joiningDate')
+  const trainersRaw = await Trainer.find(finalTrainerFilter)
+    .select('name employeeId scheduleTrainerCodes employmentStatus resignationDate includeInAttendanceUntilMonth joiningDate createdAsBulkReplacement replacementAttendanceFrom replacementAttendanceTo')
     .sort({ name: 1 })
     .lean();
+
+  const replacementWindows = await loadBulkReplacementAttendanceWindows();
+  const trainers = filterTrainersForBulkReplacementWindows({
+    trainers: trainersRaw,
+    windows: replacementWindows,
+    rangeStart,
+    rangeEnd,
+  });
 
   const trainerIds = trainers.map((trainer) => trainer._id);
   const dateKeys = dates.map(toAttendanceDateKey);
@@ -236,6 +251,19 @@ export const buildTrainerAttendanceGridPayload = async ({
       const cacheKey = `${trainer._id}|${dateKey}`;
       const log = logMap.get(cacheKey);
       const isOnLeave = fullDayLeaveKeys.has(cacheKey);
+      const replacementWindow = replacementWindows.get(trainerId);
+      if (
+        isBulkReplacementOnlyTrainer(trainer, replacementWindows)
+        && replacementWindow
+        && !isDateInsideReplacementWindow(replacementWindow, date)
+      ) {
+        days[dateKey] = buildOtherBaseAttendanceCell({
+          date,
+          today,
+          logId: log?._id || null,
+        });
+        return;
+      }
       if (shouldAutoMarkTrainerExit(trainer, date)) {
         days[dateKey] = {
           id: log?._id || null,
@@ -474,7 +502,7 @@ export const upsertTrainerDailyAttendance = async (req, res) => {
   }
 
   const trainerRecord = await Trainer.findById(trainer)
-    .select('joiningDate employmentStatus resignationDate employeeId scheduleTrainerCodes')
+    .select('joiningDate employmentStatus resignationDate employeeId scheduleTrainerCodes createdAsBulkReplacement subjects')
     .lean();
   if (!trainerRecord) {
     return res.status(404).json({ message: 'Trainer not found' });
@@ -482,6 +510,18 @@ export const upsertTrainerDailyAttendance = async (req, res) => {
 
   const day = normalizeAttendanceDate(date);
   const today = getAttendanceToday();
+
+  const replacementWindows = await loadBulkReplacementAttendanceWindows();
+  const replacementWindow = replacementWindows.get(trainerRecord._id.toString());
+  if (
+    isBulkReplacementOnlyTrainer(trainerRecord, replacementWindows)
+    && replacementWindow
+    && !isDateInsideReplacementWindow(replacementWindow, day)
+  ) {
+    return res.status(400).json({
+      message: 'Attendance for this bulk replacement trainer can only be recorded within their replacement date range.',
+    });
+  }
 
   if (isBeforeTrainerJoiningDate(trainerRecord, day)) {
     return res.status(400).json({
