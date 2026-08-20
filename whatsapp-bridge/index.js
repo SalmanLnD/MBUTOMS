@@ -77,7 +77,14 @@ const apiHealthUrl = (() => {
 const isPermanentWebhookError = (error) => {
   const status = error.response?.status;
   const message = String(error.response?.data?.message || '');
-  if (status === 400 && message) return true;
+  // Only treat clear validation issues as permanent. Generic 400s can be
+  // transient (clock/timestamp drift, partial payloads during reconnects).
+  if (
+    status === 400
+    && /oifNumber is required|OIF number must be 12 characters|phone is required|no trainer found/i.test(message)
+  ) {
+    return true;
+  }
   if (status === 404 && /no trainer found/i.test(message)) return true;
   return false;
 };
@@ -124,6 +131,21 @@ const resolveStableMessageId = (source) => {
   const author = source.author || source.from || source.phone || 'unknown';
   if (timestamp) return `fallback-${timestamp}-${author}`;
   return '';
+};
+
+const resolvePunchInIso = (rawTimestampSeconds) => {
+  const now = Date.now();
+  const parsed = Number(rawTimestampSeconds);
+  const parsedMs = Number.isFinite(parsed) && parsed > 0 ? parsed * 1000 : NaN;
+  const isPlausible =
+    Number.isFinite(parsedMs)
+    && parsedMs > Date.UTC(2025, 0, 1)
+    && parsedMs < now + 24 * 60 * 60 * 1000;
+
+  return {
+    iso: new Date(isPlausible ? parsedMs : now).toISOString(),
+    usedFallback: !isPlausible,
+  };
 };
 
 let processedIdsPersistTimer = null;
@@ -674,12 +696,6 @@ const wireClient = (activeClient) => {
       touchTargetGroupActivity();
 
       const phonePreview = message.author || message.from || 'unknown';
-      if (!message.hasMedia) {
-        if (!fromCatchUp) {
-          log(`Ignored non-media message in punch group from ${phonePreview}`);
-        }
-        return;
-      }
 
       inFlightMessageIds.add(messageId);
 
@@ -699,8 +715,12 @@ const wireClient = (activeClient) => {
         return;
       }
 
-      const punchInAt = new Date(message.timestamp * 1000).toISOString();
+      const punchInResolved = resolvePunchInIso(message.timestamp);
+      const punchInAt = punchInResolved.iso;
       const payload = { phone, oifNumber, punchInAt, whatsappMessageId: messageId };
+      if (punchInResolved.usedFallback) {
+        log(`Timestamp missing/invalid for ${phonePreview}; using current server time`);
+      }
       log(`${fromCatchUp ? 'Catch-up forwarding' : 'Forwarding'} punch-in from ${phone}, OIF ${oifNumber}`);
 
       const data = await forwardPunchIn(payload);
@@ -972,11 +992,6 @@ const wireClient = (activeClient) => {
     const messageId = resolveStableMessageId(raw);
     if (!messageId) return 'skip-no-id';
     if (processedMessageIds.has(messageId) || inFlightMessageIds.has(messageId)) return 'skip-dup';
-    // Prefer media punches; still accept captioned media-like types.
-    if (!raw.hasMedia && !['image', 'video', 'document', 'album', 'gif'].includes(raw.type)) {
-      return 'skip-non-media';
-    }
-
     inFlightMessageIds.add(messageId);
     try {
       let phone = digitsOnly(raw.phone || '');
@@ -997,7 +1012,11 @@ const wireClient = (activeClient) => {
         return 'skip-oif';
       }
 
-      const punchInAt = new Date((raw.timestamp || 0) * 1000).toISOString();
+      const punchInResolved = resolvePunchInIso(raw.timestamp);
+      const punchInAt = punchInResolved.iso;
+      if (punchInResolved.usedFallback) {
+        log(`Catch-up row had invalid timestamp (id=${messageId}); using current server time`);
+      }
       log(`${fromCatchUp ? 'Catch-up forwarding' : 'Poll forwarding'} punch-in from ${phone}, OIF ${oifNumber}`);
       const data = await forwardPunchIn({
         phone,

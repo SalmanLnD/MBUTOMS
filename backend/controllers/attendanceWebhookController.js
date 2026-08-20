@@ -48,6 +48,26 @@ const findTrainerByPhone = async (phone) => {
   ) || null;
 };
 
+const resolveWebhookPunchInstant = (rawPunchInAt) => {
+  const now = new Date();
+  if (!rawPunchInAt) {
+    return { instant: now, usedFallback: true, reason: 'missing' };
+  }
+
+  const parsed = new Date(rawPunchInAt);
+  if (Number.isNaN(parsed.getTime())) {
+    return { instant: now, usedFallback: true, reason: 'invalid' };
+  }
+
+  const maxFutureMs = 24 * 60 * 60 * 1000;
+  const minReasonableMs = Date.UTC(2025, 0, 1);
+  if (parsed.getTime() < minReasonableMs || parsed.getTime() > now.getTime() + maxFutureMs) {
+    return { instant: now, usedFallback: true, reason: 'out_of_range' };
+  }
+
+  return { instant: parsed, usedFallback: false, reason: '' };
+};
+
 /**
  * Machine-to-machine endpoint used by the WhatsApp bridge bot.
  * Auth is via the `x-webhook-secret` header (see WHATSAPP_WEBHOOK_SECRET),
@@ -100,14 +120,27 @@ export const recordWhatsappPunchIn = async (req, res) => {
     });
   }
 
-  const punchDate = punchInAt ? new Date(punchInAt) : new Date();
-  if (Number.isNaN(punchDate.getTime())) {
-    return res.status(400).json({ message: 'punchInAt is not a valid date' });
-  }
+  const punchResolution = resolveWebhookPunchInstant(punchInAt);
+  const punchDate = punchResolution.instant;
 
   const day = normalizeAttendanceDate(punchDate);
   if (day < TRAINER_ATTENDANCE_TRACKING_START) {
-    return res.status(400).json({ message: 'Attendance tracking has not started for this date' });
+    // If a bridge timestamp is wrong (epoch/missing), avoid dropping the punch:
+    // fallback to today IST so valid punches still land on the current day.
+    const fallbackDay = normalizeAttendanceDate(new Date());
+    if (fallbackDay >= TRAINER_ATTENDANCE_TRACKING_START) {
+      if (process.env.NODE_ENV !== 'test') {
+        console.warn('[whatsapp-punch] timestamp resolved before tracking start; fallback to today', {
+          phone: normalizePhone(phone),
+          rawPunchInAt: punchInAt || null,
+          fallbackReason: punchResolution.reason || 'before_tracking_start',
+        });
+      }
+      // eslint-disable-next-line no-param-reassign
+      day.setTime(fallbackDay.getTime());
+    } else {
+      return res.status(400).json({ message: 'Attendance tracking has not started for this date' });
+    }
   }
 
   const existing = await TrainerDailyAttendance.findOne({ trainer: trainer._id, date: day });
@@ -131,6 +164,15 @@ export const recordWhatsappPunchIn = async (req, res) => {
   // First punch of the day wins; later messages only backfill a missing time.
   if (!existing?.punchInAt) {
     update.punchInAt = punchDate;
+  }
+
+  if (punchResolution.usedFallback && process.env.NODE_ENV !== 'test') {
+    console.warn('[whatsapp-punch] using fallback punch timestamp', {
+      phone: normalizePhone(phone),
+      rawPunchInAt: punchInAt || null,
+      fallbackReason: punchResolution.reason,
+      attendanceDate: toAttendanceDateKey(day),
+    });
   }
 
   const updateOps = { $set: update };
