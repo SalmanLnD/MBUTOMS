@@ -37,11 +37,13 @@ const NotificationBell = () => {
       setNotifications(data.notifications || []);
       setUnreadCount(data.unreadCount || 0);
     } catch (err) {
+      // Background poll: don't toast every 45s while the API is waking.
+      if (!open) return;
       showError(getErrorMessage(err));
     } finally {
       setLoading(false);
     }
-  }, [canViewNotifications]);
+  }, [canViewNotifications, open]);
 
   useEffect(() => {
     if (!canViewNotifications) return undefined;

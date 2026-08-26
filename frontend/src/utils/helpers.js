@@ -36,8 +36,32 @@ export const formatRole = (role) => {
 export const formatStatus = (status) =>
   status?.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()) || '-';
 
-export const getErrorMessage = (error) =>
-  error.response?.data?.message || error.message || 'Something went wrong';
+/** True for wake/restart/network drops where the API never returned a body. */
+export const isTransientApiError = (error) => {
+  if (!error) return false;
+  if (
+    error.code === 'ERR_CANCELED'
+    || error.name === 'CanceledError'
+    || error.name === 'AbortError'
+  ) {
+    return false;
+  }
+  const status = error.response?.status;
+  if (status === 502 || status === 503 || status === 504) return true;
+  if (error.code === 'ERR_NETWORK' || error.code === 'ECONNABORTED') return true;
+  if (error.message === 'Network Error') return true;
+  return !error.response && Boolean(error.request);
+};
+
+export const API_RECONNECTING_MESSAGE =
+  'Server is reconnecting. Wait a moment and try again.';
+
+export const getErrorMessage = (error) => {
+  const apiMessage = error?.response?.data?.message;
+  if (apiMessage) return apiMessage;
+  if (isTransientApiError(error)) return API_RECONNECTING_MESSAGE;
+  return error?.message || 'Something went wrong';
+};
 
 export const resolveLinkedTrainerId = (trainer) => {
   if (!trainer) return null;
