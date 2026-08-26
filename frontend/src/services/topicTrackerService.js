@@ -5,6 +5,11 @@ export const getTopicTrackerOverview = async (date) => {
   return data;
 };
 
+export const getTopicTrackerPendingBacklog = async (params = {}) => {
+  const { data } = await api.get('/topic-tracker/pending-backlog', { params });
+  return data;
+};
+
 export const getTopicTrackerClassSummary = async (params = {}) => {
   const { data } = await api.get('/topic-tracker/class-summary', { params });
   return data;

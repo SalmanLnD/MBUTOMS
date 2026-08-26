@@ -1,6 +1,7 @@
 import express from 'express';
 import {
   getTopicTrackerOverview,
+  getTopicTrackerPendingBacklog,
   getTopicTrackerSessions,
   getTopicTrackerTopics,
   getTopicTrackerClassSummary,
@@ -27,6 +28,7 @@ router.get('/export', requireTopicTrackerExportKey, asyncHandler(exportTopicTrac
 router.use(protect);
 
 router.get('/overview', asyncHandler(getTopicTrackerOverview));
+router.get('/pending-backlog', asyncHandler(getTopicTrackerPendingBacklog));
 router.get('/class-summary', asyncHandler(getTopicTrackerClassSummary));
 router.get('/topics', asyncHandler(getTopicTrackerTopics));
 router.get('/sessions', asyncHandler(getTopicTrackerSessions));

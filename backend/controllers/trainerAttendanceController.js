@@ -367,7 +367,7 @@ export const buildTrainerAttendanceGridPayload = async ({
           isDefaultWeekOff: false,
           isSundayWeekOff: false,
           classHoursEditable: false,
-          // RRD only for full-day leave on a weekday the trainer teaches.
+          // RRD only for full-day leave on a teaching weekday that is not a company holiday.
           isReplacementRequired: trainingWeekdays.has(weekdayName),
           isFuture: date > today,
         };

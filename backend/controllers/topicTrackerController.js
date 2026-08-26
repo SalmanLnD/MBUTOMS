@@ -15,6 +15,7 @@ import { normalizeAttendanceDate } from '../utils/attendanceTracking.js';
 import {
   buildTopicTrackerSessions,
   buildTopicTrackerOverview,
+  buildTopicTrackerPendingBacklog,
   buildTopicTrackerExportRows,
   buildTopicTrackerClassSummary,
 } from '../utils/topicTrackerSessions.js';
@@ -95,6 +96,19 @@ export const getTopicTrackerOverview = async (req, res) => {
   const date = req.query.date || new Date().toISOString().slice(0, 10);
   const overview = await buildTopicTrackerOverview({ date, user: req.user });
   res.json(overview);
+};
+
+export const getTopicTrackerPendingBacklog = async (req, res) => {
+  if (!isAuthorizedRole(req.user.role, MANAGEMENT_VIEW_ROLES)) {
+    return res.status(403).json({ message: 'Not authorized to view pending topic trackers' });
+  }
+
+  const backlog = await buildTopicTrackerPendingBacklog({
+    until: req.query.until,
+    from: req.query.from,
+    user: req.user,
+  });
+  res.json(backlog);
 };
 
 export const getTopicTrackerSessions = async (req, res) => {

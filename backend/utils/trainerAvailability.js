@@ -11,7 +11,7 @@ import {
   getLeaveOverlapFilter,
   isDateWithinLeave,
 } from './leaveDateRange.js';
-import { getCancellationMapForRange } from './leaveAffectedClasses.js';
+import { getLeaveClassExclusionsForRange } from './leaveAffectedClasses.js';
 
 const WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
@@ -249,7 +249,7 @@ export const buildTrainerAvailabilityForRange = async ({
     subjectStartMap,
     replacementLeaves,
     activeLeaves,
-    cancellationMap,
+    exclusions,
   ] = await Promise.all([
     Schedule.find(ownedFilter).lean(),
     buildSubjectStartDateMap(),
@@ -268,8 +268,9 @@ export const buildTrainerAvailabilityForRange = async ({
     })
       .select('trainer startDate endDate')
       .lean(),
-    getCancellationMapForRange(rangeStart, rangeEnd),
+    getLeaveClassExclusionsForRange(rangeStart, rangeEnd),
   ]);
+  const { cancellationMap, holidayDateKeys } = exclusions;
 
   const leaveDatesByTrainer = new Map();
   activeLeaves.forEach((leave) => {
@@ -317,6 +318,7 @@ export const buildTrainerAvailabilityForRange = async ({
 
   dates.forEach((date) => {
     const dateKey = toDateKey(date);
+    if (holidayDateKeys.has(dateKey)) return;
     const dayName = WEEKDAYS[date.getDay()];
     replacementLeaves.forEach((leave) => {
       if (!isDateWithinLeave(date, leave)) return;
@@ -365,6 +367,26 @@ export const buildTrainerAvailabilityForRange = async ({
           day: dayName,
           onLeave: true,
           slots: [],
+        });
+        continue;
+      }
+
+      if (holidayDateKeys.has(dateKey)) {
+        const freeIntervals = busyToAvailable([], dayStartMinutes, dayEndMinutes);
+        const filteredSlots = clipSlotsToRange(
+          freeIntervals.map((interval) => ({
+            startTime: minutesToTime(interval.start),
+            endTime: minutesToTime(interval.end),
+          })),
+          filterStartMinutes,
+          filterEndMinutes
+        );
+        availability.push({
+          date: dateKey,
+          day: dayName,
+          onLeave: false,
+          isOfficialHoliday: true,
+          slots: filteredSlots,
         });
         continue;
       }

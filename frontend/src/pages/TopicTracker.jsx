@@ -5,6 +5,7 @@ import TopicTrackerSpreadsheet from '../components/TopicTrackerSpreadsheet.jsx';
 import TopicTrackerSheetSetupModal from '../components/TopicTrackerSheetSetupModal.jsx';
 import TopicTrackerClassSummaryTab from '../components/TopicTrackerClassSummaryTab.jsx';
 import TopicTrackerCancellationsTab from '../components/TopicTrackerCancellationsTab.jsx';
+import TopicTrackerPendingBacklogTab from '../components/TopicTrackerPendingBacklogTab.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
 import { getTopicTrackerOverview, getTopicTrackerSheetStatus } from '../services/topicTrackerService.js';
 import { getErrorMessage, toInputDate } from '../utils/helpers.js';
@@ -63,6 +64,7 @@ const TopicTracker = () => {
   const [sheetModalOpen, setSheetModalOpen] = useState(false);
   const [spreadsheet, setSpreadsheet] = useState(null);
   const [summaryRefreshKey, setSummaryRefreshKey] = useState(0);
+  const [pendingRefreshKey, setPendingRefreshKey] = useState(0);
 
   const loadOverview = useCallback(async () => {
     if (!showOverview || activeTab !== 'day') {
@@ -120,12 +122,21 @@ const TopicTracker = () => {
       .catch(() => setSheetStatus(null));
   }, [canManageSheets, sheetModalOpen]);
 
-  const openSpreadsheet = ({ subjectId, trainerId, title }) => {
+  const openSpreadsheet = ({
+    date = selectedDate,
+    subjectId,
+    trainerId,
+    title,
+    scheduleId,
+    entryId,
+  }) => {
     setSpreadsheet({
-      date: selectedDate,
+      date,
       subjectId,
       trainerId,
       title,
+      highlightEntryId: entryId || '',
+      highlightScheduleId: scheduleId || '',
     });
   };
 
@@ -148,6 +159,15 @@ const TopicTracker = () => {
               onClick={() => setActiveTab('day')}
             >
               Day overview
+            </button>
+          </li>
+          <li className="nav-item">
+            <button
+              type="button"
+              className={`nav-link ${activeTab === 'pending' ? 'active' : ''}`}
+              onClick={() => setActiveTab('pending')}
+            >
+              Pending backlog
             </button>
           </li>
           <li className="nav-item">
@@ -216,6 +236,17 @@ const TopicTracker = () => {
                 </button>
               </>
             )}
+          </div>
+        </div>
+      )}
+
+      {showOverview && activeTab === 'pending' && (
+        <div className="card table-card">
+          <div className="card-body">
+            <TopicTrackerPendingBacklogTab
+              refreshKey={pendingRefreshKey}
+              onOpenTracker={openSpreadsheet}
+            />
           </div>
         </div>
       )}
@@ -352,13 +383,14 @@ const TopicTracker = () => {
           trainerId={spreadsheet.trainerId}
           title={spreadsheet.title}
           canCloseEntries
-          highlightEntryId={notificationTarget?.entryId}
-          highlightScheduleId={notificationTarget?.scheduleId}
+          highlightEntryId={spreadsheet.highlightEntryId || notificationTarget?.entryId}
+          highlightScheduleId={spreadsheet.highlightScheduleId || notificationTarget?.scheduleId}
           onHighlightComplete={() => setNotificationTarget(null)}
           onClose={() => {
             setSpreadsheet(null);
             setNotificationTarget(null);
             setSummaryRefreshKey((key) => key + 1);
+            setPendingRefreshKey((key) => key + 1);
             if (showOverview && activeTab === 'day') loadOverview();
           }}
         />

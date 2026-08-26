@@ -5,8 +5,10 @@ import Student from '../models/Student.js';
 import ClassGroup from '../models/ClassGroup.js';
 import TopicTrackerEntry from '../models/TopicTrackerEntry.js';
 import Leave from '../models/Leave.js';
+import ClassCancellation from '../models/ClassCancellation.js';
 import { filterSchedulesActiveOnDate } from './activeSchedulesForDate.js';
 import { getCanceledScheduleIdsForDate } from './classCancellations.js';
+import { buildCanceledScheduleIdsByDate } from './leaveAffectedClasses.js';
 import { computeHours } from './trainerClassHours.js';
 import { resolveTrainerScheduleCodes } from './trainerMappings.js';
 import { ROLES } from './roles.js';
@@ -16,7 +18,7 @@ import {
   buildTrainerFilterForCoordinatorSubjects,
 } from './subjectCoordinatorAccess.js';
 import { getTopicOptionsForSubjectDoc } from './topicTrackerTopicCatalog.js';
-import { getLeaveDayWindow, getLeaveOverlapFilter, toLeaveDateKey } from './leaveDateRange.js';
+import { getLeaveDayWindow, getLeaveOverlapFilter, toLeaveDateKey, isDateWithinLeave } from './leaveDateRange.js';
 import {
   formatTopicModulesCovered,
   getEntryTopicModules,
@@ -26,6 +28,15 @@ import {
   getStudentCountForClass,
   resolveAllottedStudents,
 } from './studentCountByClass.js';
+import {
+  getAttendanceCalendarDates,
+  TRAINER_ATTENDANCE_TRACKING_START,
+  toAttendanceDateKey,
+  normalizeAttendanceDate,
+} from './attendanceDates.js';
+import { getAttendanceToday } from './attendanceTracking.js';
+import { loadOfficialHolidayMap } from './officialHolidays.js';
+import { DEFAULT_SUBJECT_START_DATE, buildSubjectStartDateMap } from './subjectStartDate.js';
 
 const WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
@@ -493,6 +504,244 @@ export const buildTopicTrackerOverview = async ({ date, user }) => {
     .sort((a, b) => String(a.subjectName || '').localeCompare(String(b.subjectName || '')));
 
   return { date: dateKey, subjects: overview };
+};
+
+const resolveScheduleStartDate = (schedule, subjectStartMap) => {
+  const subjectId = schedule.subject?._id?.toString() || schedule.subject?.toString();
+  if (subjectId && subjectStartMap.byId.has(subjectId)) {
+    return subjectStartMap.byId.get(subjectId);
+  }
+  const subjectCode = (schedule.subjectCode || schedule.subject?.code || '').trim();
+  if (subjectCode && subjectStartMap.byCode.has(subjectCode)) {
+    return subjectStartMap.byCode.get(subjectCode);
+  }
+  return DEFAULT_SUBJECT_START_DATE;
+};
+
+const isScheduleActiveOnDateKey = (schedule, dateKey, subjectStartMap) => {
+  const ref = normalizeAttendanceDate(dateKey);
+  const start = normalizeAttendanceDate(resolveScheduleStartDate(schedule, subjectStartMap));
+  return ref >= start;
+};
+
+/**
+ * All schedule slots through `until` (inclusive) that still need a closed tracker.
+ * Matches day-overview pending rules: schedule-driven, client cancellations excluded,
+ * company holidays excluded, missing entries count as pending.
+ */
+export const buildTopicTrackerPendingBacklog = async ({
+  until,
+  from,
+  user,
+} = {}) => {
+  const untilDate = normalizeAttendanceDate(until || getAttendanceToday());
+  let fromDate = normalizeAttendanceDate(from || TRAINER_ATTENDANCE_TRACKING_START);
+  if (fromDate < TRAINER_ATTENDANCE_TRACKING_START) {
+    fromDate = TRAINER_ATTENDANCE_TRACKING_START;
+  }
+  if (fromDate > untilDate) {
+    return {
+      from: toAttendanceDateKey(fromDate),
+      until: toAttendanceDateKey(untilDate),
+      totalPending: 0,
+      items: [],
+    };
+  }
+
+  const dates = getAttendanceCalendarDates(fromDate, untilDate);
+  const fromKey = toAttendanceDateKey(fromDate);
+  const untilKey = toAttendanceDateKey(untilDate);
+
+  const [
+    schedules,
+    trainerLookup,
+    subjectStartMap,
+    holidayMap,
+    cancellations,
+    entries,
+    replacementLeaves,
+  ] = await Promise.all([
+    Schedule.find({})
+      .populate('subject', 'name code')
+      .select('day startTime endTime slot department section semester subject subjectCode trainerCode')
+      .lean(),
+    buildTrainerLookup(),
+    buildSubjectStartDateMap(),
+    loadOfficialHolidayMap(fromDate, untilDate),
+    ClassCancellation.find({
+      date: { $gte: fromDate, $lte: untilDate },
+    })
+      .select('date schedules')
+      .lean(),
+    TopicTrackerEntry.find({
+      date: { $gte: fromDate, $lte: untilDate },
+    })
+      .select('schedule date trackerStatus trainerName courseName branchYearSection updatedAt')
+      .lean(),
+    Leave.find({
+      status: 'approved',
+      ...getLeaveOverlapFilter(fromDate, untilDate),
+      'replacements.0': { $exists: true },
+    })
+      .select('startDate endDate replacements.schedule replacements.replacementTrainer replacements.isExternal replacements.externalTrainerName')
+      .lean(),
+  ]);
+
+  const canceledByDate = buildCanceledScheduleIdsByDate(cancellations);
+
+  let allowedTrainerIds = null;
+  let allowedSubjectIds = null;
+  const ownTrainerId = user?.trainer ? String(user.trainer._id || user.trainer) : '';
+
+  if ((user?.role === ROLES.TRAINER || user?.role === ROLES.EVALUATOR) && user.trainer) {
+    allowedTrainerIds = new Set([ownTrainerId || user.trainer.toString()]);
+  } else if (isSubjectCoordinator(user)) {
+    allowedSubjectIds = new Set(getCoordinatorSubjectIds(user));
+    const filter = await buildTrainerFilterForCoordinatorSubjects([...allowedSubjectIds]);
+    allowedTrainerIds = new Set((filter._id?.$in || []).map((id) => id.toString()));
+    if (ownTrainerId) allowedTrainerIds.add(ownTrainerId);
+  }
+
+  const schedulesByDay = new Map(WEEKDAYS.map((day) => [day, []]));
+  schedules.forEach((schedule) => {
+    if (!schedulesByDay.has(schedule.day)) return;
+    schedulesByDay.get(schedule.day).push(schedule);
+  });
+
+  const entriesByDateSchedule = new Map();
+  entries.forEach((entry) => {
+    const dateKey = toLeaveDateKey(entry.date);
+    const scheduleId = entry.schedule?.toString();
+    if (!dateKey || !scheduleId) return;
+    const key = `${dateKey}|${scheduleId}`;
+    if (!entriesByDateSchedule.has(key)) entriesByDateSchedule.set(key, []);
+    entriesByDateSchedule.get(key).push(entry);
+  });
+
+  const replacementByDateSchedule = new Map();
+  replacementLeaves.forEach((leave) => {
+    (leave.replacements || []).forEach((replacement) => {
+      const scheduleId = replacement.schedule?.toString();
+      if (!scheduleId) return;
+      dates.forEach((date) => {
+        if (!isDateWithinLeave(date, leave)) return;
+        const dateKey = toAttendanceDateKey(date);
+        const key = `${dateKey}|${scheduleId}`;
+        if (replacement.isExternal && replacement.externalTrainerName) {
+          replacementByDateSchedule.set(key, {
+            isExternal: true,
+            name: replacement.externalTrainerName,
+          });
+          return;
+        }
+        const replacementTrainerId = replacement.replacementTrainer?.toString();
+        if (replacementTrainerId) {
+          replacementByDateSchedule.set(key, {
+            isExternal: false,
+            trainerId: replacementTrainerId,
+          });
+        }
+      });
+    });
+  });
+
+  const pendingItems = [];
+  const seen = new Set();
+
+  dates.forEach((date) => {
+    const dateKey = toAttendanceDateKey(date);
+    if (holidayMap.has(dateKey)) return;
+
+    const dayName = WEEKDAYS[date.getUTCDay()];
+    const daySchedules = schedulesByDay.get(dayName) || [];
+    const canceledIds = canceledByDate.get(dateKey) || new Set();
+
+    daySchedules.forEach((schedule) => {
+      const scheduleId = schedule._id.toString();
+      if (canceledIds.has(scheduleId)) return;
+      if (!isScheduleActiveOnDateKey(schedule, dateKey, subjectStartMap)) return;
+
+      const originalTrainer = trainerLookup.byCode.get(schedule.trainerCode);
+      if (!originalTrainer) return;
+      const originalTrainerId = originalTrainer._id.toString();
+
+      const subjectId = schedule.subject?._id?.toString() || schedule.subject?.toString() || '';
+      if (
+        allowedSubjectIds
+        && subjectId
+        && !allowedSubjectIds.has(subjectId)
+      ) {
+        // Coordinators still see their own teaching slots outside assigned subjects.
+        if (!ownTrainerId || originalTrainerId !== ownTrainerId) return;
+      }
+
+      const replacementInfo = replacementByDateSchedule.get(`${dateKey}|${scheduleId}`);
+      const externalReplacementName = replacementInfo?.isExternal
+        ? String(replacementInfo.name || '').trim()
+        : '';
+      const replacementTrainer = !replacementInfo?.isExternal && replacementInfo?.trainerId
+        ? trainerLookup.byId.get(replacementInfo.trainerId)
+        : null;
+
+      if (
+        allowedTrainerIds
+        && !allowedTrainerIds.has(originalTrainerId)
+        && !(replacementTrainer && allowedTrainerIds.has(replacementTrainer._id.toString()))
+      ) {
+        return;
+      }
+
+      const entryList = entriesByDateSchedule.get(`${dateKey}|${scheduleId}`) || [];
+      const entry = pickBestTrackerEntry(entryList);
+      const trackerStatus = entry?.trackerStatus || 'pending';
+      if (trackerStatus === 'closed') return;
+
+      const dedupeKey = `${dateKey}|${scheduleId}`;
+      if (seen.has(dedupeKey)) return;
+      seen.add(dedupeKey);
+
+      const displayTrainerName = replacementTrainer?.name
+        || externalReplacementName
+        || entry?.trainerName
+        || originalTrainer.name;
+      const trainerNames = mergeOverviewTrainerNames([], {
+        originalTrainerName: originalTrainer.name,
+        replacementTrainerName: replacementTrainer?.name || externalReplacementName || '',
+      });
+
+      pendingItems.push({
+        date: dateKey,
+        day: dayName,
+        scheduleId,
+        entryId: entry?._id?.toString() || null,
+        subjectId,
+        subjectCode: schedule.subjectCode || schedule.subject?.code || '',
+        courseName: entry?.courseName || schedule.subject?.name || schedule.subjectCode || '',
+        trainerId: originalTrainerId,
+        trainerName: trainerNames.join(' / ') || displayTrainerName,
+        slot: schedule.slot || '',
+        sessionStartTime: schedule.startTime,
+        sessionEndTime: schedule.endTime,
+        branchYearSection: entry?.branchYearSection || buildBranchYearSection(schedule, null),
+        trackerStatus,
+      });
+    });
+  });
+
+  pendingItems.sort((a, b) => {
+    const dateDiff = String(a.date).localeCompare(String(b.date));
+    if (dateDiff) return dateDiff;
+    const timeDiff = String(a.sessionStartTime || '').localeCompare(String(b.sessionStartTime || ''));
+    if (timeDiff) return timeDiff;
+    return String(a.courseName || '').localeCompare(String(b.courseName || ''));
+  });
+
+  return {
+    from: fromKey,
+    until: untilKey,
+    totalPending: pendingItems.length,
+    items: pendingItems,
+  };
 };
 
 export const buildTopicTrackerExportRows = async () => {

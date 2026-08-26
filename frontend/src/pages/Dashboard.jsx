@@ -23,9 +23,13 @@ import {
 } from '../components/icons.jsx';
 import { getDashboardStats } from '../services/dashboardService.js';
 import { getErrorMessage } from '../utils/helpers.js';
-import { formatTimeRange, formatScheduleClassLabel } from '../utils/scheduleUtils.js';
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, ArcElement, Title, Tooltip, Legend);
+
+const formatRating = (value) => {
+  if (value == null || Number.isNaN(Number(value))) return '—';
+  return `${Number(value).toFixed(2)}/5`;
+};
 
 const Dashboard = () => {
   const [stats, setStats] = useState(null);
@@ -47,7 +51,7 @@ const Dashboard = () => {
 
   if (loading) return <LoadingSpinner message="Loading dashboard..." />;
 
-  const { cards, attendanceSummary, trainerPerformance, upcomingClasses } = stats || {};
+  const { cards, attendanceSummary, topTrainersByFeedback } = stats || {};
 
   const attendanceChartData = {
     labels: ['Present', 'Absent', 'Late', 'Leave', 'OD', 'Holiday'],
@@ -66,12 +70,12 @@ const Dashboard = () => {
     ],
   };
 
-  const performanceChartData = {
-    labels: trainerPerformance?.map((t) => t.name) || [],
+  const feedbackChartData = {
+    labels: topTrainersByFeedback?.map((t) => t.name) || [],
     datasets: [
       {
-        label: 'Performance Score',
-        data: trainerPerformance?.map((t) => t.performanceScore) || [],
+        label: 'Average Feedback Rating',
+        data: topTrainersByFeedback?.map((t) => t.averageRating) || [],
         backgroundColor: 'rgba(20, 184, 166, 0.85)',
         hoverBackgroundColor: 'rgba(6, 182, 212, 0.95)',
         borderRadius: 12,
@@ -121,57 +125,43 @@ const Dashboard = () => {
         <div className="bento-cell bento-span-7">
           <div className="card table-card bento-panel h-100 clay-pressable">
             <div className="card-body">
-              <h5 className="bento-panel__title">Top Trainer Performance</h5>
-              {trainerPerformance?.length > 0 ? (
+              <h5 className="bento-panel__title">Top Trainers by Feedback</h5>
+              {topTrainersByFeedback?.length > 0 ? (
                 <Bar
-                  data={performanceChartData}
+                  data={feedbackChartData}
                   options={{
                     responsive: true,
-                    plugins: { legend: { display: false } },
-                    scales: { y: { beginAtZero: true, max: 100 } },
+                    plugins: {
+                      legend: { display: false },
+                      tooltip: {
+                        callbacks: {
+                          label: (context) => {
+                            const trainer = topTrainersByFeedback[context.dataIndex];
+                            const rating = formatRating(context.parsed.y);
+                            const responses = trainer?.responseCount || 0;
+                            return `${rating} (${responses} response${responses === 1 ? '' : 's'})`;
+                          },
+                        },
+                      },
+                    },
+                    scales: {
+                      y: {
+                        beginAtZero: true,
+                        max: 5,
+                        ticks: {
+                          stepSize: 1,
+                        },
+                      },
+                    },
                   }}
                 />
               ) : (
-                <p className="text-muted text-center py-5">No trainer performance data yet.</p>
+                <p className="text-muted text-center py-5">No feedback ratings yet.</p>
               )}
             </div>
           </div>
         </div>
       </div>
-
-      {upcomingClasses?.length > 0 && (
-        <div className="card table-card bento-panel clay-pressable spatial-layer--float">
-          <div className="card-body">
-            <h5 className="bento-panel__title">Upcoming Classes</h5>
-            <div className="table-responsive">
-              <table className="table table-sm table-hover mb-0">
-                <thead className="table-light">
-                  <tr>
-                    <th>Day</th>
-                    <th>Time</th>
-                    <th>Class</th>
-                    <th>Trainer</th>
-                    <th>Venue</th>
-                    <th>Dept / Section</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {upcomingClasses.map((cls) => (
-                    <tr key={cls._id}>
-                      <td>{cls.day}</td>
-                      <td>{formatTimeRange(cls.startTime, cls.endTime)}</td>
-                      <td>{formatScheduleClassLabel(cls)}</td>
-                      <td>{cls.trainerCode}</td>
-                      <td>—</td>
-                      <td>{formatScheduleClassLabel(cls)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 };

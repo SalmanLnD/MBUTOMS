@@ -16,6 +16,7 @@ import {
   isDateWithinLeave,
 } from './leaveDateRange.js';
 import { getCancellationMapForRange } from './leaveAffectedClasses.js';
+import { loadOfficialHolidayMap } from './officialHolidays.js';
 
 const SCHEDULE_FIELDS = 'day startTime endTime trainerCode semester subject subjectCode';
 
@@ -131,6 +132,7 @@ export const computeClassHandlingHoursBatch = async (
     subjectStartMap,
     leaves,
     canceledIdsByDate,
+    holidayMap,
   ] = await Promise.all([
     Schedule.find(ownedFilter).select(SCHEDULE_FIELDS).lean(),
     buildSubjectStartDateMap(),
@@ -145,6 +147,7 @@ export const computeClassHandlingHoursBatch = async (
       .select('trainer startDate endDate replacements')
       .lean(),
     getCancellationMapForRange(rangeStart, rangeEnd),
+    loadOfficialHolidayMap(rangeStart, rangeEnd),
   ]);
 
   const schedulesByTrainerDay = indexSchedulesByTrainerDay(ownedSchedules, codeToTrainerId);
@@ -182,6 +185,7 @@ export const computeClassHandlingHoursBatch = async (
     const canceledIds = canceledIdsByDate.get(dateKey) || new Set();
 
     leaves.forEach((leave) => {
+      if (holidayMap.has(dateKey)) return;
       if (!isDateWithinLeave(date, leave)) return;
       const leaveDays = leaveWeekdays.get(leave._id.toString());
       if (!leaveDays?.has(dayName)) return;
@@ -235,7 +239,7 @@ export const computeClassHandlingHoursBatch = async (
 
     trainers.forEach((trainer) => {
       const trainerId = trainer._id.toString();
-      if (isBeforeTrainerJoiningDate(trainer, date)) {
+      if (holidayMap.has(dateKey) || isBeforeTrainerJoiningDate(trainer, date)) {
         result.set(`${trainerId}|${dateKey}`, 0);
         return;
       }

@@ -10,11 +10,12 @@ import {
 } from './attendanceTracking.js';
 import { getLeaveOverlapFilter, isDateWithinLeave } from './leaveDateRange.js';
 import { getLeaveWeekdayScheduleIds, isFullDayLeave } from './leaveScope.js';
+import { loadOfficialHolidayMap } from './officialHolidays.js';
 import { resolveTrainerScheduleCodes } from './trainerMappings.js';
 
 /**
  * Map of trainerId -> Replacement Required Days count for an inclusive date range.
- * RRD = full-day approved leave on a weekday the trainer has scheduled classes.
+ * RRD = full-day approved leave on a teaching weekday that is not an official holiday.
  */
 export const getReplacementRequiredDaysByTrainer = async ({
   startDate,
@@ -38,7 +39,7 @@ export const getReplacementRequiredDaysByTrainer = async ({
   );
   const allScheduleCodes = [...new Set([...codesByTrainer.values()].flat())];
 
-  const [approvedLeaves, schedules] = await Promise.all([
+  const [approvedLeaves, schedules, holidayMap] = await Promise.all([
     Leave.find({
       trainer: { $in: trainerIds },
       status: 'approved',
@@ -51,6 +52,7 @@ export const getReplacementRequiredDaysByTrainer = async ({
         .select('_id trainerCode day')
         .lean()
       : [],
+    loadOfficialHolidayMap(rangeStart, endDate),
   ]);
 
   const schedulesByCode = new Map();
@@ -96,6 +98,7 @@ export const getReplacementRequiredDaysByTrainer = async ({
     let rrd = 0;
     dates.forEach((date) => {
       const dateKey = toAttendanceDateKey(date);
+      if (holidayMap.has(dateKey)) return;
       if (!fullDayLeaveKeys.has(`${trainerId}|${dateKey}`)) return;
       if (trainingWeekdays.has(getAttendanceWeekdayName(date))) {
         rrd += 1;

@@ -1,50 +1,74 @@
 import Trainer from '../models/Trainer.js';
-
 import Student from '../models/Student.js';
-
 import Venue from '../models/Venue.js';
-
 import Leave from '../models/Leave.js';
-
 import Attendance from '../models/Attendance.js';
-import { enrichSchedulesWithReplacementFor } from '../utils/scheduleReplacement.js';
+import FeedbackResponse from '../models/FeedbackResponse.js';
 import { getActiveSchedulesForDay } from '../utils/activeSchedulesForDate.js';
 import {
-  getCancellationMapForRange,
   getEffectiveAffectedSchedules,
+  getLeaveClassExclusionsForRange,
 } from '../utils/leaveAffectedClasses.js';
-
-
+import { PERFORMANCE_EXCLUDED_EMPLOYEE_IDS } from '../utils/trainerMappings.js';
+import { mergeRosterFilter } from '../utils/rosterFilter.js';
 
 const WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
+const roundAvg = (value) => (value != null ? Math.round(value * 100) / 100 : null);
 
+const getTopTrainersByFeedback = async () => {
+  const rosterFilter = await mergeRosterFilter({
+    status: 'active',
+    employeeId: { $nin: PERFORMANCE_EXCLUDED_EMPLOYEE_IDS },
+  }, { rosterOnly: true });
+
+  const rosterTrainers = await Trainer.find(rosterFilter).select('_id').lean();
+  const rosterIds = rosterTrainers.map((trainer) => trainer._id);
+  if (!rosterIds.length) return [];
+
+  return FeedbackResponse.aggregate([
+    {
+      $match: {
+        trainer: { $in: rosterIds },
+        rating: { $gte: 1, $lte: 5 },
+      },
+    },
+    {
+      $group: {
+        _id: '$trainer',
+        averageRating: { $avg: '$rating' },
+        responseCount: { $sum: 1 },
+      },
+    },
+    { $sort: { averageRating: -1, responseCount: -1 } },
+    { $limit: 5 },
+    {
+      $lookup: {
+        from: 'trainers',
+        localField: '_id',
+        foreignField: '_id',
+        as: 'trainer',
+      },
+    },
+    { $unwind: '$trainer' },
+    {
+      $project: {
+        _id: 1,
+        name: '$trainer.name',
+        employeeId: '$trainer.employeeId',
+        averageRating: { $round: ['$averageRating', 2] },
+        responseCount: 1,
+      },
+    },
+  ]);
+};
 
 export const getDashboardStats = async (req, res) => {
-
   const today = new Date();
-
   today.setHours(0, 0, 0, 0);
-
   const tomorrow = new Date(today);
-
   tomorrow.setDate(tomorrow.getDate() + 1);
-
   const todayName = WEEKDAYS[today.getDay()];
-
-
-
-  // Everything except the schedule enrichment is independent — run the whole
-  // set in one parallel batch instead of four sequential round trips.
-  const upcomingClassesPromise = getActiveSchedulesForDay(todayName, today).then(
-    (activeToday) =>
-      enrichSchedulesWithReplacementFor(
-        [...activeToday.schedules]
-          .sort((a, b) => a.startTime.localeCompare(b.startTime))
-          .slice(0, 5),
-        new Date()
-      ).then((upcomingClasses) => ({ activeToday, upcomingClasses }))
-  );
 
   const [
     totalTrainers,
@@ -53,8 +77,8 @@ export const getDashboardStats = async (req, res) => {
     todaysLeaves,
     replacementLeaves,
     attendanceAgg,
-    trainerPerformance,
-    { activeToday, upcomingClasses },
+    topTrainersByFeedback,
+    activeToday,
   ] = await Promise.all([
     Trainer.countDocuments(),
     Student.countDocuments({ status: 'active' }),
@@ -79,12 +103,8 @@ export const getDashboardStats = async (req, res) => {
       { $match: { date: { $gte: today, $lt: tomorrow } } },
       { $group: { _id: '$status', count: { $sum: 1 } } },
     ]),
-    Trainer.find()
-      .select('name employeeId performanceScore weeklyWorkloadHours')
-      .sort({ performanceScore: -1 })
-      .limit(5)
-      .lean(),
-    upcomingClassesPromise,
+    getTopTrainersByFeedback(),
+    getActiveSchedulesForDay(todayName, today),
   ]);
 
   const todaysClasses = activeToday.count;
@@ -98,13 +118,14 @@ export const getDashboardStats = async (req, res) => {
     (latest, leave) => (leave.endDate > latest ? leave.endDate : latest),
     replacementLeaves[0]?.endDate
   );
-  const cancellationMap = replacementLeaves.length
-    ? await getCancellationMapForRange(
+  const exclusions = replacementLeaves.length
+    ? await getLeaveClassExclusionsForRange(
       leaveRangeStart,
       // Clamp so a months-long leave doesn't scan cancellations far into the future.
       leaveRangeEnd > cancellationWindowEnd ? cancellationWindowEnd : leaveRangeEnd
     )
-    : new Map();
+    : { cancellationMap: new Map(), holidayDateKeys: new Set() };
+  const { cancellationMap, holidayDateKeys } = exclusions;
 
   const pendingReplacements = replacementLeaves.reduce((count, leave) => {
     const assignedScheduleIds = new Set(
@@ -115,7 +136,8 @@ export const getDashboardStats = async (req, res) => {
     const effectiveSchedules = getEffectiveAffectedSchedules(
       leave,
       leave.affectedSchedules,
-      cancellationMap
+      cancellationMap,
+      holidayDateKeys
     );
     const unassigned = effectiveSchedules.filter(
       (schedule) => !assignedScheduleIds.has(schedule._id.toString())
@@ -124,40 +146,25 @@ export const getDashboardStats = async (req, res) => {
   }, 0);
 
   const attendanceSummary = { present: 0, absent: 0, late: 0, leave: 0, od: 0, holiday: 0 };
-
   attendanceAgg.forEach((s) => {
     if (s._id && attendanceSummary[s._id] !== undefined) {
       attendanceSummary[s._id] = s.count;
     }
   });
 
-
-
   res.json({
-
     cards: {
-
       totalTrainers,
-
       totalStudents,
-
       todaysClasses,
-
       todaysLeaves,
-
       activeVenues,
-
       pendingReplacements,
-
     },
-
     attendanceSummary,
-
-    trainerPerformance,
-
-    upcomingClasses,
-
+    topTrainersByFeedback: topTrainersByFeedback.map((row) => ({
+      ...row,
+      averageRating: roundAvg(row.averageRating),
+    })),
   });
-
 };
-

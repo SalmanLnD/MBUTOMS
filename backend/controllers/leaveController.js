@@ -13,8 +13,8 @@ import { clearAttendanceGridCache } from '../utils/attendanceGridCache.js';
 import { LEAVE_SCOPES } from '../utils/leaveScope.js';
 import {
   buildAffectedClassOccurrences,
-  getCancellationMapForRange,
   getEffectiveAffectedSchedules,
+  getLeaveClassExclusionsForRange,
 } from '../utils/leaveAffectedClasses.js';
 
 const WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
@@ -33,17 +33,19 @@ const populateLeave = [
   },
 ];
 
-const addEffectiveAffectedData = (leave, cancellationMap) => {
+const addEffectiveAffectedData = (leave, cancellationMap, holidayDateKeys = new Set()) => {
   const plain = leave.toObject ? leave.toObject() : { ...leave };
   const occurrences = buildAffectedClassOccurrences(
     plain,
     plain.affectedSchedules,
-    cancellationMap
+    cancellationMap,
+    holidayDateKeys
   );
   const effectiveSchedules = getEffectiveAffectedSchedules(
     plain,
     plain.affectedSchedules,
-    cancellationMap
+    cancellationMap,
+    holidayDateKeys
   );
   return {
     ...plain,
@@ -65,8 +67,11 @@ const addEffectiveAffectedDataToLeaves = async (leaves) => {
     (latest, leave) => (leave.endDate > latest ? leave.endDate : latest),
     leaves[0].endDate
   );
-  const cancellationMap = await getCancellationMapForRange(startDate, endDate);
-  return leaves.map((leave) => addEffectiveAffectedData(leave, cancellationMap));
+  const { cancellationMap, holidayDateKeys } = await getLeaveClassExclusionsForRange(
+    startDate,
+    endDate
+  );
+  return leaves.map((leave) => addEffectiveAffectedData(leave, cancellationMap, holidayDateKeys));
 };
 
 const getDaysInRange = (startDate, endDate) => {
@@ -124,8 +129,11 @@ export const getLeaveById = async (req, res) => {
     return res.status(403).json({ message: 'Not authorized' });
   }
 
-  const cancellationMap = await getCancellationMapForRange(leave.startDate, leave.endDate);
-  res.json(addEffectiveAffectedData(leave, cancellationMap));
+  const { cancellationMap, holidayDateKeys } = await getLeaveClassExclusionsForRange(
+    leave.startDate,
+    leave.endDate
+  );
+  res.json(addEffectiveAffectedData(leave, cancellationMap, holidayDateKeys));
 };
 
 export const createLeave = async (req, res) => {
@@ -154,11 +162,15 @@ export const createLeave = async (req, res) => {
 
   const affectedSchedules = await findAffectedSchedules(trainerId, startDate, endDate);
   const affectedIds = affectedSchedules.map((s) => s._id);
-  const cancellationMap = await getCancellationMapForRange(startDate, endDate);
+  const { cancellationMap, holidayDateKeys } = await getLeaveClassExclusionsForRange(
+    startDate,
+    endDate
+  );
   const effectiveSchedules = getEffectiveAffectedSchedules(
     { startDate, endDate },
     affectedSchedules,
-    cancellationMap
+    cancellationMap,
+    holidayDateKeys
   );
 
   const leave = await Leave.create({
@@ -172,7 +184,7 @@ export const createLeave = async (req, res) => {
   });
 
   const populated = await Leave.findById(leave._id).populate(populateLeave);
-  res.status(201).json(addEffectiveAffectedData(populated, cancellationMap));
+  res.status(201).json(addEffectiveAffectedData(populated, cancellationMap, holidayDateKeys));
 };
 
 export const updateLeave = async (req, res) => {
@@ -202,11 +214,11 @@ export const updateLeave = async (req, res) => {
   await leave.save();
   clearAttendanceGridCache();
   const updated = await Leave.findById(leave._id).populate(populateLeave);
-  const cancellationMap = await getCancellationMapForRange(
+  const { cancellationMap, holidayDateKeys } = await getLeaveClassExclusionsForRange(
     updated.startDate,
     updated.endDate
   );
-  res.json(addEffectiveAffectedData(updated, cancellationMap));
+  res.json(addEffectiveAffectedData(updated, cancellationMap, holidayDateKeys));
 };
 
 export const deleteLeave = async (req, res) => {
@@ -299,14 +311,15 @@ export const previewAffectedSchedules = async (req, res) => {
     startDate: req.query.startDate,
     endDate: req.query.endDate,
   };
-  const cancellationMap = await getCancellationMapForRange(
+  const { cancellationMap, holidayDateKeys } = await getLeaveClassExclusionsForRange(
     req.query.startDate,
     req.query.endDate
   );
   const occurrences = buildAffectedClassOccurrences(
     leaveRange,
     schedules,
-    cancellationMap
+    cancellationMap,
+    holidayDateKeys
   );
   res.json({
     schedules: occurrences.map(({ schedule, date }) => ({

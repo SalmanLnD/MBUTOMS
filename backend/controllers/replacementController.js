@@ -11,11 +11,13 @@ import { clearAttendanceExportCache } from '../services/attendanceSheetsService.
 import { notifyReplacementAssignment, notifyReplacementCancellation } from '../utils/replacementNotifications.js';
 import { LEAVE_SCOPES } from '../utils/leaveScope.js';
 import {
-  getCancellationMapForRange,
   getEffectiveAffectedSchedules,
+  getLeaveClassExclusionsForRange,
   getUncancelledScheduleDateKeys,
 } from '../utils/leaveAffectedClasses.js';
 import { getCanceledScheduleIdsForDate } from '../utils/classCancellations.js';
+import { loadOfficialHolidayMap } from '../utils/officialHolidays.js';
+import { toAttendanceDateKey } from '../utils/attendanceDates.js';
 import {
   loadReplacementBusySlotsByTrainer,
   trainerHasSlotConflict,
@@ -107,10 +109,10 @@ const gatherBulkTargets = async ({ sourceTrainerId, start, end }) => {
     .lean();
 
   if (!leaves.length) {
-    return { leaves: [], targets: [], cancellationMap: new Map() };
+    return { leaves: [], targets: [], cancellationMap: new Map(), holidayDateKeys: new Set() };
   }
 
-  const cancellationMap = await getCancellationMapForRange(start, end);
+  const { cancellationMap, holidayDateKeys } = await getLeaveClassExclusionsForRange(start, end);
   const dateInRange = (key) => {
     const date = normalizeDate(key);
     return date >= start && date <= end;
@@ -119,14 +121,18 @@ const gatherBulkTargets = async ({ sourceTrainerId, start, end }) => {
   const targets = [];
   leaves.forEach((leave) => {
     (leave.affectedSchedules || []).forEach((schedule) => {
-      const dateKeys = getUncancelledScheduleDateKeys(leave, schedule, cancellationMap)
-        .filter(dateInRange);
+      const dateKeys = getUncancelledScheduleDateKeys(
+        leave,
+        schedule,
+        cancellationMap,
+        holidayDateKeys
+      ).filter(dateInRange);
       if (!dateKeys.length) return;
       targets.push({ leave, schedule, dateKeys });
     });
   });
 
-  return { leaves, targets, cancellationMap };
+  return { leaves, targets, cancellationMap, holidayDateKeys };
 };
 
 const resolveBulkReplacementTrainer = async ({
@@ -246,18 +252,19 @@ export const getReplacementSuggestions = async (req, res) => {
   if (!leave) {
     return res.status(400).json({ message: 'No approved leave found for this schedule' });
   }
-  const cancellationMap = await getCancellationMapForRange(
+  const { cancellationMap, holidayDateKeys } = await getLeaveClassExclusionsForRange(
     leave.startDate,
     leave.endDate
   );
   const affectedDateKeys = getUncancelledScheduleDateKeys(
     leave,
     schedule,
-    cancellationMap
+    cancellationMap,
+    holidayDateKeys
   );
   if (!affectedDateKeys.length) {
     return res.status(400).json({
-      message: 'This class is canceled for the leave date, so no replacement is needed.',
+      message: 'No replacement is needed for this class (canceled or official holiday).',
     });
   }
 
@@ -688,8 +695,8 @@ export const getAllReplacements = async (req, res) => {
 
   const replacements = [];
   const bulkRowsByGroupId = new Map();
-  const cancellationMap = leaves.length
-    ? await getCancellationMapForRange(
+  const exclusions = leaves.length
+    ? await getLeaveClassExclusionsForRange(
       leaves.reduce(
         (earliest, leave) => (leave.startDate < earliest ? leave.startDate : earliest),
         leaves[0].startDate
@@ -699,7 +706,8 @@ export const getAllReplacements = async (req, res) => {
         leaves[0].endDate
       )
     )
-    : new Map();
+    : { cancellationMap: new Map(), holidayDateKeys: new Set() };
+  const { cancellationMap, holidayDateKeys } = exclusions;
   for (const leave of leaves) {
     const startDate = normalizeDate(leave.startDate);
     const endDate = normalizeDate(leave.endDate);
@@ -772,7 +780,8 @@ export const getAllReplacements = async (req, res) => {
       const affectedDates = getUncancelledScheduleDateKeys(
         leave,
         schedule,
-        cancellationMap
+        cancellationMap,
+        holidayDateKeys
       );
       if (!affectedDates.length) continue;
       const replacement = resolveReplacementTrainer(leave, schedule, trainersById);
@@ -883,18 +892,19 @@ export const assignReplacement = async (req, res) => {
   if (!leave) {
     return res.status(400).json({ message: 'No approved leave found for this schedule' });
   }
-  const cancellationMap = await getCancellationMapForRange(
+  const { cancellationMap, holidayDateKeys } = await getLeaveClassExclusionsForRange(
     leave.startDate,
     leave.endDate
   );
   const affectedDateKeys = getUncancelledScheduleDateKeys(
     leave,
     schedule,
-    cancellationMap
+    cancellationMap,
+    holidayDateKeys
   );
   if (!affectedDateKeys.length) {
     return res.status(400).json({
-      message: 'This class is canceled for the leave date, so no replacement is needed.',
+      message: 'No replacement is needed for this class (canceled or official holiday).',
     });
   }
   if (!useExternal && leave.trainer?._id?.toString() === trainer._id.toString()) {
@@ -1094,11 +1104,15 @@ export const cancelReplacement = async (req, res) => {
     leave.replacementNeeded = false;
     leave.replacements = [];
   } else {
-    const cancellationMap = await getCancellationMapForRange(leave.startDate, leave.endDate);
+    const { cancellationMap, holidayDateKeys } = await getLeaveClassExclusionsForRange(
+      leave.startDate,
+      leave.endDate
+    );
     const effectiveSchedules = getEffectiveAffectedSchedules(
       leave,
       leave.affectedSchedules,
-      cancellationMap
+      cancellationMap,
+      holidayDateKeys
     );
     leave.replacementNeeded = effectiveSchedules.length > 0;
   }
@@ -1172,16 +1186,20 @@ export const getTrainerSlotsForReplacement = async (req, res) => {
   const slotDate = normalizeDate(date);
   const dayName = WEEKDAYS[slotDate.getDay()];
 
-  const [scheduledClasses, canceledScheduleIds] = await Promise.all([
+  const [scheduledClasses, canceledScheduleIds, holidayMap] = await Promise.all([
     Schedule.find({
     trainerCode: { $in: resolveTrainerScheduleCodes(trainer) },
     day: dayName,
     }).sort({ startTime: 1, department: 1, section: 1 }),
     getCanceledScheduleIdsForDate(slotDate),
+    loadOfficialHolidayMap(slotDate, slotDate),
   ]);
-  const schedules = scheduledClasses.filter(
-    (schedule) => !canceledScheduleIds.has(schedule._id.toString())
-  );
+  const isOfficialHoliday = holidayMap.has(toAttendanceDateKey(slotDate));
+  const schedules = isOfficialHoliday
+    ? []
+    : scheduledClasses.filter(
+      (schedule) => !canceledScheduleIds.has(schedule._id.toString())
+    );
 
   res.json({
     trainer: {
@@ -1191,6 +1209,8 @@ export const getTrainerSlotsForReplacement = async (req, res) => {
     },
     date: slotDate,
     day: dayName,
+    isOfficialHoliday,
+    holidayName: isOfficialHoliday ? holidayMap.get(toAttendanceDateKey(slotDate)) : null,
     schedules,
   });
 };
@@ -1226,6 +1246,12 @@ export const createSlotReplacementRequest = async (req, res) => {
   if (canceledScheduleIds.has(schedule._id.toString())) {
     return res.status(400).json({
       message: 'This class is canceled on the selected date, so no replacement is needed.',
+    });
+  }
+  const holidayMap = await loadOfficialHolidayMap(slotDate, slotDate);
+  if (holidayMap.has(toAttendanceDateKey(slotDate))) {
+    return res.status(400).json({
+      message: 'Selected date is an official holiday, so no replacement is needed.',
     });
   }
 
