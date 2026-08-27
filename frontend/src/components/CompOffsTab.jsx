@@ -16,6 +16,7 @@ import {
   getCompOffs,
   updateCompOff,
 } from '../services/compOffService.js';
+import { getTrainers } from '../services/trainerService.js';
 import { isAbortError } from '../services/api.js';
 
 const STATUS_OPTIONS = [
@@ -25,6 +26,7 @@ const STATUS_OPTIONS = [
 ];
 
 const emptyForm = () => ({
+  trainerId: '',
   employeeId: '',
   name: '',
   base: 'Tirupati',
@@ -43,6 +45,7 @@ const CompOffsTab = () => {
   const [summaryByEmployee, setSummaryByEmployee] = useState([]);
   const [loading, setLoading] = useState(true);
   const [viewMode, setViewMode] = useState('table');
+  const [trainers, setTrainers] = useState([]);
 
   const [employeeIdFilter, setEmployeeIdFilter] = useState('');
   const [nameFilter, setNameFilter] = useState('');
@@ -62,6 +65,16 @@ const CompOffsTab = () => {
   const debouncedEmployeeId = useDebounce(employeeIdFilter);
   const debouncedName = useDebounce(nameFilter);
   const debouncedBase = useDebounce(baseFilter);
+
+  const trainerOptions = useMemo(
+    () => trainers
+      .filter((trainer) => trainer.employeeId)
+      .map((trainer) => ({
+        value: trainer._id,
+        label: `${trainer.name} (${trainer.employeeId})`,
+      })),
+    [trainers]
+  );
 
   const fetchRows = useCallback(async (signal) => {
     setLoading(true);
@@ -89,6 +102,24 @@ const CompOffsTab = () => {
     fetchRows(controller.signal);
     return () => controller.abort();
   }, [fetchRows]);
+
+  useEffect(() => {
+    if (!canManage) return undefined;
+    const controller = new AbortController();
+    getTrainers(
+      { fields: 'lite', limit: 200, sortBy: 'name', sortOrder: 'asc' },
+      { signal: controller.signal }
+    )
+      .then((data) => {
+        const list = Array.isArray(data) ? data : (data.trainers || data.rows || []);
+        setTrainers(list);
+      })
+      .catch((err) => {
+        if (isAbortError(err)) return;
+        showError(getErrorMessage(err));
+      });
+    return () => controller.abort();
+  }, [canManage]);
 
   const sortedRows = useMemo(() => {
     const copy = [...rows];
@@ -130,6 +161,16 @@ const CompOffsTab = () => {
 
   const sortIcon = (field) => (sortField === field ? (sortOrder === 'asc' ? ' ↑' : ' ↓') : '');
 
+  const applyTrainerSelection = (trainerId) => {
+    const trainer = trainers.find((row) => row._id === trainerId);
+    setForm((prev) => ({
+      ...prev,
+      trainerId: trainerId || '',
+      employeeId: trainer?.employeeId || '',
+      name: trainer?.name || '',
+    }));
+  };
+
   const openCreateModal = () => {
     setEditingRow(null);
     setForm(emptyForm());
@@ -137,8 +178,14 @@ const CompOffsTab = () => {
   };
 
   const openEditModal = (row) => {
+    const linkedTrainerId = row.trainer?._id || row.trainer || '';
+    const matchedTrainer = trainers.find(
+      (trainer) => trainer._id === linkedTrainerId
+        || trainer.employeeId === row.employeeId
+    );
     setEditingRow(row);
     setForm({
+      trainerId: matchedTrainer?._id || linkedTrainerId || '',
       employeeId: row.employeeId,
       name: row.name,
       base: row.base,
@@ -151,9 +198,32 @@ const CompOffsTab = () => {
     setShowFormModal(true);
   };
 
+  const handleStatusChange = (status) => {
+    setForm((prev) => ({
+      ...prev,
+      status,
+      availedOn: status === 'pending' ? '' : prev.availedOn,
+    }));
+  };
+
+  const handleAvailedOnChange = (availedOn) => {
+    setForm((prev) => ({
+      ...prev,
+      availedOn,
+      status: availedOn ? 'closed' : prev.status,
+    }));
+  };
+
   const handleSubmit = async () => {
     if (!form.employeeId.trim() || !form.name.trim() || !form.dateWorkedOn || !form.uniqueId.trim()) {
-      showError('Fill employee ID, name, date worked on, and unique ID.');
+      showError(editingRow
+        ? 'Fill date worked on and unique ID.'
+        : 'Select a trainer and fill date worked on and unique ID.');
+      return;
+    }
+
+    if (form.status === 'closed' && !form.availedOn) {
+      showError('Enter the date availed on when status is closed.');
       return;
     }
 
@@ -166,8 +236,8 @@ const CompOffsTab = () => {
         dateWorkedOn: form.dateWorkedOn,
         uniqueId: form.uniqueId.trim(),
         count: Number(form.count),
-        status: form.status,
-        availedOn: form.status === 'closed' && form.availedOn ? form.availedOn : null,
+        status: form.availedOn ? 'closed' : form.status,
+        availedOn: form.availedOn || null,
       };
 
       if (editingRow) {
@@ -438,6 +508,21 @@ const CompOffsTab = () => {
           onClose={() => !submitting && setShowFormModal(false)}
         >
           <div className="row g-3">
+            {!editingRow && (
+              <div className="col-12">
+                <label className="form-label" htmlFor="comp-off-form-trainer">Trainer</label>
+                <StyledSelect
+                  id="comp-off-form-trainer"
+                  value={form.trainerId}
+                  onChange={(e) => applyTrainerSelection(e.target.value)}
+                  placeholder="Select trainer..."
+                  options={[
+                    { value: '', label: 'Select trainer...' },
+                    ...trainerOptions,
+                  ]}
+                />
+              </div>
+            )}
             <div className="col-md-4">
               <label className="form-label" htmlFor="comp-off-form-emp">Emp ID</label>
               <input
@@ -445,7 +530,8 @@ const CompOffsTab = () => {
                 type="text"
                 className="form-control"
                 value={form.employeeId}
-                onChange={(e) => setForm((prev) => ({ ...prev, employeeId: e.target.value }))}
+                readOnly
+                disabled
               />
             </div>
             <div className="col-md-8">
@@ -455,7 +541,8 @@ const CompOffsTab = () => {
                 type="text"
                 className="form-control"
                 value={form.name}
-                onChange={(e) => setForm((prev) => ({ ...prev, name: e.target.value }))}
+                readOnly
+                disabled
               />
             </div>
             <div className="col-md-4">
@@ -505,7 +592,7 @@ const CompOffsTab = () => {
               <StyledSelect
                 id="comp-off-form-status"
                 value={form.status}
-                onChange={(e) => setForm((prev) => ({ ...prev, status: e.target.value }))}
+                onChange={(e) => handleStatusChange(e.target.value)}
                 options={[
                   { value: 'pending', label: 'Pending' },
                   { value: 'closed', label: 'Closed' },
@@ -519,9 +606,13 @@ const CompOffsTab = () => {
                 type="date"
                 className="form-control"
                 value={form.availedOn}
-                disabled={form.status !== 'closed'}
-                onChange={(e) => setForm((prev) => ({ ...prev, availedOn: e.target.value }))}
+                onChange={(e) => handleAvailedOnChange(e.target.value)}
               />
+              <div className="form-text">
+                {editingRow
+                  ? 'Set this when the comp-off was used. Status becomes Closed.'
+                  : 'Optional on create. Setting a date marks status Closed.'}
+              </div>
             </div>
           </div>
           <div className="d-flex justify-content-end gap-2 mt-4">

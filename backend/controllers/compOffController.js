@@ -222,7 +222,12 @@ export const updateCompOff = async (req, res) => {
   }
 
   if (availedOn !== undefined) {
-    doc.availedOn = availedOn ? normalizeDate(availedOn) : null;
+    if (availedOn) {
+      doc.availedOn = normalizeDate(availedOn);
+      doc.status = COMP_OFF_STATUSES.CLOSED;
+    } else {
+      doc.availedOn = null;
+    }
   }
 
   await doc.save();
