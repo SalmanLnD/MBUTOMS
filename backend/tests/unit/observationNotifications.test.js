@@ -43,4 +43,12 @@ describe('buildObservationClassDetail', () => {
     });
     assert.equal(detail, '2026-06-25 14:30');
   });
+
+  it('formats replacement class observations', () => {
+    const detail = buildObservationClassDetail({
+      department: 'Replacement class',
+      observationDate: '2026-07-24',
+    });
+    assert.equal(detail, '2026-07-24 · Replacement class');
+  });
 });

@@ -31,6 +31,11 @@ export const buildObservationClassDetail = ({
   observationDate = '',
   observationTime = '',
 } = {}) => {
+  if (department === 'Replacement class') {
+    const when = [observationDate, observationTime].filter(Boolean).join(' ');
+    return when ? `${when} · Replacement class` : 'Replacement class';
+  }
+
   const className = [department, section].filter(Boolean).join(' ');
   const time = [startTime, endTime].filter(Boolean).join('–');
   const slotPart = slot ? (time ? `${slot} ${time}` : slot) : time;

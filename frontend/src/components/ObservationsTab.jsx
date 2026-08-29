@@ -20,10 +20,12 @@ const OBSERVATION_SUB_TABS = [
 // Ratings in 0.5 steps: 0.5, 1, 1.5 … 5.
 const RATING_OPTIONS = Array.from({ length: 10 }, (_, i) => (i + 1) * 0.5);
 
+const usesReplacementClass = (row) => Boolean(row.allowReplacementClass);
+
 const emptyDraft = (row) => ({
   rating: row.rating == null ? '' : String(row.rating),
   comments: row.comments || '',
-  scheduleId: row.scheduleId || '',
+  scheduleId: usesReplacementClass(row) ? '' : (row.scheduleId || ''),
   observationDate: row.observationDate || '',
   observationTime: row.observationTime || '',
 });
@@ -94,7 +96,8 @@ const ObservationsTab = () => {
 
   const handleSave = async (row) => {
     const draft = drafts[row.trainerId] || emptyDraft(row);
-    if (isClass && !draft.scheduleId) {
+    const useReplacement = isClass && usesReplacementClass(row);
+    if (isClass && !useReplacement && !draft.scheduleId) {
       showError('Select the class and slot for this observation');
       return;
     }
@@ -110,7 +113,8 @@ const ObservationsTab = () => {
         type: observationType,
         rating: draft.rating === '' ? null : Number(draft.rating),
         comments: draft.comments,
-        scheduleId: isClass ? draft.scheduleId || null : null,
+        scheduleId: isClass && !useReplacement ? draft.scheduleId || null : null,
+        isReplacementClass: useReplacement,
         observationDate: draft.observationDate || '',
         observationTime: isDemo ? (draft.observationTime || '') : '',
       });
@@ -131,6 +135,7 @@ const ObservationsTab = () => {
             subjectCode: saved.subjectCode,
             observationDate: saved.observationDate || '',
             observationTime: saved.observationTime || '',
+            isReplacementClass: saved.isReplacementClass,
             classDetail: saved.classDetail,
           }
           : item
@@ -139,6 +144,7 @@ const ObservationsTab = () => {
         ...prev,
         [row.trainerId]: emptyDraft({
           ...saved,
+          allowReplacementClass: row.allowReplacementClass,
           scheduleOptions: row.scheduleOptions,
         }),
       }));
@@ -232,7 +238,8 @@ const ObservationsTab = () => {
                   const draft = drafts[row.trainerId] || emptyDraft(row);
                   const dirty = String(draft.rating) !== String(row.rating ?? '')
                     || String(draft.comments || '') !== String(row.comments || '')
-                    || String(draft.scheduleId || '') !== String(row.scheduleId || '')
+                    || (isClass && !usesReplacementClass(row)
+                      && String(draft.scheduleId || '') !== String(row.scheduleId || ''))
                     || String(draft.observationDate || '') !== String(row.observationDate || '')
                     || String(draft.observationTime || '') !== String(row.observationTime || '');
                   return (
@@ -241,18 +248,22 @@ const ObservationsTab = () => {
                       <td>{row.employeeId}</td>
                       {isClass && (
                         <td>
-                          <StyledSelect
-                            size="sm"
-                            className="toms-styled-select--table-cell"
-                            value={draft.scheduleId}
-                            onChange={(e) => updateDraft(row.trainerId, 'scheduleId', e.target.value)}
-                            aria-label={`Class and slot for ${row.name}`}
-                            placeholder="Select class / slot"
-                            options={(row.scheduleOptions || []).map((option) => ({
-                              value: option.scheduleId,
-                              label: option.label,
-                            }))}
-                          />
+                          {usesReplacementClass(row) ? (
+                            <span className="small fw-semibold text-muted">Replacement class</span>
+                          ) : (
+                            <StyledSelect
+                              size="sm"
+                              className="toms-styled-select--table-cell"
+                              value={draft.scheduleId}
+                              onChange={(e) => updateDraft(row.trainerId, 'scheduleId', e.target.value)}
+                              aria-label={`Class and slot for ${row.name}`}
+                              placeholder="Select class / slot"
+                              options={(row.scheduleOptions || []).map((option) => ({
+                                value: option.scheduleId,
+                                label: option.label,
+                              }))}
+                            />
+                          )}
                         </td>
                       )}
                       <td>

@@ -11,6 +11,11 @@ import {
   notifyTrainerOfObservationComments,
 } from '../utils/observationNotifications.js';
 import {
+  buildReplacementClassFields,
+  isReplacementClassObservation,
+  REPLACEMENT_CLASS_LABEL,
+} from '../utils/observationClass.js';
+import {
   buildTrainerFilterForEvaluator,
   evaluatorCanRateTrainer,
   getEvaluatorSubjectCodes,
@@ -49,6 +54,7 @@ const serializeClassFields = (observation = {}) => ({
   subjectCode: observation.subjectCode || '',
   observationDate: observation.observationDate || '',
   observationTime: observation.observationTime || '',
+  isReplacementClass: isReplacementClassObservation(observation),
   classDetail: buildObservationClassDetail(observation),
 });
 
@@ -163,6 +169,14 @@ const resolveClassFields = async ({ type, scheduleId, body }) => {
     };
   }
 
+  if (body.isReplacementClass) {
+    return {
+      ...buildReplacementClassFields(),
+      observationDate,
+      observationTime,
+    };
+  }
+
   if (scheduleId) {
     const schedule = await Schedule.findById(scheduleId)
       .select('_id day slot startTime endTime department section subjectCode')
@@ -266,6 +280,7 @@ export const getObservations = async (req, res) => {
         updatedAt: observation?.updatedAt || null,
         ...serializeClassFields(observation),
         scheduleOptions,
+        allowReplacementClass: scheduleOptions.length === 0,
       };
     }),
   });
@@ -320,6 +335,8 @@ export const upsertObservation = async (req, res) => {
     return res.status(400).json({ message: 'Select the class and slot for this class observation' });
   }
 
+  const isReplacementClass = classFields.department === REPLACEMENT_CLASS_LABEL;
+
   if ((rating != null || comments) && !classFields.observationDate) {
     return res.status(400).json({ message: 'Observation date is required' });
   }
@@ -342,7 +359,7 @@ export const upsertObservation = async (req, res) => {
     });
   }
 
-  if (rating == null && !comments && type === 'class' && !classFields.schedule) {
+  if (rating == null && !comments && type === 'class' && (!classFields.schedule || isReplacementClass)) {
     await TrainerObservation.deleteOne({ trainer: trainerId, monthKey, type });
     return res.json({
       trainerId: trainer._id,
