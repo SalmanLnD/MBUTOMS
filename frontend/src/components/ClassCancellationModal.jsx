@@ -27,6 +27,30 @@ const scheduleLabel = (schedule) => [
   schedule.trainerCode,
 ].filter(Boolean).join(' · ');
 
+const SEMESTER_ORDER = { I: 1, II: 2, III: 3, IV: 4, V: 5, VI: 6, VII: 7, VIII: 8 };
+const semesterSortKey = (sem) => SEMESTER_ORDER[String(sem || '').trim()] ?? 99;
+
+const buildDepartmentCodesBySchoolId = (departments = []) => {
+  const map = new Map();
+  departments.forEach((department) => {
+    const schoolId = department.school?._id || department.school;
+    if (!schoolId) return;
+    const key = String(schoolId);
+    if (!map.has(key)) map.set(key, new Set());
+    map.get(key).add(department.code);
+    if (department.code === 'CE-ME') {
+      map.get(key).add('CE & ME');
+    }
+    if (department.code === 'ECE' || department.code === 'EIE') {
+      map.get(key).add('ECE & EIE');
+    }
+    if (department.code === 'BCOM-CA') {
+      map.get(key).add('B.COM(CA)');
+    }
+  });
+  return map;
+};
+
 const cancellationScopeLabel = (entry) => {
   if (entry.scope === 'all') return 'All college classes';
   if (entry.scope === 'school') {
@@ -42,6 +66,9 @@ const ClassCancellationModal = ({ show, initialDate, onClose, onChanged }) => {
   const [selectedIds, setSelectedIds] = useState([]);
   const [reason, setReason] = useState('');
   const [search, setSearch] = useState('');
+  const [schoolFilter, setSchoolFilter] = useState('');
+  const [departmentFilter, setDepartmentFilter] = useState('');
+  const [semesterFilter, setSemesterFilter] = useState('');
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -53,6 +80,10 @@ const ClassCancellationModal = ({ show, initialDate, onClose, onChanged }) => {
       const result = await getClassCancellationOptions(selectedDate);
       setData(result);
       setSelectedIds([]);
+      setSchoolFilter('');
+      setDepartmentFilter('');
+      setSemesterFilter('');
+      setSearch('');
     } catch (error) {
       setData(null);
       showError(getErrorMessage(error));
@@ -68,6 +99,9 @@ const ClassCancellationModal = ({ show, initialDate, onClose, onChanged }) => {
     setSchoolId('');
     setReason('');
     setSearch('');
+    setSchoolFilter('');
+    setDepartmentFilter('');
+    setSemesterFilter('');
     loadOptions(initialDate);
   }, [show, initialDate, loadOptions]);
 
@@ -76,13 +110,58 @@ const ClassCancellationModal = ({ show, initialDate, onClose, onChanged }) => {
     [data]
   );
 
+  const departmentCodesBySchoolId = useMemo(
+    () => buildDepartmentCodesBySchoolId(data?.departments || []),
+    [data?.departments]
+  );
+
+  const classFilterOptions = useMemo(() => {
+    const schoolDeptCodes = schoolFilter
+      ? (departmentCodesBySchoolId.get(schoolFilter) || new Set())
+      : null;
+    const schoolScoped = schoolDeptCodes
+      ? availableSchedules.filter((schedule) => schoolDeptCodes.has(schedule.department))
+      : availableSchedules;
+    const departments = [...new Set(schoolScoped.map((schedule) => schedule.department).filter(Boolean))]
+      .sort((a, b) => a.localeCompare(b));
+    const semesters = [...new Set(
+      schoolScoped
+        .filter((schedule) => !departmentFilter || schedule.department === departmentFilter)
+        .map((schedule) => schedule.semester)
+        .filter(Boolean)
+    )].sort((a, b) => semesterSortKey(a) - semesterSortKey(b));
+    return { departments, semesters };
+  }, [availableSchedules, departmentFilter, departmentCodesBySchoolId, schoolFilter]);
+
   const visibleSchedules = useMemo(() => {
+    const schoolDeptCodes = schoolFilter
+      ? (departmentCodesBySchoolId.get(schoolFilter) || new Set())
+      : null;
+    let list = availableSchedules;
+    if (schoolDeptCodes) {
+      list = list.filter((schedule) => schoolDeptCodes.has(schedule.department));
+    }
+    if (departmentFilter) {
+      list = list.filter((schedule) => schedule.department === departmentFilter);
+    }
+    if (semesterFilter) {
+      list = list.filter((schedule) => schedule.semester === semesterFilter);
+    }
     const term = search.trim().toLowerCase();
-    if (!term) return availableSchedules;
-    return availableSchedules.filter((schedule) =>
+    if (!term) return list;
+    return list.filter((schedule) =>
       scheduleLabel(schedule).toLowerCase().includes(term)
     );
-  }, [availableSchedules, search]);
+  }, [availableSchedules, departmentFilter, departmentCodesBySchoolId, schoolFilter, semesterFilter, search]);
+
+  const hasClassFilters = Boolean(schoolFilter || departmentFilter || semesterFilter || search.trim());
+
+  const clearClassFilters = () => {
+    setSchoolFilter('');
+    setDepartmentFilter('');
+    setSemesterFilter('');
+    setSearch('');
+  };
 
   const toggleSchedule = (scheduleId) => {
     setSelectedIds((current) =>
@@ -217,9 +296,66 @@ const ClassCancellationModal = ({ show, initialDate, onClose, onChanged }) => {
                 <div className="mb-3">
                   <div className="d-flex flex-wrap justify-content-between align-items-end gap-2 mb-2">
                     <div className="flex-grow-1">
-                      <label htmlFor="class-cancellation-search" className="form-label fw-semibold">
+                      <label className="form-label fw-semibold">
                         Select classes ({selectedIds.length} selected)
                       </label>
+                      <div className="row g-2 mb-2">
+                        <div className="col-md-4">
+                          <StyledSelect
+                            size="sm"
+                            value={schoolFilter}
+                            onChange={(event) => {
+                              setSchoolFilter(event.target.value);
+                              setDepartmentFilter('');
+                              setSemesterFilter('');
+                            }}
+                            aria-label="Filter by school"
+                            placeholder="All schools"
+                            options={[
+                              { value: '', label: 'All schools' },
+                              ...(data?.schools || []).map((school) => ({
+                                value: school._id,
+                                label: `${school.name} (${school.code})`,
+                              })),
+                            ]}
+                          />
+                        </div>
+                        <div className="col-md-4">
+                          <StyledSelect
+                            size="sm"
+                            value={departmentFilter}
+                            onChange={(event) => {
+                              setDepartmentFilter(event.target.value);
+                              setSemesterFilter('');
+                            }}
+                            aria-label="Filter by department"
+                            placeholder="All departments"
+                            options={[
+                              { value: '', label: 'All departments' },
+                              ...classFilterOptions.departments.map((department) => ({
+                                value: department,
+                                label: department,
+                              })),
+                            ]}
+                          />
+                        </div>
+                        <div className="col-md-4">
+                          <StyledSelect
+                            size="sm"
+                            value={semesterFilter}
+                            onChange={(event) => setSemesterFilter(event.target.value)}
+                            aria-label="Filter by semester"
+                            placeholder="All semesters"
+                            options={[
+                              { value: '', label: 'All semesters' },
+                              ...classFilterOptions.semesters.map((semester) => ({
+                                value: semester,
+                                label: semester,
+                              })),
+                            ]}
+                          />
+                        </div>
+                      </div>
                       <input
                         id="class-cancellation-search"
                         type="search"
@@ -233,6 +369,11 @@ const ClassCancellationModal = ({ show, initialDate, onClose, onChanged }) => {
                       <button type="button" className="btn btn-outline-secondary btn-sm" onClick={selectVisible}>
                         Select visible
                       </button>
+                      {hasClassFilters && (
+                        <button type="button" className="btn btn-outline-secondary btn-sm" onClick={clearClassFilters}>
+                          Clear filters
+                        </button>
+                      )}
                       <button type="button" className="btn btn-outline-secondary btn-sm" onClick={() => setSelectedIds([])}>
                         Clear
                       </button>

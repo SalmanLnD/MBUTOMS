@@ -60,13 +60,18 @@ const populateCancellation = (query) =>
 
 export const getClassCancellationOptions = async (req, res) => {
   const date = parseDate(req.query.date);
-  const [schedules, canceledIds, cancellations, schools] = await Promise.all([
+  const [schedules, canceledIds, cancellations, schools, departments] = await Promise.all([
     getSchedulesForDate(date),
     getCanceledScheduleIdsForDate(date),
     populateCancellation(
       ClassCancellation.find({ date }).sort({ createdAt: -1 })
     ).lean(),
     School.find().sort({ code: 1 }).lean(),
+    Department.find()
+      .select('code name school')
+      .populate('school', 'name code')
+      .sort({ code: 1 })
+      .lean(),
   ]);
 
   res.json({
@@ -77,6 +82,7 @@ export const getClassCancellationOptions = async (req, res) => {
       isCanceled: canceledIds.has(schedule._id.toString()),
     })),
     schools,
+    departments,
     cancellations,
   });
 };
