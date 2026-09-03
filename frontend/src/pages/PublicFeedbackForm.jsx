@@ -120,6 +120,8 @@ const PublicFeedbackForm = () => {
             value={answers[field.id]}
             onChange={(value) => handleChange(field.id, value)}
             trainers={form.trainers || []}
+            classes={form.classes || []}
+            semesters={form.semesters}
           />
         ))}
 

@@ -10,6 +10,7 @@ import {
   publishFeedbackForm,
 } from '../services/feedbackService.js';
 import { getTrainers } from '../services/trainerService.js';
+import { getClasses } from '../services/classService.js';
 import { showError, showSuccess } from '../utils/toast.js';
 import { getErrorMessage } from '../utils/helpers.js';
 import '../styles/feedback-forms.css';
@@ -20,6 +21,8 @@ const FIELD_TYPES = [
   { value: 'rating', label: 'Rating (1-5)' },
   { value: 'multiple_choice', label: 'Multiple choice' },
   { value: 'trainer_select', label: 'Trainer' },
+  { value: 'class_select', label: 'Class' },
+  { value: 'semester_select', label: 'Semester' },
 ];
 
 const FeedbackFormTab = () => {
@@ -31,6 +34,7 @@ const FeedbackFormTab = () => {
   const [previewMode, setPreviewMode] = useState(false);
   const [shareUrl, setShareUrl] = useState('');
   const [trainers, setTrainers] = useState([]);
+  const [classes, setClasses] = useState([]);
 
   const loadForm = useCallback(async () => {
     setLoading(true);
@@ -53,15 +57,20 @@ const FeedbackFormTab = () => {
   }, [loadForm]);
 
   useEffect(() => {
-    const loadTrainers = async () => {
+    const loadLookups = async () => {
       try {
-        const data = await getTrainers({ limit: 200, sortBy: 'name', sortOrder: 'asc' });
-        setTrainers(data.trainers || data);
+        const [trainerData, classData] = await Promise.all([
+          getTrainers({ limit: 200, sortBy: 'name', sortOrder: 'asc' }),
+          getClasses({ status: 'active' }),
+        ]);
+        setTrainers(trainerData.trainers || trainerData);
+        setClasses(Array.isArray(classData) ? classData : classData.classes || []);
       } catch {
         setTrainers([]);
+        setClasses([]);
       }
     };
-    loadTrainers();
+    loadLookups();
   }, []);
 
   const handleCreate = async () => {
@@ -249,6 +258,7 @@ const FeedbackFormTab = () => {
               onChange={() => {}}
               preview
               trainers={trainers}
+              classes={classes}
             />
           ) : (
             <div key={field.id} className="feedback-question-card">
@@ -284,7 +294,7 @@ const FeedbackFormTab = () => {
                       placeholder="One option per line"
                     />
                   )}
-                  <FeedbackFieldPreview field={field} value="" onChange={() => {}} preview trainers={trainers} />
+                  <FeedbackFieldPreview field={field} value="" onChange={() => {}} preview trainers={trainers} classes={classes} />
                 </div>
                 <div className="col-md-4 text-md-end">
                   <div className="form-check form-check-inline">

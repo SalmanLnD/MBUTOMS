@@ -1,10 +1,13 @@
 import mongoose from 'mongoose';
+import ClassGroup from '../models/ClassGroup.js';
 import FeedbackForm from '../models/FeedbackForm.js';
 import FeedbackResponse from '../models/FeedbackResponse.js';
 import Trainer from '../models/Trainer.js';
 import {
   currentMonthKey,
   DEFAULT_FEEDBACK_FIELDS,
+  FEEDBACK_SEMESTER_OPTIONS,
+  formatFeedbackClassLabel,
   generatePublicSlug,
   mergeDefaultFeedbackFields,
 } from '../utils/feedbackDefaults.js';
@@ -167,18 +170,21 @@ export const getFeedbackForms = async (req, res) => {
   res.json(forms);
 };
 
+const maybeMergeDefaultFields = async (form) => {
+  if (!form) return form;
+  const mergedFields = mergeDefaultFeedbackFields(form.fields);
+  const fieldsChanged = JSON.stringify(mergedFields) !== JSON.stringify(form.fields);
+  if (fieldsChanged) {
+    form.fields = mergedFields;
+    await form.save();
+  }
+  return form;
+};
+
 export const getCurrentMonthForm = async (req, res) => {
   const monthKey = currentMonthKey();
   let form = await FeedbackForm.findOne({ monthKey });
-
-  if (form && form.status === 'draft') {
-    const mergedFields = mergeDefaultFeedbackFields(form.fields);
-    const fieldsChanged = JSON.stringify(mergedFields) !== JSON.stringify(form.fields);
-    if (fieldsChanged) {
-      form.fields = mergedFields;
-      await form.save();
-    }
-  }
+  form = await maybeMergeDefaultFields(form);
 
   res.json({
     monthKey,
@@ -273,11 +279,27 @@ export const getPublicFeedbackForm = async (req, res) => {
     return res.status(404).json({ message: 'Feedback form not found or not published' });
   }
 
+  await maybeMergeDefaultFields(form);
+
   const trainerRosterFilter = await mergeRosterFilter({ status: 'active' }, { rosterOnly: true });
-  const trainers = await Trainer.find(trainerRosterFilter)
-    .select('name employeeId')
-    .sort({ name: 1 })
-    .lean();
+  const [trainers, classGroups] = await Promise.all([
+    Trainer.find(trainerRosterFilter)
+      .select('name employeeId')
+      .sort({ name: 1 })
+      .lean(),
+    ClassGroup.find({ status: 'active' })
+      .select('department section currentSemester py')
+      .sort({ department: 1, section: 1, currentSemester: 1 })
+      .lean(),
+  ]);
+
+  const classes = classGroups.map((cls) => ({
+    _id: cls._id,
+    department: cls.department,
+    section: cls.section,
+    currentSemester: cls.currentSemester,
+    label: formatFeedbackClassLabel(cls, classGroups),
+  }));
 
   res.json({
     title: form.title,
@@ -286,6 +308,8 @@ export const getPublicFeedbackForm = async (req, res) => {
     monthLabel: formatMonthLabel(form.monthKey),
     fields: form.fields.sort((a, b) => a.order - b.order),
     trainers,
+    classes,
+    semesters: FEEDBACK_SEMESTER_OPTIONS,
   });
 };
 

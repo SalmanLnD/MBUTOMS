@@ -5,7 +5,15 @@ const fieldSchema = new mongoose.Schema(
     id: { type: String, required: true },
     type: {
       type: String,
-      enum: ['short_text', 'paragraph', 'rating', 'multiple_choice', 'trainer_select'],
+      enum: [
+        'short_text',
+        'paragraph',
+        'rating',
+        'multiple_choice',
+        'trainer_select',
+        'class_select',
+        'semester_select',
+      ],
       required: true,
     },
     label: { type: String, required: true, trim: true },

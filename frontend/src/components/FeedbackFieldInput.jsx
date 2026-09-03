@@ -1,5 +1,7 @@
 import StyledSelect from './StyledSelect.jsx';
 
+export const FEEDBACK_SEMESTER_OPTIONS = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII'];
+
 const RatingInput = ({ value, onChange, disabled = false }) => (
   <div className="feedback-rating-row">
     {[1, 2, 3, 4, 5].map((score) => (
@@ -17,7 +19,15 @@ const RatingInput = ({ value, onChange, disabled = false }) => (
   </div>
 );
 
-const FeedbackFieldInput = ({ field, value, onChange, disabled = false, trainers = [] }) => {
+const FeedbackFieldInput = ({
+  field,
+  value,
+  onChange,
+  disabled = false,
+  trainers = [],
+  classes = [],
+  semesters = FEEDBACK_SEMESTER_OPTIONS,
+}) => {
   if (field.type === 'paragraph') {
     return (
       <textarea
@@ -50,6 +60,46 @@ const FeedbackFieldInput = ({ field, value, onChange, disabled = false, trainers
         required={field.required}
         placeholder="Select trainer"
         options={trainerOptions}
+        aria-label={field.label}
+      />
+    );
+  }
+
+  if (field.type === 'class_select') {
+    const classOptions = classes.map((cls) => ({
+      value: cls.label || `${cls.department || ''} ${cls.section || ''}`.trim(),
+      label: cls.label || `${cls.department || ''} ${cls.section || ''}`.trim(),
+    })).filter((option) => option.value);
+
+    return (
+      <StyledSelect
+        name={field.id}
+        value={value || ''}
+        onChange={(e) => onChange(e.target.value)}
+        disabled={disabled}
+        required={field.required}
+        placeholder="Select class"
+        options={classOptions}
+        aria-label={field.label}
+      />
+    );
+  }
+
+  if (field.type === 'semester_select') {
+    const semesterOptions = (semesters.length ? semesters : FEEDBACK_SEMESTER_OPTIONS).map((semester) => ({
+      value: semester,
+      label: semester,
+    }));
+
+    return (
+      <StyledSelect
+        name={field.id}
+        value={value || ''}
+        onChange={(e) => onChange(e.target.value)}
+        disabled={disabled}
+        required={field.required}
+        placeholder="Select semester"
+        options={semesterOptions}
         aria-label={field.label}
       />
     );
@@ -89,7 +139,15 @@ const FeedbackFieldInput = ({ field, value, onChange, disabled = false, trainers
   );
 };
 
-export const FeedbackFieldPreview = ({ field, value, onChange, preview = false, trainers = [] }) => (
+export const FeedbackFieldPreview = ({
+  field,
+  value,
+  onChange,
+  preview = false,
+  trainers = [],
+  classes = [],
+  semesters = FEEDBACK_SEMESTER_OPTIONS,
+}) => (
   <div className={`feedback-question-card ${preview ? '' : 'is-focused'}`}>
     <label className="d-block">
       {field.label}
@@ -101,6 +159,8 @@ export const FeedbackFieldPreview = ({ field, value, onChange, preview = false, 
       onChange={onChange}
       disabled={preview}
       trainers={trainers}
+      classes={classes}
+      semesters={semesters}
     />
   </div>
 );
