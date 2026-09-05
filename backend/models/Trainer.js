@@ -31,7 +31,7 @@ const trainerSchema = new mongoose.Schema(
     showInRoster: { type: Boolean, default: true },
     employmentStatus: {
       type: String,
-      enum: ['active', 'resigned'],
+      enum: ['active', 'resigned', 'relocated'],
       default: 'active',
     },
     resignationDate: { type: Date, default: null },

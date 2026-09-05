@@ -88,9 +88,9 @@ const TrainerDetailsPanel = ({ trainerId, canEdit = false }) => {
         </div>
       )}
 
-      {trainer.employmentStatus === 'resigned' && (
+      {(trainer.employmentStatus === 'resigned' || trainer.employmentStatus === 'relocated') && (
         <div className="alert alert-warning mb-3">
-          Resigned
+          {trainer.employmentStatus === 'relocated' ? 'Relocated' : 'Resigned'}
           {trainer.resignationDate ? ` — last working day ${formatDate(trainer.resignationDate)}` : ''}
           {trainer.successorTrainer?.name
             ? `. Replaced by ${trainer.successorTrainer.name} (${trainer.successorTrainer.employeeId}).`
@@ -98,7 +98,7 @@ const TrainerDetailsPanel = ({ trainerId, canEdit = false }) => {
         </div>
       )}
 
-      {canEdit && trainer.employmentStatus === 'resigned' && (
+      {canEdit && (trainer.employmentStatus === 'resigned' || trainer.employmentStatus === 'relocated') && (
         <div className="mb-3 d-flex justify-content-end">
           <button type="button" className="btn btn-outline-secondary btn-sm" onClick={() => setShowEditModal(true)}>
             Edit Profile

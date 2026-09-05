@@ -30,7 +30,12 @@ import {
   resolveMockPrepHoursForOif,
 } from '../utils/attendanceOifRules.js';
 import { mergeRosterFilter } from '../utils/rosterFilter.js';
-import { mergeAttendanceUiTrainerFilter, shouldAutoMarkTrainerExit, isBeforeTrainerJoiningDate } from '../utils/trainerEmployment.js';
+import {
+  mergeAttendanceUiTrainerFilter,
+  shouldAutoMarkTrainerRelocated,
+  shouldAutoMarkTrainerExit,
+  isBeforeTrainerJoiningDate,
+} from '../utils/trainerEmployment.js';
 import { getLeaveOverlapFilter, isDateWithinLeave } from '../utils/leaveDateRange.js';
 import {
   getLeaveWeekdayScheduleIds,
@@ -262,6 +267,25 @@ export const buildTrainerAttendanceGridPayload = async ({
           today,
           logId: log?._id || null,
         });
+        return;
+      }
+      if (shouldAutoMarkTrainerRelocated(trainer, date)) {
+        days[dateKey] = {
+          id: log?._id || null,
+          attendanceType: TRAINER_ATTENDANCE_TYPES.RELOCATED,
+          oifNumber: '',
+          oifDisplay: formatTrainerAttendanceOifDisplay(TRAINER_ATTENDANCE_TYPES.RELOCATED, ''),
+          foodAllowance: log?.foodAllowance || '',
+          mockPrepHours: 0,
+          classHandlingHours: 0,
+          isOnLeave: true,
+          isDefaultWeekOff: false,
+          isSundayWeekOff: false,
+          classHoursEditable: false,
+          isReplacementRequired: false,
+          isFuture: date > today,
+          isAutoExit: true,
+        };
         return;
       }
       if (shouldAutoMarkTrainerExit(trainer, date)) {

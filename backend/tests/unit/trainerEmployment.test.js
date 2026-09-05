@@ -1,6 +1,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { isBeforeTrainerJoiningDate } from '../../utils/trainerEmployment.js';
+import {
+  isBeforeTrainerJoiningDate,
+  shouldAutoMarkTrainerRelocated,
+  shouldAutoMarkTrainerExit,
+  isTrainerVisibleInUi,
+} from '../../utils/trainerEmployment.js';
 
 test('isBeforeTrainerJoiningDate is true for days before joining date', () => {
   const trainer = { joiningDate: new Date('2026-08-11T00:00:00.000Z') };
@@ -11,4 +16,18 @@ test('isBeforeTrainerJoiningDate is true for days before joining date', () => {
 
 test('isBeforeTrainerJoiningDate returns false when joining date is missing', () => {
   assert.equal(isBeforeTrainerJoiningDate({}, new Date('2026-08-01T00:00:00.000Z')), false);
+});
+
+test('relocated trainer is marked relocated until last working date and hidden after that month', () => {
+  const trainer = {
+    employmentStatus: 'relocated',
+    resignationDate: new Date('2026-08-20T00:00:00.000Z'),
+    includeInAttendanceUntilMonth: '2026-08',
+  };
+
+  assert.equal(shouldAutoMarkTrainerRelocated(trainer, new Date('2026-08-15T12:00:00.000Z')), true);
+  assert.equal(shouldAutoMarkTrainerRelocated(trainer, new Date('2026-08-20T12:00:00.000Z')), true);
+  assert.equal(shouldAutoMarkTrainerRelocated(trainer, new Date('2026-08-21T12:00:00.000Z')), false);
+  assert.equal(shouldAutoMarkTrainerExit(trainer, new Date('2026-08-21T12:00:00.000Z')), true);
+  assert.equal(isTrainerVisibleInUi(trainer, new Date('2026-09-01T00:00:00.000Z')), false);
 });

@@ -19,8 +19,8 @@ const loadTrainerPair = async (sourceId, successorId) => {
   if (!successorTrainer) {
     throw Object.assign(new Error('Successor trainer not found'), { statusCode: 404 });
   }
-  if (sourceTrainer.employmentStatus === 'resigned') {
-    throw Object.assign(new Error('This trainer has already resigned'), { statusCode: 409 });
+  if (['resigned', 'relocated'].includes(sourceTrainer.employmentStatus)) {
+    throw Object.assign(new Error('This trainer has already resigned or relocated'), { statusCode: 409 });
   }
   if (await trainerHasOwnedSlots(successorTrainer)) {
     throw Object.assign(
@@ -85,11 +85,12 @@ const finalizeExitTransfer = async ({
 
   if (!successorTrainerId) {
     const exitDate = normalizeAttendanceDate(resignationDate);
+    const finalEmploymentStatus = mode === 'relocate' ? 'relocated' : 'resigned';
     await Trainer.updateOne(
       { _id: sourceTrainer._id },
       {
         $set: {
-          employmentStatus: 'resigned',
+          employmentStatus: finalEmploymentStatus,
           resignationDate: exitDate,
           includeInAttendanceUntilMonth: exitDate
             ? `${exitDate.getUTCFullYear()}-${String(exitDate.getUTCMonth() + 1).padStart(2, '0')}`
@@ -119,7 +120,7 @@ const finalizeExitTransfer = async ({
   const result = await transferTrainerRole({
     sourceTrainer,
     successorTrainer,
-    mode: 'resignation',
+    mode: mode === 'relocate' ? 'relocation' : 'resignation',
     resignationDate: normalizeAttendanceDate(resignationDate),
   });
 

@@ -50,7 +50,7 @@ export const listReplacementCandidates = async ({
 }) => {
   const trainers = await Trainer.find({
     _id: { $ne: excludeId },
-    employmentStatus: { $ne: 'resigned' },
+    employmentStatus: { $nin: ['resigned', 'relocated'] },
   })
     .select('name employeeId scheduleTrainerCodes employmentStatus status')
     .sort({ name: 1 })

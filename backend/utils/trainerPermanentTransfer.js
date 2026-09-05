@@ -26,8 +26,8 @@ export async function transferTrainerRole({
   if (String(sourceTrainer._id) === String(successorTrainer._id)) {
     throw Object.assign(new Error('Successor must be a different trainer'), { statusCode: 400 });
   }
-  if (successorTrainer.employmentStatus === 'resigned') {
-    throw Object.assign(new Error('Cannot transfer role to a resigned trainer'), { statusCode: 400 });
+  if (['resigned', 'relocated'].includes(successorTrainer.employmentStatus)) {
+    throw Object.assign(new Error('Cannot transfer role to a resigned or relocated trainer'), { statusCode: 400 });
   }
 
   const sourceCodes = collectSourceScheduleCodes(sourceTrainer);
@@ -105,10 +105,10 @@ export async function transferTrainerRole({
     roleTransferEffectiveDate: normalizedEffective,
   };
 
-  if (mode === 'resignation') {
+  if (mode === 'resignation' || mode === 'relocation') {
     const exitDate = normalizeAttendanceDate(resignationDate || new Date());
     Object.assign(sourceSet, {
-      employmentStatus: 'resigned',
+      employmentStatus: mode === 'relocation' ? 'relocated' : 'resigned',
       resignationDate: exitDate,
       includeInAttendanceUntilMonth: resignationMonthKeyFromDate(exitDate),
       status: 'unavailable',

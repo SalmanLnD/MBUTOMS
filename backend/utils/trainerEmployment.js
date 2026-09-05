@@ -9,7 +9,7 @@ export const formatEmploymentMonthKey = (date) => {
 export const getCurrentEmploymentMonthKey = () => formatEmploymentMonthKey(new Date());
 
 export const isTrainerVisibleInUi = (trainer, referenceDate = new Date()) => {
-  if (trainer?.employmentStatus !== 'resigned') return true;
+  if (!['resigned', 'relocated'].includes(trainer?.employmentStatus)) return true;
   if (!trainer?.includeInAttendanceUntilMonth) return false;
   return trainer.includeInAttendanceUntilMonth >= formatEmploymentMonthKey(referenceDate);
 };
@@ -18,7 +18,7 @@ export const buildUiTrainerEmploymentFilter = (referenceDate = new Date()) => {
   const currentMonth = formatEmploymentMonthKey(referenceDate);
   return {
     $or: [
-      { employmentStatus: { $ne: 'resigned' } },
+      { employmentStatus: { $nin: ['resigned', 'relocated'] } },
       { includeInAttendanceUntilMonth: { $gte: currentMonth } },
     ],
   };
@@ -40,10 +40,10 @@ export const mergeAttendanceExportTrainerFilter = async (baseFilter = {}) => {
     $or: [
       {
         showInRoster: { $ne: false },
-        employmentStatus: { $ne: 'resigned' },
+        employmentStatus: { $nin: ['resigned', 'relocated'] },
         ...(hiddenTrainerIds.length ? { _id: { $nin: hiddenTrainerIds } } : {}),
       },
-      { employmentStatus: 'resigned' },
+      { employmentStatus: { $in: ['resigned', 'relocated'] } },
     ],
   };
 
@@ -51,11 +51,21 @@ export const mergeAttendanceExportTrainerFilter = async (baseFilter = {}) => {
   return { $and: [baseFilter, exportClause] };
 };
 
+export const shouldAutoMarkTrainerRelocated = (trainer, date) => {
+  if (trainer?.employmentStatus !== 'relocated' || !trainer?.resignationDate) return false;
+  const lastWorkingDate = normalizeAttendanceDate(trainer.resignationDate);
+  const day = normalizeAttendanceDate(date);
+  return day <= lastWorkingDate;
+};
+
 export const shouldAutoMarkTrainerExit = (trainer, date) => {
-  if (trainer?.employmentStatus !== 'resigned' || !trainer?.resignationDate) return false;
+  if (!trainer?.resignationDate) return false;
   const resignDate = normalizeAttendanceDate(trainer.resignationDate);
   const day = normalizeAttendanceDate(date);
-  return day >= resignDate;
+
+  if (trainer?.employmentStatus === 'resigned') return day >= resignDate;
+  if (trainer?.employmentStatus === 'relocated') return day > resignDate;
+  return false;
 };
 
 /** Days before a trainer's joining date should not inherit timetable class hours. */
