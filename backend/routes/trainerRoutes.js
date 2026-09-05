@@ -11,6 +11,7 @@ import {
 } from '../controllers/trainerController.js';
 import {
   resignTrainer,
+  relocateTrainer,
   permanentReplaceTrainer,
   getReplacementCandidates,
 } from '../controllers/trainerTransferController.js';
@@ -20,7 +21,7 @@ import { asyncHandler } from '../middleware/asyncHandler.js';
 import { trainerValidation } from '../utils/validators.js';
 
 const resignValidation = [
-  body('successorTrainerId').notEmpty().withMessage('Permanent replacement trainer is required'),
+  body('successorTrainerId').optional({ nullable: true, values: 'falsy' }),
   body('resignationDate').isISO8601().withMessage('Resignation date is required'),
 ];
 
@@ -62,6 +63,14 @@ router.post(
   resignValidation,
   validate,
   asyncHandler(resignTrainer)
+);
+
+router.post(
+  '/:id/relocate',
+  authorize('admin', 'campus_manager'),
+  resignValidation,
+  validate,
+  asyncHandler(relocateTrainer)
 );
 
 router.post(

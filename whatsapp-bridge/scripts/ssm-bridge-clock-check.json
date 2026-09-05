@@ -1,0 +1,11 @@
+{
+  "commands": [
+    "date -u",
+    "date",
+    "sudo -u ubuntu bash -lc 'pm2 describe mbutoms-whatsapp-bridge' | tr -cd '\\11\\12\\15\\40-\\176' | sed -n '1,40p'",
+    "ls -la /home/ubuntu/.pm2/logs/ | tr -cd '\\11\\12\\15\\40-\\176'",
+    "wc -l /home/ubuntu/.pm2/logs/mbutoms-whatsapp-bridge-out.log /home/ubuntu/.pm2/logs/mbutoms-whatsapp-bridge-error.log",
+    "tail -n 30 /home/ubuntu/.pm2/logs/mbutoms-whatsapp-bridge-error.log | tr -cd '\\11\\12\\15\\40-\\176'",
+    "python3 - <<'PY'\nfrom pathlib import Path\nimport os\np=Path('/home/ubuntu/.pm2/logs/mbutoms-whatsapp-bridge-out.log')\nprint('mtime', p.stat().st_mtime if p.exists() else None)\nprint('size', p.stat().st_size if p.exists() else None)\nprint('now', __import__('time').time())\nPY"
+  ]
+}

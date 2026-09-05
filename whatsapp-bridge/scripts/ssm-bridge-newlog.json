@@ -1,0 +1,5 @@
+{
+  "commands": [
+    "python3 - <<'PY'\nfrom pathlib import Path\np=Path('/home/ubuntu/.pm2/logs/mbutoms-whatsapp-bridge-out-0.log')\nlines=p.read_text(errors='ignore').splitlines() if p.exists() else []\nprint('total='+str(len(lines)))\nprint('size='+str(p.stat().st_size if p.exists() else 0))\nkeys=('Bridge is ready','Listening to group','Control server','Catch-up','Queued-sync','Manual-sync','Forwarding','Recorded','Failed to forward','QR code','authenticated','Disconnected','Scheduling reconnect','Ready timeout','Store probe')\nmatched=[ln for ln in lines if any(k in ln for k in keys)]\nprint('matched='+str(len(matched)))\nfor ln in matched[-50:]:\n print(ln.encode('ascii','ignore').decode())\nprint('--- last 20 ---')\nfor ln in lines[-20:]:\n print(ln.encode('ascii','ignore').decode())\nPY"
+  ]
+}

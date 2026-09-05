@@ -40,6 +40,11 @@ export const resignTrainer = async (id, payload) => {
   return data;
 };
 
+export const relocateTrainer = async (id, payload) => {
+  const { data } = await api.post(`/trainers/${id}/relocate`, payload);
+  return data;
+};
+
 export const permanentReplaceTrainer = async (id, payload) => {
   const { data } = await api.post(`/trainers/${id}/permanent-replacement`, payload);
   return data;

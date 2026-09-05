@@ -5,12 +5,14 @@ import AlertMessage from './AlertMessage.jsx';
 import {
   getReplacementCandidates,
   resignTrainer,
+  relocateTrainer,
   permanentReplaceTrainer,
 } from '../services/trainerService.js';
 import { getErrorMessage, toInputDate } from '../utils/helpers.js';
 
 const TrainerRoleTransferModal = ({ trainer, mode, onClose, onComplete }) => {
   const isResignation = mode === 'resign';
+  const isRelocation = mode === 'relocate';
   const [successorTrainerId, setSuccessorTrainerId] = useState('');
   const [resignationDate, setResignationDate] = useState(toInputDate(new Date()));
   const [effectiveDate, setEffectiveDate] = useState(toInputDate(new Date()));
@@ -47,19 +49,22 @@ const TrainerRoleTransferModal = ({ trainer, mode, onClose, onComplete }) => {
     return () => { cancelled = true; };
   }, [trainer._id]);
 
-  const title = isResignation ? 'Trainer Resignation / Exit' : 'Permanent Replacement';
-  const submitLabel = isResignation ? 'Confirm Resignation' : 'Confirm Transfer';
+  const title = isResignation ? 'Trainer Resignation / Exit' : isRelocation ? 'Trainer Relocation' : 'Permanent Replacement';
+  const submitLabel = isResignation ? 'Confirm Resignation' : isRelocation ? 'Confirm Relocation' : 'Confirm Transfer';
 
   const helperText = useMemo(() => {
     if (isResignation) {
-      return 'Only trainers with no timetable slots are listed. Schedules, subjects, and CAMU credentials move to the replacement immediately. Attendance marks Exit from the resignation date through the month end in UI and Google Sheets; after that month the trainer is hidden in UI but Sheets keeps marking Exit.';
+      return 'Permanent replacement is required only when the trainer still has timetable classes. If no classes remain, the exit can proceed without a replacement trainer.';
+    }
+    if (isRelocation) {
+      return 'Permanent replacement is optional when the trainer has no assigned classes. If classes remain, a replacement trainer is required before relocation is saved.';
     }
     return 'Only trainers with no timetable slots are listed. The current trainer stays active in the system with no slots after transfer. Schedules, subjects, and CAMU credentials move to the replacement from the selected date.';
-  }, [isResignation]);
+  }, [isResignation, isRelocation]);
 
   const handleSubmit = async (event) => {
     event.preventDefault();
-    if (!successorTrainerId) {
+    if (!isResignation && !isRelocation && !successorTrainerId) {
       setError('Select a replacement trainer.');
       return;
     }
@@ -67,9 +72,9 @@ const TrainerRoleTransferModal = ({ trainer, mode, onClose, onComplete }) => {
     setSubmitting(true);
     setError('');
     try {
-      const payload = isResignation
+      const payload = isResignation || isRelocation
         ? {
-          successorTrainerId,
+          successorTrainerId: successorTrainerId || '',
           resignationDate: new Date(`${resignationDate}T12:00:00`).toISOString(),
         }
         : {
@@ -79,7 +84,9 @@ const TrainerRoleTransferModal = ({ trainer, mode, onClose, onComplete }) => {
 
       const result = isResignation
         ? await resignTrainer(trainer._id, payload)
-        : await permanentReplaceTrainer(trainer._id, payload);
+        : isRelocation
+          ? await relocateTrainer(trainer._id, payload)
+          : await permanentReplaceTrainer(trainer._id, payload);
 
       onComplete(result);
     } catch (err) {
@@ -129,23 +136,42 @@ const TrainerRoleTransferModal = ({ trainer, mode, onClose, onComplete }) => {
             />
           </div>
 
-          <div className="mb-3">
-            <label className="form-label fw-semibold" htmlFor="successor-trainer">
-              {isResignation ? 'Permanent replacement' : 'Replacement trainer'}
-              <span className="text-danger"> *</span>
-            </label>
-            <StyledSelect
-              id="successor-trainer"
-              value={successorTrainerId}
-              onChange={(event) => setSuccessorTrainerId(event.target.value)}
-              options={successorOptions}
-              placeholder={loadingOptions ? 'Loading trainers…' : 'Select replacement trainer'}
-              disabled={loadingOptions || submitting}
-              required
-            />
-          </div>
+          {!isResignation && !isRelocation && (
+            <div className="mb-3">
+              <label className="form-label fw-semibold" htmlFor="successor-trainer">
+                Replacement trainer
+                <span className="text-danger"> *</span>
+              </label>
+              <StyledSelect
+                id="successor-trainer"
+                value={successorTrainerId}
+                onChange={(event) => setSuccessorTrainerId(event.target.value)}
+                options={successorOptions}
+                placeholder={loadingOptions ? 'Loading trainers…' : 'Select replacement trainer'}
+                disabled={loadingOptions || submitting}
+                required
+              />
+            </div>
+          )}
 
-          {isResignation ? (
+          {(isResignation || isRelocation) && (
+            <div className="mb-3">
+              <label className="form-label fw-semibold" htmlFor="successor-trainer">
+                Permanent replacement
+                <span className="text-muted small ms-1">(optional if no timetable classes remain)</span>
+              </label>
+              <StyledSelect
+                id="successor-trainer"
+                value={successorTrainerId}
+                onChange={(event) => setSuccessorTrainerId(event.target.value)}
+                options={successorOptions}
+                placeholder={loadingOptions ? 'Loading trainers…' : 'Select replacement trainer if needed'}
+                disabled={loadingOptions || submitting}
+              />
+            </div>
+          )}
+
+          {isResignation || isRelocation ? (
             <div className="mb-0">
               <label className="form-label fw-semibold" htmlFor="resignation-date">
                 Resignation / last working date

@@ -1,0 +1,7 @@
+{
+  "commands": [
+    "grep -n 'pollQueuedSyncJobs\\|Queued-sync\\|Control server listening' /opt/MBUTOMS/whatsapp-bridge/index.js | head -10 | tr -cd '\\11\\12\\15\\40-\\176'",
+    "sleep 60",
+    "python3 - <<'PY'\nfrom pathlib import Path\np=Path('/home/ubuntu/.pm2/logs/mbutoms-whatsapp-bridge-out.log')\nlines=p.read_text(errors='ignore').splitlines() if p.exists() else []\nprint('total='+str(len(lines)))\nfor ln in lines[-60:]:\n print(ln.encode('ascii','ignore').decode())\nPY"
+  ]
+}

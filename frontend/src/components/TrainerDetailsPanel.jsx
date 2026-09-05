@@ -79,6 +79,9 @@ const TrainerDetailsPanel = ({ trainerId, canEdit = false }) => {
           <button type="button" className="btn btn-outline-primary btn-sm" onClick={() => setTransferMode('replacement')}>
             Permanent Replacement
           </button>
+          <button type="button" className="btn btn-outline-warning btn-sm" onClick={() => setTransferMode('relocate')}>
+            Relocated
+          </button>
           <button type="button" className="btn btn-outline-danger btn-sm" onClick={() => setTransferMode('resign')}>
             Resignation / Exit
           </button>
