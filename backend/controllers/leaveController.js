@@ -15,7 +15,10 @@ import {
   buildAffectedClassOccurrences,
   getEffectiveAffectedSchedules,
   getLeaveClassExclusionsForRange,
+  getUncancelledScheduleDateKeys,
 } from '../utils/leaveAffectedClasses.js';
+import { getLeaveDateKeysForWeekday, toLeaveDateKey } from '../utils/leaveDateRange.js';
+import { splitLeaveRangeForPartialCancel } from '../utils/leaveRangeSplit.js';
 
 const WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
@@ -286,6 +289,214 @@ export const deleteLeave = async (req, res) => {
       ? 'Leave cancelled and replacement assignments revoked'
       : 'Leave cancelled',
     leave: updated,
+  });
+};
+
+export const partialCancelLeave = async (req, res) => {
+  const leave = await Leave.findById(req.params.id)
+    .populate('trainer', 'name employeeId')
+    .populate('affectedSchedules')
+    .populate({
+      path: 'replacements.schedule',
+      select: 'department section startTime endTime day',
+    })
+    .populate({
+      path: 'replacements.replacementTrainer',
+      select: 'name employeeId',
+    });
+
+  if (!leave) return res.status(404).json({ message: 'Leave not found' });
+  if (['rejected', 'cancelled'].includes(leave.status)) {
+    return res.status(400).json({ message: 'This leave cannot be partially cancelled' });
+  }
+
+  if (isTrainerLikeRole(req.user.role)) {
+    if (!isOwnLeave(leave, req.user)) {
+      return res.status(403).json({ message: 'Not authorized' });
+    }
+  } else if (!hasExactFullAccess(req.user.role)) {
+    return res.status(403).json({ message: 'Not authorized' });
+  }
+
+  const { startDate, endDate } = req.body || {};
+  if (!startDate || !endDate) {
+    return res.status(400).json({ message: 'Cancelled start date and end date are required' });
+  }
+
+  const cancelStart = normalizeDate(startDate);
+  const cancelEnd = normalizeDate(endDate);
+  if (cancelEnd < cancelStart) {
+    return res.status(400).json({ message: 'Cancel end date must be on or after the start date' });
+  }
+
+  const remainingRanges = splitLeaveRangeForPartialCancel(
+    leave.startDate,
+    leave.endDate,
+    cancelStart,
+    cancelEnd
+  );
+
+  if (!remainingRanges.length) {
+    return deleteLeave(req, res);
+  }
+
+  const cancelKeyStart = toLeaveDateKey(cancelStart);
+  const cancelKeyEnd = toLeaveDateKey(cancelEnd);
+  const { cancellationMap, holidayDateKeys } = await getLeaveClassExclusionsForRange(
+    leave.startDate,
+    leave.endDate
+  );
+
+  const revokedReplacements = (leave.replacements || []).filter((entry) => {
+    const schedule = entry.schedule;
+    const scheduleId = schedule?._id?.toString?.() || schedule?.toString?.();
+    if (!scheduleId) return false;
+    const matchingSchedule = (leave.affectedSchedules || []).find(
+      (item) => (item?._id?.toString?.() || item?.toString?.()) === scheduleId
+    );
+    if (!matchingSchedule) return false;
+
+    const affectedDateKeys = getUncancelledScheduleDateKeys(
+      leave,
+      matchingSchedule,
+      cancellationMap,
+      holidayDateKeys
+    );
+
+    return affectedDateKeys.some((dateKey) => dateKey >= cancelKeyStart && dateKey <= cancelKeyEnd);
+  });
+
+  if (remainingRanges.length === 1) {
+    const [range] = remainingRanges;
+    leave.startDate = normalizeDate(range.startDate);
+    leave.endDate = normalizeDate(range.endDate);
+    leave.replacements = (leave.replacements || []).filter((entry) => {
+      const schedule = entry.schedule;
+      const scheduleId = schedule?._id?.toString?.() || schedule?.toString?.();
+      if (!scheduleId) return false;
+      const matchingSchedule = (leave.affectedSchedules || []).find(
+        (item) => (item?._id?.toString?.() || item?.toString?.()) === scheduleId
+      );
+      if (!matchingSchedule) return false;
+      const affectedDateKeys = getUncancelledScheduleDateKeys(
+        leave,
+        matchingSchedule,
+        cancellationMap,
+        holidayDateKeys
+      );
+      return !affectedDateKeys.some((dateKey) => dateKey >= cancelKeyStart && dateKey <= cancelKeyEnd);
+    });
+
+    const updatedAffectedSchedules = await findAffectedSchedules(leave.trainer._id, leave.startDate, leave.endDate);
+    leave.affectedSchedules = updatedAffectedSchedules.map((schedule) => schedule._id);
+    leave.replacementNeeded = leave.replacements.length > 0;
+    leave.bulkReplacement = {
+      groupId: '',
+      fromDate: null,
+      toDate: null,
+      replacementTrainer: null,
+      assignedAt: null,
+      assignedBy: null,
+    };
+    leave.status = 'approved';
+    leave.markModified('replacements');
+    leave.markModified('affectedSchedules');
+    leave.markModified('bulkReplacement');
+    await leave.save();
+    clearAttendanceGridCache();
+
+    if (revokedReplacements.length) {
+      try {
+        await notifyReplacementCancellation({
+          actor: req.user,
+          leave,
+          originalTrainer: leave.trainer,
+          replacements: revokedReplacements,
+        });
+      } catch (error) {
+        console.error('Failed to send partial leave cancellation notifications:', error.message);
+      }
+    }
+
+    const updated = await Leave.findById(leave._id).populate(populateLeave);
+    const rangeExclusions = await getLeaveClassExclusionsForRange(updated.startDate, updated.endDate);
+    res.json({
+      message: revokedReplacements.length
+        ? 'Leave period partially cancelled and replacement assignments revoked'
+        : 'Leave period updated',
+      leave: addEffectiveAffectedData(updated, rangeExclusions.cancellationMap, rangeExclusions.holidayDateKeys),
+    });
+    return;
+  }
+
+  const createdRecords = [];
+  for (const range of remainingRanges) {
+    const affectedSchedules = await findAffectedSchedules(leave.trainer._id, range.startDate, range.endDate);
+    const affectedIds = affectedSchedules.map((schedule) => schedule._id);
+    const { cancellationMap: rangeCancellationMap, holidayDateKeys: rangeHolidayKeys } = await getLeaveClassExclusionsForRange(
+      range.startDate,
+      range.endDate
+    );
+    const effectiveSchedules = getEffectiveAffectedSchedules(
+      { startDate: range.startDate, endDate: range.endDate },
+      affectedSchedules,
+      rangeCancellationMap,
+      rangeHolidayKeys
+    );
+
+    const created = await Leave.create({
+      trainer: leave.trainer._id,
+      startDate: normalizeDate(range.startDate),
+      endDate: normalizeDate(range.endDate),
+      reason: leave.reason,
+      scope: leave.scope || LEAVE_SCOPES.FULL_DAY,
+      status: 'approved',
+      affectedSchedules: affectedIds,
+      replacementNeeded: effectiveSchedules.length > 0,
+    });
+    createdRecords.push(created);
+  }
+
+  leave.status = 'cancelled';
+  leave.replacements = [];
+  leave.affectedSchedules = [];
+  leave.replacementNeeded = false;
+  leave.bulkReplacement = {
+    groupId: '',
+    fromDate: null,
+    toDate: null,
+    replacementTrainer: null,
+    assignedAt: null,
+    assignedBy: null,
+  };
+  leave.markModified('replacements');
+  leave.markModified('affectedSchedules');
+  leave.markModified('bulkReplacement');
+  await leave.save();
+  clearAttendanceGridCache();
+
+  if (revokedReplacements.length) {
+    try {
+      await notifyReplacementCancellation({
+        actor: req.user,
+        leave,
+        originalTrainer: leave.trainer,
+        replacements: revokedReplacements,
+      });
+    } catch (error) {
+      console.error('Failed to send partial leave cancellation notifications:', error.message);
+    }
+  }
+
+  res.json({
+    message: 'Leave partially cancelled. Remaining date ranges were preserved as new leave entries.',
+    cancelledLeaveId: leave._id,
+    remainingLeaves: createdRecords.map((entry) => ({
+      _id: entry._id,
+      startDate: entry.startDate,
+      endDate: entry.endDate,
+      status: entry.status,
+    })),
   });
 };
 

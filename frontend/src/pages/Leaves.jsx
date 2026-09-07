@@ -6,7 +6,7 @@ import { useAuth } from '../context/AuthContext.jsx';
 import { usePagination } from '../hooks/usePagination.js';
 import { useDebounce } from '../hooks/useDebounce.js';
 import { isAbortError } from '../services/api.js';
-import { getLeaves, createLeave, updateLeave, deleteLeave, previewAffectedSchedules } from '../services/leaveService.js';
+import { getLeaves, createLeave, updateLeave, deleteLeave, partialCancelLeave, previewAffectedSchedules } from '../services/leaveService.js';
 import { getTrainers } from '../services/trainerService.js';
 import { formatDate, formatStatus, getErrorMessage, toInputDate } from '../utils/helpers.js';
 import { formatTimeRange } from '../utils/scheduleUtils.js';
@@ -50,6 +50,7 @@ const Leaves = () => {
   });
   const [preview, setPreview] = useState(null);
   const [pendingCancel, setPendingCancel] = useState(null);
+  const [pendingPartialCancel, setPendingPartialCancel] = useState(null);
 
   const fetchLeaves = async (signal) => {
     setLoading(true);
@@ -163,6 +164,27 @@ const Leaves = () => {
     }
   };
 
+  const handlePartialCancel = (leave) => {
+    setPendingPartialCancel({
+      leave,
+      startDate: toInputDate(new Date(leave.startDate)),
+      endDate: toInputDate(new Date(leave.endDate)),
+    });
+  };
+
+  const handleConfirmPartialCancel = async () => {
+    if (!pendingPartialCancel) return;
+    try {
+      const { leave, startDate, endDate } = pendingPartialCancel;
+      await partialCancelLeave(leave._id, { startDate, endDate });
+      showSuccess('Leave range updated');
+      setPendingPartialCancel(null);
+      fetchLeaves();
+    } catch (err) {
+      showError(getErrorMessage(err));
+    }
+  };
+
   const canCancelLeave = (leave) => {
     if (['rejected', 'cancelled'].includes(leave.status)) return false;
     if (!selfLeaveOnly) return true;
@@ -230,13 +252,22 @@ const Leaves = () => {
                           </div>
                         )}
                         {canCancelLeave(leave) && (
-                          <ActionIconButton
-                            variant="delete"
-                            icon={TrashIcon}
-                            title="Cancel leave"
-                            aria-label={`Cancel leave for ${leave.trainer?.name}`}
-                            onClick={() => handleDelete(leave)}
-                          />
+                          <>
+                            <button
+                              type="button"
+                              className="btn btn-outline-warning btn-sm"
+                              onClick={() => handlePartialCancel(leave)}
+                            >
+                              Partial Cancel
+                            </button>
+                            <ActionIconButton
+                              variant="delete"
+                              icon={TrashIcon}
+                              title="Cancel leave"
+                              aria-label={`Cancel leave for ${leave.trainer?.name}`}
+                              onClick={() => handleDelete(leave)}
+                            />
+                          </>
                         )}
                       </div>
                     </td>
@@ -313,6 +344,43 @@ const Leaves = () => {
             </div>
           </form>
         </Modal>
+      )}
+
+      {pendingPartialCancel && (
+        <ConfirmModal
+          show
+          title="Partial Cancel Leave"
+          message={`Revoke only part of ${pendingPartialCancel.leave.trainer?.name}'s leave. Enter the exact date range to cancel within ${formatDate(pendingPartialCancel.leave.startDate)} to ${formatDate(pendingPartialCancel.leave.endDate)}.`}
+          confirmLabel="Apply Partial Cancel"
+          confirmVariant="warning"
+          onConfirm={handleConfirmPartialCancel}
+          onClose={() => setPendingPartialCancel(null)}
+        >
+          <div className="row g-3 mt-1">
+            <div className="col-md-6">
+              <label className="form-label">Leave cancel start</label>
+              <input
+                type="date"
+                className="form-control"
+                value={pendingPartialCancel.startDate}
+                min={toInputDate(new Date(pendingPartialCancel.leave.startDate))}
+                max={toInputDate(new Date(pendingPartialCancel.leave.endDate))}
+                onChange={(e) => setPendingPartialCancel((prev) => ({ ...prev, startDate: e.target.value }))}
+              />
+            </div>
+            <div className="col-md-6">
+              <label className="form-label">Leave cancel end</label>
+              <input
+                type="date"
+                className="form-control"
+                value={pendingPartialCancel.endDate}
+                min={pendingPartialCancel.startDate || toInputDate(new Date(pendingPartialCancel.leave.startDate))}
+                max={toInputDate(new Date(pendingPartialCancel.leave.endDate))}
+                onChange={(e) => setPendingPartialCancel((prev) => ({ ...prev, endDate: e.target.value }))}
+              />
+            </div>
+          </div>
+        </ConfirmModal>
       )}
 
       {pendingCancel && (

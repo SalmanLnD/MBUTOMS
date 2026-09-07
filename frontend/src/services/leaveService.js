@@ -20,6 +20,11 @@ export const deleteLeave = async (id) => {
   return data;
 };
 
+export const partialCancelLeave = async (id, payload = {}) => {
+  const { data } = await api.post(`/leaves/${id}/partial-cancel`, payload);
+  return data;
+};
+
 export const previewAffectedSchedules = async (params, { signal } = {}) => {
   const { data } = await api.get('/leaves/preview/affected', { params, signal });
   return data;

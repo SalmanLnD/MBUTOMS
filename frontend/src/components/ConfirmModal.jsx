@@ -9,6 +9,7 @@ const ConfirmModal = ({
   confirmVariant = 'danger',
   onConfirm,
   onClose,
+  children,
 }) => {
   if (!show) return null;
 
@@ -29,7 +30,8 @@ const ConfirmModal = ({
       )}
     >
       <div className="toms-modal-body">
-        <p className="mb-0">{message}</p>
+        {message && <p className="mb-0">{message}</p>}
+        {children}
       </div>
     </Modal>
   );
