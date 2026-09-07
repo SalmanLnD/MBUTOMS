@@ -55,7 +55,7 @@ export const shouldAutoMarkTrainerRelocated = (trainer, date) => {
   if (trainer?.employmentStatus !== 'relocated' || !trainer?.resignationDate) return false;
   const lastWorkingDate = normalizeAttendanceDate(trainer.resignationDate);
   const day = normalizeAttendanceDate(date);
-  return day >= lastWorkingDate;
+  return day > lastWorkingDate;
 };
 
 export const shouldAutoMarkTrainerExit = (trainer, date) => {

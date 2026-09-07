@@ -1,11 +1,12 @@
 import { isCampusSubjectOif } from './subjectOifCatalog.js';
 
 export const IT_OIF_CODE = 'IT';
+export const CA26421_OIF_CODE = 'CA26421';
 export const IT_MOCK_PREP_HOURS = 7;
 
 export const isItOif = (oifNumber) => {
   const value = String(oifNumber || '').trim().toUpperCase();
-  return value.startsWith(IT_OIF_CODE);
+  return value.startsWith(IT_OIF_CODE) || value === CA26421_OIF_CODE || value.startsWith(`${CA26421_OIF_CODE} `);
 };
 
 export const countsAsOifDay = (oifNumber) => {

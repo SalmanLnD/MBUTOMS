@@ -79,18 +79,15 @@ const TrainerDetailsPanel = ({ trainerId, canEdit = false }) => {
           <button type="button" className="btn btn-outline-primary btn-sm" onClick={() => setTransferMode('replacement')}>
             Permanent Replacement
           </button>
-          <button type="button" className="btn btn-outline-warning btn-sm" onClick={() => setTransferMode('relocate')}>
-            Relocated
-          </button>
           <button type="button" className="btn btn-outline-danger btn-sm" onClick={() => setTransferMode('resign')}>
             Resignation / Exit
           </button>
         </div>
       )}
 
-      {(trainer.employmentStatus === 'resigned' || trainer.employmentStatus === 'relocated') && (
+      {trainer.employmentStatus === 'resigned' && (
         <div className="alert alert-warning mb-3">
-          {trainer.employmentStatus === 'relocated' ? 'Relocated' : 'Resigned'}
+          Resigned
           {trainer.resignationDate ? ` — last working day ${formatDate(trainer.resignationDate)}` : ''}
           {trainer.successorTrainer?.name
             ? `. Replaced by ${trainer.successorTrainer.name} (${trainer.successorTrainer.employeeId}).`
@@ -98,7 +95,7 @@ const TrainerDetailsPanel = ({ trainerId, canEdit = false }) => {
         </div>
       )}
 
-      {canEdit && (trainer.employmentStatus === 'resigned' || trainer.employmentStatus === 'relocated') && (
+      {canEdit && trainer.employmentStatus === 'resigned' && (
         <div className="mb-3 d-flex justify-content-end">
           <button type="button" className="btn btn-outline-secondary btn-sm" onClick={() => setShowEditModal(true)}>
             Edit Profile

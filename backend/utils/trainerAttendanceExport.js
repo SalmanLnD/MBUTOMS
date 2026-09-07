@@ -12,12 +12,7 @@ import {
 import { getAttendanceToday } from './attendanceTracking.js';
 import { computeClassHandlingHoursBatch } from './trainerClassHoursBatch.js';
 import { mergeRosterFilter } from './rosterFilter.js';
-import {
-  mergeAttendanceExportTrainerFilter,
-  shouldAutoMarkTrainerRelocated,
-  shouldAutoMarkTrainerExit,
-  isBeforeTrainerJoiningDate,
-} from './trainerEmployment.js';
+import { mergeAttendanceExportTrainerFilter, shouldAutoMarkTrainerExit, isBeforeTrainerJoiningDate } from './trainerEmployment.js';
 import {
   isBulkReplacementOnlyTrainer,
   isDateInsideReplacementWindow,
@@ -195,12 +190,7 @@ export const buildTrainerAttendanceExportPayload = async () => {
           return;
         }
 
-        if (shouldAutoMarkTrainerRelocated(trainer, date)) {
-          attendanceType = TRAINER_ATTENDANCE_TYPES.RELOCATED;
-          oifNumber = '';
-          mockPrepHours = 0;
-          classHandlingHours = 0;
-        } else if (shouldAutoMarkTrainerExit(trainer, date)) {
+        if (shouldAutoMarkTrainerExit(trainer, date)) {
           attendanceType = TRAINER_ATTENDANCE_TYPES.EXIT;
           oifNumber = '';
           mockPrepHours = 0;
