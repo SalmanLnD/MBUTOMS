@@ -187,8 +187,7 @@ const Leaves = () => {
 
   const canCancelLeave = (leave) => {
     if (['rejected', 'cancelled'].includes(leave.status)) return false;
-    if (!selfLeaveOnly) return true;
-    return leave.trainer?._id === user?.trainer || leave.trainer?._id?.toString() === user?.trainer?.toString();
+    return true;
   };
 
   const getLeaveStatusBadgeClass = (status) => {

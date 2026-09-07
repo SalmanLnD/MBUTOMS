@@ -11,6 +11,7 @@ import {
 } from '../controllers/trainerController.js';
 import {
   resignTrainer,
+  relocateTrainer,
   permanentReplaceTrainer,
   getReplacementCandidates,
 } from '../controllers/trainerTransferController.js';
@@ -62,6 +63,14 @@ router.post(
   resignValidation,
   validate,
   asyncHandler(resignTrainer)
+);
+
+router.post(
+  '/:id/relocate',
+  authorize('admin', 'campus_manager'),
+  resignValidation,
+  validate,
+  asyncHandler(relocateTrainer)
 );
 
 router.post(
