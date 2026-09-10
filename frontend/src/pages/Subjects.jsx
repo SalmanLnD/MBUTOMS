@@ -13,7 +13,7 @@ import { usePagination } from '../hooks/usePagination.js';
 import { getSubjects, deleteSubject, updateSubjectResources } from '../services/subjectService.js';
 import { EditIcon, TrashIcon } from '../components/icons.jsx';
 import ActionIconButton from '../components/ActionIconButton.jsx';
-import { getErrorMessage } from '../utils/helpers.js';
+import { getErrorMessage, formatDate } from '../utils/helpers.js';
 import { ROLES } from '../utils/roles.js';
 import { usePageTitle } from '../context/PageTitleContext.jsx';
 import { isAbortError } from '../services/api.js';
