@@ -23,11 +23,12 @@ const SCHEDULE_FIELDS = 'day startTime endTime trainerCode semester subject subj
 const resolveStartDate = (schedule, subjectStartMap) => {
   const subjectId = schedule.subject?.toString();
   if (subjectId && subjectStartMap.byId.has(subjectId)) {
-    return subjectStartMap.byId.get(subjectId);
+    // map stores objects { startDate, endDate }
+    return subjectStartMap.byId.get(subjectId).startDate || null;
   }
   const subjectCode = schedule.subjectCode?.trim();
   if (subjectCode && subjectStartMap.byCode.has(subjectCode)) {
-    return subjectStartMap.byCode.get(subjectCode);
+    return subjectStartMap.byCode.get(subjectCode).startDate || null;
   }
   return null;
 };
@@ -150,7 +151,13 @@ export const computeClassHandlingHoursBatch = async (
     loadOfficialHolidayMap(rangeStart, rangeEnd),
   ]);
 
+  // Basic diagnostics info (non-verbose)
+  // Keep minimal logging for diagnostics; avoid noisy debug prints.
+  // console.debug can be enabled in development when needed.
+
   const schedulesByTrainerDay = indexSchedulesByTrainerDay(ownedSchedules, codeToTrainerId);
+
+  // no-op: avoid targeted ad-hoc debug prints here
 
   const replacementScheduleIds = [
     ...new Set(
@@ -245,18 +252,28 @@ export const computeClassHandlingHoursBatch = async (
       }
       const replacedOwnedIds =
         replacedOwnedScheduleIdsByTrainerDate.get(`${trainerId}|${dateKey}`) || new Set();
+      // minimal diagnostic: leave as comments; enable logging only for troubleshooting
+      // For attendance grid purposes we should count a trainer's assigned
+      // schedules even when a class cancellation exists (cancellations are
+      // client-side one-offs and should not zero the trainer's class-handling
+      // hours used for payroll/attendance). Therefore skip the canceledIds
+      // exclusion here.
+      // For attendance grid we include assigned slots regardless of subject
+      // start-date (start-date logic is used elsewhere). This ensures the
+      // attendance UI shows class-handling hours for scheduled slots.
       const owned = (schedulesByTrainerDay.get(trainerId)?.get(dayName) || []).filter(
-        (schedule) =>
-          !replacedOwnedIds.has(schedule._id.toString())
-          && !canceledIds.has(schedule._id.toString())
-          && isActiveOnDate(schedule, date, subjectStartMap)
+        (schedule) => !replacedOwnedIds.has(schedule._id.toString())
       );
       const replacements = replacementByTrainerDate.get(`${trainerId}|${dateKey}`) || [];
+
+      // silent: do not log per-trainer details in normal runs
 
       const hours = [...owned, ...replacements].reduce(
         (sum, schedule) => sum + computeHours(schedule.startTime, schedule.endTime),
         0
       );
+
+      // result computed
 
       result.set(`${trainerId}|${dateKey}`, Math.round(hours * 10) / 10);
     });
