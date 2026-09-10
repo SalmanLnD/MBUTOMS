@@ -5,16 +5,29 @@
 export const ATTENDANCE_TIMEZONE = 'Asia/Kolkata';
 
 export const toAttendanceDateKey = (dateInput) => {
+  if (dateInput === null || dateInput === undefined || dateInput === '') {
+    return '';
+  }
+
+  const date = new Date(dateInput);
+  if (Number.isNaN(date.getTime())) {
+    return '';
+  }
+
   return new Intl.DateTimeFormat('en-CA', {
     timeZone: ATTENDANCE_TIMEZONE,
     year: 'numeric',
     month: '2-digit',
     day: '2-digit',
-  }).format(new Date(dateInput));
+  }).format(date);
 };
 
 export const normalizeAttendanceDate = (dateInput) => {
   const key = toAttendanceDateKey(dateInput);
+  if (!key) {
+    return new Date(NaN);
+  }
+
   const [year, month, day] = key.split('-').map(Number);
   return new Date(Date.UTC(year, month - 1, day));
 };

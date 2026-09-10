@@ -11,7 +11,10 @@ export const parseAttendanceMonthParam = (monthParam, referenceDate = new Date()
     const [year, month] = monthParam.split('-').map(Number);
     return { year, month };
   }
-  const key = toAttendanceDateKey(referenceDate);
+  let key = toAttendanceDateKey(referenceDate);
+  if (!key) {
+    key = toAttendanceDateKey(new Date());
+  }
   const [year, month] = key.split('-').map(Number);
   return { year, month };
 };
@@ -41,6 +44,7 @@ export const formatAttendanceMonthKey = (year, month) =>
 export const getAttendanceCalendarDates = (startDate, endDate) => {
   const start = normalizeAttendanceDate(startDate);
   const end = normalizeAttendanceDate(endDate);
+  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) return [];
   const dates = [];
   const cursor = new Date(start);
 
@@ -54,17 +58,20 @@ export const getAttendanceCalendarDates = (startDate, endDate) => {
 
 export const isAttendanceWeekendDate = (date) => {
   const normalized = normalizeAttendanceDate(date);
+  if (Number.isNaN(normalized.getTime())) return false;
   const day = normalized.getUTCDay();
   return day === 0 || day === 6;
 };
 
 export const isAttendanceSundayDate = (date) => {
   const normalized = normalizeAttendanceDate(date);
+  if (Number.isNaN(normalized.getTime())) return false;
   return normalized.getUTCDay() === 0;
 };
 
 export const getAttendanceWeekdayName = (date) => {
   const normalized = normalizeAttendanceDate(date);
+  if (Number.isNaN(normalized.getTime())) return '';
   return ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'][
     normalized.getUTCDay()
   ];
