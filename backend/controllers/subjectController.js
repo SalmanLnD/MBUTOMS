@@ -78,6 +78,10 @@ const normalizeSubjectPayload = (body) => {
     payload.startDate = normalizeDate(payload.startDate);
   }
 
+  if (payload.endDate) {
+    payload.endDate = normalizeDate(payload.endDate);
+  }
+
   if (payload.academicYear !== undefined) {
     payload.academicYear = String(payload.academicYear || '').trim() || '2026-27';
   }
