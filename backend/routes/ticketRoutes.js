@@ -4,6 +4,7 @@ import {
   getTicketById,
   createTicket,
   updateTicketStatus,
+  getUnreadTicketCount,
 } from '../controllers/ticketController.js';
 import { protect, authorize } from '../middleware/auth.js';
 import { ROLES } from '../utils/roles.js';
@@ -18,6 +19,8 @@ router.use(protect);
 router.route('/')
   .get(asyncHandler(getTickets))
   .post(ticketValidation, validate, asyncHandler(createTicket));
+
+router.get('/unread-count', asyncHandler(getUnreadTicketCount));
 
 router.route('/:id')
   .get(asyncHandler(getTicketById));
