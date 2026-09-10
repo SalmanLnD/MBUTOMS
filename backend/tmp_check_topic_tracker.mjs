@@ -1,0 +1,23 @@
+import mongoose from 'mongoose';
+import dotenv from 'dotenv';
+import Schedule from './models/Schedule.js';
+import Subject from './models/Subject.js';
+import Trainer from './models/Trainer.js';
+import { buildTopicTrackerSessions } from './utils/topicTrackerSessions.js';
+import { resolveTrainerScheduleCodes } from './utils/trainerMappings.js';
+
+dotenv.config();
+await mongoose.connect(process.env.MONGODB_URI);
+const date = '2026-09-10';
+const subject = await Subject.findOne({ code: '22CS102033' }).select('code name startDate endDate').lean();
+console.log('subject', subject);
+const activeSchedules = await Schedule.find({ day: 'Thursday' }).select('day startTime endTime subjectCode subject department section semester trainerCode').limit(5).lean();
+console.log('sample schedules', JSON.stringify(activeSchedules, null, 2));
+const trainerMatches = await Trainer.find({ $or: [{ employeeId: 'IDSA-T1' }, { scheduleTrainerCodes: 'IDSA-T1' }, { employeeId: 'IDSA-T4' }, { scheduleTrainerCodes: 'IDSA-T4' }, { employeeId: '135130' }, { scheduleTrainerCodes: '135130' }] }).select('name employeeId scheduleTrainerCodes').lean();
+console.log('trainer matches', JSON.stringify(trainerMatches, null, 2));
+const codeMap = await Trainer.find().select('name employeeId scheduleTrainerCodes').lean();
+console.log('sample global code map', codeMap.slice(0, 3).map((t) => ({ name: t.name, employeeId: t.employeeId, codes: resolveTrainerScheduleCodes(t) })).slice(0, 3));
+const sessions = await buildTopicTrackerSessions({ date, user: { role: 'campus_manager' }, lite: true });
+console.log('sessions length', sessions.sessions.length);
+console.log(JSON.stringify(sessions.sessions.slice(0,5), null, 2));
+await mongoose.disconnect();
