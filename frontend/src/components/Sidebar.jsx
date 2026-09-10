@@ -1,5 +1,7 @@
 import { NavLink } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.jsx';
+import { useEffect, useState } from 'react';
+import { getUnreadTicketCount } from '../services/ticketService.js';
 import { ChevronLeftIcon } from './icons.jsx';
 import { navItems } from '../config/navItems.js';
 import { formatRole } from '../utils/helpers.js';
@@ -7,6 +9,21 @@ import '../styles/sidebar.css';
 
 const Sidebar = ({ collapsed = false, labelsVisible = true, onToggle }) => {
   const { user, hasRole } = useAuth();
+  const [unreadCount, setUnreadCount] = useState(0);
+
+  useEffect(() => {
+    let mounted = true;
+    const load = async () => {
+      try {
+        const c = await getUnreadTicketCount();
+        if (mounted) setUnreadCount(c || 0);
+      } catch (err) {
+        // ignore
+      }
+    };
+    load();
+    return () => { mounted = false; };
+  }, []);
 
   const visibleItems = navItems.filter((item) =>
     item.roles.some((role) => hasRole(role))
@@ -41,6 +58,9 @@ const Sidebar = ({ collapsed = false, labelsVisible = true, onToggle }) => {
               <Icon size={18} />
             </span>
             <span className="sidebar-link-label">{label}</span>
+            {label === 'Tickets' && unreadCount > 0 && (
+              <span className="sidebar-badge" aria-hidden="true">{unreadCount}</span>
+            )}
           </NavLink>
         ))}
       </nav>
