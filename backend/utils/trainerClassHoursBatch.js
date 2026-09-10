@@ -9,6 +9,7 @@ import { computeHours } from './trainerClassHours.js';
 import {
   buildSubjectStartDateMap,
   DEFAULT_SUBJECT_START_DATE,
+  DEFAULT_SUBJECT_END_DATE,
 } from './subjectStartDate.js';
 import { getWeekdaysInLeaveRange } from './trainerScheduleView.js';
 import {
@@ -33,13 +34,31 @@ const resolveStartDate = (schedule, subjectStartMap) => {
   return null;
 };
 
+const resolveEndDate = (schedule, subjectStartMap) => {
+  const subjectId = schedule.subject?.toString();
+  if (subjectId && subjectStartMap.byId.has(subjectId)) {
+    return subjectStartMap.byId.get(subjectId).endDate || null;
+  }
+  const subjectCode = schedule.subjectCode?.trim();
+  if (subjectCode && subjectStartMap.byCode.has(subjectCode)) {
+    return subjectStartMap.byCode.get(subjectCode).endDate || null;
+  }
+  return null;
+};
+
 const isActiveOnDate = (schedule, referenceDate, subjectStartMap) => {
   const ref = normalizeAttendanceDate(referenceDate);
   const rawStart = resolveStartDate(schedule, subjectStartMap);
   const effectiveStart = rawStart
     ? normalizeAttendanceDate(rawStart)
     : DEFAULT_SUBJECT_START_DATE;
-  return ref >= effectiveStart;
+
+  const rawEnd = resolveEndDate(schedule, subjectStartMap);
+  const effectiveEnd = rawEnd
+    ? normalizeAttendanceDate(rawEnd)
+    : DEFAULT_SUBJECT_END_DATE;
+
+  return ref >= effectiveStart && ref <= effectiveEnd;
 };
 
 const buildTrainerLookup = (trainers) => {
