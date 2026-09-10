@@ -419,6 +419,14 @@ const Subjects = () => {
               </div>
               {showFullSubjectDetails && (
                 <>
+                      <div className="col-sm-4">
+                        <label className="text-muted small">Start Date</label>
+                        <p className="mb-0">{formatDate(selectedSubject.startDate)}</p>
+                      </div>
+                      <div className="col-sm-4">
+                        <label className="text-muted small">End Date</label>
+                        <p className="mb-0">{selectedSubject.endDate ? formatDate(selectedSubject.endDate) : '—'}</p>
+                      </div>
                   <div className="col-sm-4">
                     <label className="text-muted small">Semester</label>
                     <p className="mb-0">{selectedSubject.semester?.name || '-'}</p>

@@ -281,7 +281,7 @@ export const computeClassHandlingHoursBatch = async (
       // start-date (start-date logic is used elsewhere). This ensures the
       // attendance UI shows class-handling hours for scheduled slots.
       const owned = (schedulesByTrainerDay.get(trainerId)?.get(dayName) || []).filter(
-        (schedule) => !replacedOwnedIds.has(schedule._id.toString())
+        (schedule) => !replacedOwnedIds.has(schedule._id.toString()) && isActiveOnDate(schedule, date, subjectStartMap)
       );
       const replacements = replacementByTrainerDate.get(`${trainerId}|${dateKey}`) || [];
 

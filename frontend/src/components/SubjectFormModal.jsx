@@ -301,6 +301,10 @@ const SubjectFormModal = ({ subject, onClose, onManageResource, onManageTopics }
                 <input type="date" name="startDate" className="form-control" value={form.startDate} onChange={handleChange} required />
               </div>
               <div className="col-md-4">
+                <label className="form-label">End Date</label>
+                <input type="date" name="endDate" className="form-control" value={form.endDate} onChange={handleChange} />
+              </div>
+              <div className="col-md-4">
                 <label className="form-label">Academic Year *</label>
                 <input
                   name="academicYear"
