@@ -4,6 +4,15 @@
  */
 export const ATTENDANCE_TIMEZONE = 'Asia/Kolkata';
 
+// Reused across calls: report builders convert tens of thousands of dates per
+// request, and a per-call formatter costs both CPU and retained ICU memory.
+const attendanceDateFormatter = new Intl.DateTimeFormat('en-CA', {
+  timeZone: ATTENDANCE_TIMEZONE,
+  year: 'numeric',
+  month: '2-digit',
+  day: '2-digit',
+});
+
 export const toAttendanceDateKey = (dateInput) => {
   if (dateInput === null || dateInput === undefined || dateInput === '') {
     return '';
@@ -14,12 +23,7 @@ export const toAttendanceDateKey = (dateInput) => {
     return '';
   }
 
-  return new Intl.DateTimeFormat('en-CA', {
-    timeZone: ATTENDANCE_TIMEZONE,
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-  }).format(date);
+  return attendanceDateFormatter.format(date);
 };
 
 export const normalizeAttendanceDate = (dateInput) => {
