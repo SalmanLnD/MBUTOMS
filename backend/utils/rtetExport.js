@@ -23,7 +23,6 @@ import { SUBJECT_OIF_CATALOG } from './subjectOifCatalog.js';
 import {
   buildSubjectStartDateMap,
   DEFAULT_SUBJECT_START_DATE,
-  isScheduleWithinSubjectDates,
 } from './subjectStartDate.js';
 import { loadOfficialHolidayMap } from './officialHolidays.js';
 import { getCancellationMapForRange } from './leaveAffectedClasses.js';
@@ -48,12 +47,29 @@ const formatDateLabel = (dateKey) => {
 const buildSlotKey = (schedule, codeOverride) =>
   `${codeOverride || schedule.subjectCode || ''}|${schedule.startTime}|${schedule.endTime}|${schedule.section || ''}|${schedule.department || ''}`;
 
-export const isRtetScheduleActiveOnDate = (schedule, date, subjectStartMap) =>
-  isScheduleWithinSubjectDates(schedule, date, subjectStartMap);
+const getSubjectRange = (schedule, subjectStartMap) => {
+  const subjectId = schedule.subject?._id?.toString() || schedule.subject?.toString();
+  const subjectCode = schedule.subjectCode?.trim();
+  const cached = (subjectId && subjectStartMap.byId.get(subjectId))
+    || (subjectCode && subjectStartMap.byCode.get(subjectCode));
+  // Support both the historical Date cache and the current
+  // { startDate, endDate } cache contract during rolling deployments.
+  if (cached instanceof Date) return { startDate: cached, endDate: null };
+  return {
+    startDate: cached?.startDate || DEFAULT_SUBJECT_START_DATE,
+    endDate: cached?.endDate || null,
+  };
+};
+
+export const isRtetScheduleActiveOnDate = (schedule, date, subjectStartMap) => {
+  const ref = normalizeAttendanceDate(date);
+  const { startDate, endDate } = getSubjectRange(schedule, subjectStartMap);
+  return ref >= startDate && (!endDate || ref <= endDate);
+};
 
 export const getRtetRangeStart = (subjectStartMap) => {
   const candidates = RTET_SUBJECTS.map((subject) =>
-    subjectStartMap.byCode.get(subject.code)?.startDate || DEFAULT_SUBJECT_START_DATE
+    getSubjectRange({ subjectCode: subject.code }, subjectStartMap).startDate
   );
   const earliest = candidates.reduce(
     (min, date) => (date < min ? date : min),
