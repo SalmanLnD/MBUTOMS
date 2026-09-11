@@ -214,9 +214,17 @@ function syncRTET(spreadsheet) {
   var numRows = out.length;
   var numCols = out[0].length;
 
+  // Keep column A empty so relative formulas that shifted to column C continue
+  // to point at the first RTET date (12 Jul 2026).
+  var firstOutputColumn = 2;
+  var requiredColumns = numCols + firstOutputColumn - 1;
+
   // Resize sheet to fit.
-  if (rtetSheet.getMaxColumns() < numCols) {
-    rtetSheet.insertColumnsAfter(rtetSheet.getMaxColumns(), numCols - rtetSheet.getMaxColumns());
+  if (rtetSheet.getMaxColumns() < requiredColumns) {
+    rtetSheet.insertColumnsAfter(
+      rtetSheet.getMaxColumns(),
+      requiredColumns - rtetSheet.getMaxColumns()
+    );
   }
   if (rtetSheet.getMaxRows() < numRows) {
     rtetSheet.insertRowsAfter(rtetSheet.getMaxRows(), numRows - rtetSheet.getMaxRows());
@@ -224,14 +232,14 @@ function syncRTET(spreadsheet) {
 
   rtetSheet.clear();
   rtetSheet.getRange(1, 1).clearNote();
-  rtetSheet.getRange(1, 1, numRows, numCols).setValues(out);
+  rtetSheet.getRange(1, firstOutputColumn, numRows, numCols).setValues(out);
 
-  // Freeze header row and Subject column.
+  // Freeze header row, the empty spacer column, and Subject column.
   rtetSheet.setFrozenRows(1);
-  rtetSheet.setFrozenColumns(1);
+  rtetSheet.setFrozenColumns(2);
 
   // Styling.
-  var allRange = rtetSheet.getRange(1, 1, numRows, numCols);
+  var allRange = rtetSheet.getRange(1, firstOutputColumn, numRows, numCols);
   allRange
     .setHorizontalAlignment('center')
     .setVerticalAlignment('middle')
@@ -239,28 +247,28 @@ function syncRTET(spreadsheet) {
     .setBorder(true, true, true, true, true, true);
 
   // Header row styling.
-  rtetSheet.getRange(1, 1, 1, numCols)
+  rtetSheet.getRange(1, firstOutputColumn, 1, numCols)
     .setFontWeight('bold')
     .setBackground('#cfe2f3');
 
   // Subject name column — left-align and bold.
-  rtetSheet.getRange(1, 1, numRows, 1)
+  rtetSheet.getRange(1, firstOutputColumn, numRows, 1)
     .setFontWeight('bold')
     .setHorizontalAlignment('left');
 
   // Totals row (last row) styling.
-  rtetSheet.getRange(numRows, 1, 1, numCols)
+  rtetSheet.getRange(numRows, firstOutputColumn, 1, numCols)
     .setFontWeight('bold')
     .setBackground('#fff2cc');
 
   // Grand total cell styling.
-  rtetSheet.getRange(numRows, numCols)
+  rtetSheet.getRange(numRows, requiredColumns)
     .setBackground('#f9cb9c');
 
   // Column widths.
-  rtetSheet.setColumnWidth(1, 280);
+  rtetSheet.setColumnWidth(firstOutputColumn, 280);
   if (numCols > 1) {
-    rtetSheet.setColumnWidths(2, numCols - 1, 110);
+    rtetSheet.setColumnWidths(firstOutputColumn + 1, numCols - 1, 110);
   }
 }
 
