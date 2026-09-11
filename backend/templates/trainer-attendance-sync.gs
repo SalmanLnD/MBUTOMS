@@ -46,6 +46,45 @@ function fetchTomsJson(url) {
 }
 
 function syncTrainerAttendance() {
+  var lock = LockService.getScriptLock();
+  if (!lock.tryLock(1000)) return;
+  try {
+    return syncTrainerAttendanceUnlocked();
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+function syncTrainerAttendanceUnlocked() {
+  var spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
+  var failures = [];
+  try {
+    syncRTET(spreadsheet);
+    SpreadsheetApp.flush();
+  } catch (error) {
+    failures.push('RTET: ' + error.message);
+  }
+  try {
+    syncAttendanceSheet();
+    SpreadsheetApp.flush();
+  } catch (error) {
+    failures.push('Attendance: ' + error.message);
+  }
+  if (failures.length) throw new Error(failures.join('\n'));
+}
+
+function syncRTETOnly() {
+  var lock = LockService.getScriptLock();
+  if (!lock.tryLock(1000)) return;
+  try {
+    syncRTET(SpreadsheetApp.getActiveSpreadsheet());
+    SpreadsheetApp.flush();
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+function syncAttendanceSheet() {
   var payload = fetchTomsJson(EXPORT_URL);
   var rows = payload.rows || [];
   var spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
@@ -104,8 +143,6 @@ function syncTrainerAttendance() {
     }
   }
 
-  syncRTET(spreadsheet);
-  SpreadsheetApp.flush();
 }
 
 /**
@@ -123,9 +160,12 @@ function syncRTET(spreadsheet) {
   try {
     rtetPayload = fetchTomsJson(RTET_EXPORT_URL);
   } catch (e) {
-    // Attendance sheet already succeeded; log RTET failure without throwing.
-    Logger.log('RTET fetch failed: ' + e.message);
-    return;
+    var failedSheet = spreadsheet.getSheetByName(RTET_SHEET_NAME);
+    if (!failedSheet) failedSheet = spreadsheet.insertSheet(RTET_SHEET_NAME);
+    var message = 'Last RTET sync failed: ' + e.message;
+    failedSheet.getRange(1, 1).setNote(message);
+    Logger.log(message);
+    throw e;
   }
 
   var dateLabels = rtetPayload.dateLabels || [];
@@ -227,6 +267,7 @@ function onOpen() {
   SpreadsheetApp.getUi()
     .createMenu('TOMS Attendance')
     .addItem('Refresh now', 'syncTrainerAttendance')
+    .addItem('Refresh RTET now', 'syncRTETOnly')
     .addToUi();
 }
 
