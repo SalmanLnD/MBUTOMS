@@ -33,20 +33,36 @@ const minutesToTime = (minutes) => {
 const resolveStartDate = (schedule, subjectStartMap) => {
   const subjectId = schedule.subject?.toString();
   if (subjectId && subjectStartMap.byId.has(subjectId)) {
-    return subjectStartMap.byId.get(subjectId);
+    return subjectStartMap.byId.get(subjectId).startDate || null;
   }
   const subjectCode = schedule.subjectCode?.trim();
   if (subjectCode && subjectStartMap.byCode.has(subjectCode)) {
-    return subjectStartMap.byCode.get(subjectCode);
+    return subjectStartMap.byCode.get(subjectCode).startDate || null;
+  }
+  return null;
+};
+
+const resolveEndDate = (schedule, subjectStartMap) => {
+  const subjectId = schedule.subject?.toString();
+  if (subjectId && subjectStartMap.byId.has(subjectId)) {
+    return subjectStartMap.byId.get(subjectId).endDate || null;
+  }
+  const subjectCode = schedule.subjectCode?.trim();
+  if (subjectCode && subjectStartMap.byCode.has(subjectCode)) {
+    return subjectStartMap.byCode.get(subjectCode).endDate || null;
   }
   return null;
 };
 
 const isActiveOnDate = (schedule, referenceDate, subjectStartMap) => {
   const ref = normalizeDate(referenceDate);
-  const startDate = resolveStartDate(schedule, subjectStartMap);
-  const effectiveStart = startDate ?? DEFAULT_SUBJECT_START_DATE;
-  return ref >= effectiveStart;
+  const rawStart = resolveStartDate(schedule, subjectStartMap);
+  const effectiveStart = rawStart ? normalizeDate(rawStart) : DEFAULT_SUBJECT_START_DATE;
+
+  const rawEnd = resolveEndDate(schedule, subjectStartMap);
+  const effectiveEnd = rawEnd ? normalizeDate(rawEnd) : DEFAULT_SUBJECT_END_DATE;
+
+  return ref >= effectiveStart && ref <= effectiveEnd;
 };
 
 const mergeMinuteIntervals = (intervals) => {
