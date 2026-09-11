@@ -8,6 +8,14 @@ const API_KEY = '__API_KEY__';
 const DEFAULT_SHEET_NAME = 'Trainer Attendance from July 13';
 const RTET_SHEET_NAME = 'rtet';
 
+function wakeTomsApi() {
+  try {
+    var healthUrl = String(EXPORT_URL || '').replace(/\/api\/attendance\/export.*$/, '/api/health');
+    if (healthUrl.indexOf('/api/health') === -1) return;
+    UrlFetchApp.fetch(healthUrl, { muteHttpExceptions: true });
+  } catch (error) {}
+}
+
 function fetchTomsJson(url) {
   const headers = {
     'x-sheets-key': API_KEY,
@@ -29,15 +37,16 @@ function fetchTomsJson(url) {
     }
     var body = String(response.getContentText() || '');
     lastMessage = 'TOMS API error (' + code + '): ' + body.slice(0, 160);
-    if (code === 429 || body.indexOf('Just a moment') !== -1) {
+    if (body.indexOf('Just a moment') !== -1) {
       throw new Error(
         'TOMS API error (' + code + '): Cloudflare blocked the sheet sync. '
         + 'Wait one minute, then use Refresh now. Do not run installTriggers again.'
       );
     }
-    if (code !== 502 && code !== 503 && code !== 504) {
-      throw new Error(lastMessage);
+    if (code === 429 || code === 502 || code === 503 || code === 504) {
+      continue;
     }
+    throw new Error(lastMessage);
   }
 
   throw new Error(
@@ -56,6 +65,7 @@ function syncTrainerAttendance() {
 }
 
 function syncTrainerAttendanceUnlocked() {
+  wakeTomsApi();
   var spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
   var failures = [];
   try {
