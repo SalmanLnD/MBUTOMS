@@ -123,6 +123,21 @@ const indexSchedulesByTrainerDay = (schedules, codeToTrainerId) => {
   return schedulesByTrainerDay;
 };
 
+export const filterOwnedSchedulesForAttendanceDate = (
+  schedules,
+  {
+    replacedScheduleIds = new Set(),
+    canceledScheduleIds = new Set(),
+    date,
+    subjectStartMap,
+  }
+) => schedules.filter((schedule) => {
+  const scheduleId = schedule._id.toString();
+  return !replacedScheduleIds.has(scheduleId)
+    && !canceledScheduleIds.has(scheduleId)
+    && isActiveOnDate(schedule, date, subjectStartMap);
+});
+
 export const computeClassHandlingHoursBatch = async (
   trainerIds,
   dates,
@@ -271,17 +286,14 @@ export const computeClassHandlingHoursBatch = async (
       }
       const replacedOwnedIds =
         replacedOwnedScheduleIdsByTrainerDate.get(`${trainerId}|${dateKey}`) || new Set();
-      // minimal diagnostic: leave as comments; enable logging only for troubleshooting
-      // For attendance grid purposes we should count a trainer's assigned
-      // schedules even when a class cancellation exists (cancellations are
-      // client-side one-offs and should not zero the trainer's class-handling
-      // hours used for payroll/attendance). Therefore skip the canceledIds
-      // exclusion here.
-      // For attendance grid we include assigned slots regardless of subject
-      // start-date (start-date logic is used elsewhere). This ensures the
-      // attendance UI shows class-handling hours for scheduled slots.
-      const owned = (schedulesByTrainerDay.get(trainerId)?.get(dayName) || []).filter(
-        (schedule) => !replacedOwnedIds.has(schedule._id.toString()) && isActiveOnDate(schedule, date, subjectStartMap)
+      const owned = filterOwnedSchedulesForAttendanceDate(
+        schedulesByTrainerDay.get(trainerId)?.get(dayName) || [],
+        {
+          replacedScheduleIds: replacedOwnedIds,
+          canceledScheduleIds: canceledIds,
+          date,
+          subjectStartMap,
+        }
       );
       const replacements = replacementByTrainerDate.get(`${trainerId}|${dateKey}`) || [];
 
