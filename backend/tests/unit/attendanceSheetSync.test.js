@@ -8,7 +8,10 @@ function harness() {
   const calls = [];
   const range = new Proxy({}, { get: (_, name) => (...args) => { calls.push([name, ...args]); return range; } });
   const sheet = new Proxy({}, { get: (_, name) => (...args) => {
-    if (name === 'getRange') return range;
+    if (name === 'getRange') {
+      calls.push([name, ...args]);
+      return range;
+    }
     if (name === 'getMaxColumns' || name === 'getMaxRows') return 100;
     calls.push([name, ...args]);
     return sheet;
@@ -37,6 +40,7 @@ test('RTET is written and flushed even when attendance API returns 502', () => {
   assert.ok(write >= 0 && write < attendance);
   assert.ok(calls.slice(write, attendance).some(c => c[0] === 'flush'));
   assert.equal(calls[write][1][1][2], 2);
+  assert.ok(calls.some(c => c[0] === 'getRange' && c[1] === 1 && c[2] === 2 && c[3] === 3 && c[4] === 3));
   assert.equal(calls.at(-1)[0], 'release');
 });
 
