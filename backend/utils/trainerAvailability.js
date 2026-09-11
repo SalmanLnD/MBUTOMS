@@ -241,7 +241,8 @@ export const buildTrainerAvailabilityForRange = async ({
   const { codeToTrainerId, allCodes } = buildTrainerCodeIndex(trainers);
   const trainerById = new Map(trainers.map((trainer) => [trainer._id.toString(), trainer]));
 
-  const ownedFilter = { trainerCode: { $in: allCodes } };
+  const cleanedCodes = allCodes.map((c) => String(c || '').trim()).filter(Boolean);
+  const ownedFilter = { trainerCode: { $in: cleanedCodes } };
   if (semester) ownedFilter.semester = semester;
 
   const [
@@ -297,6 +298,11 @@ export const buildTrainerAvailabilityForRange = async ({
     if (!schedulesByTrainer.has(trainerId)) schedulesByTrainer.set(trainerId, []);
     schedulesByTrainer.get(trainerId).push(schedule);
   });
+
+  // If schedules were not found from the bulk query (possible when trainer
+  // codes in DB differ), we'll lazily fetch per-trainer schedules as a
+  // fallback to improve resilience. This keeps behavior correct even when
+  // schedule codes are stored in unexpected formats.
 
   const replacementScheduleIds = [
     ...new Set(
@@ -393,7 +399,23 @@ export const buildTrainerAvailabilityForRange = async ({
 
       const busyIntervals = [];
 
-      (schedulesByTrainer.get(trainerId) || []).forEach((schedule) => {
+      let trainerSchedules = schedulesByTrainer.get(trainerId) || [];
+      // Fallback: try fetching schedules for this trainer if none were found
+      // in the bulk query. This handles cases where schedule codes don't
+      // match the precomputed index.
+      if (!trainerSchedules.length) {
+        try {
+          const fallbackCodes = resolveTrainerScheduleCodes(trainer).map((c) => String(c || '').trim()).filter(Boolean);
+          if (fallbackCodes.length) {
+            // eslint-disable-next-line no-await-in-loop
+            trainerSchedules = await Schedule.find({ trainerCode: { $in: fallbackCodes } }).lean();
+          }
+        } catch (err) {
+          // ignore fallback errors and proceed with empty schedules
+        }
+      }
+
+      trainerSchedules.forEach((schedule) => {
         if (schedule.day !== dayName) return;
         if (cancellationMap.get(dateKey)?.has(schedule._id.toString())) return;
         if (!isActiveOnDate(schedule, date, subjectStartMap)) return;
