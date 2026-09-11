@@ -5,6 +5,7 @@ import { fileURLToPath } from 'url';
 import AppSetting from '../models/AppSetting.js';
 import { getPublicApiBaseUrl } from './appsScriptSheetsService.js';
 import { buildTrainerAttendanceExportPayload } from '../utils/trainerAttendanceExport.js';
+import { buildRtetExportPayload } from '../utils/rtetExport.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const SPREADSHEET_SETTING_KEY = 'trainer_attendance_spreadsheet';
@@ -12,10 +13,14 @@ const EXPORT_KEY_SETTING = 'trainer_attendance_export_api_key_v2';
 const EXPORT_CACHE_MS = 300_000;
 let exportCache = { payload: null, cachedAt: 0 };
 let exportInFlight = null;
+let rtetCache = { payload: null, cachedAt: 0 };
+let rtetInFlight = null;
 
 export const clearAttendanceExportCache = () => {
   exportCache = { payload: null, cachedAt: 0 };
   exportInFlight = null;
+  rtetCache = { payload: null, cachedAt: 0 };
+  rtetInFlight = null;
 };
 
 const getExportKey = async () => {
@@ -122,21 +127,40 @@ export const exportTrainerAttendance = async () => {
     return exportCache.payload;
   }
 
-  if (exportInFlight) {
-    if (exportCache.payload) {
-      return exportCache.payload;
-    }
-    return exportInFlight;
+  if (!exportInFlight) {
+    exportInFlight = buildTrainerAttendanceExportPayload()
+      .then((payload) => {
+        exportCache = { payload, cachedAt: Date.now() };
+        return payload;
+      })
+      .finally(() => {
+        exportInFlight = null;
+      });
   }
 
-  exportInFlight = buildTrainerAttendanceExportPayload()
-    .then((payload) => {
-      exportCache = { payload, cachedAt: Date.now() };
-      return payload;
-    })
-    .finally(() => {
-      exportInFlight = null;
-    });
-
+  // Serve the last good snapshot immediately so Sheets Refresh now does not
+  // wait on a 30s Render timeout (which looks like a backend restart).
+  if (exportCache.payload) return exportCache.payload;
   return exportInFlight;
+};
+
+export const exportRtet = async () => {
+  const now = Date.now();
+  if (rtetCache.payload && now - rtetCache.cachedAt < EXPORT_CACHE_MS) {
+    return rtetCache.payload;
+  }
+
+  if (!rtetInFlight) {
+    rtetInFlight = buildRtetExportPayload()
+      .then((payload) => {
+        rtetCache = { payload, cachedAt: Date.now() };
+        return payload;
+      })
+      .finally(() => {
+        rtetInFlight = null;
+      });
+  }
+
+  if (rtetCache.payload) return rtetCache.payload;
+  return rtetInFlight;
 };

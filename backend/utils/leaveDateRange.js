@@ -2,6 +2,15 @@ const OPERATIONS_TIMEZONE = 'Asia/Kolkata';
 const DATE_KEY_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 const WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
+// Reused across calls: report builders convert tens of thousands of dates per
+// request, and a per-call formatter costs both CPU and retained ICU memory.
+const operationalDateFormatter = new Intl.DateTimeFormat('en-CA', {
+  timeZone: OPERATIONS_TIMEZONE,
+  year: 'numeric',
+  month: '2-digit',
+  day: '2-digit',
+});
+
 /**
  * Convert strings and stored Date values to the operational IST calendar day.
  * Plain YYYY-MM-DD inputs are preserved so server timezone never shifts them.
@@ -13,12 +22,7 @@ export const toLeaveDateKey = (dateInput) => {
   const date = new Date(dateInput);
   if (Number.isNaN(date.getTime())) return '';
 
-  return new Intl.DateTimeFormat('en-CA', {
-    timeZone: OPERATIONS_TIMEZONE,
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-  }).format(date);
+  return operationalDateFormatter.format(date);
 };
 
 /**
@@ -63,18 +67,10 @@ export const isDateWithinLeave = (dateInput, leave) => {
   return Boolean(dateKey && startKey && endKey && dateKey >= startKey && dateKey <= endKey);
 };
 
-/**
- * Return each calendar day in a leave range that falls on the given weekday.
- * A Monday slot in a Sat–Mon leave therefore maps to the single Monday date,
- * not the full leave span.
- */
-export const getLeaveDateKeysForWeekday = (leave, weekday) => {
+export const getLeaveDateKeys = (leave) => {
   const startKey = toLeaveDateKey(leave?.startDate);
   const endKey = toLeaveDateKey(leave?.endDate);
-  if (!startKey || !endKey || !weekday) return [];
-
-  const targetDay = WEEKDAYS.indexOf(weekday);
-  if (targetDay < 0) return [];
+  if (!startKey || !endKey || startKey > endKey) return [];
 
   const [startYear, startMonth, startDay] = startKey.split('-').map(Number);
   const [endYear, endMonth, endDay] = endKey.split('-').map(Number);
@@ -83,11 +79,32 @@ export const getLeaveDateKeysForWeekday = (leave, weekday) => {
   const keys = [];
 
   while (cursor <= end) {
-    if (cursor.getUTCDay() === targetDay) {
-      keys.push(toLeaveDateKey(cursor));
-    }
+    keys.push(toLeaveDateKey(cursor));
     cursor.setUTCDate(cursor.getUTCDate() + 1);
   }
 
   return keys;
+};
+
+export const getLeaveDateKeysInWindow = (leave, fromKey, untilKey) => {
+  const keys = getLeaveDateKeys(leave);
+  if (!fromKey && !untilKey) return keys;
+  return keys.filter((key) => (
+    (!fromKey || key >= fromKey)
+    && (!untilKey || key <= untilKey)
+  ));
+};
+
+/**
+ * Return each calendar day in a leave range that falls on the given weekday.
+ * A Monday slot in a Sat–Mon leave therefore maps to the single Monday date,
+ * not the full leave span.
+ */
+export const getLeaveDateKeysForWeekday = (leave, weekday) => {
+  const targetDay = WEEKDAYS.indexOf(weekday);
+  if (targetDay < 0) return [];
+  return getLeaveDateKeys(leave).filter((key) => {
+    const [year, month, day] = key.split('-').map(Number);
+    return new Date(Date.UTC(year, month - 1, day, 12)).getUTCDay() === targetDay;
+  });
 };
