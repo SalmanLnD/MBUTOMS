@@ -32,5 +32,5 @@ test('RTET reads startDate from cached subject range objects', () => {
     ),
     true
   );
-  assert.equal(getRtetRangeStart(subjectRanges).toISOString().slice(0, 10), '2026-07-13');
+  assert.equal(getRtetRangeStart().toISOString().slice(0, 10), '2026-07-12');
 });

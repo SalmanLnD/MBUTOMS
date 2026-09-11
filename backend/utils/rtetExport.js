@@ -15,7 +15,6 @@ import {
   getAttendanceWeekdayName,
   normalizeAttendanceDate,
   toAttendanceDateKey,
-  TRAINER_ATTENDANCE_TRACKING_START,
 } from './attendanceDates.js';
 import { getAttendanceToday } from './attendanceTracking.js';
 import { computeHours } from './trainerClassHours.js';
@@ -33,6 +32,9 @@ export const RTET_SUBJECTS = SUBJECT_OIF_CATALOG.map((entry) => ({
   name: entry.name,
   oifNumber: entry.oifNumber,
 }));
+
+/** Keep the RTET date axis stable for formulas in linked worksheets. */
+export const RTET_TRACKING_START = new Date(Date.UTC(2026, 6, 12));
 
 const formatDateLabel = (dateKey) => {
   const [year, month, day] = dateKey.split('-').map(Number);
@@ -67,26 +69,16 @@ export const isRtetScheduleActiveOnDate = (schedule, date, subjectStartMap) => {
   return ref >= startDate && (!endDate || ref <= endDate);
 };
 
-export const getRtetRangeStart = (subjectStartMap) => {
-  const candidates = RTET_SUBJECTS.map((subject) =>
-    getSubjectRange({ subjectCode: subject.code }, subjectStartMap).startDate
-  );
-  const earliest = candidates.reduce(
-    (min, date) => (date < min ? date : min),
-    DEFAULT_SUBJECT_START_DATE
-  );
-  return earliest > TRAINER_ATTENDANCE_TRACKING_START
-    ? earliest
-    : TRAINER_ATTENDANCE_TRACKING_START;
-};
+export const getRtetRangeStart = () => new Date(RTET_TRACKING_START);
 
 export const buildRtetExportPayload = async () => {
   const today = getAttendanceToday();
   const subjectCodes = RTET_SUBJECTS.map((s) => s.code);
   const subjectStartMap = await buildSubjectStartDateMap();
 
-  // Show RTET only from the earliest subject start date (fallback 13 Jul 2026).
-  const rangeStart = getRtetRangeStart(subjectStartMap);
+  // Keep 12 Jul 2026 in column B. Subject start dates still make pre-start
+  // occurrences zero without shifting columns used by dependent formulas.
+  const rangeStart = getRtetRangeStart();
   const rangeEnd = today;
 
   const dates = getAttendanceCalendarDates(rangeStart, rangeEnd);
