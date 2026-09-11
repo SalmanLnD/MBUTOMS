@@ -223,6 +223,7 @@ function syncRTET(spreadsheet) {
   }
 
   rtetSheet.clear();
+  rtetSheet.getRange(1, 1).clearNote();
   rtetSheet.getRange(1, 1, numRows, numCols).setValues(out);
 
   // Freeze header row and Subject column.
