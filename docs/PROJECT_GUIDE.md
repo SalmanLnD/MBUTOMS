@@ -1,6 +1,6 @@
 # MBUTOMS project guide
 
-Reviewed on 2026-09-11 against commit `7e8120a` (package version 2.0.1).
+Reviewed for the 2026-09-12 release (package version 2.1.0).
 
 ## Review scope and baseline
 

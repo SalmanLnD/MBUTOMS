@@ -4,7 +4,7 @@ A MERN stack web application to manage trainers, schedules, attendance, venues, 
 
 **GitHub:** [MBUTOMS](https://github.com/SalmanLnD/MBUTOMS)
 
-**Current version:** 2.0.1 — see [CHANGELOG.md](./CHANGELOG.md) for release notes.
+**Current version:** 2.1.0 — see [CHANGELOG.md](./CHANGELOG.md) for release notes.
 
 **App:** https://mbutoms.onrender.com
 

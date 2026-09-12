@@ -2,6 +2,39 @@
 
 All notable changes to MBU TOMS are documented here.
 
+## [2.1.0] - 2026-09-12
+
+### Complete interface redesign
+
+- Reworked the TOMS visual system with a new color palette, surfaces, typography, navigation, controls, tables, calendars, forms, modals, and responsive layouts
+- Made trainer timetables substantially more compact, removed unnecessary empty space, and kept each timetable within the available screen width
+- Improved mobile layouts across dashboard, trainers, subjects, timetable, venues, classes and students, leaves, tickets, topic tracker, performance, and replacements
+- Standardized pagination, filters, dropdowns, content padding, table density, tab navigation, and responsive action toolbars
+- Preserved the TOMS name, existing content, workflows, and role-based functionality throughout the redesign
+
+### Attendance, timetable, and RTET reliability
+
+- Restored RTET subject-hour exports and preserved the date-column alignment required by linked-sheet formulas, beginning with 12 July
+- Corrected trainer class-hour calculations so cancellations, holidays, approved leave, replacements, joining dates, and subject date ranges are applied consistently
+- Prevented cancelled or replaced timetable slots from remaining in the original trainer's attendance hours
+- Added reliable handling for historical IST and UTC date storage across attendance, leave, replacement, and topic-tracker reports
+
+### Reports and operations
+
+- Improved report caching, invalidation, concurrency limits, error handling, and request diagnostics
+- Added safer Google Sheets export behavior so failed refreshes preserve existing data and report visible errors
+- Improved topic-tracker backlog and class-summary loading, including subject expiry and historical closed-entry handling
+- Added maintenance and report-profiling tools plus expanded project documentation
+
+### Quality
+
+- Added regression coverage for report reliability, RTET export dates, attendance-sheet synchronization, cancellations, replacements, and trainer class hours
+- Verified the release with a successful frontend production build and all 135 backend tests passing
+
+_Release signature: GPT-6 Astra × GPT-5.6 Sol_
+
+---
+
 ## [2.0.1] - 2026-08-13
 
 Previous release: **1.1.2** (2026-07-16)
