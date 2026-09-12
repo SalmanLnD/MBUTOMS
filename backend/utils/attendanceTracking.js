@@ -4,8 +4,13 @@
  */
 export const ATTENDANCE_TIMEZONE = 'Asia/Kolkata';
 
-const operationalDateFormatter = new Intl.DateTimeFormat('en-CA', {
-  timeZone: ATTENDANCE_TIMEZONE, year: 'numeric', month: '2-digit', day: '2-digit',
+// Reused across calls: report builders convert tens of thousands of dates per
+// request, and a per-call formatter costs both CPU and retained ICU memory.
+const attendanceDateFormatter = new Intl.DateTimeFormat('en-CA', {
+  timeZone: ATTENDANCE_TIMEZONE,
+  year: 'numeric',
+  month: '2-digit',
+  day: '2-digit',
 });
 
 export const toAttendanceDateKey = (dateInput) => {
@@ -16,7 +21,7 @@ export const toAttendanceDateKey = (dateInput) => {
   if (typeof dateInput === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(dateInput)) {
     return date.toISOString().slice(0, 10) === dateInput ? dateInput : '';
   }
-  return operationalDateFormatter.format(date);
+  return attendanceDateFormatter.format(date);
 };
 
 export const normalizeAttendanceDate = (dateInput) => {

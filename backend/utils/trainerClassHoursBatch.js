@@ -9,6 +9,7 @@ import { computeHours } from './trainerClassHours.js';
 import {
   buildSubjectStartDateMap,
   DEFAULT_SUBJECT_START_DATE,
+  DEFAULT_SUBJECT_END_DATE,
 } from './subjectStartDate.js';
 import { getWeekdaysInLeaveRange } from './trainerScheduleView.js';
 import {
@@ -23,11 +24,23 @@ const SCHEDULE_FIELDS = 'day startTime endTime trainerCode semester subject subj
 const resolveStartDate = (schedule, subjectStartMap) => {
   const subjectId = schedule.subject?.toString();
   if (subjectId && subjectStartMap.byId.has(subjectId)) {
-    return subjectStartMap.byId.get(subjectId);
+    return subjectStartMap.byId.get(subjectId).startDate || null;
   }
   const subjectCode = schedule.subjectCode?.trim();
   if (subjectCode && subjectStartMap.byCode.has(subjectCode)) {
-    return subjectStartMap.byCode.get(subjectCode);
+    return subjectStartMap.byCode.get(subjectCode).startDate || null;
+  }
+  return null;
+};
+
+const resolveEndDate = (schedule, subjectStartMap) => {
+  const subjectId = schedule.subject?.toString();
+  if (subjectId && subjectStartMap.byId.has(subjectId)) {
+    return subjectStartMap.byId.get(subjectId).endDate || null;
+  }
+  const subjectCode = schedule.subjectCode?.trim();
+  if (subjectCode && subjectStartMap.byCode.has(subjectCode)) {
+    return subjectStartMap.byCode.get(subjectCode).endDate || null;
   }
   return null;
 };
@@ -38,7 +51,11 @@ const isActiveOnDate = (schedule, referenceDate, subjectStartMap) => {
   const effectiveStart = rawStart
     ? normalizeAttendanceDate(rawStart)
     : DEFAULT_SUBJECT_START_DATE;
-  return ref >= effectiveStart;
+  const rawEnd = resolveEndDate(schedule, subjectStartMap);
+  const effectiveEnd = rawEnd
+    ? normalizeAttendanceDate(rawEnd)
+    : DEFAULT_SUBJECT_END_DATE;
+  return ref >= effectiveStart && ref <= effectiveEnd;
 };
 
 const buildTrainerLookup = (trainers) => {
@@ -102,6 +119,21 @@ const indexSchedulesByTrainerDay = (schedules, codeToTrainerId) => {
 
   return schedulesByTrainerDay;
 };
+
+export const filterOwnedSchedulesForAttendanceDate = (
+  schedules,
+  {
+    replacedScheduleIds = new Set(),
+    canceledScheduleIds = new Set(),
+    date,
+    subjectStartMap,
+  }
+) => schedules.filter((schedule) => {
+  const scheduleId = schedule._id.toString();
+  return !replacedScheduleIds.has(scheduleId)
+    && !canceledScheduleIds.has(scheduleId)
+    && isActiveOnDate(schedule, date, subjectStartMap);
+});
 
 export const computeClassHandlingHoursBatch = async (
   trainerIds,
@@ -245,11 +277,14 @@ export const computeClassHandlingHoursBatch = async (
       }
       const replacedOwnedIds =
         replacedOwnedScheduleIdsByTrainerDate.get(`${trainerId}|${dateKey}`) || new Set();
-      const owned = (schedulesByTrainerDay.get(trainerId)?.get(dayName) || []).filter(
-        (schedule) =>
-          !replacedOwnedIds.has(schedule._id.toString())
-          && !canceledIds.has(schedule._id.toString())
-          && isActiveOnDate(schedule, date, subjectStartMap)
+      const owned = filterOwnedSchedulesForAttendanceDate(
+        schedulesByTrainerDay.get(trainerId)?.get(dayName) || [],
+        {
+          replacedScheduleIds: replacedOwnedIds,
+          canceledScheduleIds: canceledIds,
+          date,
+          subjectStartMap,
+        }
       );
       const replacements = replacementByTrainerDate.get(`${trainerId}|${dateKey}`) || [];
 
