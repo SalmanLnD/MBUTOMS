@@ -76,18 +76,37 @@ img, svg { max-width: 100%; }
 .timetable-trainer-section .timetable-card { box-shadow: none; border-radius: 8px; }
 .timetable-trainer-title { color: var(--ink-950); font-weight: 850; }
 
-.trainer-attendance-month-table { min-width: 1320px; table-layout: fixed; }
+.trainer-attendance-month-table { width: max-content; min-width: 100%; table-layout: fixed; }
+.trainer-attendance-month-table col.trainer-attendance-sticky-col { width: 180px; }
+.trainer-attendance-month-table col.trainer-attendance-oif-col { width: 84px; }
+.trainer-attendance-month-table col.trainer-attendance-mock-col { width: 58px; }
+.trainer-attendance-month-table col.trainer-attendance-class-col { width: 62px; }
+.trainer-attendance-month-table col.trainer-attendance-food-col { width: 82px; }
+.trainer-attendance-month-table col.trainer-attendance-totals-col { width: 150px; }
 .trainer-attendance-month-table thead { position: sticky; top: 0; z-index: 5; }
 .trainer-attendance-grid .trainer-attendance-sticky-col { position: sticky; left: 0; z-index: 4; min-width: 180px; background: var(--surface); box-shadow: 1px 0 var(--line); }
 .trainer-attendance-grid thead .trainer-attendance-sticky-col { z-index: 7; color: #fff; background: var(--surface-strong); }
 .trainer-attendance-month-table .trainer-attendance-day-header { text-align: center; color: #fff; background: var(--surface-strong); }
 .trainer-attendance-month-table .trainer-attendance-subheader { text-align: center; color: var(--text-secondary); background: var(--surface-soft); }
-.trainer-attendance-grid td { min-width: 82px; }
+.trainer-attendance-grid td { min-width: 0; }
+.trainer-attendance-grid .trainer-attendance-oif-cell { width: 84px; }
+.trainer-attendance-grid .trainer-attendance-mock-cell { width: 58px; }
+.trainer-attendance-grid .trainer-attendance-class-cell { width: 62px; }
+.trainer-attendance-grid .trainer-attendance-food-cell { width: 82px; }
+.trainer-attendance-grid .trainer-attendance-totals-col { width: 150px; min-width: 150px; }
 .trainer-attendance-class-input, .trainer-attendance-oif-input { width: 100%; min-width: 68px; height: 34px; padding: .25rem .4rem; text-align: center; border: 1px solid var(--line); border-radius: 7px; background: var(--surface); color: var(--text-primary); }
 .trainer-attendance-class-value { display: inline-grid; place-items: center; min-width: 36px; min-height: 30px; padding: .2rem .4rem; border-radius: 7px; background: var(--surface-soft); font-weight: 800; }
 .trainer-attendance-future { opacity: .55; }
 .trainer-attendance-weekend { background: var(--surface-soft) !important; }
 .trainer-attendance-holiday { background: var(--amber-soft) !important; }
+.trainer-attendance-month-table .trainer-attendance-day-header.trainer-attendance-weekend {
+  color: var(--ink-950);
+  background: var(--line-strong) !important;
+}
+.trainer-attendance-month-table .trainer-attendance-day-header.trainer-attendance-holiday {
+  color: var(--ink-950);
+  background: var(--amber-soft) !important;
+}
 .trainer-attendance-totals-col { background: var(--primary-soft) !important; }
 .trainer-attendance-summary { display: flex; flex-wrap: wrap; gap: .5rem; }
 .trainer-attendance-pill { display: inline-flex; align-items: center; gap: .35rem; padding: .4rem .7rem; border: 1px solid var(--line); border-radius: 999px; color: var(--text-secondary); background: var(--surface); font-size: .78rem; font-weight: 750; }

@@ -112,22 +112,23 @@ const TopicTrackerClassSummaryTab = ({
               <span className="badge bg-secondary">{subject.topicCount} syllabus topics</span>
             </div>
             <div className="table-responsive">
-              <table className="table table-sm mb-0 align-middle">
+              <table className="table table-sm mb-0 align-middle topic-summary-table">
                 <thead>
                   <tr>
                     <th>Trainer</th>
                     <th>Class</th>
-                    <th>Closed slots</th>
+                    <th className="topic-summary-table__mobile-secondary">Closed slots</th>
                     <th>Topics covered</th>
                     <th>Coverage</th>
-                    <th>Avg attendance</th>
+                    <th>Remaining training hours</th>
+                    <th className="topic-summary-table__mobile-secondary">Avg attendance</th>
                     <th />
                   </tr>
                 </thead>
                 <tbody>
                   {!visibleClasses.length ? (
                     <tr>
-                      <td colSpan="7" className="text-muted text-center py-3">
+                      <td colSpan="8" className="text-muted text-center py-3">
                         No closed topic entries found for this subject and trainer.
                       </td>
                     </tr>
@@ -141,7 +142,7 @@ const TopicTrackerClassSummaryTab = ({
                           <tr>
                             <td>{cls.trainerName || 'Unassigned trainer'}</td>
                             <td>{cls.branchYearSection}</td>
-                            <td>{cls.closedSlots}</td>
+                            <td className="topic-summary-table__mobile-secondary">{cls.closedSlots}</td>
                             <td>
                               {cls.totalTopics
                                 ? `${cls.coveredCount} / ${cls.totalTopics}`
@@ -156,7 +157,12 @@ const TopicTrackerClassSummaryTab = ({
                                 <span className="text-muted">-</span>
                               )}
                             </td>
-                            <td>{cls.avgAttendance != null ? `${cls.avgAttendance}%` : '-'}</td>
+                            <td>
+                              {Number(cls.remainingTrainingHours || 0).toFixed(1)} hrs
+                            </td>
+                            <td className="topic-summary-table__mobile-secondary">
+                              {cls.avgAttendance != null ? `${cls.avgAttendance}%` : '-'}
+                            </td>
                             <td className="text-end">
                               <button
                                 type="button"
@@ -169,7 +175,7 @@ const TopicTrackerClassSummaryTab = ({
                           </tr>
                           {isExpanded && (
                             <tr>
-                              <td colSpan="7" className="bg-light">
+                              <td colSpan="8" className="bg-light">
                                 <div className="row g-3 p-2">
                                   <div className="col-md-6">
                                     <h4 className="h6">Covered</h4>

@@ -18,7 +18,13 @@ import {
   buildTrainerFilterForCoordinatorSubjects,
 } from './subjectCoordinatorAccess.js';
 import { getTopicOptionsForSubjectDoc } from './topicTrackerTopicCatalog.js';
-import { getLeaveDayWindow, getLeaveOverlapFilter, toLeaveDateKey, getLeaveDateKeysInWindow } from './leaveDateRange.js';
+import {
+  getLeaveDayWindow,
+  getLeaveOverlapFilter,
+  toLeaveDateKey,
+  getLeaveDateKeysInWindow,
+  getLeaveDateKeysForWeekday,
+} from './leaveDateRange.js';
 import {
   formatTopicModulesCovered,
   getEntryTopicModules,
@@ -33,6 +39,7 @@ import {
   TRAINER_ATTENDANCE_TRACKING_START,
   toAttendanceDateKey,
   normalizeAttendanceDate,
+  getAttendanceWeekdayName,
 } from './attendanceDates.js';
 import { getAttendanceToday } from './attendanceTracking.js';
 import { loadOfficialHolidayMap } from './officialHolidays.js';
@@ -41,6 +48,7 @@ import {
   DEFAULT_SUBJECT_END_DATE,
   buildSubjectStartDateMap,
   getScheduleSubjectRange,
+  isScheduleWithinSubjectDates,
 } from './subjectStartDate.js';
 
 const WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
@@ -105,14 +113,25 @@ const buildClassGroupMap = async () => {
 };
 
 const buildTrainerLookup = async () => {
-  const trainers = await Trainer.find().select('name employeeId scheduleTrainerCodes').lean();
+  const trainers = await Trainer.find()
+    .select('name employeeId scheduleTrainerCodes status employmentStatus createdAsBulkReplacement')
+    .lean();
   const byCode = new Map();
   const byId = new Map();
+  const codeRanks = new Map();
   trainers.forEach((trainer) => {
     byId.set(trainer._id.toString(), trainer);
+    const isActiveFullTime = trainer.status !== 'unavailable'
+      && !['resigned', 'relocated'].includes(trainer.employmentStatus)
+      && !trainer.createdAsBulkReplacement;
     const codes = resolveTrainerScheduleCodes(trainer);
     codes.forEach((code) => {
-      byCode.set(code, trainer);
+      const isDirectOwner = String(trainer.employeeId || '').trim() === code;
+      const rank = (isActiveFullTime ? 2 : 0) + (isDirectOwner ? 1 : 0);
+      if (!byCode.has(code) || rank > (codeRanks.get(code) || 0)) {
+        byCode.set(code, trainer);
+        codeRanks.set(code, rank);
+      }
     });
   });
   return { byCode, byId };
@@ -158,6 +177,194 @@ const computeAttendancePercent = (allotted, present) => {
   if (!allotted || allotted <= 0) return null;
   const value = Math.round((present / allotted) * 1000) / 10;
   return Number.isFinite(value) ? value : null;
+};
+
+const roundHours = (hours) => Math.max(0, Math.round((Number(hours) || 0) * 10) / 10);
+
+const getSubjectId = (subject) => subject?._id?.toString?.() || subject?.toString?.() || '';
+
+const getDocumentId = (value) => value?._id?.toString?.() || value?.toString?.() || '';
+
+export const normalizeTopicTrackerClassLabel = (value = '') => {
+  const label = String(value || '').trim();
+  if (!label) return 'Unassigned class';
+
+  const match = label.match(/^(.*?\bSem\s+\S+)\s*-\s*(.+)$/i);
+  if (!match) {
+    return label.replace(/'/g, '').replace(/\s+/g, ' ');
+  }
+
+  const prefix = `${match[1].trim()} - `;
+  const section = match[2].trim()
+    .replace(/'/g, '')
+    .replace(/\s*-\s*.*$/, '')
+    .trim();
+  return `${prefix}${section}`.replace(/\s+/g, ' ');
+};
+
+const buildClassSummaryKey = ({ subjectId, branchYearSection }) => {
+  const normalizedClass = normalizeTopicTrackerClassLabel(branchYearSection)
+    .replace(/,\s*PY\s+\d{4}(?=\s+Sem\b)/i, ',')
+    .toLocaleLowerCase();
+  return `${subjectId || ''}::${normalizedClass}`;
+};
+
+const buildInterruptionKeys = (leaves = [], schedulesById = new Map(), fromKey = '', untilKey = '') => {
+  const keys = new Set();
+  leaves.forEach((leave) => {
+    const affectedScheduleIds = new Set(
+      (leave.affectedSchedules || []).map(getDocumentId).filter(Boolean)
+    );
+    if (!affectedScheduleIds.size) return;
+
+    affectedScheduleIds.forEach((scheduleId) => {
+      const schedule = schedulesById.get(scheduleId);
+      if (!schedule) return;
+      getLeaveDateKeysForWeekday(leave, schedule.day).forEach((dateKey) => {
+        if (fromKey && dateKey < fromKey) return;
+        if (untilKey && dateKey > untilKey) return;
+        keys.add(`${dateKey}|${scheduleId}`);
+      });
+    });
+  });
+  return keys;
+};
+
+export const buildRemainingTrainingHoursByClass = async ({
+  subjects = [],
+  trainerId,
+  today = getAttendanceToday(),
+} = {}) => {
+  const todayKey = toAttendanceDateKey(today);
+  if (!todayKey || !subjects.length) return new Map();
+
+  const subjectIds = subjects.map((subject) => getSubjectId(subject)).filter(Boolean);
+  const subjectCodes = subjects.map((subject) => String(subject.code || '').trim()).filter(Boolean);
+  if (!subjectIds.length && !subjectCodes.length) return new Map();
+  const subjectIdByCode = new Map(
+    subjects
+      .map((subject) => [String(subject.code || '').trim(), getSubjectId(subject)])
+      .filter(([code, id]) => code && id)
+  );
+
+  const subjectDateMap = await buildSubjectStartDateMap();
+  const todayDate = normalizeAttendanceDate(todayKey);
+  let rangeEnd = null;
+
+  subjects.forEach((subject) => {
+    const range = getScheduleSubjectRange(
+      { subject: { _id: subject._id }, subjectCode: subject.code },
+      subjectDateMap
+    );
+    const end = normalizeAttendanceDate(range.endDate || DEFAULT_SUBJECT_END_DATE);
+    if (!Number.isNaN(end.getTime()) && (!rangeEnd || end > rangeEnd)) rangeEnd = end;
+  });
+
+  if (!rangeEnd || rangeEnd < todayDate) return new Map();
+
+  const untilKey = toAttendanceDateKey(rangeEnd);
+  const fromWindow = getLeaveDayWindow(todayKey);
+  const untilWindow = getLeaveDayWindow(untilKey);
+  const subjectIdSet = new Set(subjectIds);
+
+  const [schedules, trainerLookup, classGroupMap, holidayMap, cancellations, entries, leaves] = await Promise.all([
+    Schedule.find({
+      $or: [
+        { subject: { $in: subjectIds } },
+        { subjectCode: { $in: subjectCodes } },
+      ],
+    })
+      .populate('subject', 'name code startDate endDate')
+      .select('day startTime endTime slot department section semester subject subjectCode trainerCode')
+      .lean(),
+    buildTrainerLookup(),
+    buildClassGroupMap(),
+    loadOfficialHolidayMap(todayDate, rangeEnd),
+    ClassCancellation.find({
+      date: { $gte: fromWindow.start, $lt: untilWindow.endExclusive },
+    })
+      .select('date schedules')
+      .lean(),
+    TopicTrackerEntry.find({
+      date: { $gte: fromWindow.start, $lt: untilWindow.endExclusive },
+    })
+      .select('schedule date trackerStatus sessionStatus updatedAt')
+      .lean(),
+    Leave.find({
+      status: 'approved',
+      ...getLeaveOverlapFilter(todayDate, rangeEnd),
+    })
+      .select('startDate endDate affectedSchedules')
+      .lean(),
+  ]);
+
+  const canceledByDate = buildCanceledScheduleIdsByDate(cancellations);
+  const schedulesById = new Map(schedules.map((schedule) => [schedule._id.toString(), schedule]));
+  const interruptedKeys = buildInterruptionKeys(leaves, schedulesById, todayKey, untilKey);
+  const completedTodayScheduleIds = new Set();
+
+  entries.forEach((entry) => {
+    if (toLeaveDateKey(entry.date) !== todayKey) return;
+    if (entry.trackerStatus === 'closed' || entry.sessionStatus === 'completed') {
+      const scheduleId = getDocumentId(entry.schedule);
+      if (scheduleId) completedTodayScheduleIds.add(scheduleId);
+    }
+  });
+
+  const schedulesByDay = new Map(WEEKDAYS.map((day) => [day, []]));
+  schedules.forEach((schedule) => {
+    if (!schedulesByDay.has(schedule.day)) return;
+    schedulesByDay.get(schedule.day).push(schedule);
+  });
+
+  const remainingByClass = new Map();
+  getAttendanceCalendarDates(todayDate, rangeEnd).forEach((date) => {
+    const dateKey = toAttendanceDateKey(date);
+    if (!dateKey || holidayMap.has(dateKey)) return;
+
+    const canceledIds = canceledByDate.get(dateKey) || new Set();
+    const daySchedules = schedulesByDay.get(getAttendanceWeekdayName(date)) || [];
+    daySchedules.forEach((schedule) => {
+      const scheduleId = schedule._id.toString();
+      if (canceledIds.has(scheduleId)) return;
+      if (interruptedKeys.has(`${dateKey}|${scheduleId}`)) return;
+      if (dateKey === todayKey && completedTodayScheduleIds.has(scheduleId)) return;
+      if (!isScheduleWithinSubjectDates(schedule, date, subjectDateMap)) return;
+
+      const scheduleSubjectId = getSubjectId(schedule.subject)
+        || subjectIdByCode.get(String(schedule.subjectCode || '').trim())
+        || '';
+      if (!subjectIdSet.has(scheduleSubjectId)) return;
+
+      const mainTrainer = trainerLookup.byCode.get(schedule.trainerCode);
+      if (!mainTrainer) return;
+      const mainTrainerId = mainTrainer._id.toString();
+      if (trainerId && mainTrainerId !== trainerId.toString()) return;
+
+      const classGroup = classGroupMap.get(
+        `${schedule.department}::${schedule.section}::${schedule.semester}`
+      );
+      const branchYearSection = buildBranchYearSection(schedule, classGroup);
+      const key = buildClassSummaryKey({
+        subjectId: scheduleSubjectId,
+        branchYearSection,
+      });
+      const existing = remainingByClass.get(key) || {
+        subjectId: scheduleSubjectId,
+        trainerKey: `${mainTrainerId || 'unassigned'}::${mainTrainer.name || 'Unassigned trainer'}`,
+        trainerId: mainTrainerId,
+        trainerName: mainTrainer.name || 'Unassigned trainer',
+        branchYearSection: normalizeTopicTrackerClassLabel(branchYearSection),
+        remainingTrainingHours: 0,
+      };
+      existing.remainingTrainingHours = roundHours(
+        existing.remainingTrainingHours + computeHours(schedule.startTime, schedule.endTime)
+      );
+      remainingByClass.set(key, existing);
+    });
+  });
+
+  return remainingByClass;
 };
 
 export const mergeOverviewTrainerNames = (currentNames = [], session = {}) => {
@@ -808,7 +1015,12 @@ export const buildTopicTrackerExportRows = async () => {
   return { rows, exportedAt: new Date().toISOString(), count: entries.length };
 };
 
-export const buildTopicTrackerClassSummary = async ({ subjectId, user, trainerId } = {}) => {
+export const buildTopicTrackerClassSummary = async ({
+  subjectId,
+  user,
+  trainerId,
+  today,
+} = {}) => {
   const ownTrainerId = trainerId
     ? String(trainerId._id || trainerId)
     : ((user?.role === ROLES.TRAINER || user?.role === ROLES.EVALUATOR) && user.trainer
@@ -874,10 +1086,14 @@ export const buildTopicTrackerClassSummary = async ({ subjectId, user, trainerId
     return { subjects: [] };
   }
 
-  const entries = await TopicTrackerEntry.find(entryFilter)
-    .select('subject trainer branchYearSection topicModuleCovered topicModulesCovered date sessionStatus allottedStudents noPresent attendancePercent trainerName')
-    .sort({ date: 1 })
-    .lean();
+  const [entries, trainerLookup, remainingHoursByClass] = await Promise.all([
+    TopicTrackerEntry.find(entryFilter)
+      .select('subject trainer branchYearSection topicModuleCovered topicModulesCovered date sessionStatus allottedStudents noPresent attendancePercent trainerName')
+      .sort({ date: 1 })
+      .lean(),
+    buildTrainerLookup(),
+    buildRemainingTrainingHoursByClass({ subjects, trainerId: ownTrainerId || undefined, today }),
+  ]);
 
   const entriesBySubject = new Map();
   entries.forEach((entry) => {
@@ -891,17 +1107,37 @@ export const buildTopicTrackerClassSummary = async ({ subjectId, user, trainerId
     const subjectEntries = entriesBySubject.get(subject._id.toString()) || [];
     const classMap = new Map();
 
+    remainingHoursByClass.forEach((remaining, key) => {
+      if (remaining.subjectId !== subject._id.toString()) return;
+      classMap.set(key, {
+        trainerKey: remaining.trainerKey,
+        trainerId: remaining.trainerId,
+        trainerName: remaining.trainerName,
+        branchYearSection: remaining.branchYearSection,
+        closedSlots: 0,
+        topicHits: new Map(),
+        attendanceSum: 0,
+        attendanceCount: 0,
+      });
+    });
+
     subjectEntries.forEach((entry) => {
-      const trainerId = entry.trainer?.toString() || '';
-      const trainerName = entry.trainerName || 'Unassigned trainer';
-      const trainerKey = `${trainerId || 'unassigned'}::${trainerName}`;
-      const branchYearSection = entry.branchYearSection || 'Unassigned class';
-      const classKey = `${trainerKey}::${branchYearSection}`;
+      const historicalTrainerId = entry.trainer?.toString() || '';
+      const historicalTrainerName = trainerLookup.byId.get(historicalTrainerId)?.name
+        || entry.trainerName
+        || 'Unassigned trainer';
+      const branchYearSection = normalizeTopicTrackerClassLabel(
+        entry.branchYearSection || 'Unassigned class'
+      );
+      const classKey = buildClassSummaryKey({
+        subjectId: entry.subject?.toString() || '',
+        branchYearSection,
+      });
       if (!classMap.has(classKey)) {
         classMap.set(classKey, {
-          trainerKey,
-          trainerId,
-          trainerName,
+          trainerKey: `${historicalTrainerId || 'unassigned'}::${historicalTrainerName}`,
+          trainerId: historicalTrainerId,
+          trainerName: historicalTrainerName,
           branchYearSection,
           closedSlots: 0,
           topicHits: new Map(),
@@ -954,6 +1190,10 @@ export const buildTopicTrackerClassSummary = async ({ subjectId, user, trainerId
           avgAttendance: row.attendanceCount
             ? Math.round((row.attendanceSum / row.attendanceCount) * 10) / 10
             : null,
+          remainingTrainingHours: remainingHoursByClass.get(buildClassSummaryKey({
+            subjectId: subject._id.toString(),
+            branchYearSection: row.branchYearSection,
+          }))?.remainingTrainingHours || 0,
           coveredTopics,
           uncoveredTopics,
         };

@@ -1,11 +1,11 @@
 /**
  * RTET – Real Time Execution Tracker (baseline mode)
  *
- * Baseline mode intentionally uses ONLY timetable schedules:
- * - ignore cancellations
- * - ignore replacements/interventions
+ * Baseline mode uses the main timetable as its source of truth:
+ * - exclude cancelled timetable occurrences
+ * - ignore replacement-trainer ownership changes
  * - apply official holidays (0 hours)
- * - apply only subject start dates
+ * - respect subject start and end dates
  *
  * This yields the same recurring weekly pattern for each weekday.
  */
