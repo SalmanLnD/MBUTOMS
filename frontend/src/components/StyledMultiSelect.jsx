@@ -184,7 +184,8 @@ const StyledMultiSelect = ({
         width: menuStyle.width,
         maxHeight: menuStyle.maxHeight,
         transform: menuStyle.transform,
-        zIndex: 1200,
+        // Menus are portalled to <body>; keep them above our modal overlay (1300).
+        zIndex: 1400,
       }}
     >
       <div className="toms-styled-multi-select__menu-inner">
