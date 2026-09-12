@@ -1,7 +1,7 @@
 import Schedule from '../models/Schedule.js';
 import {
   buildSubjectStartDateMap,
-  DEFAULT_SUBJECT_START_DATE,
+  isScheduleWithinSubjectDates,
 } from './subjectStartDate.js';
 import { normalizeDate } from './scheduleHelpers.js';
 import { getCanceledScheduleIdsForDate } from './classCancellations.js';
@@ -10,17 +10,11 @@ import { toAttendanceDateKey } from './attendanceDates.js';
 
 export async function filterSchedulesActiveOnDate(schedules, referenceDate = new Date()) {
   if (!schedules.length) return [];
-  const { byId, byCode } = await buildSubjectStartDateMap();
+  const subjectDateMap = await buildSubjectStartDateMap();
   const ref = normalizeDate(referenceDate);
-
-  return schedules.filter((schedule) => {
-    const subjectId = schedule.subject?._id?.toString() || schedule.subject?.toString();
-    const subjectCode = schedule.subjectCode?.trim();
-    const startDate = (subjectId && byId.get(subjectId))
-      || (subjectCode && byCode.get(subjectCode))
-      || DEFAULT_SUBJECT_START_DATE;
-    return ref >= startDate;
-  });
+  return schedules.filter((schedule) =>
+    isScheduleWithinSubjectDates(schedule, ref, subjectDateMap)
+  );
 }
 
 export async function getActiveSchedulesForDay(dayName, referenceDate = new Date()) {

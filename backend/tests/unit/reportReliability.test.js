@@ -6,6 +6,7 @@ import { invalidateDerivedData } from '../../utils/dataRevision.js';
 import { buildAttendanceGridCacheKey, setCachedAttendanceGrid, getCachedAttendanceGrid, clearAttendanceGridCache } from '../../utils/attendanceGridCache.js';
 import { getScheduleSubjectRange, isScheduleWithinSubjectDates, clearSubjectStartDateCache } from '../../utils/subjectStartDate.js';
 import { buildTopicTrackerPendingBacklog } from '../../utils/topicTrackerSessions.js';
+import { filterSchedulesActiveOnDate } from '../../utils/activeSchedulesForDate.js';
 import { exportGuard } from '../../middleware/exportGuard.js';
 import { requireAttendanceExportKey } from '../../middleware/attendanceExportAuth.js';
 import AppSetting from '../../models/AppSetting.js';
@@ -28,6 +29,27 @@ test('subject windows include end day and reject the following day for IDs and c
     assert.equal(isScheduleWithinSubjectDates(schedule, 'invalid', map), false);
     assert.deepEqual(getScheduleSubjectRange(schedule, map), range);
   }
+});
+
+test('active schedule filtering reads cached subject range objects and honors both boundaries', async (t) => {
+  const subject = {
+    _id: 'subject',
+    code: 'CODE',
+    name: 'Course',
+    startDate: new Date('2026-08-01'),
+    endDate: new Date('2026-08-31'),
+  };
+  const query = { select() { return this; }, lean: async () => [subject] };
+  t.mock.method(Subject, 'find', () => query);
+  clearSubjectStartDateCache();
+
+  const schedule = { _id: 'slot', subject: { _id: 'subject', code: 'CODE' }, subjectCode: 'CODE' };
+  assert.equal((await filterSchedulesActiveOnDate([schedule], '2026-07-31')).length, 0);
+  assert.equal((await filterSchedulesActiveOnDate([schedule], '2026-08-01')).length, 1);
+  assert.equal((await filterSchedulesActiveOnDate([schedule], '2026-08-31')).length, 1);
+  assert.equal((await filterSchedulesActiveOnDate([schedule], '2026-09-01')).length, 0);
+
+  clearSubjectStartDateCache();
 });
 
 test('concurrent report reads share work; writes invalidate; failed loads are retried', async () => {
