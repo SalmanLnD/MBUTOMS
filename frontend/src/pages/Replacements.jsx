@@ -350,7 +350,7 @@ const Replacements = () => {
           <div className="card-body">
             <div className="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
               <h5 className="card-title mb-0">Replacement Register</h5>
-              <div className="d-flex align-items-center gap-2">
+              <div className="d-flex flex-wrap align-items-center gap-2">
                 <div className="btn-group btn-group-sm" role="group" aria-label="Replacement register filter">
                   <button
                     type="button"
@@ -763,8 +763,8 @@ const Replacements = () => {
                           <tr className="table-light">
                             <td colSpan="5" className="small text-muted py-2">
                               Other available trainers (not subject-eligible)
-                            </td>
-                          </tr>
+                        </td>
+                      </tr>
                         )}
                         {renderSuggestionRows(visibleOtherSuggestions, {
                           startIndex: visibleSuggestions.length,

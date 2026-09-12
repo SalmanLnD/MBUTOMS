@@ -14,7 +14,6 @@ import {
 } from '../services/sheetsService.js';
 import TimetableSheetSetupModal from '../components/TimetableSheetSetupModal.jsx';
 import ClassCancellationModal from '../components/ClassCancellationModal.jsx';
-import CollapsibleFilters from '../components/CollapsibleFilters.jsx';
 import { CalendarIcon, SheetIcon, ExternalLinkIcon } from '../components/icons.jsx';
 import { getErrorMessage, toInputDate } from '../utils/helpers.js';
 import { isAbortError } from '../services/api.js';
@@ -348,7 +347,7 @@ const Timetable = () => {
         </div>
       )}
 
-      <CollapsibleFilters label="Search and filters">
+      <div className="timetable-filter-panel">
         <div className={`row g-3 mb-3 align-items-end timetable-controls${isViewOnly ? ' timetable-controls--view-only' : ''}`}>
         <div className="col-md-3">
           <label htmlFor="trainer-search" className="form-label fw-semibold">
@@ -456,7 +455,7 @@ const Timetable = () => {
           )}
         </div>
       )}
-      </CollapsibleFilters>
+      </div>
 
       <div className="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3 timetable-summary-bar">
         <p className="text-muted small mb-0">

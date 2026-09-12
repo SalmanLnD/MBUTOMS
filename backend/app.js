@@ -25,7 +25,6 @@ import ticketRoutes from './routes/ticketRoutes.js';
 import topicTrackerRoutes from './routes/topicTrackerRoutes.js';
 import studentTestReportRoutes from './routes/studentTestReportRoutes.js';
 import compOffRoutes from './routes/compOffRoutes.js';
-import { computeClassHandlingHoursBatch } from './utils/trainerClassHoursBatch.js';
 
 dotenv.config();
 const app = express();
@@ -73,21 +72,6 @@ app.use('/api/tickets', ticketRoutes);
 app.use('/api/topic-tracker', topicTrackerRoutes);
 app.use('/api/student-test-reports', studentTestReportRoutes);
 app.use('/api/comp-offs', compOffRoutes);
-
-// Temporary debug endpoint to inspect computed class handling hours for a trainer/date
-app.get('/api/debug/class-hours', async (req, res) => {
-  try {
-    const { trainerId, date } = req.query;
-    if (!trainerId || !date) return res.status(400).json({ message: 'trainerId and date are required' });
-    const dt = new Date(date);
-    const map = await computeClassHandlingHoursBatch([trainerId], [dt], null);
-    const entries = {};
-    for (const [k, v] of map.entries()) entries[k] = v;
-    return res.json({ entries });
-  } catch (err) {
-    return res.status(500).json({ message: err.message });
-  }
-});
 
 app.use(notFound);
 app.use(errorHandler);

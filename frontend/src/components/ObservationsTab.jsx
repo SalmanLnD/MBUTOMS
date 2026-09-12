@@ -36,6 +36,7 @@ const ObservationsTab = () => {
   const [rows, setRows] = useState([]);
   const [drafts, setDrafts] = useState({});
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState('');
   const [savingId, setSavingId] = useState('');
 
   const monthKey = formatMonthKey(monthParts.year, monthParts.month);
@@ -45,6 +46,7 @@ const ObservationsTab = () => {
 
   const loadObservations = useCallback(async () => {
     setLoading(true);
+    setLoadError('');
     try {
       const data = await getObservations({ month: monthKey, type: observationType });
       const trainers = data.trainers || [];
@@ -54,8 +56,7 @@ const ObservationsTab = () => {
       ));
     } catch (err) {
       showError(getErrorMessage(err));
-      setRows([]);
-      setDrafts({});
+      setLoadError(getErrorMessage(err));
     } finally {
       setLoading(false);
     }
@@ -230,7 +231,7 @@ const ObservationsTab = () => {
               {rows.length === 0 ? (
                 <tr>
                   <td colSpan={7} className="text-center text-muted py-4">
-                    No trainers found
+                    {loadError || 'No trainers found'}
                   </td>
                 </tr>
               ) : (

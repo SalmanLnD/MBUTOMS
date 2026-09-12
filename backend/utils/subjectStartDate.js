@@ -1,5 +1,7 @@
 import Subject from '../models/Subject.js';
-import { normalizeDate } from './scheduleHelpers.js';
+import { normalizeAttendanceDate as normalizeDate } from './attendanceTracking.js';
+import { createAsyncReportCache } from './asyncReportCache.js';
+import { invalidateDerivedData } from './dataRevision.js';
 
 /** Fallback when a schedule slot is not linked to a subject record. */
 export const DEFAULT_SUBJECT_START_DATE = new Date(Date.UTC(2026, 6, 13));
@@ -41,38 +43,38 @@ export const resolveSubjectEndDate = (subject = {}) => {
   return null;
 };
 
-let subjectStartDateCache = null;
-let subjectStartDateCacheAt = 0;
-const CACHE_TTL_MS = 60_000;
-
-export const buildSubjectStartDateMap = async () => {
-  const now = Date.now();
-  if (subjectStartDateCache && now - subjectStartDateCacheAt < CACHE_TTL_MS) {
-    return subjectStartDateCache;
-  }
-
-  const subjects = await Subject.find().select('_id code name startDate endDate');
+const readSubjectMap = createAsyncReportCache({ ttlMs: 60_000, maxEntries: 1 });
+export const buildSubjectStartDateMap = () => readSubjectMap('subjects', async () => {
+  const subjects = await Subject.find().select('_id code name startDate endDate').lean();
   const byId = new Map();
   const byCode = new Map();
+  for (const subject of subjects) {
+    const range = {
+      startDate: subject.startDate ? normalizeDate(subject.startDate) : DEFAULT_SUBJECT_START_DATE,
+      endDate: resolveSubjectEndDate(subject) || DEFAULT_SUBJECT_END_DATE,
+    };
+    byId.set(String(subject._id), range);
+    if (subject.code) byCode.set(subject.code.trim(), range);
+  }
+  return { byId, byCode };
+});
+export const clearSubjectStartDateCache = invalidateDerivedData;
 
-  subjects.forEach((subject) => {
-    const startDate = subject.startDate ? normalizeDate(subject.startDate) : DEFAULT_SUBJECT_START_DATE;
-    const endDate = subject.endDate ? normalizeDate(subject.endDate) : resolveSubjectEndDate(subject);
-
-    byId.set(subject._id.toString(), { startDate, endDate: endDate || null });
-    if (subject.code) {
-      byCode.set(subject.code.trim(), { startDate, endDate: endDate || null });
-    }
-  });
-
-  subjectStartDateCache = { byId, byCode };
-  subjectStartDateCacheAt = now;
-  return subjectStartDateCache;
+export const getScheduleSubjectRange = (schedule, map) => {
+  const id = schedule.subject?._id?.toString() || schedule.subject?.toString();
+  const code = String(schedule.subjectCode || schedule.subject?.code || '').trim();
+  const meta = map.byId.get(id) || map.byCode.get(code);
+  return {
+    startDate: meta?.startDate || DEFAULT_SUBJECT_START_DATE,
+    endDate: meta?.endDate || DEFAULT_SUBJECT_END_DATE,
+  };
 };
 
-export const clearSubjectStartDateCache = () => {
-  subjectStartDateCache = null;
-  subjectStartDateCacheAt = 0;
+// All callers use inclusive operational calendar-day boundaries.
+export const isScheduleWithinSubjectDates = (schedule, referenceDate, map) => {
+  const ref = normalizeDate(referenceDate);
+  const { startDate, endDate } = getScheduleSubjectRange(schedule, map);
+  return ref >= startDate && ref <= endDate;
 };
 
 export const resolveScheduleSubjectStartDate = async (schedule) => {
@@ -107,9 +109,5 @@ export const resolveScheduleSubjectEndDate = async (schedule) => {
   return DEFAULT_SUBJECT_END_DATE;
 };
 
-export const isScheduleActiveOnDate = async (schedule, referenceDate) => {
-  const ref = normalizeDate(referenceDate);
-  const startDate = await resolveScheduleSubjectStartDate(schedule);
-  const effectiveStart = startDate ?? DEFAULT_SUBJECT_START_DATE;
-  return ref >= effectiveStart;
-};
+export const isScheduleActiveOnDate = async (schedule, referenceDate) =>
+  isScheduleWithinSubjectDates(schedule, referenceDate, await buildSubjectStartDateMap());

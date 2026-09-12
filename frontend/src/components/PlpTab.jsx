@@ -34,6 +34,7 @@ const PlpTab = () => {
   const [weightDraft, setWeightDraft] = useState(null);
   const [finalDrafts, setFinalDrafts] = useState({});
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState('');
   const [savingWeights, setSavingWeights] = useState(false);
   const [savingFinalId, setSavingFinalId] = useState('');
   const [sheetStatus, setSheetStatus] = useState(null);
@@ -57,6 +58,7 @@ const PlpTab = () => {
 
   const loadPlp = useCallback(async (signal, preferredCycle) => {
     setLoading(true);
+    setLoadError('');
     try {
       const data = await getPlpSheet(preferredCycle || cycleKey || undefined, { signal });
       const nextCycle = data.cycleKey;
@@ -75,7 +77,7 @@ const PlpTab = () => {
     } catch (err) {
       if (isAbortError(err)) return;
       showError(getErrorMessage(err));
-      setRows([]);
+      setLoadError(getErrorMessage(err));
     } finally {
       if (!signal?.aborted) setLoading(false);
     }
@@ -289,7 +291,7 @@ const PlpTab = () => {
               {rows.length === 0 ? (
                 <tr>
                   <td colSpan={9} className="text-center text-muted py-4">
-                    No trainers found for this cycle.
+                    {loadError || 'No trainers found for this cycle.'}
                   </td>
                 </tr>
               ) : rows.map((row) => (

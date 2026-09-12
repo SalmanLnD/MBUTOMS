@@ -1,5 +1,6 @@
 import Attendance from '../models/Attendance.js';
 import { normalizeDate } from '../utils/scheduleHelpers.js';
+import { canManageAttendanceRecord, scopeAttendanceFilter } from '../utils/legacyAttendanceAccess.js';
 
 const populateOptions = [
   { path: 'trainer', select: 'name employeeId' },
@@ -28,9 +29,10 @@ export const getAttendance = async (req, res) => {
     filter.date = { $gte: day, $lt: next };
   }
 
+  const scoped = await scopeAttendanceFilter(filter, req.user, req);
   const [records, total] = await Promise.all([
-    Attendance.find(filter).populate(populateOptions).sort({ date: -1 }).skip(skip).limit(limit),
-    Attendance.countDocuments(filter),
+    Attendance.find(scoped).populate(populateOptions).sort({ date: -1 }).skip(skip).limit(limit),
+    Attendance.countDocuments(scoped),
   ]);
 
   res.json({ records, pagination: { page, limit, total, pages: Math.ceil(total / limit) } });
@@ -38,6 +40,9 @@ export const getAttendance = async (req, res) => {
 
 export const markAttendance = async (req, res) => {
   const { type, trainer, student, schedule, date, status, remarks } = req.body;
+  if (!await canManageAttendanceRecord(req.user, { type, trainer, student }, req)) {
+    return res.status(403).json({ message: 'Not authorized to mark attendance for this person.' });
+  }
 
   const record = await Attendance.create({
     type,
@@ -57,8 +62,14 @@ export const markAttendance = async (req, res) => {
 export const updateAttendance = async (req, res) => {
   const record = await Attendance.findById(req.params.id);
   if (!record) return res.status(404).json({ message: 'Attendance record not found' });
-
-  Object.assign(record, req.body);
+  if (!await canManageAttendanceRecord(req.user, record, req)) {
+    return res.status(403).json({ message: 'Not authorized to edit this attendance record.' });
+  }
+  if (Object.keys(req.body).some(key => !['status', 'remarks', 'date'].includes(key))) {
+    return res.status(400).json({ message: 'Only attendance status, remarks and date can be changed.' });
+  }
+  if (req.body.status !== undefined) record.status = req.body.status;
+  if (req.body.remarks !== undefined) record.remarks = req.body.remarks;
   if (req.body.date) record.date = normalizeDate(req.body.date);
   await record.save();
 
@@ -76,8 +87,9 @@ export const getAttendanceSummary = async (req, res) => {
   }
   if (req.query.type) filter.type = req.query.type;
 
+  const scoped = await scopeAttendanceFilter(filter, req.user, req);
   const summary = await Attendance.aggregate([
-    { $match: filter },
+    { $match: scoped },
     { $group: { _id: '$status', count: { $sum: 1 } } },
   ]);
 

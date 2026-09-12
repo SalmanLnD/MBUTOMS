@@ -18,7 +18,7 @@ import {
   buildTrainerFilterForCoordinatorSubjects,
 } from './subjectCoordinatorAccess.js';
 import { getTopicOptionsForSubjectDoc } from './topicTrackerTopicCatalog.js';
-import { getLeaveDayWindow, getLeaveOverlapFilter, toLeaveDateKey, isDateWithinLeave } from './leaveDateRange.js';
+import { getLeaveDayWindow, getLeaveOverlapFilter, toLeaveDateKey, getLeaveDateKeysInWindow } from './leaveDateRange.js';
 import {
   formatTopicModulesCovered,
   getEntryTopicModules,
@@ -40,56 +40,12 @@ import {
   DEFAULT_SUBJECT_START_DATE,
   DEFAULT_SUBJECT_END_DATE,
   buildSubjectStartDateMap,
-  resolveSubjectEndDate,
+  getScheduleSubjectRange,
 } from './subjectStartDate.js';
 
 const WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
 const formatDateKey = (date) => toLeaveDateKey(date);
-
-export const calculateRemainingScheduledHours = (scheduledHours = 0, completedHours = 0) => {
-  const scheduled = Number(scheduledHours) || 0;
-  const completed = Number(completedHours) || 0;
-  return Math.max(0, Number((scheduled - completed).toFixed(1)));
-};
-
-export const calculateRemainingHoursForScheduleSet = ({
-  schedules = [],
-  fromDate,
-  toDate,
-  cancellationMap = new Map(),
-  holidayDateKeys = new Set(),
-} = {}) => {
-  const start = normalizeAttendanceDate(fromDate || new Date());
-  const end = normalizeAttendanceDate(toDate || fromDate || new Date());
-  if (!schedules.length || end < start) return 0;
-
-  const holidays = new Set(holidayDateKeys || []);
-  let total = 0;
-  const cursor = new Date(start);
-
-  while (cursor <= end) {
-    const dateKey = toAttendanceDateKey(cursor);
-    const dayName = WEEKDAYS[cursor.getUTCDay()];
-
-    if (!holidays.has(dateKey)) {
-      for (const schedule of schedules) {
-        if (schedule.day !== dayName) continue;
-
-        const scheduleId = schedule?._id?.toString?.() || schedule?.scheduleId || schedule?.id;
-        if (scheduleId && (cancellationMap.get(dateKey) || new Set()).has(scheduleId)) {
-          continue;
-        }
-
-        total += Number(computeHours(schedule.startTime, schedule.endTime) || 0);
-      }
-    }
-
-    cursor.setUTCDate(cursor.getUTCDate() + 1);
-  }
-
-  return Number(total.toFixed(1));
-};
 
 const toOperationalNoon = (dateInput) => {
   const key = toLeaveDateKey(dateInput);
@@ -103,67 +59,6 @@ const pickBestTrackerEntry = (entries = []) => {
     if (closedDiff) return closedDiff;
     return new Date(b.updatedAt || 0) - new Date(a.updatedAt || 0);
   })[0];
-};
-
-const normalizeClassSummaryBranch = (branchYearSection = '') => {
-  const raw = String(branchYearSection || 'Unassigned class').trim();
-  if (!raw || raw === 'Unassigned class') return 'Unassigned class';
-
-  const withoutSuffix = raw.replace(/(?:\s*[-'’]\s*|\s+)(?:Devops|CC)\s*$/i, '');
-  return withoutSuffix.replace(/(?:\s*[-'’]\s*)+$/g, '').trim();
-};
-
-export const buildClassSummaryKey = (branchYearSection = '') =>
-  normalizeClassSummaryBranch(branchYearSection);
-
-export const resolveClassSummaryTrainer = (entry = {}, scheduleById = new Map(), trainerLookup = { byCode: new Map() }) => {
-  const scheduleId = entry?.schedule?.toString?.() || entry?.scheduleId || '';
-  const schedule = scheduleId ? scheduleById.get(scheduleId) : null;
-  const trainerCode = schedule?.trainerCode || '';
-
-  if (trainerCode) {
-    const trainer = trainerLookup.byCode?.get(trainerCode);
-    if (trainer) {
-      return {
-        trainerId: trainer._id?.toString?.() || '',
-        trainerName: trainer.name || trainerCode,
-      };
-    }
-  }
-
-  if (entry.originalTrainerId || entry.originalTrainerName) {
-    return {
-      trainerId: entry.originalTrainerId || '',
-      trainerName: entry.originalTrainerName || entry.trainerName || 'Unassigned trainer',
-    };
-  }
-
-  const fallbackId = entry.trainer?.toString?.() || entry.trainerId || '';
-  return {
-    trainerId: fallbackId,
-    trainerName: entry.trainerName || 'Unassigned trainer',
-  };
-};
-
-export const pickPrimaryTrainerForClassSummary = (trainers = []) => {
-  const valid = trainers.filter((trainer) => trainer && (trainer.trainerId || trainer.trainerName));
-  if (!valid.length) {
-    return { trainerId: '', trainerName: 'Unassigned trainer' };
-  }
-
-  return valid.reduce((best, current) => {
-    const bestCount = Number(best.count ?? best.closedSlots ?? 0);
-    const currentCount = Number(current.count ?? current.closedSlots ?? 0);
-
-    if (currentCount > bestCount) return current;
-    if (currentCount === bestCount) {
-      const currentPriority = Boolean(current.trainerId && current.trainerId !== 'unassigned');
-      const bestPriority = Boolean(best.trainerId && best.trainerId !== 'unassigned');
-      if (currentPriority && !bestPriority) return current;
-      if (currentPriority === bestPriority && current.trainerId && !best.trainerId) return current;
-    }
-    return best;
-  }, valid[0]);
 };
 
 const buildBranchYearSection = (schedule, classGroup) => {
@@ -210,7 +105,7 @@ const buildClassGroupMap = async () => {
 };
 
 const buildTrainerLookup = async () => {
-  const trainers = await Trainer.find().select('name employeeId scheduleTrainerCodes subjects').lean();
+  const trainers = await Trainer.find().select('name employeeId scheduleTrainerCodes').lean();
   const byCode = new Map();
   const byId = new Map();
   trainers.forEach((trainer) => {
@@ -616,22 +511,12 @@ export const buildTopicTrackerOverview = async ({ date, user }) => {
   return { date: dateKey, subjects: overview };
 };
 
-const resolveScheduleStartDate = (schedule, subjectStartMap) => {
-  const subjectId = schedule.subject?._id?.toString() || schedule.subject?.toString();
-  if (subjectId && subjectStartMap.byId.has(subjectId)) {
-    return subjectStartMap.byId.get(subjectId);
-  }
-  const subjectCode = (schedule.subjectCode || schedule.subject?.code || '').trim();
-  if (subjectCode && subjectStartMap.byCode.has(subjectCode)) {
-    return subjectStartMap.byCode.get(subjectCode);
-  }
-  return DEFAULT_SUBJECT_START_DATE;
-};
-
 const isScheduleActiveOnDateKey = (schedule, dateKey, subjectStartMap) => {
   const ref = normalizeAttendanceDate(dateKey);
-  const start = normalizeAttendanceDate(resolveScheduleStartDate(schedule, subjectStartMap));
-  return ref >= start;
+  const range = getScheduleSubjectRange(schedule, subjectStartMap);
+  const start = normalizeAttendanceDate(range.startDate || DEFAULT_SUBJECT_START_DATE);
+  const end = normalizeAttendanceDate(range.endDate || DEFAULT_SUBJECT_END_DATE);
+  return ref >= start && ref <= end;
 };
 
 /**
@@ -644,8 +529,13 @@ export const buildTopicTrackerPendingBacklog = async ({
   from,
   user,
 } = {}) => {
-  const untilDate = normalizeAttendanceDate(until || getAttendanceToday());
-  let fromDate = normalizeAttendanceDate(from || TRAINER_ATTENDANCE_TRACKING_START);
+  const untilKeyInput = toAttendanceDateKey(until || getAttendanceToday());
+  const fromKeyInput = toAttendanceDateKey(from || TRAINER_ATTENDANCE_TRACKING_START);
+  if (!untilKeyInput || !fromKeyInput) {
+    throw Object.assign(new Error('Invalid backlog date range'), { statusCode: 400 });
+  }
+  const untilDate = normalizeAttendanceDate(untilKeyInput);
+  let fromDate = normalizeAttendanceDate(fromKeyInput);
   if (fromDate < TRAINER_ATTENDANCE_TRACKING_START) {
     fromDate = TRAINER_ATTENDANCE_TRACKING_START;
   }
@@ -661,6 +551,8 @@ export const buildTopicTrackerPendingBacklog = async ({
   const dates = getAttendanceCalendarDates(fromDate, untilDate);
   const fromKey = toAttendanceDateKey(fromDate);
   const untilKey = toAttendanceDateKey(untilDate);
+  const fromWindow = getLeaveDayWindow(fromKey);
+  const untilWindow = getLeaveDayWindow(untilKey);
 
   const [
     schedules,
@@ -679,12 +571,12 @@ export const buildTopicTrackerPendingBacklog = async ({
     buildSubjectStartDateMap(),
     loadOfficialHolidayMap(fromDate, untilDate),
     ClassCancellation.find({
-      date: { $gte: fromDate, $lte: untilDate },
+      date: { $gte: fromWindow.start, $lt: untilWindow.endExclusive },
     })
       .select('date schedules')
       .lean(),
     TopicTrackerEntry.find({
-      date: { $gte: fromDate, $lte: untilDate },
+      date: { $gte: fromWindow.start, $lt: untilWindow.endExclusive },
     })
       .select('schedule date trackerStatus trainerName courseName branchYearSection updatedAt')
       .lean(),
@@ -718,24 +610,32 @@ export const buildTopicTrackerPendingBacklog = async ({
     schedulesByDay.get(schedule.day).push(schedule);
   });
 
+  const closedKeys = new Set();
   const entriesByDateSchedule = new Map();
   entries.forEach((entry) => {
     const dateKey = toLeaveDateKey(entry.date);
     const scheduleId = entry.schedule?.toString();
     if (!dateKey || !scheduleId) return;
     const key = `${dateKey}|${scheduleId}`;
+    if (entry.trackerStatus === 'closed') {
+      closedKeys.add(key);
+      entriesByDateSchedule.delete(key);
+      return;
+    }
+    if (closedKeys.has(key)) return;
     if (!entriesByDateSchedule.has(key)) entriesByDateSchedule.set(key, []);
     entriesByDateSchedule.get(key).push(entry);
   });
 
   const replacementByDateSchedule = new Map();
   replacementLeaves.forEach((leave) => {
+    const leaveDateKeys = getLeaveDateKeysInWindow(leave, fromKey, untilKey);
+    if (!leaveDateKeys.length) return;
     (leave.replacements || []).forEach((replacement) => {
       const scheduleId = replacement.schedule?.toString();
       if (!scheduleId) return;
-      dates.forEach((date) => {
-        if (!isDateWithinLeave(date, leave)) return;
-        const dateKey = toAttendanceDateKey(date);
+      leaveDateKeys.forEach((dateKey) => {
+        if (holidayMap.has(dateKey)) return;
         const key = `${dateKey}|${scheduleId}`;
         if (replacement.isExternal && replacement.externalTrainerName) {
           replacementByDateSchedule.set(key, {
@@ -764,10 +664,13 @@ export const buildTopicTrackerPendingBacklog = async ({
 
     const dayName = WEEKDAYS[date.getUTCDay()];
     const daySchedules = schedulesByDay.get(dayName) || [];
+    if (!daySchedules.length) return;
     const canceledIds = canceledByDate.get(dateKey) || new Set();
 
     daySchedules.forEach((schedule) => {
       const scheduleId = schedule._id.toString();
+      const dedupeKey = `${dateKey}|${scheduleId}`;
+      if (seen.has(dedupeKey) || closedKeys.has(dedupeKey)) return;
       if (canceledIds.has(scheduleId)) return;
       if (!isScheduleActiveOnDateKey(schedule, dateKey, subjectStartMap)) return;
 
@@ -785,7 +688,7 @@ export const buildTopicTrackerPendingBacklog = async ({
         if (!ownTrainerId || originalTrainerId !== ownTrainerId) return;
       }
 
-      const replacementInfo = replacementByDateSchedule.get(`${dateKey}|${scheduleId}`);
+      const replacementInfo = replacementByDateSchedule.get(dedupeKey);
       const externalReplacementName = replacementInfo?.isExternal
         ? String(replacementInfo.name || '').trim()
         : '';
@@ -801,13 +704,8 @@ export const buildTopicTrackerPendingBacklog = async ({
         return;
       }
 
-      const entryList = entriesByDateSchedule.get(`${dateKey}|${scheduleId}`) || [];
-      const entry = pickBestTrackerEntry(entryList);
-      const trackerStatus = entry?.trackerStatus || 'pending';
-      if (trackerStatus === 'closed') return;
-
-      const dedupeKey = `${dateKey}|${scheduleId}`;
-      if (seen.has(dedupeKey)) return;
+      const entry = pickBestTrackerEntry(entriesByDateSchedule.get(dedupeKey) || []);
+      if (entry?.trackerStatus === 'closed') return;
       seen.add(dedupeKey);
 
       const displayTrainerName = replacementTrainer?.name
@@ -833,7 +731,7 @@ export const buildTopicTrackerPendingBacklog = async ({
         sessionStartTime: schedule.startTime,
         sessionEndTime: schedule.endTime,
         branchYearSection: entry?.branchYearSection || buildBranchYearSection(schedule, null),
-        trackerStatus,
+        trackerStatus: entry?.trackerStatus || 'pending',
       });
     });
   });
@@ -976,36 +874,10 @@ export const buildTopicTrackerClassSummary = async ({ subjectId, user, trainerId
     return { subjects: [] };
   }
 
-  const today = normalizeAttendanceDate(new Date());
-  const maxEndDate = subjects.reduce((currentMax, subject) => {
-    const candidate = resolveSubjectEndDate(subject) || DEFAULT_SUBJECT_END_DATE;
-    return !currentMax || candidate > currentMax ? candidate : currentMax;
-  }, null);
-
-  const [holidayMap, cancellationRows] = await Promise.all([
-    loadOfficialHolidayMap(today, maxEndDate || today),
-    ClassCancellation.find({
-      date: { $gte: today, $lte: maxEndDate || today },
-    })
-      .select('date schedules')
-      .lean(),
-  ]);
-
-  const cancellationMap = buildCanceledScheduleIdsByDate(cancellationRows);
-  const holidayDateKeys = new Set(holidayMap.keys());
-
   const entries = await TopicTrackerEntry.find(entryFilter)
-    .select('schedule subject trainer branchYearSection topicModuleCovered topicModulesCovered date sessionStatus allottedStudents noPresent attendancePercent trainerName')
+    .select('subject trainer branchYearSection topicModuleCovered topicModulesCovered date sessionStatus allottedStudents noPresent attendancePercent trainerName')
     .sort({ date: 1 })
     .lean();
-
-  const scheduleEntriesBySubject = new Map();
-  const classGroupMap = await buildClassGroupMap();
-  const scheduleRows = await Schedule.find({ subject: { $in: subjects.map((subject) => subject._id) } })
-    .select('subject department section semester day startTime endTime trainerCode subjectCode')
-    .lean();
-  const scheduleById = new Map(scheduleRows.map((schedule) => [schedule._id.toString(), schedule]));
-  const trainerLookup = await buildTrainerLookup();
 
   const entriesBySubject = new Map();
   entries.forEach((entry) => {
@@ -1014,70 +886,31 @@ export const buildTopicTrackerClassSummary = async ({ subjectId, user, trainerId
     entriesBySubject.get(sid).push(entry);
   });
 
-  scheduleRows.forEach((schedule) => {
-    const sid = schedule.subject?.toString();
-    if (!sid) return;
-    const classKey = `${schedule.department || 'Unassigned'}::${schedule.section || 'Unassigned'}::${schedule.semester || ''}`;
-    const classGroup = classGroupMap.get(classKey);
-    const branchYearSection = normalizeClassSummaryBranch(buildBranchYearSection(schedule, classGroup));
-    const key = `${sid}::${branchYearSection}`;
-    const subjectMeta = subjects.find((subject) => subject._id.toString() === sid) || null;
-    const endDate = resolveSubjectEndDate(subjectMeta || { code: schedule.subjectCode || '', name: subjectMeta?.name || '' }) || DEFAULT_SUBJECT_END_DATE;
-    const entry = scheduleEntriesBySubject.get(key) || {
-      scheduledHours: 0,
-      classCount: 0,
-      branchYearSection,
-      endDate,
-      schedules: [],
-    };
-    entry.schedules.push(schedule);
-    entry.classCount += 1;
-    entry.endDate = endDate > entry.endDate ? endDate : entry.endDate;
-    scheduleEntriesBySubject.set(key, entry);
-  });
-
-  for (const [key, entry] of scheduleEntriesBySubject.entries()) {
-    entry.scheduledHours = calculateRemainingHoursForScheduleSet({
-      schedules: entry.schedules,
-      fromDate: today,
-      toDate: entry.endDate,
-      cancellationMap,
-      holidayDateKeys,
-    });
-  }
-
   const summarySubjects = subjects.map((subject) => {
     const syllabusTopics = getTopicOptionsForSubjectDoc(subject) || [];
     const subjectEntries = entriesBySubject.get(subject._id.toString()) || [];
     const classMap = new Map();
 
     subjectEntries.forEach((entry) => {
-      const resolvedTrainer = resolveClassSummaryTrainer(entry, scheduleById, trainerLookup);
-      const trainerId = resolvedTrainer.trainerId || '';
-      const trainerName = resolvedTrainer.trainerName || 'Unassigned trainer';
-      const branchYearSection = normalizeClassSummaryBranch(entry.branchYearSection || 'Unassigned class');
-      const classKey = buildClassSummaryKey(branchYearSection);
-
+      const trainerId = entry.trainer?.toString() || '';
+      const trainerName = entry.trainerName || 'Unassigned trainer';
+      const trainerKey = `${trainerId || 'unassigned'}::${trainerName}`;
+      const branchYearSection = entry.branchYearSection || 'Unassigned class';
+      const classKey = `${trainerKey}::${branchYearSection}`;
       if (!classMap.has(classKey)) {
         classMap.set(classKey, {
-          trainerKey: `${trainerId || 'unassigned'}::${trainerName}`,
+          trainerKey,
           trainerId,
           trainerName,
           branchYearSection,
-          trainerCounts: new Map(),
           closedSlots: 0,
-          closedHours: 0,
           topicHits: new Map(),
           attendanceSum: 0,
           attendanceCount: 0,
         });
       }
-
       const row = classMap.get(classKey);
-      const trainerKey = `${trainerId || 'unassigned'}::${trainerName}`;
-      row.trainerCounts.set(trainerKey, (row.trainerCounts.get(trainerKey) || 0) + 1);
       row.closedSlots += 1;
-      row.closedHours += Number(entry.durationHrs) || 0;
       getEntryTopicModules(entry).forEach((topic) => {
         const existing = row.topicHits.get(topic) || { topic, count: 0, lastDate: null };
         existing.count += 1;
@@ -1095,11 +928,6 @@ export const buildTopicTrackerClassSummary = async ({ subjectId, user, trainerId
 
     const classes = [...classMap.values()]
       .map((row) => {
-        const trainerCandidates = [...row.trainerCounts.entries()].map(([trainerKey, count]) => {
-          const [trainerId = '', trainerName = 'Unassigned trainer'] = trainerKey.split('::');
-          return { trainerId, trainerName, count };
-        });
-        const primaryTrainer = pickPrimaryTrainerForClassSummary(trainerCandidates);
         const coveredTopics = [...row.topicHits.values()].sort((a, b) => {
           const aIndex = syllabusTopics.indexOf(a.topic);
           const bIndex = syllabusTopics.indexOf(b.topic);
@@ -1112,17 +940,12 @@ export const buildTopicTrackerClassSummary = async ({ subjectId, user, trainerId
         });
         const coveredSet = new Set(coveredTopics.map((item) => item.topic));
         const uncoveredTopics = syllabusTopics.filter((topic) => !coveredSet.has(topic));
-        const scheduledHours = scheduleEntriesBySubject.get(`${subject._id.toString()}::${row.branchYearSection}`)?.scheduledHours || 0;
-        const remainingScheduledHours = scheduledHours;
         return {
-          trainerKey: `${primaryTrainer.trainerId || 'unassigned'}::${primaryTrainer.trainerName || 'Unassigned trainer'}`,
-          trainerId: primaryTrainer.trainerId || row.trainerId || '',
-          trainerName: primaryTrainer.trainerName || row.trainerName || 'Unassigned trainer',
-          branchYearSection: normalizeClassSummaryBranch(row.branchYearSection),
+          trainerKey: row.trainerKey,
+          trainerId: row.trainerId,
+          trainerName: row.trainerName,
+          branchYearSection: row.branchYearSection,
           closedSlots: row.closedSlots,
-          closedHours: row.closedHours,
-          scheduledHours,
-          remainingScheduledHours,
           coveredCount: coveredTopics.filter((item) => syllabusTopics.includes(item.topic)).length,
           totalTopics: syllabusTopics.length,
           coveragePercent: syllabusTopics.length
@@ -1135,11 +958,10 @@ export const buildTopicTrackerClassSummary = async ({ subjectId, user, trainerId
           uncoveredTopics,
         };
       })
-      .sort((a, b) => {
-        const trainerCompare = String(a.trainerName || '').localeCompare(String(b.trainerName || ''));
-        if (trainerCompare !== 0) return trainerCompare;
-        return String(a.branchYearSection || '').localeCompare(String(b.branchYearSection || ''));
-      });
+      .sort((a, b) =>
+        String(a.trainerName || '').localeCompare(String(b.trainerName || ''))
+        || String(a.branchYearSection || '').localeCompare(String(b.branchYearSection || ''))
+      );
 
     return {
       subjectId: subject._id.toString(),

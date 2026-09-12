@@ -7,10 +7,11 @@ export const notFound = (req, res, next) => {
 };
 
 export const errorHandler = (err, req, res, next) => {
-  console.error(`[API Error] ${req.method} ${req.originalUrl}:`, err.message);
+  console.error(`[API Error] ${req.method} ${req.path}:`, err.message);
   const fallback = res.statusCode === 200 ? 500 : res.statusCode;
-  const statusCode = err.statusCode || fallback;
+  const statusCode = err.statusCode || (err.name === 'ValidationError' || err.name === 'CastError' ? 400 : err.code === 11000 ? 409 : fallback);
   applyCorsHeaders(req, res);
+  if (res.headersSent) return next(err);
   res.status(statusCode).json({
     message: err.message || 'Internal server error',
     stack: process.env.NODE_ENV === 'production' ? undefined : err.stack,

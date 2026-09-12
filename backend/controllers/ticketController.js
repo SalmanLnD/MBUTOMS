@@ -51,16 +51,6 @@ export const getTickets = async (req, res) => {
   res.json({ tickets, pagination: { page, limit, total, pages: Math.ceil(total / limit) } });
 };
 
-export const getUnreadTicketCount = async (req, res) => {
-  if (req.user.role === ROLES.ADMIN) {
-    const count = await Ticket.countDocuments({ status: 'pending' });
-    return res.json({ count });
-  }
-
-  const count = await Ticket.countDocuments({ raisedBy: req.user._id, status: 'pending' });
-  return res.json({ count });
-};
-
 export const getTicketById = async (req, res) => {
   const ticket = await Ticket.findById(req.params.id).populate(populateOptions);
   if (!ticket) return res.status(404).json({ message: 'Ticket not found' });

@@ -19,8 +19,3 @@ export const updateTicketStatus = async (id, payload) => {
   const { data } = await api.put(`/tickets/${id}/status`, payload);
   return data;
 };
-
-export const getUnreadTicketCount = async () => {
-  const { data } = await api.get('/tickets/unread-count');
-  return data.count;
-};

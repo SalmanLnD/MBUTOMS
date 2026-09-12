@@ -13,7 +13,7 @@ import { usePagination } from '../hooks/usePagination.js';
 import { getSubjects, deleteSubject, updateSubjectResources } from '../services/subjectService.js';
 import { EditIcon, TrashIcon } from '../components/icons.jsx';
 import ActionIconButton from '../components/ActionIconButton.jsx';
-import { getErrorMessage, formatDate } from '../utils/helpers.js';
+import { getErrorMessage } from '../utils/helpers.js';
 import { ROLES } from '../utils/roles.js';
 import { usePageTitle } from '../context/PageTitleContext.jsx';
 import { isAbortError } from '../services/api.js';
@@ -419,14 +419,6 @@ const Subjects = () => {
               </div>
               {showFullSubjectDetails && (
                 <>
-                      <div className="col-sm-4">
-                        <label className="text-muted small">Start Date</label>
-                        <p className="mb-0">{formatDate(selectedSubject.startDate)}</p>
-                      </div>
-                      <div className="col-sm-4">
-                        <label className="text-muted small">End Date</label>
-                        <p className="mb-0">{selectedSubject.endDate ? formatDate(selectedSubject.endDate) : '—'}</p>
-                      </div>
                   <div className="col-sm-4">
                     <label className="text-muted small">Semester</label>
                     <p className="mb-0">{selectedSubject.semester?.name || '-'}</p>

@@ -118,7 +118,6 @@ const TopicTrackerClassSummaryTab = ({
                     <th>Trainer</th>
                     <th>Class</th>
                     <th>Closed slots</th>
-                    <th>Remaining hrs (scheduled)</th>
                     <th>Topics covered</th>
                     <th>Coverage</th>
                     <th>Avg attendance</th>
@@ -128,7 +127,7 @@ const TopicTrackerClassSummaryTab = ({
                 <tbody>
                   {!visibleClasses.length ? (
                     <tr>
-                      <td colSpan="8" className="text-muted text-center py-3">
+                      <td colSpan="7" className="text-muted text-center py-3">
                         No closed topic entries found for this subject and trainer.
                       </td>
                     </tr>
@@ -143,15 +142,6 @@ const TopicTrackerClassSummaryTab = ({
                             <td>{cls.trainerName || 'Unassigned trainer'}</td>
                             <td>{cls.branchYearSection}</td>
                             <td>{cls.closedSlots}</td>
-                            <td>
-                              {cls.remainingScheduledHours != null ? (
-                                <span className="fw-semibold text-primary">
-                                  {cls.remainingScheduledHours.toFixed(1)} hrs
-                                </span>
-                              ) : (
-                                <span className="text-muted">-</span>
-                              )}
-                            </td>
                             <td>
                               {cls.totalTopics
                                 ? `${cls.coveredCount} / ${cls.totalTopics}`
@@ -179,7 +169,7 @@ const TopicTrackerClassSummaryTab = ({
                           </tr>
                           {isExpanded && (
                             <tr>
-                              <td colSpan="8" className="bg-light">
+                              <td colSpan="7" className="bg-light">
                                 <div className="row g-3 p-2">
                                   <div className="col-md-6">
                                     <h4 className="h6">Covered</h4>

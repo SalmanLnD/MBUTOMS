@@ -8,7 +8,7 @@ export const isAbortError = (error) =>
   || error?.name === 'CanceledError'
   || error?.name === 'AbortError';
 
-const MAX_TRANSIENT_RETRIES = 3;
+const MAX_TRANSIENT_RETRIES = 1;
 const REQUEST_TIMEOUT_MS = 30_000;
 
 const sleep = (ms) => new Promise((resolve) => {
@@ -65,6 +65,7 @@ api.interceptors.response.use(
       config
       && !config.skipRetry
       && !isAbortError(error)
+      && error.code !== 'ECONNABORTED'
       && isTransientApiError(error)
     ) {
       const retryCount = config.__retryCount || 0;

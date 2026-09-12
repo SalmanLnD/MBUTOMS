@@ -198,30 +198,6 @@ export const buildTrainerAttendanceGridPayload = async ({
     loadOfficialHolidayMap(rangeStart, rangeEnd),
   ]);
 
-  // Minimal diagnostics retained behind debug level; enable by setting
-  // `DEBUG_CLASS_HOURS=1` in the environment when needed.
-  try {
-    if (process.env.DEBUG_CLASS_HOURS) {
-      const nonZero = [...classHoursCache.entries()].filter(([, val]) => Number(val) > 0).slice(0, 6);
-      console.debug('classHoursCache non-zero samples:', nonZero);
-    }
-  } catch (err) {
-    if (process.env.DEBUG_CLASS_HOURS) console.debug('classHoursCache sample failed', err && err.message);
-  }
-
-  try {
-    if (process.env.DEBUG_CLASS_HOURS) {
-      trainers.slice(0, 6).forEach((t) => {
-        dates.slice(0, 6).forEach((d) => {
-          const k = `${t._id.toString()}|${toAttendanceDateKey(d)}`;
-          console.debug('classHoursCache value:', k, classHoursCache.get(k));
-        });
-      });
-    }
-  } catch (err) {
-    if (process.env.DEBUG_CLASS_HOURS) console.debug('classHoursCache matrix failed', err && err.message);
-  }
-
   const schedulesByCode = new Map();
   schedules.forEach((schedule) => {
     if (!schedulesByCode.has(schedule.trainerCode)) {
@@ -418,14 +394,9 @@ export const buildTrainerAttendanceGridPayload = async ({
         classHandlingHours = 0;
       } else if (classHoursEditable) {
         mockPrepHours = resolveMockPrepHoursForOif(oifNumber, log?.mockPrepHours ?? 0);
-        if (log?.classHandlingHours != null) {
-          classHandlingHours = Number(log.classHandlingHours);
-        } else {
-          // Fall back to computed class-handling hours for the trainer/date when
-          // manual class hours aren't recorded yet. Use the same cacheKey defined
-          // earlier to match computeClassHandlingHoursBatch keys.
-          classHandlingHours = classHoursCache.get(cacheKey) ?? 0;
-        }
+        classHandlingHours = log?.classHandlingHours != null
+          ? Number(log.classHandlingHours)
+          : 0;
       } else {
         const resolved = applyItOifAttendanceRules({
           oifNumber,

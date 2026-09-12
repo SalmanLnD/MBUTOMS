@@ -1,7 +1,7 @@
 import api from './api.js';
 
 export const getObservations = async (params = {}) => {
-  const { data } = await api.get('/observations', { params });
+  const { data } = await api.get('/observations', { params, skipRetry: true });
   return data;
 };
 

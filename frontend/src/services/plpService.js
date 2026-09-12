@@ -3,6 +3,7 @@ import api from './api.js';
 export const getPlpSheet = async (cycle, config = {}) => {
   const { data } = await api.get('/plp', {
     ...config,
+    skipRetry: true,
     params: { cycle, ...(config.params || {}) },
   });
   return data;

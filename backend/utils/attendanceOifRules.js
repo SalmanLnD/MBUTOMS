@@ -6,7 +6,7 @@ export const IT_MOCK_PREP_HOURS = 7;
 
 export const isItOif = (oifNumber) => {
   const value = String(oifNumber || '').trim().toUpperCase();
-  return value.startsWith(IT_OIF_CODE);
+  return value.startsWith(IT_OIF_CODE) || value === CA26421_OIF_CODE || value.startsWith(`${CA26421_OIF_CODE} `);
 };
 
 export const countsAsOifDay = (oifNumber) => {
@@ -21,11 +21,8 @@ export const allowsManualClassHandlingHours = (oifNumber) => {
   return !isCampusSubjectOif(value);
 };
 
-export const resolveMockPrepHoursForOif = (oifNumber, mockPrepHours) => {
-  const value = String(oifNumber || '').trim().toUpperCase();
-  if (value === CA26421_OIF_CODE || value.startsWith(`${CA26421_OIF_CODE} `)) return IT_MOCK_PREP_HOURS;
-  return (isItOif(oifNumber) ? IT_MOCK_PREP_HOURS : Number(mockPrepHours ?? 0));
-};
+export const resolveMockPrepHoursForOif = (oifNumber, mockPrepHours) =>
+  (isItOif(oifNumber) ? IT_MOCK_PREP_HOURS : Number(mockPrepHours ?? 0));
 
 export const resolveClassHandlingHoursForOif = (oifNumber, classHandlingHours) =>
   (isItOif(oifNumber) ? 0 : Number(classHandlingHours ?? 0));

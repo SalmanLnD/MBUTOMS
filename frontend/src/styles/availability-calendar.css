@@ -1,64 +1,281 @@
+/* Trainer availability — scheduling information with a calm, technical grid. */
+
+.trainer-availability-panel {
+  --availability-surface: var(--surface-elevated, #ffffff);
+  --availability-subtle: var(--surface-muted, #f5f7fb);
+  --availability-ink: var(--ink-950, #111827);
+  --availability-muted: var(--ink-600, #64748b);
+  --availability-line: var(--line, #dbe3ee);
+  --availability-indigo: var(--primary, #5b5ce2);
+  --availability-teal: var(--teal, #0f9f9a);
+  --availability-teal-wash: var(--teal-50, #e4f6f4);
+}
+
+[data-theme='dark'] .trainer-availability-panel {
+  --availability-surface: var(--surface-elevated, #182337);
+  --availability-subtle: var(--surface-muted, #202d42);
+  --availability-ink: var(--ink-950, #f5f7fb);
+  --availability-muted: var(--ink-600, #aeb9c9);
+  --availability-line: var(--line, rgba(203, 213, 225, 0.2));
+  --availability-teal-wash: var(--teal-50, rgba(15, 159, 154, 0.16));
+}
+
+.trainer-availability-panel .form-label {
+  margin-bottom: 0.42rem;
+  color: var(--availability-muted);
+  font-size: 0.74rem;
+  font-weight: 780;
+  letter-spacing: 0.075em;
+  text-transform: uppercase;
+}
+
+.trainer-availability-panel .availability-week-toolbar {
+  display: flex;
+  gap: 1rem;
+  padding: 0.85rem 1rem;
+  border: 1px solid var(--availability-line);
+  border-radius: var(--radius-md, 0.8rem);
+  background: var(--availability-surface);
+  color: var(--availability-ink);
+  box-shadow: 0 1px 2px rgba(17, 24, 39, 0.04);
+}
+
+.trainer-availability-panel .availability-week-toolbar > .fw-semibold {
+  font-size: 0.9rem;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
+}
+
+.trainer-availability-panel .availability-week-toolbar .btn {
+  min-height: 2.5rem;
+  border-color: var(--availability-line);
+  color: var(--availability-ink);
+  font-weight: 680;
+}
+
+.trainer-availability-panel .availability-week-toolbar .btn:hover:not(:disabled),
+.trainer-availability-panel .availability-week-toolbar .btn:focus-visible {
+  border-color: var(--availability-indigo);
+  background: var(--indigo-50, #eeeeff);
+  color: var(--availability-indigo);
+  box-shadow: 0 0 0 3px var(--primary-focus, rgba(91, 92, 226, 0.16));
+}
+
 .trainer-availability-panel .availability-calendar {
-  background: #fff;
-  border-radius: 12px;
+  position: relative;
+  overflow: hidden;
   padding: 1rem;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+  border: 1px solid var(--availability-line);
+  border-radius: var(--radius-lg, 1rem);
+  background: var(--availability-surface);
+  box-shadow: 0 1px 2px rgba(17, 24, 39, 0.04);
 }
 
 .trainer-availability-panel .availability-calendar .fc {
+  color: var(--availability-ink);
   font-family: inherit;
+  font-size: 0.86rem;
+}
+
+.trainer-availability-panel .availability-calendar .fc-scrollgrid,
+.trainer-availability-panel .availability-calendar .fc-theme-standard td,
+.trainer-availability-panel .availability-calendar .fc-theme-standard th {
+  border-color: var(--availability-line);
+}
+
+.trainer-availability-panel .availability-calendar .fc-col-header-cell {
+  background: var(--availability-subtle);
+}
+
+.trainer-availability-panel .availability-calendar .fc-col-header-cell-cushion {
+  padding: 0.65rem 0.4rem;
+  color: var(--availability-muted);
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.085em;
+  text-decoration: none;
+  text-transform: uppercase;
 }
 
 .trainer-availability-panel .availability-calendar .fc-timegrid-slot {
-  height: 2.5em;
+  height: 3.1em;
+}
+
+.trainer-availability-panel .availability-calendar .fc-timegrid-slot-label-cushion,
+.trainer-availability-panel .availability-calendar .fc-timegrid-axis-cushion {
+  color: var(--availability-muted);
+  font-size: 0.72rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.trainer-availability-panel .availability-calendar .fc-timegrid-now-indicator-line {
+  border-color: var(--coral, #f26b5e);
+}
+
+.trainer-availability-panel .availability-calendar .fc-timegrid-now-indicator-arrow {
+  border-color: var(--coral, #f26b5e);
 }
 
 .trainer-availability-panel .availability-event {
-  border-radius: 4px;
-  font-size: 0.8rem;
-  font-weight: 600;
+  padding: 0.2rem 0.35rem;
+  border: 1px solid var(--availability-teal) !important;
+  border-radius: 0.42rem;
+  background: var(--availability-teal-wash) !important;
+  color: var(--availability-teal) !important;
+  font-size: 0.75rem;
+  font-weight: 780;
+  letter-spacing: 0.01em;
+}
+
+.trainer-availability-panel .availability-event .fc-event-main {
+  color: inherit !important;
 }
 
 .trainer-availability-panel .availability-calendar-overlay {
   position: absolute;
   inset: 0;
-  background: rgba(255, 255, 255, 0.72);
+  z-index: 2;
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 2;
-  border-radius: 12px;
+  border-radius: inherit;
+  background: color-mix(in srgb, var(--availability-surface) 82%, transparent);
+  backdrop-filter: blur(2px);
 }
 
-.trainer-availability-panel .availability-week-toolbar {
-  background: #fff;
-  border: 1px solid rgba(0, 0, 0, 0.08);
-  border-radius: 12px;
-  padding: 0.75rem 1rem;
+@supports not (background: color-mix(in srgb, white 50%, transparent)) {
+  .trainer-availability-panel .availability-calendar-overlay {
+    background: rgba(255, 255, 255, 0.82);
+  }
+
+  [data-theme='dark'] .trainer-availability-panel .availability-calendar-overlay {
+    background: rgba(24, 35, 55, 0.82);
+  }
+}
+
+.trainer-availability-panel .availability-overview-table {
+  margin: 0;
+  color: var(--availability-ink);
+  border-color: var(--availability-line);
+  font-size: 0.84rem;
 }
 
 .trainer-availability-panel .availability-overview-table th,
 .trainer-availability-panel .availability-overview-table td {
+  padding: 0.75rem;
+  border-color: var(--availability-line);
   vertical-align: top;
 }
 
+.trainer-availability-panel .availability-overview-table thead th {
+  background: var(--availability-subtle);
+  color: var(--availability-muted);
+  font-size: 0.69rem;
+  font-weight: 800;
+  letter-spacing: 0.075em;
+  text-transform: uppercase;
+}
+
+.trainer-availability-panel .availability-overview-table tbody tr:hover {
+  background: var(--availability-subtle);
+}
+
 .trainer-availability-panel .availability-trainer-col {
-  min-width: 10rem;
+  min-width: 11rem;
   white-space: nowrap;
 }
 
+.trainer-availability-panel .availability-trainer-col .btn-link {
+  color: var(--availability-indigo);
+  font-weight: 760;
+  text-decoration: none;
+}
+
+.trainer-availability-panel .availability-trainer-col .btn-link:hover,
+.trainer-availability-panel .availability-trainer-col .btn-link:focus-visible {
+  color: var(--availability-teal);
+  text-decoration: underline;
+}
+
 .trainer-availability-panel .availability-slot-cell {
-  min-width: 7rem;
+  min-width: 7.75rem;
 }
 
 .trainer-availability-panel .availability-pill {
   display: block;
-  background: #d1e7dd;
-  color: #0f5132;
-  border: 1px solid #badbcc;
-  border-radius: 4px;
-  font-size: 0.75rem;
-  font-weight: 600;
-  padding: 0.2rem 0.35rem;
-  margin-bottom: 0.25rem;
+  width: fit-content;
+  max-width: 100%;
+  margin-bottom: 0.35rem;
+  padding: 0.31rem 0.48rem;
+  overflow: hidden;
+  border: 1px solid var(--availability-teal);
+  border-radius: 0.38rem;
+  background: var(--availability-teal-wash);
+  color: var(--availability-teal);
+  font-size: 0.72rem;
+  font-weight: 760;
+  line-height: 1.25;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@media (max-width: 991.98px) {
+  .trainer-availability-panel .availability-calendar {
+    padding: 0.75rem;
+  }
+
+  .trainer-availability-panel .availability-calendar .fc-timegrid-slot {
+    height: 3.35em;
+  }
+}
+
+@media (max-width: 767.98px) {
+  .trainer-availability-panel .availability-week-toolbar {
+    align-items: stretch !important;
+    flex-direction: column;
+  }
+
+  .trainer-availability-panel .availability-week-toolbar .btn-group {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    width: 100%;
+  }
+
+  .trainer-availability-panel .availability-week-toolbar .btn {
+    min-height: 2.75rem;
+    padding-inline: 0.35rem;
+  }
+
+  .trainer-availability-panel .availability-calendar {
+    overflow-x: auto;
+    padding: 0.6rem;
+  }
+
+  .trainer-availability-panel .availability-calendar .fc {
+    min-width: 42rem;
+  }
+
+  .trainer-availability-panel .availability-overview-table th,
+  .trainer-availability-panel .availability-overview-table td {
+    padding: 0.65rem 0.55rem;
+  }
+}
+
+@media (max-width: 575.98px) {
+  .trainer-availability-panel .availability-week-toolbar {
+    padding: 0.75rem;
+  }
+
+  .trainer-availability-panel .availability-week-toolbar > .fw-semibold {
+    text-align: center;
+  }
+
+  .trainer-availability-panel .availability-calendar .fc-col-header-cell-cushion {
+    font-size: 0.62rem;
+  }
+
+  .trainer-availability-panel .availability-pill {
+    min-height: 2rem;
+    padding: 0.4rem 0.48rem;
+  }
 }

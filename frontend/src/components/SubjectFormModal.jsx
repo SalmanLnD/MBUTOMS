@@ -21,7 +21,6 @@ const emptyForm = {
   oifNumber: '',
   dealNumber: '',
   startDate: '',
-  endDate: '',
   academicYear: '2026-27',
   schools: [],
   semester: '',
@@ -111,7 +110,6 @@ const SubjectFormModal = ({ subject, onClose, onManageResource, onManageTopics }
       oifNumber: subject.oifNumber || '',
       dealNumber: subject.dealNumber || '',
       startDate: subject.startDate ? toInputDate(subject.startDate) : '',
-      endDate: subject.endDate ? toInputDate(subject.endDate) : '',
       academicYear: subject.academicYear || '2026-27',
       schools: schoolIds,
       semester: toId(subject.semester),
@@ -221,7 +219,6 @@ const SubjectFormModal = ({ subject, onClose, onManageResource, onManageTopics }
       oifNumber: form.oifNumber,
       dealNumber: form.dealNumber,
       startDate: form.startDate,
-      endDate: form.endDate || undefined,
       schools: form.schools,
       semester: form.semester || undefined,
       departments: form.allDepartments ? [] : form.departments,
@@ -299,10 +296,6 @@ const SubjectFormModal = ({ subject, onClose, onManageResource, onManageTopics }
               <div className="col-md-4">
                 <label className="form-label">Start Date *</label>
                 <input type="date" name="startDate" className="form-control" value={form.startDate} onChange={handleChange} required />
-              </div>
-              <div className="col-md-4">
-                <label className="form-label">End Date</label>
-                <input type="date" name="endDate" className="form-control" value={form.endDate} onChange={handleChange} />
               </div>
               <div className="col-md-4">
                 <label className="form-label">Academic Year *</label>

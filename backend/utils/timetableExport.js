@@ -1,3 +1,4 @@
+import { filterSchedulesActiveOnDate } from './activeSchedulesForDate.js';
 import Trainer from '../models/Trainer.js';
 import Schedule from '../models/Schedule.js';
 import { resolveTrainerScheduleCodes } from './trainerMappings.js';
@@ -37,7 +38,7 @@ const pickSlotForCell = (schedules, day, slotKey) => {
  */
 export const buildTimetableExport = async () => {
   const trainers = await Trainer.find().sort({ employeeId: 1 }).lean();
-  const allSchedules = await Schedule.find().lean();
+  const allSchedules = await filterSchedulesActiveOnDate(await Schedule.find().lean(), new Date());
 
   const sections = [];
 

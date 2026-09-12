@@ -12,14 +12,17 @@ const TopicTrackerPendingBacklogTab = ({ refreshKey = 0, onOpenTracker }) => {
   const [subjectFilter, setSubjectFilter] = useState('');
   const [trainerFilter, setTrainerFilter] = useState('');
 
+  const [loadError, setLoadError] = useState('');
+
   const loadBacklog = useCallback(async () => {
     setLoading(true);
+    setLoadError('');
     try {
       const data = await getTopicTrackerPendingBacklog();
       setBacklog(data);
     } catch (err) {
       showError(getErrorMessage(err));
-      setBacklog({ items: [], totalPending: 0 });
+      setLoadError(getErrorMessage(err));
     } finally {
       setLoading(false);
     }
@@ -122,10 +125,20 @@ const TopicTrackerPendingBacklogTab = ({ refreshKey = 0, onOpenTracker }) => {
       </div>
 
       {!filteredItems.length ? (
-        <div className="alert alert-light border mb-0">
-          {items.length
-            ? 'No pending trackers match the selected filters.'
-            : 'No pending unclosed topic trackers through today.'}
+        <div className={`alert mb-0 ${loadError ? 'alert-danger' : 'alert-light border'}`}>
+          {loadError
+            ? (
+              <>
+                Could not load pending trackers. {loadError}
+                {' '}
+                <button type="button" className="btn btn-sm btn-outline-danger ms-2" onClick={loadBacklog}>
+                  Retry
+                </button>
+              </>
+            )
+            : items.length
+              ? 'No pending trackers match the selected filters.'
+              : 'No pending unclosed topic trackers through today.'}
         </div>
       ) : (
         <div className="table-responsive">

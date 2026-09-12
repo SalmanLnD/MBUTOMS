@@ -17,10 +17,7 @@ const OPERATIONS_TIMEZONE = 'Asia/Kolkata';
 
 /** IST calendar day, weekday name, and clock minutes for live venue matching. */
 export const getIstNowParts = (dateInput = new Date()) => {
-  let date = dateInput instanceof Date ? dateInput : new Date(dateInput);
-  if (Number.isNaN(date.getTime())) {
-    date = new Date();
-  }
+  const date = dateInput instanceof Date ? dateInput : new Date(dateInput);
   const dateKey = toLeaveDateKey(date);
   const dayName = new Intl.DateTimeFormat('en-US', {
     timeZone: OPERATIONS_TIMEZONE,
@@ -45,7 +42,7 @@ export const getIstNowParts = (dateInput = new Date()) => {
     dayName,
     currentTime,
     minutes: hour * 60 + minute,
-    asOf: Number.isNaN(date.getTime()) ? '' : date.toISOString(),
+    asOf: date.toISOString(),
   };
 };
 
@@ -86,10 +83,9 @@ export const isScheduleActiveAtMinutes = (schedule, minutes) => {
 const isSubjectStarted = (schedule, ref, byId, byCode) => {
   const subjectId = schedule.subject?._id?.toString() || schedule.subject?.toString();
   const subjectCode = schedule.subjectCode?.trim();
-  const subjectMeta = (subjectId && byId.get(subjectId))
+  const startDate = (subjectId && byId.get(subjectId))
     || (subjectCode && byCode.get(subjectCode))
-    || { startDate: DEFAULT_SUBJECT_START_DATE };
-  const startDate = subjectMeta?.startDate ?? DEFAULT_SUBJECT_START_DATE;
+    || DEFAULT_SUBJECT_START_DATE;
   return ref >= startDate;
 };
 

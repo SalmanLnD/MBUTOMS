@@ -6,7 +6,10 @@ export const getTopicTrackerOverview = async (date) => {
 };
 
 export const getTopicTrackerPendingBacklog = async (params = {}) => {
-  const { data } = await api.get('/topic-tracker/pending-backlog', { params });
+  const { data } = await api.get('/topic-tracker/pending-backlog', {
+    params,
+    skipRetry: true,
+  });
   return data;
 };
 

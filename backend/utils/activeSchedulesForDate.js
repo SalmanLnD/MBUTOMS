@@ -16,10 +16,9 @@ export async function filterSchedulesActiveOnDate(schedules, referenceDate = new
   return schedules.filter((schedule) => {
     const subjectId = schedule.subject?._id?.toString() || schedule.subject?.toString();
     const subjectCode = schedule.subjectCode?.trim();
-    const subjectMeta = (subjectId && byId.get(subjectId))
+    const startDate = (subjectId && byId.get(subjectId))
       || (subjectCode && byCode.get(subjectCode))
-      || { startDate: DEFAULT_SUBJECT_START_DATE };
-    const startDate = subjectMeta?.startDate ?? DEFAULT_SUBJECT_START_DATE;
+      || DEFAULT_SUBJECT_START_DATE;
     return ref >= startDate;
   });
 }

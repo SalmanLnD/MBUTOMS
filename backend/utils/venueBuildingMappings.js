@@ -65,12 +65,6 @@ export const VENUE_MAPPING_REFERENCE = [
     notes: '800 series',
   },
   {
-    rooms: '4000–4999',
-    building: 'NAB Block',
-    floor: '',
-    notes: 'NAB block rooms',
-  },
-  {
     rooms: '1700–2000',
     building: 'Diploma Block',
     floor: '',
@@ -130,9 +124,6 @@ export const resolveVenueLocation = (venueNumberOrName) => {
   if (IN_RANGE(roomNumber, 322, 333)) {
     return { building: 'M Block West', floor: '2nd Floor', block: 'M Block West' };
   }
-  if (IN_RANGE(roomNumber, 300, 399)) {
-    return { building: 'M Block', floor: '2nd Floor', block: 'M Block' };
-  }
   if (IN_RANGE(roomNumber, 400, 499)) {
     return { building: 'MNS Block', floor: 'Ground Floor', block: 'MNS Block' };
   }
@@ -148,9 +139,6 @@ export const resolveVenueLocation = (venueNumberOrName) => {
   if (IN_RANGE(roomNumber, 800, 822)) {
     return { building: 'MNS Block', floor: '4th Floor', block: 'MNS Block' };
   }
-  if (IN_RANGE(roomNumber, 4000, 4999)) {
-    return { building: 'NAB Block', floor: '', block: 'NAB Block' };
-  }
   if (IN_RANGE(roomNumber, 1700, 2000)) {
     return { building: 'Diploma Block', floor: '', block: 'Diploma Block' };
   }
@@ -159,6 +147,9 @@ export const resolveVenueLocation = (venueNumberOrName) => {
   }
   if (IN_RANGE(roomNumber, 2501, 2805)) {
     return { building: 'Mechanical Block', floor: '', block: 'Mechanical Block' };
+  }
+  if (IN_RANGE(roomNumber, 4100, 4400)) {
+    return { building: 'NAB Block', floor: '', block: 'NAB Block' };
   }
 
   return null;

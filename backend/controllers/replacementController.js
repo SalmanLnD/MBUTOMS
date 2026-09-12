@@ -878,8 +878,8 @@ export const assignReplacement = async (req, res) => {
   let trainer = null;
   if (!useExternal) {
     trainer = await Trainer.findById(replacementTrainerId);
-    if (!trainer || trainer.status !== 'active') {
-      return res.status(400).json({ message: 'Replacement trainer is not available' });
+  if (!trainer || trainer.status !== 'active') {
+    return res.status(400).json({ message: 'Replacement trainer is not available' });
     }
   }
 
@@ -912,15 +912,15 @@ export const assignReplacement = async (req, res) => {
   }
 
   if (!useExternal) {
-    const available = await isTrainerAvailableForReplacement({
-      trainerId: replacementTrainerId,
-      scheduleDay: schedule.day,
-      leaveStart: leave.startDate,
-      leaveEnd: leave.endDate,
-      status: trainer.status,
-    });
-    if (!available) {
-      return res.status(400).json({ message: 'Replacement trainer is on leave during this class' });
+  const available = await isTrainerAvailableForReplacement({
+    trainerId: replacementTrainerId,
+    scheduleDay: schedule.day,
+    leaveStart: leave.startDate,
+    leaveEnd: leave.endDate,
+    status: trainer.status,
+  });
+  if (!available) {
+    return res.status(400).json({ message: 'Replacement trainer is on leave during this class' });
     }
 
     const scheduleCodes = resolveTrainerScheduleCodes(trainer);

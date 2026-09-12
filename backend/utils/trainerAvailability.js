@@ -33,36 +33,20 @@ const minutesToTime = (minutes) => {
 const resolveStartDate = (schedule, subjectStartMap) => {
   const subjectId = schedule.subject?.toString();
   if (subjectId && subjectStartMap.byId.has(subjectId)) {
-    return subjectStartMap.byId.get(subjectId).startDate || null;
+    return subjectStartMap.byId.get(subjectId);
   }
   const subjectCode = schedule.subjectCode?.trim();
   if (subjectCode && subjectStartMap.byCode.has(subjectCode)) {
-    return subjectStartMap.byCode.get(subjectCode).startDate || null;
-  }
-  return null;
-};
-
-const resolveEndDate = (schedule, subjectStartMap) => {
-  const subjectId = schedule.subject?.toString();
-  if (subjectId && subjectStartMap.byId.has(subjectId)) {
-    return subjectStartMap.byId.get(subjectId).endDate || null;
-  }
-  const subjectCode = schedule.subjectCode?.trim();
-  if (subjectCode && subjectStartMap.byCode.has(subjectCode)) {
-    return subjectStartMap.byCode.get(subjectCode).endDate || null;
+    return subjectStartMap.byCode.get(subjectCode);
   }
   return null;
 };
 
 const isActiveOnDate = (schedule, referenceDate, subjectStartMap) => {
   const ref = normalizeDate(referenceDate);
-  const rawStart = resolveStartDate(schedule, subjectStartMap);
-  const effectiveStart = rawStart ? normalizeDate(rawStart) : DEFAULT_SUBJECT_START_DATE;
-
-  const rawEnd = resolveEndDate(schedule, subjectStartMap);
-  const effectiveEnd = rawEnd ? normalizeDate(rawEnd) : DEFAULT_SUBJECT_END_DATE;
-
-  return ref >= effectiveStart && ref <= effectiveEnd;
+  const startDate = resolveStartDate(schedule, subjectStartMap);
+  const effectiveStart = startDate ?? DEFAULT_SUBJECT_START_DATE;
+  return ref >= effectiveStart;
 };
 
 const mergeMinuteIntervals = (intervals) => {
@@ -257,8 +241,7 @@ export const buildTrainerAvailabilityForRange = async ({
   const { codeToTrainerId, allCodes } = buildTrainerCodeIndex(trainers);
   const trainerById = new Map(trainers.map((trainer) => [trainer._id.toString(), trainer]));
 
-  const cleanedCodes = allCodes.map((c) => String(c || '').trim()).filter(Boolean);
-  const ownedFilter = { trainerCode: { $in: cleanedCodes } };
+  const ownedFilter = { trainerCode: { $in: allCodes } };
   if (semester) ownedFilter.semester = semester;
 
   const [
@@ -314,11 +297,6 @@ export const buildTrainerAvailabilityForRange = async ({
     if (!schedulesByTrainer.has(trainerId)) schedulesByTrainer.set(trainerId, []);
     schedulesByTrainer.get(trainerId).push(schedule);
   });
-
-  // If schedules were not found from the bulk query (possible when trainer
-  // codes in DB differ), we'll lazily fetch per-trainer schedules as a
-  // fallback to improve resilience. This keeps behavior correct even when
-  // schedule codes are stored in unexpected formats.
 
   const replacementScheduleIds = [
     ...new Set(
@@ -415,23 +393,7 @@ export const buildTrainerAvailabilityForRange = async ({
 
       const busyIntervals = [];
 
-      let trainerSchedules = schedulesByTrainer.get(trainerId) || [];
-      // Fallback: try fetching schedules for this trainer if none were found
-      // in the bulk query. This handles cases where schedule codes don't
-      // match the precomputed index.
-      if (!trainerSchedules.length) {
-        try {
-          const fallbackCodes = resolveTrainerScheduleCodes(trainer).map((c) => String(c || '').trim()).filter(Boolean);
-          if (fallbackCodes.length) {
-            // eslint-disable-next-line no-await-in-loop
-            trainerSchedules = await Schedule.find({ trainerCode: { $in: fallbackCodes } }).lean();
-          }
-        } catch (err) {
-          // ignore fallback errors and proceed with empty schedules
-        }
-      }
-
-      trainerSchedules.forEach((schedule) => {
+      (schedulesByTrainer.get(trainerId) || []).forEach((schedule) => {
         if (schedule.day !== dayName) return;
         if (cancellationMap.get(dateKey)?.has(schedule._id.toString())) return;
         if (!isActiveOnDate(schedule, date, subjectStartMap)) return;

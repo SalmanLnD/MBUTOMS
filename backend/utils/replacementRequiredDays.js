@@ -8,7 +8,7 @@ import {
   TRAINER_ATTENDANCE_TRACKING_START,
   toAttendanceDateKey,
 } from './attendanceTracking.js';
-import { getLeaveOverlapFilter, isDateWithinLeave } from './leaveDateRange.js';
+import { getLeaveOverlapFilter, getLeaveDateKeysInWindow } from './leaveDateRange.js';
 import { getLeaveWeekdayScheduleIds, isFullDayLeave } from './leaveScope.js';
 import { loadOfficialHolidayMap } from './officialHolidays.js';
 import { resolveTrainerScheduleCodes } from './trainerMappings.js';
@@ -76,6 +76,9 @@ export const getReplacementRequiredDaysByTrainer = async ({
     );
   });
 
+  const fromKey = toAttendanceDateKey(rangeStart);
+  const untilKey = toAttendanceDateKey(endDate);
+
   const fullDayLeaveKeys = new Set();
   approvedLeaves.forEach((leave) => {
     const trainerId = leave.trainer.toString();
@@ -85,10 +88,8 @@ export const getReplacementRequiredDaysByTrainer = async ({
     );
     if (!isFullDayLeave(leave, { dayScheduleIds })) return;
 
-    dates.forEach((date) => {
-      if (isDateWithinLeave(date, leave)) {
-        fullDayLeaveKeys.add(`${trainerId}|${toAttendanceDateKey(date)}`);
-      }
+    getLeaveDateKeysInWindow(leave, fromKey, untilKey).forEach((dateKey) => {
+      fullDayLeaveKeys.add(`${trainerId}|${dateKey}`);
     });
   });
 

@@ -4,22 +4,19 @@
  */
 export const ATTENDANCE_TIMEZONE = 'Asia/Kolkata';
 
+const operationalDateFormatter = new Intl.DateTimeFormat('en-CA', {
+  timeZone: ATTENDANCE_TIMEZONE, year: 'numeric', month: '2-digit', day: '2-digit',
+});
+
 export const toAttendanceDateKey = (dateInput) => {
-  if (dateInput === null || dateInput === undefined || dateInput === '') {
-    return '';
-  }
-
+  if (dateInput === null || dateInput === undefined || dateInput === '') return '';
   const date = new Date(dateInput);
-  if (Number.isNaN(date.getTime())) {
-    return '';
+  if (Number.isNaN(date.getTime())) return '';
+  // Calendar dates are already canonical; reject impossible dates, don't roll them over.
+  if (typeof dateInput === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(dateInput)) {
+    return date.toISOString().slice(0, 10) === dateInput ? dateInput : '';
   }
-
-  return new Intl.DateTimeFormat('en-CA', {
-    timeZone: ATTENDANCE_TIMEZONE,
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-  }).format(date);
+  return operationalDateFormatter.format(date);
 };
 
 export const normalizeAttendanceDate = (dateInput) => {

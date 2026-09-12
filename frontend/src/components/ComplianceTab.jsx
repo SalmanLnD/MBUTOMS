@@ -68,7 +68,6 @@ const ComplianceTab = () => {
     } catch (err) {
       if (isAbortError(err)) return;
       showError(getErrorMessage(err));
-      setItems([]);
     } finally {
       if (!signal?.aborted) setLoading(false);
     }

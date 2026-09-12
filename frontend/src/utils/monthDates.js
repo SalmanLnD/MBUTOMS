@@ -2,23 +2,14 @@ export const TRAINER_ATTENDANCE_TRACKING_START = '2026-07-01';
 export const TRAINER_ATTENDANCE_INITIAL_END = '2027-01-31';
 export const ATTENDANCE_TIMEZONE = 'Asia/Kolkata';
 
-export const toAttendanceDateKey = (dateInput = new Date()) => {
-  if (dateInput === null || dateInput === undefined || dateInput === '') {
-    return '';
-  }
-
-  const date = new Date(dateInput);
-  if (Number.isNaN(date.getTime())) {
-    return '';
-  }
-
-  return new Intl.DateTimeFormat('en-CA', {
+export const toAttendanceDateKey = (dateInput = new Date()) => (
+  new Intl.DateTimeFormat('en-CA', {
     timeZone: ATTENDANCE_TIMEZONE,
     year: 'numeric',
     month: '2-digit',
     day: '2-digit',
-  }).format(date);
-};
+  }).format(new Date(dateInput))
+);
 
 export const toInputDate = (date) => {
   if (!date) return '';

@@ -1,7 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
+  getLeaveDateKeys,
   getLeaveDateKeysForWeekday,
+  getLeaveDateKeysInWindow,
   getLeaveDayWindow,
   getLeaveOverlapFilter,
   isDateWithinLeave,
@@ -62,4 +64,19 @@ test('maps a weekday slot to the matching calendar dates inside a leave range', 
   assert.deepEqual(getLeaveDateKeysForWeekday(leave, 'Monday'), ['2026-08-03']);
   assert.deepEqual(getLeaveDateKeysForWeekday(leave, 'Saturday'), ['2026-08-01']);
   assert.deepEqual(getLeaveDateKeysForWeekday(leave, 'Tuesday'), []);
+});
+
+test('expands leave calendar keys without scanning an outer date range', () => {
+  const leave = {
+    startDate: '2026-08-01',
+    endDate: '2026-08-03',
+  };
+  assert.deepEqual(getLeaveDateKeys(leave), [
+    '2026-08-01',
+    '2026-08-02',
+    '2026-08-03',
+  ]);
+  assert.deepEqual(getLeaveDateKeysInWindow(leave, '2026-08-02', '2026-08-02'), [
+    '2026-08-02',
+  ]);
 });
