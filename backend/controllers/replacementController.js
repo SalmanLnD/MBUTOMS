@@ -823,6 +823,14 @@ export const getAllReplacements = async (req, res) => {
     cancelled: 5,
   };
   replacements.sort((a, b) => {
+    if (req.query.sortBy === 'date') {
+      const direction = req.query.sortOrder === 'desc' ? -1 : 1;
+      const dateDiff = new Date(a.replacementDate) - new Date(b.replacementDate);
+      if (dateDiff) return direction * dateDiff;
+      const timeDiff = String(a.schedule.startTime || '').localeCompare(String(b.schedule.startTime || ''));
+      if (timeDiff) return direction * timeDiff;
+      return `${a.leave._id}|${a.schedule._id}`.localeCompare(`${b.leave._id}|${b.schedule._id}`);
+    }
     const rankDiff = (rank[a.timelineStatus] ?? 9) - (rank[b.timelineStatus] ?? 9);
     if (rankDiff) return rankDiff;
     return new Date(b.leave.startDate) - new Date(a.leave.startDate);

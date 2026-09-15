@@ -31,7 +31,7 @@ jobs:
           VITE_API_URL: https://mbutoms-api.onrender.com/api
 
   backend:
-    name: Backend syntax check
+    name: Backend checks
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -50,3 +50,22 @@ jobs:
 
       - name: Verify server entry loads
         run: node --check server.js
+
+      - name: Run regression tests
+        run: npm test
+
+  whatsapp-bridge:
+    name: WhatsApp bridge regression tests
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: whatsapp-bridge
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Check bridge syntax
+        run: node --check index.js
+      - name: Run regression tests
+        run: npm test

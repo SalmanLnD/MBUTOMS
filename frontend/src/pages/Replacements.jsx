@@ -55,6 +55,7 @@ const Replacements = () => {
   const [assigningExternal, setAssigningExternal] = useState(false);
   const [pendingCancel, setPendingCancel] = useState(null);
   const [registerFilter, setRegisterFilter] = useState('all');
+  const [dateSortOrder, setDateSortOrder] = useState(null);
   const [showBulkModal, setShowBulkModal] = useState(false);
   const [bulkSubmitting, setBulkSubmitting] = useState(false);
   const [loadingBulkSuggestions, setLoadingBulkSuggestions] = useState(false);
@@ -79,6 +80,7 @@ const Replacements = () => {
         page,
         limit: pageSize,
         registerFilter,
+        ...(dateSortOrder ? { sortBy: 'date', sortOrder: dateSortOrder } : {}),
       });
       setReplacements(data.replacements || []);
       setPagination(data.pagination || null);
@@ -89,7 +91,7 @@ const Replacements = () => {
     }
   };
 
-  useEffect(() => { fetchReplacements(); }, [page, pageSize, registerFilter]);
+  useEffect(() => { fetchReplacements(); }, [page, pageSize, registerFilter, dateSortOrder]);
 
   const resetBulkForm = () => {
     setBulkForm({
@@ -404,7 +406,18 @@ const Replacements = () => {
                 <thead className="table-light">
                   <tr>
                     <th>Trainer on Leave</th>
-                    <th>Date</th>
+                    <th aria-sort={dateSortOrder === 'asc' ? 'ascending' : dateSortOrder === 'desc' ? 'descending' : 'none'}>
+                      <button
+                        type="button"
+                        className="btn btn-link p-0 text-reset fw-bold text-decoration-none"
+                        onClick={() => {
+                          setDateSortOrder((current) => current === 'asc' ? 'desc' : 'asc');
+                          setPage(1);
+                        }}
+                      >
+                        Date{dateSortOrder === 'asc' ? ' ↑' : dateSortOrder === 'desc' ? ' ↓' : ' ↕'}
+                      </button>
+                    </th>
                     <th>Time</th>
                     <th>Class</th>
                     <th>Subject</th>

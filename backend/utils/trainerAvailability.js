@@ -5,7 +5,7 @@ import Subject from '../models/Subject.js';
 import { normalizeDate } from './scheduleHelpers.js';
 import { getCalendarDates, toDateKey } from './dateRange.js';
 import { resolveTrainerScheduleCodes } from './trainerMappings.js';
-import { buildSubjectStartDateMap, DEFAULT_SUBJECT_START_DATE } from './subjectStartDate.js';
+import { buildSubjectStartDateMap, isScheduleWithinSubjectDates } from './subjectStartDate.js';
 import { isScheduleDayInLeaveRange } from './trainerScheduleView.js';
 import {
   getLeaveOverlapFilter,
@@ -28,25 +28,6 @@ const minutesToTime = (minutes) => {
   const h = Math.floor(minutes / 60);
   const m = minutes % 60;
   return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
-};
-
-const resolveStartDate = (schedule, subjectStartMap) => {
-  const subjectId = schedule.subject?.toString();
-  if (subjectId && subjectStartMap.byId.has(subjectId)) {
-    return subjectStartMap.byId.get(subjectId);
-  }
-  const subjectCode = schedule.subjectCode?.trim();
-  if (subjectCode && subjectStartMap.byCode.has(subjectCode)) {
-    return subjectStartMap.byCode.get(subjectCode);
-  }
-  return null;
-};
-
-const isActiveOnDate = (schedule, referenceDate, subjectStartMap) => {
-  const ref = normalizeDate(referenceDate);
-  const startDate = resolveStartDate(schedule, subjectStartMap);
-  const effectiveStart = startDate ?? DEFAULT_SUBJECT_START_DATE;
-  return ref >= effectiveStart;
 };
 
 const mergeMinuteIntervals = (intervals) => {
@@ -333,7 +314,7 @@ export const buildTrainerAvailabilityForRange = async ({
         if (semester && schedule.semester !== semester) return;
         if (schedule.day !== dayName) return;
         if (!isScheduleDayInLeaveRange(schedule.day, leave)) return;
-        if (!isActiveOnDate(schedule, date, subjectStartMap)) return;
+        if (!isScheduleWithinSubjectDates(schedule, date, subjectStartMap)) return;
 
         const uniqueKey = `${replacementTrainerId}|${dateKey}|${schedule._id.toString()}`;
         if (seenReplacementBusyKeys.has(uniqueKey)) return;
@@ -396,7 +377,7 @@ export const buildTrainerAvailabilityForRange = async ({
       (schedulesByTrainer.get(trainerId) || []).forEach((schedule) => {
         if (schedule.day !== dayName) return;
         if (cancellationMap.get(dateKey)?.has(schedule._id.toString())) return;
-        if (!isActiveOnDate(schedule, date, subjectStartMap)) return;
+        if (!isScheduleWithinSubjectDates(schedule, date, subjectStartMap)) return;
         busyIntervals.push(toBusyInterval(schedule.startTime, schedule.endTime, dayEndMinutes));
       });
 

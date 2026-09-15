@@ -2,6 +2,9 @@ import 'dotenv/config';
 import pkg from 'whatsapp-web.js';
 import qrcode from 'qrcode-terminal';
 import axios from 'axios';
+import { resolvePhoneInPage } from './phoneResolution.js';
+import { scrapeGroupMessagesInPage } from './groupHistory.js';
+import { createReconnectTimer } from './reconnectTimer.js';
 
 const { Client, LocalAuth } = pkg;
 
@@ -330,7 +333,7 @@ const createClient = () =>
 let client = null;
 let bridgeReady = false;
 let reconnecting = false;
-let reconnectTimer = null;
+const reconnectTimer = createReconnectTimer();
 let watchdogTimer = null;
 let keepAliveTimer = null;
 let syncJobPollTimer = null;
@@ -431,12 +434,11 @@ const isPunchWatchWindow = () => {
 
 const scheduleReconnect = (reason) => {
   if (ONE_SHOT_MODE || shuttingDown) return;
-  if (reconnectTimer) clearTimeout(reconnectTimer);
+  if (reconnectTimer.pending) return;
   const delay = Math.min(reconnectMinMs * 2 ** reconnectAttempt, reconnectMaxMs);
   reconnectAttempt += 1;
   log(`Scheduling reconnect in ${Math.round(delay / 1000)}s (reason: ${reason}, attempt ${reconnectAttempt})`);
-  reconnectTimer = setTimeout(() => {
-    reconnectTimer = null;
+  reconnectTimer.schedule(() => {
     if (shuttingDown) return;
     if (reconnecting) {
       scheduleReconnect(`wait-lock:${reason}`);
@@ -550,7 +552,7 @@ const startWatchdog = () => {
 const shutdownBridge = async () => {
   if (shuttingDown) return;
   shuttingDown = true;
-  if (reconnectTimer) clearTimeout(reconnectTimer);
+  reconnectTimer.cancel();
   if (watchdogTimer) clearInterval(watchdogTimer);
   if (keepAliveTimer) clearInterval(keepAliveTimer);
   if (syncJobPollTimer) clearInterval(syncJobPollTimer);
@@ -644,45 +646,7 @@ const wireClient = (activeClient) => {
     const contactId = senderId.includes('@') ? senderId : `${senderId}@lid`;
 
     try {
-      const resolved = await activeClient.pupPage.evaluate(async (uid) => {
-        const tryUser = (widLike) => {
-          if (!widLike) return null;
-          if (typeof widLike === 'object' && widLike.user) return widLike.user;
-          if (typeof widLike === 'string') return widLike.split('@')[0];
-          return null;
-        };
-
-        const widFactory = window.require('WAWebWidFactory');
-        const contactStore = window.require('WAWebCollections').Contact;
-        const wid = widFactory.createWid(uid);
-
-        const contact = await contactStore.find(wid);
-        if (contact?.phoneNumber) {
-          const phone = tryUser(contact.phoneNumber);
-          if (phone) return { phone, source: 'contact.phoneNumber' };
-        }
-
-        if (window.WWebJS?.getContact) {
-          const model = await window.WWebJS.getContact(wid._serialized || uid);
-          const phone = model?.userid || tryUser(model?.id);
-          if (phone) return { phone, source: 'WWebJS.getContact' };
-        }
-
-        if (window.WWebJS?.enforceLidAndPnRetrieval) {
-          const { phone } = await window.WWebJS.enforceLidAndPnRetrieval(wid._serialized || uid);
-          const phoneUser = tryUser(phone);
-          if (phoneUser) return { phone: phoneUser, source: 'enforceLidAndPnRetrieval' };
-        }
-
-        const toPn = window.require('WAWebLidMigrationUtils')?.toPn;
-        if (toPn) {
-          const phoneWid = toPn(wid);
-          const phone = tryUser(phoneWid);
-          if (phone) return { phone, source: 'toPn' };
-        }
-
-        return null;
-      }, contactId);
+      const resolved = await activeClient.pupPage.evaluate(resolvePhoneInPage, contactId);
 
       if (resolved?.phone) {
         log(`Resolved ${senderId} via ${resolved.source}: ${resolved.phone}`);
@@ -708,7 +672,8 @@ const wireClient = (activeClient) => {
 
     try {
       const contact = await message.getContact();
-      const fromContact = digitsOnly(contact?.number) || digitsOnly(contact?.id?.user);
+      const fromContact = contact?.id?.server === 'lid' || contact?.id?._serialized?.endsWith('@lid')
+        ? '' : digitsOnly(contact?.number) || digitsOnly(contact?.id?.user);
       if (isLikelyPhoneUserId(fromContact)) {
         return fromContact;
       }
@@ -893,185 +858,7 @@ const wireClient = (activeClient) => {
       return { error: 'no-page-or-group', messages: [] };
     }
 
-    return activeClient.pupPage.evaluate(async (groupId, cutoffSec, limit, historyRounds) => {
-      const tryUser = (widLike) => {
-        if (!widLike) return '';
-        if (typeof widLike === 'object' && widLike.user) return String(widLike.user);
-        if (typeof widLike === 'string') return widLike.split('@')[0];
-        return '';
-      };
-
-      const collections = window.require('WAWebCollections');
-      const widFactory = window.require('WAWebWidFactory');
-      const toPn = window.require('WAWebLidMigrationUtils')?.toPn;
-      const wid = widFactory.createWid(groupId);
-
-      let chat = null;
-      try {
-        chat = collections.Chat?.get?.(wid) || collections.Chat?.get?.(groupId) || null;
-      } catch {
-        chat = null;
-      }
-
-      if (!chat) {
-        const models = collections.Chat?.getModelsArray?.()
-          || Object.values(collections.Chat?._models || {})
-          || [];
-        chat = models.find((item) => item?.id?._serialized === groupId) || null;
-      }
-
-      if (!chat) {
-        try {
-          const findChat = window.require('WAWebFindChatAction')?.findChat;
-          if (findChat) chat = await findChat(wid);
-        } catch {
-          // ignore
-        }
-      }
-
-      if (!chat) {
-        try {
-          const query = window.require('WAWebChatGetters');
-          // no-op probe; keep for future WA builds
-          void query;
-        } catch {
-          // ignore
-        }
-      }
-
-      if (!chat) {
-        const sampleIds = (collections.Chat?.getModelsArray?.() || [])
-          .slice(0, 40)
-          .map((item) => item?.id?._serialized)
-          .filter(Boolean);
-        return {
-          error: 'not-found',
-          sampleIds,
-          chatCount: sampleIds.length,
-          messages: [],
-        };
-      }
-
-      try {
-        const Cmd = window.require('WAWebCmd')?.Cmd;
-        if (Cmd?.openChatBottom) await Cmd.openChatBottom(chat);
-        else if (Cmd?.openChatAt) await Cmd.openChatAt({ chat, msgContext: null });
-      } catch {
-        // ignore open failures
-      }
-
-      try {
-        const loader = window.require('WAWebChatLoadMessagesMsgAction')
-          || window.require('WAWebChatLoadMessages')
-          || window.Store?.ConversationMsgs;
-        for (let i = 0; i < historyRounds; i += 1) {
-          const current = chat.msgs?.getModelsArray?.() || [];
-          const oldest = current.reduce((min, msg) => {
-            const t = Number(msg?.t) || 0;
-            if (!t) return min;
-            return min === 0 ? t : Math.min(min, t);
-          }, 0);
-          if (oldest && oldest <= cutoffSec) break;
-
-          if (loader?.loadEarlierMsgs) {
-            // eslint-disable-next-line no-await-in-loop
-            await loader.loadEarlierMsgs(chat);
-          } else if (typeof chat.loadEarlierMsgs === 'function') {
-            // eslint-disable-next-line no-await-in-loop
-            await chat.loadEarlierMsgs();
-          } else {
-            break;
-          }
-        }
-      } catch {
-        // ignore history load failures
-      }
-
-      const mediaTypes = new Set(['image', 'video', 'document', 'sticker', 'ptt', 'audio', 'album', 'gif']);
-      const msgs = chat.msgs?.getModelsArray?.() || [];
-      const ownUser = window.Store?.Conn?.wid?.user
-        || window.require?.('WAWebUserPrefsMeUser')?.getMaybeMePnUser?.()?.user
-        || '';
-
-      const rows = [];
-      for (const msg of msgs) {
-        if (!msg?.t || msg.t < cutoffSec) continue;
-        const type = msg.type || '';
-        const hasMedia = mediaTypes.has(type)
-          || Boolean(msg.mediaData)
-          || Boolean(msg.deprecatedMms3Url)
-          || Boolean(msg.directPath)
-          || Boolean(msg.mimetype);
-        const body = msg.caption || msg.body || msg.text || msg.captionText || '';
-        let author = '';
-        if (msg.author) author = msg.author._serialized || String(msg.author);
-        else if (msg.id?.fromMe) author = 'fromMe';
-        else if (msg.sender) author = msg.sender._serialized || String(msg.sender);
-
-        let phone = '';
-        try {
-          if (author === 'fromMe') {
-            phone = ownUser;
-          } else if (author) {
-            const authorWid = widFactory.createWid(author);
-            const contact = await collections.Contact.find(authorWid);
-            phone = tryUser(contact?.phoneNumber)
-              || tryUser(contact?.id)
-              || tryUser(toPn?.(authorWid));
-            if (!phone && contact?.phoneNumber?.user) phone = String(contact.phoneNumber.user);
-          }
-        } catch {
-          // ignore contact resolution failures
-        }
-
-        const stableId = (msg.id?._serialized && String(msg.id._serialized).trim())
-          || (msg.id?.id
-            ? `${msg.id.remote || groupId}_${msg.id.fromMe ? 1 : 0}_${msg.id.id}`
-            : '')
-          || `fallback-${msg.t}-${author || 'unknown'}`;
-
-        rows.push({
-          id: stableId,
-          timestamp: msg.t,
-          hasMedia,
-          body,
-          author,
-          phone: String(phone || '').replace(/\D/g, ''),
-          type,
-        });
-      }
-
-      rows.sort((a, b) => a.timestamp - b.timestamp);
-
-      // Prefer punches that include media OR an OIF caption/body so text-only
-      // punches are not dropped when the lookback window is busy.
-      const oifLike = (body) => /\bOIF[\s:_-]*/i.test(String(body || ''));
-      const priorityRows = rows.filter((row) => row.hasMedia
-        || ['image', 'video', 'document', 'album', 'gif'].includes(row.type)
-        || oifLike(row.body));
-      let selected = priorityRows;
-      if (selected.length > limit) {
-        selected = priorityRows.slice(-limit);
-      } else {
-        const selectedIds = new Set(priorityRows.map((row) => row.id));
-        const extras = rows
-          .filter((row) => !selectedIds.has(row.id))
-          .slice(-(limit - priorityRows.length));
-        selected = [...priorityRows, ...extras].sort((a, b) => a.timestamp - b.timestamp);
-      }
-
-      return {
-        chatId: chat.id?._serialized || groupId,
-        msgCount: msgs.length,
-        oldestTs: selected[0]?.timestamp || rows[0]?.timestamp || 0,
-        newestTs: selected[selected.length - 1]?.timestamp || rows[rows.length - 1]?.timestamp || 0,
-        mediaCount: priorityRows.filter((row) => row.hasMedia
-          || ['image', 'video', 'document', 'album', 'gif'].includes(row.type)).length,
-        oifCount: priorityRows.filter((row) => oifLike(row.body)).length,
-        truncated: priorityRows.length > limit,
-        messages: selected,
-      };
-    }, GROUP_ID, Math.floor(cutoffMs / 1000), catchupMessageLimit, historyLoadRounds);
+    return activeClient.pupPage.evaluate(scrapeGroupMessagesInPage, GROUP_ID, Math.floor(cutoffMs / 1000), catchupMessageLimit, historyLoadRounds);
   };
 
   const processScrapedPunch = async (raw, { fromCatchUp = false, force = false } = {}) => {
@@ -1154,6 +941,7 @@ const wireClient = (activeClient) => {
       }
 
       const recent = (scraped.messages || []).filter((row) => (row.timestamp || 0) * 1000 >= cutoffMs);
+      if (scraped.historyError) log(`${label}: incomplete history: ${scraped.historyError}`);
       const oldest = scraped.oldestTs ? new Date(scraped.oldestTs * 1000).toISOString() : '-';
       const newest = scraped.newestTs ? new Date(scraped.newestTs * 1000).toISOString() : '-';
       log(`${label}: scanned ${recent.length}/${scraped.msgCount || 0} msgs media=${scraped.mediaCount || 0} oif=${scraped.oifCount || 0} truncated=${Boolean(scraped.truncated)} force=${Boolean(force)} range=${oldest}..${newest}`);
@@ -1184,13 +972,15 @@ const wireClient = (activeClient) => {
       }
       log(`${label}: results ${JSON.stringify(counts)}`);
 
-      lastSuccessfulSyncAt = Date.now();
+      const complete = !scraped.historyError && !scraped.truncated && counts.error === 0;
+      if (complete) lastSuccessfulSyncAt = Date.now();
       consecutiveSyncFailures = 0;
       if (counts['skip-no-id'] > 0) {
         log(`${label}: WARNING ${counts['skip-no-id']} messages still lacked stable ids`);
       }
       return {
-        ok: true,
+        ok: complete,
+        reason: complete ? null : scraped.historyError || (scraped.truncated ? 'message-limit' : 'forwarding-errors'),
         scanned: recent.length,
         msgCount: scraped.msgCount || 0,
         oldest,
@@ -1244,7 +1034,10 @@ const wireClient = (activeClient) => {
   };
 
   const activateBridge = async (reason = 'ready') => {
-    if (ONE_SHOT_MODE) return;
+    if (ONE_SHOT_MODE || activeClient !== client || shuttingDown) return;
+    // Initialization may recover after a watchdog retry was queued.
+    // Cancel that retry before it tears down this now-working session.
+    reconnectTimer.cancel();
     if (bridgeReady) {
       log(`Bridge already active, skip (${reason})`);
       return;
@@ -1273,7 +1066,6 @@ const wireClient = (activeClient) => {
     await patchWhatsAppStoreApis();
     startPunchPoller();
     await catchUpRecentGroupMessages();
-    lastSuccessfulSyncAt = Date.now();
   };
   activateBridgeFn = activateBridge;
 
