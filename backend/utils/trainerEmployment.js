@@ -1,6 +1,6 @@
 import { getHiddenRosterTrainerIds } from './rosterFilter.js';
 import { excludeArchivedExternalTrainers, isExternalTrainerArchived } from './externalTrainerArchive.js';
-import { normalizeAttendanceDate, toAttendanceDateKey } from './attendanceDates.js';
+import { normalizeAttendanceDate } from './attendanceDates.js';
 
 export const formatEmploymentMonthKey = (date) => {
   const value = normalizeAttendanceDate(date);

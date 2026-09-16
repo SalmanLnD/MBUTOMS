@@ -11,7 +11,6 @@ import {
 } from './attendanceDates.js';
 import { getAttendanceToday } from './attendanceTracking.js';
 import { computeClassHandlingHoursBatch } from './trainerClassHoursBatch.js';
-import { mergeRosterFilter } from './rosterFilter.js';
 import { mergeAttendanceExportTrainerFilter, shouldAutoMarkTrainerExit, isBeforeTrainerJoiningDate } from './trainerEmployment.js';
 import {
   isBulkReplacementOnlyTrainer,

@@ -32,6 +32,9 @@ backend/uploads/*
 # Test / coverage
 coverage/
 
+# Local troubleshooting artifacts
+.tmp/
+
 # Vercel local
 .vercel/
 
