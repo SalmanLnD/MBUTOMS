@@ -65,6 +65,8 @@ const PROCESSED_IDS_PATH = './.processed-message-ids.json';
 let syncGroupPunchesFn = null;
 let lastManualSyncAt = 0;
 let lastManualSyncResult = null;
+let latestQr = null;
+let latestQrAt = 0;
 
 const oifPattern = new RegExp(OIF_REGEX, 'i');
 const processedMessageIds = new Set();
@@ -574,11 +576,17 @@ const shutdownBridge = async () => {
 
 const wireClient = (activeClient) => {
   activeClient.on('qr', (qr) => {
+    // Codes rotate every ~20s and the terminal art is unusable over SSM, so keep
+    // the raw payload available on /qr for remote re-linking.
+    latestQr = qr;
+    latestQrAt = Date.now();
     console.log('\nScan this QR code with the WhatsApp account that is in the group:\n');
     qrcode.generate(qr, { small: true });
   });
 
   activeClient.on('authenticated', () => {
+    latestQr = null;
+    latestQrAt = 0;
     log('WhatsApp authenticated');
     armReadyTimeout();
   });
@@ -1187,6 +1195,19 @@ const startControlServer = () => {
             lastManualSyncAt: lastManualSyncAt || null,
             lastManualSyncResult,
           });
+        }
+
+        if (req.method === 'GET' && url.pathname === '/qr') {
+          if (!isAuthorizedControlRequest(req)) {
+            return send(401, { message: 'Invalid bridge control secret' });
+          }
+          if (bridgeReady) {
+            return send(409, { message: 'Bridge is already linked; no QR needed' });
+          }
+          if (!latestQr) {
+            return send(503, { message: 'No QR available yet; retry in a few seconds' });
+          }
+          return send(200, { qr: latestQr, at: latestQrAt, ageMs: Date.now() - latestQrAt });
         }
 
         if (req.method === 'POST' && url.pathname === '/sync') {
