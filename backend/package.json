@@ -13,7 +13,7 @@
     "seed:pstp": "node utils/runPstpSync.js",
     "seed:classes": "node utils/runClassMigration.js",
     "seed:lrre-v": "node scripts/verify-lrre-v-semester-timetable.js",
-    "test": "node --test tests/unit/**/*.test.js",
+    "test": "node --test",
     "verify:timetable": "node scripts/verify-timetable-integrity.js",
     "verify:display": "node scripts/verify-subject-timetable-display.js",
     "import:idsa-venues": "node scripts/import-idsa-venues.mjs",

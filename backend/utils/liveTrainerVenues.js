@@ -3,9 +3,8 @@ import Trainer from '../models/Trainer.js';
 import { buildTimetableBoardForDate } from './timetableBoard.js';
 import {
   buildSubjectStartDateMap,
-  DEFAULT_SUBJECT_START_DATE,
+  isScheduleWithinSubjectDates,
 } from './subjectStartDate.js';
-import { normalizeDate } from './scheduleHelpers.js';
 import { mergeRosterFilter } from './rosterFilter.js';
 import { parseTimeToMinutes } from './timetableSlots.js';
 import { enrichVenueRecord } from './venueBuildingMappings.js';
@@ -80,20 +79,11 @@ export const isScheduleActiveAtMinutes = (schedule, minutes) => {
   return start <= minutes && minutes < end;
 };
 
-const isSubjectStarted = (schedule, ref, byId, byCode) => {
-  const subjectId = schedule.subject?._id?.toString() || schedule.subject?.toString();
-  const subjectCode = schedule.subjectCode?.trim();
-  const startDate = (subjectId && byId.get(subjectId))
-    || (subjectCode && byCode.get(subjectCode))
-    || DEFAULT_SUBJECT_START_DATE;
-  return ref >= startDate;
-};
-
 const pickCurrentSchedule = (schedules, dayName, minutes, ref, byId, byCode) => {
   const candidates = (schedules || []).filter(
     (schedule) =>
       schedule.day === dayName
-      && isSubjectStarted(schedule, ref, byId, byCode)
+      && isScheduleWithinSubjectDates(schedule, ref, { byId, byCode })
       && isScheduleActiveAtMinutes(schedule, minutes)
   );
   if (!candidates.length) return null;
@@ -347,7 +337,8 @@ export const buildLiveTrainerVenues = async ({ now = new Date(), time } = {}) =>
 
   const trainerIds = trainers.map((trainer) => trainer._id);
   const trainerById = new Map(trainers.map((trainer) => [trainer._id.toString(), trainer]));
-  const ref = normalizeDate(referenceDate);
+  // Preserve the IST calendar day; the shared helper owns date normalization.
+  const ref = referenceDate;
   const { byId, byCode } = subjectStarts;
 
   const leaves = trainerIds.length
@@ -406,7 +397,7 @@ export const buildLiveTrainerVenues = async ({ now = new Date(), time } = {}) =>
     const hasToday = boardSchedules.some(
       (schedule) =>
         schedule.day === clock.dayName
-        && isSubjectStarted(schedule, ref, byId, byCode)
+        && isScheduleWithinSubjectDates(schedule, ref, { byId, byCode })
     );
     if (!hasToday) return;
 
