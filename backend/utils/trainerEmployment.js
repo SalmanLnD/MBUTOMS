@@ -1,4 +1,5 @@
 import { getHiddenRosterTrainerIds } from './rosterFilter.js';
+import { excludeArchivedExternalTrainers, isExternalTrainerArchived } from './externalTrainerArchive.js';
 import { normalizeAttendanceDate, toAttendanceDateKey } from './attendanceDates.js';
 
 export const formatEmploymentMonthKey = (date) => {
@@ -9,6 +10,7 @@ export const formatEmploymentMonthKey = (date) => {
 export const getCurrentEmploymentMonthKey = () => formatEmploymentMonthKey(new Date());
 
 export const isTrainerVisibleInUi = (trainer, referenceDate = new Date()) => {
+  if (isExternalTrainerArchived(trainer, referenceDate)) return false;
   if (!['resigned', 'relocated'].includes(trainer?.employmentStatus)) return true;
   if (!trainer?.includeInAttendanceUntilMonth) return false;
   return trainer.includeInAttendanceUntilMonth >= formatEmploymentMonthKey(referenceDate);
@@ -16,12 +18,12 @@ export const isTrainerVisibleInUi = (trainer, referenceDate = new Date()) => {
 
 export const buildUiTrainerEmploymentFilter = (referenceDate = new Date()) => {
   const currentMonth = formatEmploymentMonthKey(referenceDate);
-  return {
+  return excludeArchivedExternalTrainers({
     $or: [
       { employmentStatus: { $nin: ['resigned', 'relocated'] } },
       { includeInAttendanceUntilMonth: { $gte: currentMonth } },
     ],
-  };
+  }, referenceDate);
 };
 
 export const mergeUiTrainerFilter = async (baseFilter = {}, referenceDate = new Date()) => {

@@ -1,6 +1,7 @@
 import Schedule from '../models/Schedule.js';
 import Leave from '../models/Leave.js';
 import Trainer from '../models/Trainer.js';
+import { excludeArchivedExternalTrainers } from '../utils/externalTrainerArchive.js';
 import Subject from '../models/Subject.js';
 import { normalizeDate } from '../utils/scheduleHelpers.js';
 import { resolveTrainerScheduleCodes } from '../utils/trainerMappings.js';
@@ -279,10 +280,10 @@ export const getReplacementSuggestions = async (req, res) => {
     (subject?.trainerEligible || []).map((trainerId) => trainerId.toString())
   );
 
-  const trainers = await Trainer.find({
+  const trainers = await Trainer.find(excludeArchivedExternalTrainers({
     _id: { $ne: leave.trainer },
     status: 'active',
-  })
+  }))
     .select('name employeeId email performanceScore status scheduleTrainerCodes')
     .lean();
 
@@ -435,10 +436,10 @@ export const getBulkReplacementSuggestions = async (req, res) => {
     });
   }
 
-  const candidates = await Trainer.find({
+  const candidates = await Trainer.find(excludeArchivedExternalTrainers({
     _id: { $ne: sourceTrainerId },
     status: 'active',
-  })
+  }))
     .select('name employeeId email performanceScore status scheduleTrainerCodes')
     .lean();
 

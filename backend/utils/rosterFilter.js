@@ -1,4 +1,5 @@
 import User from '../models/User.js';
+import { excludeArchivedExternalTrainers } from './externalTrainerArchive.js';
 import { ROSTER_HIDDEN_STAFF_ROLES } from './roles.js';
 
 const isTruthyQuery = (value) => value === true || value === 'true' || value === '1';
@@ -21,7 +22,7 @@ export const getHiddenRosterTrainerIds = async () => {
 };
 
 export const mergeRosterFilter = async (baseFilter = {}, { rosterOnly = true } = {}) => {
-  if (!rosterOnly) return baseFilter;
+  if (!rosterOnly) return excludeArchivedExternalTrainers(baseFilter);
 
   const hiddenTrainerIds = await getHiddenRosterTrainerIds();
   const rosterClause = {
@@ -29,6 +30,6 @@ export const mergeRosterFilter = async (baseFilter = {}, { rosterOnly = true } =
     ...(hiddenTrainerIds.length ? { _id: { $nin: hiddenTrainerIds } } : {}),
   };
 
-  if (!Object.keys(baseFilter).length) return rosterClause;
-  return { $and: [baseFilter, rosterClause] };
+  if (!Object.keys(baseFilter).length) return excludeArchivedExternalTrainers(rosterClause);
+  return excludeArchivedExternalTrainers({ $and: [baseFilter, rosterClause] });
 };

@@ -20,14 +20,14 @@ const schedule = (overrides = {}) => ({
   day: 'Wednesday', startTime: '10:00', endTime: '12:00', department: 'CSE', section: 'A',
   venue: { _id: 'venue', name: 'Room 101', building: 'Block A', floor: '1' }, ...overrides,
 });
-function fixtures(t, { schedules = [schedule()], leaves = [], cancellations = [] } = {}) {
+function fixtures(t, { schedules = [schedule()], leaves = [], cancellations = [], trainers = [trainer] } = {}) {
   const query = (rows) => ({
     select() { return this; }, sort() { return this; }, populate() { return this; },
     lean: async () => rows,
     then(resolve, reject) { return Promise.resolve(rows).then(resolve, reject); },
   });
   t.mock.method(User, 'find', () => query([]));
-  t.mock.method(Trainer, 'find', () => query([trainer]));
+  t.mock.method(Trainer, 'find', () => query(trainers));
   t.mock.method(Trainer, 'findById', async () => trainer);
   t.mock.method(Subject, 'find', () => query([subject]));
   t.mock.method(Schedule, 'find', (filter) => query(schedules.filter((row) =>
@@ -95,11 +95,43 @@ test('leave and external replacement statuses still use the active class', async
   });
   await t.test('external cover', async (t) => {
     fixtures(t, { leaves: [{ ...leave, replacements: [{ schedule: 'slot', isExternal: true, externalTrainerName: 'Guest' }] }] });
-    const row = (await live()).trainers[0];
+    const result = await live();
+    assert.equal(result.trainers[0].status, 'not_available');
+    const row = result.trainers.find((r) => r.isExternal);
     assert.equal(row.status, 'in_class');
     assert.equal(row.name, 'Guest');
     assert.equal(row.replacedTrainerName, trainer.name);
   });
+});
+
+test('internal replacement occupies the covering trainer row without duplicating the absent owner', async (t) => {
+  const cover = { _id: 'cover', employeeId: 'COVER', name: 'Sai Priya' };
+  const leave = { trainer: trainer._id, startDate: new Date('2026-09-16'),
+    endDate: new Date('2026-09-16'), scope: 'full_day', affectedSchedules: ['slot'],
+    replacements: [{ schedule: 'slot', replacementTrainer: cover }] };
+  fixtures(t, { trainers: [trainer, cover], leaves: [leave] });
+  for (const [time, status] of [['09:59', 'free'], ['10:00', 'in_class'], ['11:59', 'in_class'], ['12:00', 'free']]) {
+    const result = await live(undefined, time);
+    assert.equal(result.trainers.length, 2);
+    assert.equal(result.trainers[0].name, trainer.name);
+    assert.equal(result.trainers[0].status, 'not_available');
+    const row = result.trainers.find((r) => r.employeeId === 'COVER');
+    assert.equal(row.status, status);
+    if (status === 'in_class') {
+      assert.equal(row.venue.name, 'Room 101');
+      assert.equal(row.schedule.isReplacementAssignment, true);
+      assert.equal(row.replacedTrainerName, trainer.name);
+    }
+  }
+});
+
+test('cancelled replacement classes do not occupy the covering trainer', async (t) => {
+  const cover = { _id: 'cover', employeeId: 'COVER', name: 'Cover' };
+  fixtures(t, { trainers: [trainer, cover], cancellations: [{ schedules: ['slot'] }], leaves: [{
+    trainer: trainer._id, startDate: new Date('2026-09-16'), endDate: new Date('2026-09-16'),
+    scope: 'full_day', replacements: [{ schedule: 'slot', replacementTrainer: cover }],
+  }] });
+  assert.equal((await live()).trainers.find((r) => r.employeeId === 'COVER').status, 'free');
 });
 
 test('Venue Live leaves the subject-cache contract, attendance hours and RTET output intact', async (t) => {

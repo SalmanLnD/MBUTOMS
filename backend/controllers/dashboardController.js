@@ -1,4 +1,5 @@
 import Trainer from '../models/Trainer.js';
+import { excludeArchivedExternalTrainers } from '../utils/externalTrainerArchive.js';
 import Student from '../models/Student.js';
 import Venue from '../models/Venue.js';
 import Leave from '../models/Leave.js';
@@ -80,7 +81,7 @@ export const getDashboardStats = async (req, res) => {
     topTrainersByFeedback,
     activeToday,
   ] = await Promise.all([
-    Trainer.countDocuments(),
+    Trainer.countDocuments(excludeArchivedExternalTrainers()),
     Student.countDocuments({ status: 'active' }),
     Venue.countDocuments({ isActive: true }),
     Leave.countDocuments({

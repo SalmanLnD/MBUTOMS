@@ -1,6 +1,7 @@
 import Schedule from '../models/Schedule.js';
 import Leave from '../models/Leave.js';
 import Trainer from '../models/Trainer.js';
+import { excludeArchivedExternalTrainers } from './externalTrainerArchive.js';
 import Subject from '../models/Subject.js';
 import { normalizeDate } from './scheduleHelpers.js';
 import { getCalendarDates, toDateKey } from './dateRange.js';
@@ -202,7 +203,7 @@ export const buildTrainerAvailabilityForRange = async ({
     }
   }
 
-  const trainers = await Trainer.find(trainerFilter)
+  const trainers = await Trainer.find(excludeArchivedExternalTrainers(trainerFilter))
     .select('name employeeId scheduleTrainerCodes status')
     .sort({ name: 1 })
     .lean();

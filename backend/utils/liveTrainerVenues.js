@@ -1,5 +1,7 @@
 import Leave from '../models/Leave.js';
 import Trainer from '../models/Trainer.js';
+import Schedule from '../models/Schedule.js';
+import { getCanceledScheduleIdsForDate } from './classCancellations.js';
 import { buildTimetableBoardForDate } from './timetableBoard.js';
 import {
   buildSubjectStartDateMap,
@@ -13,6 +15,7 @@ import { isScheduleDayInLeaveRange } from './trainerScheduleView.js';
 import { getLeaveWeekdayScheduleIds, isFullDayLeave } from './leaveScope.js';
 
 const OPERATIONS_TIMEZONE = 'Asia/Kolkata';
+const recordId = (value) => value?._id?.toString() || value?.toString();
 
 /** IST calendar day, weekday name, and clock minutes for live venue matching. */
 export const getIstNowParts = (dateInput = new Date()) => {
@@ -103,7 +106,7 @@ export const isTrainerOnLeaveNow = ({
   minutes,
 }) => {
   const trainerLeaves = leaves.filter(
-    (leave) => leave.trainer?.toString() === trainerId
+    (leave) => recordId(leave.trainer) === trainerId
   );
 
   for (const leave of trainerLeaves) {
@@ -132,7 +135,7 @@ export const buildReplacementByScheduleMap = (leaves = [], trainerById = new Map
   const map = new Map();
   leaves.forEach((leave) => {
     (leave.replacements || []).forEach((replacement) => {
-      const scheduleId = replacement.schedule?.toString();
+      const scheduleId = recordId(replacement.schedule);
       if (!scheduleId) return;
 
       if (replacement.isExternal && replacement.externalTrainerName) {
@@ -145,7 +148,7 @@ export const buildReplacementByScheduleMap = (leaves = [], trainerById = new Map
         return;
       }
 
-      const replacementTrainerId = replacement.replacementTrainer?.toString();
+      const replacementTrainerId = recordId(replacement.replacementTrainer);
       const trainer = replacementTrainerId ? trainerById.get(replacementTrainerId) : null;
       if (!trainer) return;
 
@@ -264,6 +267,7 @@ const resolveRosterTrainerRow = ({
       employeeId: trainer.employeeId,
       name: trainer.name,
       current: currentCovering,
+      replacedTrainerName: currentCovering.replacementFor?.trainerName,
     });
   }
 
@@ -279,17 +283,7 @@ const resolveRosterTrainerRow = ({
   if (currentOwned) {
     const scheduleId = currentOwned._id.toString();
     const replacement = replacementBySchedule.get(scheduleId);
-    if (replacement) {
-      return buildTrainerLiveRow({
-        trainerId: replacement.trainerId,
-        employeeId: replacement.employeeId,
-        name: replacement.name,
-        isExternal: replacement.isExternal,
-        current: currentOwned,
-        replacedTrainerName: trainer.name,
-      });
-    }
-    if (onLeaveNow) {
+    if (replacement || onLeaveNow) {
       return buildTrainerLiveRow({
         trainerId: trainer._id,
         employeeId: trainer.employeeId,
@@ -357,7 +351,7 @@ export const buildLiveTrainerVenues = async ({ now = new Date(), time } = {}) =>
     ...getLeaveOverlapFilter(referenceDate),
     'replacements.0': { $exists: true },
   })
-    .select('replacements')
+    .select('trainer startDate endDate replacements')
     .populate('replacements.replacementTrainer', 'name employeeId')
     .lean();
 
@@ -368,14 +362,45 @@ export const buildLiveTrainerVenues = async ({ now = new Date(), time } = {}) =>
     trainerById.set(trainer._id.toString(), trainer);
   });
 
+  const activeReplacementLeaves = replacementLeaves.filter((leave) => isDateWithinLeave(ref, leave));
   const replacementBySchedule = buildReplacementByScheduleMap(
-    replacementLeaves,
+    activeReplacementLeaves,
     trainerById
   );
+  const sourceLeaveBySchedule = new Map(activeReplacementLeaves.flatMap((leave) =>
+    (leave.replacements || []).map((entry) => [recordId(entry.schedule), leave])));
+
+  // Resolve coverage here, independently of the shared timetable board. The board
+  // suppresses cover entries for schedules already owned by another trainer.
+  // Keep exactly one row per roster trainer and assign coverage to that trainer.
+  const liveSchedules = Object.fromEntries(Object.entries(schedulesByTrainer)
+    .filter(([key]) => !key.startsWith('external:'))
+    .map(([key, schedules]) => [key, schedules.filter((s) => !s.isReplacementAssignment)]));
+  const replacementIds = [...replacementBySchedule.keys()];
+  if (replacementIds.length) {
+    const [replacementSchedules, canceledIds] = await Promise.all([
+      Schedule.find({ _id: { $in: replacementIds } })
+        .select('day startTime endTime department section subjectCode subject slot venue isLab isProject')
+        .populate('venue', 'name building floor').lean(),
+      getCanceledScheduleIdsForDate(referenceDate),
+    ]);
+    const scheduleById = new Map(replacementSchedules.map((s) => [recordId(s), s]));
+    for (const [scheduleId, replacement] of replacementBySchedule) {
+      const schedule = scheduleById.get(scheduleId);
+      const leave = sourceLeaveBySchedule.get(scheduleId);
+      if (!schedule || canceledIds.has(scheduleId) || !isScheduleDayInLeaveRange(schedule.day, leave)) continue;
+      const source = trainerById.get(recordId(leave.trainer));
+      const key = replacement.isExternal ? `external:${replacement.name.toLowerCase()}` : replacement.employeeId;
+      if (!liveSchedules[key]) liveSchedules[key] = [];
+      liveSchedules[key].push({ ...schedule, isReplacementAssignment: true,
+        isExternal: replacement.isExternal, externalTrainerName: replacement.isExternal ? replacement.name : '',
+        replacementFor: { trainerCode: source?.employeeId || '', trainerName: source?.name || '' } });
+    }
+  }
 
   const rows = trainers.map((trainer) => resolveRosterTrainerRow({
     trainer,
-    boardSchedules: schedulesByTrainer[trainer.employeeId] || [],
+    boardSchedules: liveSchedules[trainer.employeeId] || [],
     clock,
     ref,
     byId,
@@ -385,15 +410,15 @@ export const buildLiveTrainerVenues = async ({ now = new Date(), time } = {}) =>
   }));
 
   const representedScheduleIds = new Set(
-    rows.map((row) => row.schedule?._id).filter(Boolean)
+    rows.map((row) => recordId(row.schedule?._id)).filter(Boolean)
   );
 
-  const externalKeys = Object.keys(schedulesByTrainer)
+  const externalKeys = Object.keys(liveSchedules)
     .filter((key) => key.startsWith('external:'))
     .sort((a, b) => a.localeCompare(b));
 
   externalKeys.forEach((key) => {
-    const boardSchedules = schedulesByTrainer[key] || [];
+    const boardSchedules = liveSchedules[key] || [];
     const hasToday = boardSchedules.some(
       (schedule) =>
         schedule.day === clock.dayName
@@ -419,6 +444,7 @@ export const buildLiveTrainerVenues = async ({ now = new Date(), time } = {}) =>
       name,
       isExternal: true,
       current,
+      replacedTrainerName: current?.replacementFor?.trainerName,
     }));
   });
 
