@@ -83,7 +83,7 @@ export const VENUE_MAPPING_REFERENCE = [
     notes: 'Mechanical block rooms',
   },
   {
-    rooms: '4100–4400',
+    rooms: '4100–4499',
     building: 'NAB Block',
     floor: '',
     notes: 'NAB block rooms',
@@ -148,7 +148,7 @@ export const resolveVenueLocation = (venueNumberOrName) => {
   if (IN_RANGE(roomNumber, 2501, 2805)) {
     return { building: 'Mechanical Block', floor: '', block: 'Mechanical Block' };
   }
-  if (IN_RANGE(roomNumber, 4100, 4400)) {
+  if (IN_RANGE(roomNumber, 4100, 4499)) {
     return { building: 'NAB Block', floor: '', block: 'NAB Block' };
   }
 
