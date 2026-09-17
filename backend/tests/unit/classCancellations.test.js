@@ -5,6 +5,7 @@ import {
   buildAffectedClassOccurrences,
   buildCanceledScheduleIdsByDate,
   getUncancelledScheduleDateKeys,
+  hasUncancelledClassOnDate,
 } from '../../utils/leaveAffectedClasses.js';
 
 test('excludes only schedules canceled for the selected date', () => {
@@ -104,5 +105,37 @@ test('a replacement remains required for uncanceled occurrences in a multi-week 
       cancellationMap
     ),
     ['2026-08-28']
+  );
+});
+
+test('leave days with every class cancelled are not replacement-required', () => {
+  const thursday = [
+    { _id: { toString: () => 'thu-1' }, day: 'Thursday' },
+    { _id: { toString: () => 'thu-2' }, day: 'Thursday' },
+    { _id: { toString: () => 'thu-3' }, day: 'Thursday' },
+  ];
+  const tuesday = [
+    { _id: { toString: () => 'tue-1' }, day: 'Tuesday' },
+  ];
+  const cancellationMap = buildCanceledScheduleIdsByDate([{
+    date: '2026-09-03',
+    schedules: thursday,
+  }]);
+
+  assert.equal(
+    hasUncancelledClassOnDate(thursday, '2026-09-03', 'Thursday', cancellationMap),
+    false
+  );
+  assert.equal(
+    hasUncancelledClassOnDate(thursday, '2026-09-10', 'Thursday', cancellationMap),
+    true
+  );
+  assert.equal(
+    hasUncancelledClassOnDate(tuesday, '2026-09-29', 'Tuesday', new Map()),
+    true
+  );
+  assert.equal(
+    hasUncancelledClassOnDate(tuesday, '2026-09-12', 'Saturday', new Map()),
+    false
   );
 });

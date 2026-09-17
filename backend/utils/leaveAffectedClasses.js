@@ -68,6 +68,18 @@ export const getLeaveClassExclusionsForRange = async (startDate, endDate) => {
   };
 };
 
+export const hasUncancelledClassOnDate = (
+  schedules = [],
+  dateKey,
+  weekdayName,
+  canceledScheduleIdsByDate = new Map()
+) =>
+  schedules.some((schedule) => {
+    if (schedule.day !== weekdayName) return false;
+    const scheduleId = getScheduleId(schedule);
+    return Boolean(scheduleId) && !canceledScheduleIdsByDate.get(dateKey)?.has(scheduleId);
+  });
+
 export const getUncancelledScheduleDateKeys = (
   leave,
   schedule,

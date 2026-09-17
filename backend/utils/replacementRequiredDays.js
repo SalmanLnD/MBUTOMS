@@ -10,12 +10,16 @@ import {
 } from './attendanceTracking.js';
 import { getLeaveOverlapFilter, getLeaveDateKeysInWindow } from './leaveDateRange.js';
 import { getLeaveWeekdayScheduleIds, isFullDayLeave } from './leaveScope.js';
+import {
+  getCancellationMapForRange,
+  hasUncancelledClassOnDate,
+} from './leaveAffectedClasses.js';
 import { loadOfficialHolidayMap } from './officialHolidays.js';
 import { resolveTrainerScheduleCodes } from './trainerMappings.js';
 
 /**
  * Map of trainerId -> Replacement Required Days count for an inclusive date range.
- * RRD = full-day approved leave on a teaching weekday that is not an official holiday.
+ * RRD = full-day approved leave on a day that still has uncancelled classes.
  */
 export const getReplacementRequiredDaysByTrainer = async ({
   startDate,
@@ -39,7 +43,7 @@ export const getReplacementRequiredDaysByTrainer = async ({
   );
   const allScheduleCodes = [...new Set([...codesByTrainer.values()].flat())];
 
-  const [approvedLeaves, schedules, holidayMap] = await Promise.all([
+  const [approvedLeaves, schedules, holidayMap, cancellationMap] = await Promise.all([
     Leave.find({
       trainer: { $in: trainerIds },
       status: 'approved',
@@ -53,6 +57,7 @@ export const getReplacementRequiredDaysByTrainer = async ({
         .lean()
       : [],
     loadOfficialHolidayMap(rangeStart, endDate),
+    getCancellationMapForRange(rangeStart, endDate),
   ]);
 
   const schedulesByCode = new Map();
@@ -64,16 +69,11 @@ export const getReplacementRequiredDaysByTrainer = async ({
   });
 
   const schedulesByTrainer = new Map();
-  const trainingWeekdaysByTrainer = new Map();
   trainers.forEach((trainer) => {
     const trainerId = trainer._id.toString();
     const trainerSchedules = (codesByTrainer.get(trainerId) || [])
       .flatMap((code) => schedulesByCode.get(code) || []);
     schedulesByTrainer.set(trainerId, trainerSchedules);
-    trainingWeekdaysByTrainer.set(
-      trainerId,
-      new Set(trainerSchedules.map((schedule) => schedule.day))
-    );
   });
 
   const fromKey = toAttendanceDateKey(rangeStart);
@@ -95,13 +95,18 @@ export const getReplacementRequiredDaysByTrainer = async ({
 
   trainers.forEach((trainer) => {
     const trainerId = trainer._id.toString();
-    const trainingWeekdays = trainingWeekdaysByTrainer.get(trainerId) || new Set();
+    const trainerSchedules = schedulesByTrainer.get(trainerId) || [];
     let rrd = 0;
     dates.forEach((date) => {
       const dateKey = toAttendanceDateKey(date);
       if (holidayMap.has(dateKey)) return;
       if (!fullDayLeaveKeys.has(`${trainerId}|${dateKey}`)) return;
-      if (trainingWeekdays.has(getAttendanceWeekdayName(date))) {
+      if (hasUncancelledClassOnDate(
+        trainerSchedules,
+        dateKey,
+        getAttendanceWeekdayName(date),
+        cancellationMap
+      )) {
         rrd += 1;
       }
     });

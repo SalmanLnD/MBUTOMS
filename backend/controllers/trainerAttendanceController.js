@@ -33,6 +33,10 @@ import { mergeRosterFilter } from '../utils/rosterFilter.js';
 import { mergeAttendanceUiTrainerFilter, shouldAutoMarkTrainerExit, isBeforeTrainerJoiningDate } from '../utils/trainerEmployment.js';
 import { getLeaveOverlapFilter, isDateWithinLeave } from '../utils/leaveDateRange.js';
 import {
+  getCancellationMapForRange,
+  hasUncancelledClassOnDate,
+} from '../utils/leaveAffectedClasses.js';
+import {
   getLeaveWeekdayScheduleIds,
   isFullDayLeave,
 } from '../utils/leaveScope.js';
@@ -88,7 +92,7 @@ const buildRowTotals = (days, dateKeys) => {
     if (countsAsOifDay(cell.oifNumber)) oifDays += 1;
     if (cell.isOnLeave) {
       leaveDays += 1;
-      // Slot leaves never set isOnLeave; RRD is full-day leave ∩ teaching weekday only.
+      // Slot leaves never set isOnLeave; RRD is full-day leave with remaining classes.
       if (cell.isReplacementRequired) replacementRequiredDays += 1;
     }
   });
@@ -171,7 +175,7 @@ export const buildTrainerAttendanceGridPayload = async ({
   );
   const allScheduleCodes = [...new Set([...codesByTrainer.values()].flat())];
 
-  const [logs, classHoursCache, approvedLeaves, schedules, holidayMap] = await Promise.all([
+  const [logs, classHoursCache, approvedLeaves, schedules, holidayMap, cancellationMap] = await Promise.all([
     trainerIds.length
       ? TrainerDailyAttendance.find({
         trainer: { $in: trainerIds },
@@ -196,6 +200,7 @@ export const buildTrainerAttendanceGridPayload = async ({
         .lean()
       : [],
     loadOfficialHolidayMap(rangeStart, rangeEnd),
+    getCancellationMapForRange(rangeStart, rangeEnd),
   ]);
 
   const schedulesByCode = new Map();
@@ -216,15 +221,6 @@ export const buildTrainerAttendanceGridPayload = async ({
 
   const logMap = buildLogMap(logs);
   const fullDayLeaveKeys = new Set();
-  const trainingWeekdaysByTrainer = new Map();
-
-  trainers.forEach((trainer) => {
-    const trainerId = trainer._id.toString();
-    const weekdays = new Set(
-      (schedulesByTrainer.get(trainerId) || []).map((schedule) => schedule.day)
-    );
-    trainingWeekdaysByTrainer.set(trainerId, weekdays);
-  });
 
   approvedLeaves.forEach((leave) => {
     const trainerId = leave.trainer.toString();
@@ -244,7 +240,7 @@ export const buildTrainerAttendanceGridPayload = async ({
   const rows = trainers.map((trainer) => {
     const days = {};
     const trainerId = trainer._id.toString();
-    const trainingWeekdays = trainingWeekdaysByTrainer.get(trainerId) || new Set();
+    const trainerSchedules = schedulesByTrainer.get(trainerId) || [];
 
     dates.forEach((date) => {
       const dateKey = toAttendanceDateKey(date);
@@ -367,8 +363,13 @@ export const buildTrainerAttendanceGridPayload = async ({
           isDefaultWeekOff: false,
           isSundayWeekOff: false,
           classHoursEditable: false,
-          // RRD only for full-day leave on a teaching weekday that is not a company holiday.
-          isReplacementRequired: trainingWeekdays.has(weekdayName),
+          // RRD only when that leave day still has uncancelled classes.
+          isReplacementRequired: hasUncancelledClassOnDate(
+            trainerSchedules,
+            dateKey,
+            weekdayName,
+            cancellationMap
+          ),
           isFuture: date > today,
         };
         return;
