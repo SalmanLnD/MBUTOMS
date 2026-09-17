@@ -17,8 +17,12 @@ import {
   getLeaveClassExclusionsForRange,
   getUncancelledScheduleDateKeys,
 } from '../utils/leaveAffectedClasses.js';
-import { getLeaveDateKeysForWeekday, toLeaveDateKey } from '../utils/leaveDateRange.js';
+import { getLeaveDateKeys, getLeaveDateKeysForWeekday, toLeaveDateKey } from '../utils/leaveDateRange.js';
 import { splitLeaveRangeForPartialCancel } from '../utils/leaveRangeSplit.js';
+import {
+  applyDefaultExcessRrdAttendance,
+  clearELeaveAttendanceForDateKeys,
+} from '../utils/excessRrdAttendance.js';
 
 const WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
@@ -215,6 +219,9 @@ export const updateLeave = async (req, res) => {
   }
 
   await leave.save();
+  if (status === 'approved') {
+    await applyDefaultExcessRrdAttendance({ leave, markedBy: req.user._id });
+  }
   clearAttendanceGridCache();
   const updated = await Leave.findById(leave._id).populate(populateLeave);
   const { cancellationMap, holidayDateKeys } = await getLeaveClassExclusionsForRange(
@@ -268,6 +275,10 @@ export const deleteLeave = async (req, res) => {
   leave.markModified('replacements');
   leave.markModified('bulkReplacement');
   await leave.save();
+  await clearELeaveAttendanceForDateKeys({
+    trainerId: leave.trainer?._id || leave.trainer,
+    dateKeys: getLeaveDateKeys(leave),
+  });
   clearAttendanceGridCache();
 
   if (hadReplacements) {
@@ -403,6 +414,10 @@ export const partialCancelLeave = async (req, res) => {
     leave.markModified('affectedSchedules');
     leave.markModified('bulkReplacement');
     await leave.save();
+    await clearELeaveAttendanceForDateKeys({
+      trainerId: leave.trainer._id,
+      dateKeys: getLeaveDateKeys({ startDate: cancelStart, endDate: cancelEnd }),
+    });
     clearAttendanceGridCache();
 
     if (revokedReplacements.length) {
@@ -473,6 +488,10 @@ export const partialCancelLeave = async (req, res) => {
   leave.markModified('affectedSchedules');
   leave.markModified('bulkReplacement');
   await leave.save();
+  await clearELeaveAttendanceForDateKeys({
+    trainerId: leave.trainer._id,
+    dateKeys: getLeaveDateKeys({ startDate: cancelStart, endDate: cancelEnd }),
+  });
   clearAttendanceGridCache();
 
   if (revokedReplacements.length) {
