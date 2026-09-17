@@ -74,10 +74,10 @@ export const NAVYA_IDSA_VENUE_SLOTS = [
 
 /** Navya B.COM(CA) / PSTJ venues. */
 export const NAVYA_PSTJ_VENUE_SLOTS = [
-  { day: 'Monday', slot: 'S4', venue: 208 },
-  { day: 'Tuesday', slot: 'S4', venue: 208 },
-  { day: 'Thursday', slot: 'S4', venue: 208 },
-  { day: 'Friday', slot: 'S1', venue: 207 },
+  { day: 'Monday', slot: 'S4', venue: 4400 },
+  { day: 'Tuesday', slot: 'S4', venue: 4400 },
+  { day: 'Thursday', slot: 'S4', venue: 4400 },
+  { day: 'Friday', slot: 'S1', venue: 4400 },
 ];
 
 export const IDSA_VENUE_TRAINER_CODES = [
