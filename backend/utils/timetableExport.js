@@ -6,12 +6,20 @@ import { SLOT_KEYS } from './timetableSlots.js';
 
 const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
 
-const cellText = (schedule) => {
+const venueNameFromSchedule = (schedule) => {
+  const venue = schedule?.venue;
+  if (venue && typeof venue === 'object' && venue.name) return String(venue.name).trim();
+  return '';
+};
+
+export const formatTimetableExportCell = (schedule) => {
   if (!schedule) return '';
   const parts = [];
   if (schedule.subjectCode) parts.push(schedule.subjectCode);
   const classLabel = [schedule.department, schedule.section].filter(Boolean).join(' ');
   if (classLabel) parts.push(classLabel);
+  const venueName = venueNameFromSchedule(schedule);
+  if (venueName) parts.push(`Venue ${venueName}`);
   if (schedule.startTime && schedule.endTime) {
     parts.push(`${schedule.startTime}-${schedule.endTime}`);
   }
@@ -38,7 +46,10 @@ const pickSlotForCell = (schedules, day, slotKey) => {
  */
 export const buildTimetableExport = async () => {
   const trainers = await Trainer.find().sort({ employeeId: 1 }).lean();
-  const allSchedules = await filterSchedulesActiveOnDate(await Schedule.find().lean(), new Date());
+  const allSchedules = await filterSchedulesActiveOnDate(
+    await Schedule.find().populate('venue', 'name').lean(),
+    new Date()
+  );
 
   const sections = [];
 
@@ -55,7 +66,7 @@ export const buildTimetableExport = async () => {
     for (const day of DAYS) {
       const row = [day];
       for (const slotKey of SLOT_KEYS) {
-        row.push(cellText(pickSlotForCell(schedules, day, slotKey)));
+        row.push(formatTimetableExportCell(pickSlotForCell(schedules, day, slotKey)));
       }
       rows.push(row);
     }

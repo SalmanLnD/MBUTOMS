@@ -53,6 +53,7 @@ function syncTimetable() {
   });
 
   sheet.getRange(1, 1, padded.length, maxCols).setValues(padded);
+  sheet.getRange(1, 1, padded.length, maxCols).setWrap(true);
   sheet.getRange(1, 1, 1, maxCols).setFontWeight('bold');
   SpreadsheetApp.flush();
 }
