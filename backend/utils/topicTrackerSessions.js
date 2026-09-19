@@ -1015,6 +1015,31 @@ export const buildTopicTrackerExportRows = async () => {
   return { rows, exportedAt: new Date().toISOString(), count: entries.length };
 };
 
+export const collectTaughtSubjectIds = async (trainer) => {
+  const ids = new Set(
+    (trainer?.subjects || []).map((id) => id?.toString?.()).filter(Boolean)
+  );
+  if (!trainer) return [...ids];
+
+  const codes = resolveTrainerScheduleCodes(trainer);
+  if (!codes.length) return [...ids];
+
+  const slots = await Schedule.find({ trainerCode: { $in: codes } })
+    .select('subject subjectCode')
+    .lean();
+  const subjectCodes = new Set();
+  slots.forEach((slot) => {
+    if (slot.subject) ids.add(slot.subject.toString());
+    const code = String(slot.subjectCode || '').trim();
+    if (code) subjectCodes.add(code);
+  });
+  if (subjectCodes.size) {
+    const byCode = await Subject.find({ code: { $in: [...subjectCodes] } }).select('_id').lean();
+    byCode.forEach((subject) => ids.add(subject._id.toString()));
+  }
+  return [...ids];
+};
+
 export const buildTopicTrackerClassSummary = async ({
   subjectId,
   user,
@@ -1026,14 +1051,20 @@ export const buildTopicTrackerClassSummary = async ({
     : ((user?.role === ROLES.TRAINER || user?.role === ROLES.EVALUATOR) && user.trainer
       ? String(user.trainer._id || user.trainer)
       : '');
+  const linkedTrainerId = ownTrainerId
+    || (user?.trainer ? String(user.trainer._id || user.trainer) : '');
 
   let subjects = [];
-  let entryFilter = {
-    trackerStatus: 'closed',
+  let extraOwnSubjectIds = [];
+  const topicFilter = {
     $or: [
       { topicModulesCovered: { $exists: true, $ne: [] } },
       { topicModuleCovered: { $nin: [null, ''] } },
     ],
+  };
+  let entryFilter = {
+    trackerStatus: 'closed',
+    ...topicFilter,
   };
 
   if (ownTrainerId) {
@@ -1041,12 +1072,12 @@ export const buildTopicTrackerClassSummary = async ({
     if (subjectId) entryFilter.subject = subjectId;
 
     const [trainer, closedEntries] = await Promise.all([
-      Trainer.findById(ownTrainerId).select('subjects').lean(),
+      Trainer.findById(ownTrainerId).select('subjects scheduleTrainerCodes employeeId name').lean(),
       TopicTrackerEntry.find(entryFilter).select('subject').lean(),
     ]);
 
     const subjectIdSet = new Set([
-      ...(trainer?.subjects || []).map((id) => id.toString()),
+      ...(await collectTaughtSubjectIds(trainer)),
       ...closedEntries.map((entry) => entry.subject?.toString()).filter(Boolean),
     ]);
 
@@ -1067,7 +1098,16 @@ export const buildTopicTrackerClassSummary = async ({
     if (subjectId) {
       subjectFilter = { _id: subjectId };
     } else if (isSubjectCoordinator(user)) {
-      subjectFilter = { _id: { $in: getCoordinatorSubjectIds(user) } };
+      const coordinatorIds = getCoordinatorSubjectIds(user);
+      let taughtIds = [];
+      if (linkedTrainerId) {
+        const trainer = await Trainer.findById(linkedTrainerId)
+          .select('subjects scheduleTrainerCodes employeeId name')
+          .lean();
+        taughtIds = await collectTaughtSubjectIds(trainer);
+      }
+      extraOwnSubjectIds = taughtIds.filter((id) => !coordinatorIds.includes(id));
+      subjectFilter = { _id: { $in: [...new Set([...coordinatorIds, ...taughtIds])] } };
     }
 
     subjects = await Subject.find(subjectFilter)
@@ -1079,21 +1119,59 @@ export const buildTopicTrackerClassSummary = async ({
     if (!subjectIds.length) {
       return { subjects: [] };
     }
-    entryFilter.subject = { $in: subjectIds };
+
+    if (extraOwnSubjectIds.length && linkedTrainerId) {
+      const coordinatorIds = subjects
+        .map((subject) => subject._id.toString())
+        .filter((id) => !extraOwnSubjectIds.includes(id));
+      entryFilter = {
+        trackerStatus: 'closed',
+        $and: [
+          topicFilter,
+          {
+            $or: [
+              { subject: { $in: coordinatorIds } },
+              { subject: { $in: extraOwnSubjectIds }, trainer: linkedTrainerId },
+            ],
+          },
+        ],
+      };
+    } else {
+      entryFilter.subject = { $in: subjectIds };
+    }
   }
 
   if (!subjects.length) {
     return { subjects: [] };
   }
 
-  const [entries, trainerLookup, remainingHoursByClass] = await Promise.all([
+  const extraSubjectDocs = extraOwnSubjectIds.length
+    ? subjects.filter((subject) => extraOwnSubjectIds.includes(subject._id.toString()))
+    : [];
+  const remainingSubjectDocs = extraSubjectDocs.length
+    ? subjects.filter((subject) => !extraOwnSubjectIds.includes(subject._id.toString()))
+    : subjects;
+
+  const [entries, trainerLookup, remainingHours, extraHours] = await Promise.all([
     TopicTrackerEntry.find(entryFilter)
       .select('subject trainer branchYearSection topicModuleCovered topicModulesCovered date sessionStatus allottedStudents noPresent attendancePercent trainerName')
       .sort({ date: 1 })
       .lean(),
     buildTrainerLookup(),
-    buildRemainingTrainingHoursByClass({ subjects, trainerId: ownTrainerId || undefined, today }),
+    buildRemainingTrainingHoursByClass({
+      subjects: remainingSubjectDocs,
+      trainerId: ownTrainerId || undefined,
+      today,
+    }),
+    extraSubjectDocs.length
+      ? buildRemainingTrainingHoursByClass({
+        subjects: extraSubjectDocs,
+        trainerId: linkedTrainerId,
+        today,
+      })
+      : Promise.resolve(new Map()),
   ]);
+  const remainingHoursByClass = new Map([...remainingHours, ...extraHours]);
 
   const entriesBySubject = new Map();
   entries.forEach((entry) => {

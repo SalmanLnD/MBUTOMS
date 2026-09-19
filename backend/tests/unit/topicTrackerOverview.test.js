@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {
   buildTopicTrackerClassSummary,
   buildRemainingTrainingHoursByClass,
+  collectTaughtSubjectIds,
   mergeOverviewTrainerNames,
   normalizeTopicTrackerClassLabel,
 } from '../../utils/topicTrackerSessions.js';
@@ -245,6 +246,131 @@ test('class summary uses main trainer names and merged class rows', async (t) =>
   assert.equal(result.subjects[0].classes[0].branchYearSection, 'AIML, PY 2029 Sem V - A7');
   assert.equal(result.subjects[0].classes[0].closedSlots, 2);
   assert.equal(result.subjects[0].classes[0].remainingTrainingHours, 1);
+
+  clearSubjectStartDateCache();
+});
+
+test('class summary includes a coordinator own teaching subject such as Navya PSTJ', async (t) => {
+  const query = (rows) => ({
+    select() { return this; },
+    populate() { return this; },
+    sort() { return this; },
+    lean: async () => rows,
+  });
+  const idsa = {
+    _id: 'subject-idsa',
+    code: '22CS102033',
+    name: 'Industrial Data Structures and Algorithms',
+    topics: ['Arrays'],
+    startDate: new Date('2026-09-01T00:00:00Z'),
+    endDate: new Date('2026-09-30T00:00:00Z'),
+  };
+  const pstj = {
+    _id: 'subject-pstj',
+    code: '22CA102006',
+    name: 'Problem Solving Techniques using Java',
+    topics: ['Collections Lab: CRUD operations'],
+    startDate: new Date('2026-09-01T00:00:00Z'),
+    endDate: new Date('2026-09-30T00:00:00Z'),
+  };
+  const navya = {
+    _id: 'trainer-navya',
+    employeeId: '135301',
+    name: 'Navya Mallidi',
+    subjects: [idsa._id],
+    scheduleTrainerCodes: ['IDSA-T2'],
+  };
+  const saiPriya = {
+    _id: 'trainer-saipriya',
+    employeeId: 'PSTJ1',
+    name: 'Sai Priya',
+    scheduleTrainerCodes: ['PSTJ1'],
+  };
+  const navyaPstjSlot = {
+    _id: 'navya-pstj-thu',
+    day: 'Thursday',
+    startTime: '14:45',
+    endTime: '16:45',
+    trainerCode: 'IDSA-T2',
+    department: 'B.COM(CA)',
+    section: '1',
+    semester: 'III',
+    subject: pstj._id,
+    subjectCode: pstj.code,
+  };
+  const otherPstjSlot = {
+    _id: 'sai-pstj-fri',
+    day: 'Friday',
+    startTime: '09:00',
+    endTime: '11:00',
+    trainerCode: 'PSTJ1',
+    department: 'BCA',
+    section: 'A',
+    semester: 'III',
+    subject: pstj._id,
+    subjectCode: pstj.code,
+  };
+  const navyaIdsaSlot = {
+    _id: 'navya-idsa-wed',
+    day: 'Wednesday',
+    startTime: '09:00',
+    endTime: '10:00',
+    trainerCode: 'IDSA-T2',
+    department: 'AI&DS',
+    section: 'AI&DS-2',
+    semester: 'III',
+    subject: idsa._id,
+    subjectCode: idsa.code,
+  };
+
+  t.mock.method(Trainer, 'findById', () => ({
+    select() { return this; },
+    lean: async () => navya,
+  }));
+  t.mock.method(Trainer, 'find', () => query([navya, saiPriya]));
+  t.mock.method(Subject, 'find', (filter) => {
+    if (filter?.code?.$in) {
+      return query([idsa, pstj].filter((subject) => filter.code.$in.includes(subject.code)));
+    }
+    if (filter?._id?.$in) {
+      const ids = filter._id.$in.map(String);
+      return query([idsa, pstj].filter((subject) => ids.includes(subject._id)));
+    }
+    return query([idsa, pstj]);
+  });
+  t.mock.method(Schedule, 'find', (filter) => {
+    if (filter?.trainerCode?.$in) {
+      const codes = filter.trainerCode.$in;
+      return query([navyaPstjSlot, navyaIdsaSlot, otherPstjSlot].filter((slot) => codes.includes(slot.trainerCode)));
+    }
+    return query([navyaPstjSlot, navyaIdsaSlot, otherPstjSlot]);
+  });
+  t.mock.method(ClassGroup, 'find', () => query([]));
+  t.mock.method(OfficialHoliday, 'find', () => query([]));
+  t.mock.method(ClassCancellation, 'find', () => query([]));
+  t.mock.method(Leave, 'find', () => query([]));
+  t.mock.method(TopicTrackerEntry, 'find', () => query([]));
+  clearSubjectStartDateCache();
+
+  const taught = await collectTaughtSubjectIds(navya);
+  assert.deepEqual(taught.sort(), [idsa._id, pstj._id].sort());
+
+  const result = await buildTopicTrackerClassSummary({
+    user: {
+      role: 'subject_coordinator',
+      trainer: navya._id,
+      coordinatorSubjects: [idsa._id],
+    },
+    today: '2026-09-16',
+  });
+
+  const codes = result.subjects.map((subject) => subject.subjectCode).sort();
+  assert.deepEqual(codes, [idsa.code, pstj.code].sort());
+  const pstjSummary = result.subjects.find((subject) => subject.subjectCode === pstj.code);
+  assert.equal(pstjSummary.classes.length, 1);
+  assert.equal(pstjSummary.classes[0].trainerName, 'Navya Mallidi');
+  assert.match(pstjSummary.classes[0].branchYearSection, /B\.COM\(CA\)/);
+  assert.equal(pstjSummary.classes.some((cls) => cls.trainerName === 'Sai Priya'), false);
 
   clearSubjectStartDateCache();
 });
