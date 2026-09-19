@@ -786,8 +786,7 @@ export const getAllReplacements = async (req, res) => {
       );
       if (!affectedDates.length) continue;
       const replacement = resolveReplacementTrainer(leave, schedule, trainersById);
-      const isEditableWindow = leave.status === 'approved'
-        && (timelineStatus === 'current' || timelineStatus === 'upcoming');
+      const isEditable = leave.status === 'approved';
       replacements.push({
         leave: {
           _id: leave._id,
@@ -801,8 +800,8 @@ export const getAllReplacements = async (req, res) => {
         schedule,
         replacement,
         timelineStatus,
-        canAssign: isEditableWindow && !replacement,
-        canChange: isEditableWindow && Boolean(replacement),
+        canAssign: isEditable && !replacement,
+        canChange: isEditable && Boolean(replacement),
         replacementDate: affectedDates[0],
         affectedDates,
         isSlotReplacement:
