@@ -437,6 +437,12 @@ const isPunchWatchWindow = () => {
 const scheduleReconnect = (reason) => {
   if (ONE_SHOT_MODE || shuttingDown) return;
   if (reconnectTimer.pending) return;
+  // WhatsApp pairing QRs last ~20s. Reconnects during that window invalidate the
+  // code the operator is scanning ("couldn't connect, try again").
+  if (latestQr && Date.now() - latestQrAt < 180000) {
+    log(`Skipping reconnect (${reason}) — QR is waiting to be scanned`);
+    return;
+  }
   const delay = Math.min(reconnectMinMs * 2 ** reconnectAttempt, reconnectMaxMs);
   reconnectAttempt += 1;
   log(`Scheduling reconnect in ${Math.round(delay / 1000)}s (reason: ${reason}, attempt ${reconnectAttempt})`);
@@ -580,6 +586,7 @@ const wireClient = (activeClient) => {
     // the raw payload available on /qr for remote re-linking.
     latestQr = qr;
     latestQrAt = Date.now();
+    reconnectTimer.cancel();
     console.log('\nScan this QR code with the WhatsApp account that is in the group:\n');
     qrcode.generate(qr, { small: true });
   });
@@ -1170,6 +1177,16 @@ const isAuthorizedControlRequest = (req) => {
   return headerSecret === bridgeControlSecret || bearer === bridgeControlSecret;
 };
 
+const isLoopbackRequest = (req) => {
+  const raw = String(req.socket?.remoteAddress || '');
+  return raw === '127.0.0.1' || raw === '::1' || raw === '::ffff:127.0.0.1';
+};
+
+const canViewPairingQr = (req) => {
+  if (isAuthorizedControlRequest(req) || isLoopbackRequest(req)) return true;
+  return String(process.env.PAIRING_OPEN || '') === '1' && !bridgeReady;
+};
+
 const startControlServer = () => {
   if (ONE_SHOT_MODE) return;
   if (!bridgeControlSecret) {
@@ -1208,6 +1225,56 @@ const startControlServer = () => {
             return send(503, { message: 'No QR available yet; retry in a few seconds' });
           }
           return send(200, { qr: latestQr, at: latestQrAt, ageMs: Date.now() - latestQrAt });
+        }
+
+        if (req.method === 'GET' && (url.pathname === '/pair' || url.pathname === '/pair.png')) {
+          if (bridgeReady) {
+            if (url.pathname === '/pair') {
+              const html = `<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>WhatsApp linked</title>
+<style>body{font-family:sans-serif;text-align:center;padding:48px}</style></head>
+<body><h1>WhatsApp is linked</h1><p>You can close this tab.</p></body></html>`;
+              res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' });
+              return res.end(html);
+            }
+            return send(409, { message: 'Bridge is already linked; no QR needed' });
+          }
+          if (!canViewPairingQr(req)) {
+            return send(401, { message: 'Invalid bridge control secret' });
+          }
+          if (url.pathname === '/pair') {
+            const html = `<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="refresh" content="2">
+  <title>WhatsApp pairing</title>
+  <style>
+    body { font-family: sans-serif; text-align: center; padding: 24px; color: #111; }
+    img { width: min(92vw, 560px); height: auto; border: 1px solid #ccc; }
+  </style>
+</head>
+<body>
+  <h1>Scan this WhatsApp code now</h1>
+  <p>This page refreshes every 2 seconds so the code stays valid.</p>
+  <img src="/pair.png?t=${Date.now()}" alt="WhatsApp pairing QR">
+</body>
+</html>`;
+            res.writeHead(200, {
+              'Content-Type': 'text/html; charset=utf-8',
+              'Cache-Control': 'no-store',
+            });
+            return res.end(html);
+          }
+          if (!client?.pupPage) {
+            return send(503, { message: 'WhatsApp page is not ready yet; retry in a few seconds' });
+          }
+          const png = await client.pupPage.screenshot({ type: 'png' });
+          res.writeHead(200, {
+            'Content-Type': 'image/png',
+            'Cache-Control': 'no-store',
+          });
+          return res.end(png);
         }
 
         if (req.method === 'POST' && url.pathname === '/sync') {
