@@ -4,8 +4,8 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import AppSetting from '../models/AppSetting.js';
 import { getPublicApiBaseUrl } from './appsScriptSheetsService.js';
-import { buildTrainerAttendanceExportPayload } from '../utils/trainerAttendanceExport.js';
-import { buildRtetExportPayload } from '../utils/rtetExport.js';
+import * as trainerAttendanceExport from '../utils/trainerAttendanceExport.js';
+import * as rtetExport from '../utils/rtetExport.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const SPREADSHEET_SETTING_KEY = 'trainer_attendance_spreadsheet';
@@ -13,12 +13,16 @@ const EXPORT_KEY_SETTING = 'trainer_attendance_export_api_key_v2';
 const EXPORT_CACHE_MS = 300_000;
 let exportCache = { payload: null, cachedAt: 0 };
 let exportInFlight = null;
+let exportGeneration = 0;
 let rtetCache = { payload: null, cachedAt: 0 };
 let rtetInFlight = null;
+let rtetGeneration = 0;
 
 export const clearAttendanceExportCache = () => {
+  exportGeneration += 1;
   exportCache = { payload: null, cachedAt: 0 };
   exportInFlight = null;
+  rtetGeneration += 1;
   rtetCache = { payload: null, cachedAt: 0 };
   rtetInFlight = null;
 };
@@ -127,14 +131,20 @@ export const exportTrainerAttendance = async () => {
     return exportCache.payload;
   }
 
+  const generation = exportGeneration;
   if (!exportInFlight) {
-    exportInFlight = buildTrainerAttendanceExportPayload()
+    exportInFlight = trainerAttendanceExport.buildTrainerAttendanceExportPayload()
       .then((payload) => {
-        exportCache = { payload, cachedAt: Date.now() };
+        // Ignore builds that started before an attendance write cleared the cache.
+        if (generation === exportGeneration) {
+          exportCache = { payload, cachedAt: Date.now() };
+        }
         return payload;
       })
       .finally(() => {
-        exportInFlight = null;
+        if (generation === exportGeneration) {
+          exportInFlight = null;
+        }
       });
   }
 
@@ -150,14 +160,19 @@ export const exportRtet = async () => {
     return rtetCache.payload;
   }
 
+  const generation = rtetGeneration;
   if (!rtetInFlight) {
-    rtetInFlight = buildRtetExportPayload()
+    rtetInFlight = rtetExport.buildRtetExportPayload()
       .then((payload) => {
-        rtetCache = { payload, cachedAt: Date.now() };
+        if (generation === rtetGeneration) {
+          rtetCache = { payload, cachedAt: Date.now() };
+        }
         return payload;
       })
       .finally(() => {
-        rtetInFlight = null;
+        if (generation === rtetGeneration) {
+          rtetInFlight = null;
+        }
       });
   }
 

@@ -1,5 +1,6 @@
 import { isTrainerLikeRole } from './roles.js';
-import { getDataRevision } from './dataRevision.js';
+import { getDataRevision, invalidateDerivedData } from './dataRevision.js';
+import { clearAttendanceExportCache } from '../services/attendanceSheetsService.js';
 
 const cache = new Map();
 // Leave/punch/replacement writes invalidate explicitly, so a longer TTL is safe.
@@ -32,4 +33,8 @@ export const setCachedAttendanceGrid = (key, data) => {
 
 export const clearAttendanceGridCache = () => {
   cache.clear();
+  // Attendance edits must also drop the Google Sheet export snapshot, otherwise
+  // Refresh can keep serving OIF values for up to five minutes after a save.
+  clearAttendanceExportCache();
+  invalidateDerivedData();
 };
