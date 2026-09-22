@@ -189,12 +189,13 @@ const TopicTrackerSpreadsheet = ({
   const saveRow = async (row, index) => {
     const key = getRowKey(row);
     if (!dirtyRows.has(key)) return;
-    if (!getSelectedTopics(row).length) {
-      showError('Select at least one topic before saving this slot.');
-      return;
-    }
     if (!row.sessionStatus?.trim()) {
       showError('Select a session status before saving this slot.');
+      return;
+    }
+    const topicsOptional = row.sessionStatus === 'cancelled';
+    if (!topicsOptional && !getSelectedTopics(row).length) {
+      showError('Select at least one topic before saving this slot.');
       return;
     }
 
@@ -272,6 +273,7 @@ const TopicTrackerSpreadsheet = ({
       const options = row.topicOptions || [];
       const topics = getRowTopics(row);
       const selectedTopics = new Set(topics.filter(Boolean));
+      const topicsOptional = row.sessionStatus === 'cancelled';
       return (
         <div className="topic-tracker-topics">
           {topics.map((topic, topicIndex) => {
@@ -286,7 +288,7 @@ const TopicTrackerSpreadsheet = ({
                     onChange={(e) => updateTopic(index, topicIndex, e.target.value)}
                     disabled={isSaving}
                     aria-label={`Topic / Module Covered ${topicIndex + 1}`}
-                    placeholder="Select topic..."
+                    placeholder={topicsOptional ? 'Optional for cancelled...' : 'Select topic...'}
                     options={[
                       ...(valueNotInList ? [{ value: topic, label: topic }] : []),
                       ...options.map((option) => ({
@@ -304,6 +306,7 @@ const TopicTrackerSpreadsheet = ({
                     onChange={(e) => updateTopic(index, topicIndex, e.target.value)}
                     disabled={isSaving}
                     aria-label={`Topic / Module Covered ${topicIndex + 1}`}
+                    placeholder={topicsOptional ? 'Optional for cancelled' : ''}
                   />
                 )}
                 {topics.length > 1 && (
