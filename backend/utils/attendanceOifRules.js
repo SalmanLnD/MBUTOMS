@@ -1,8 +1,14 @@
 import { isCampusSubjectOif } from './subjectOifCatalog.js';
+import { ADMIN_TRAINER_EMPLOYEE_ID } from './trainerMappings.js';
 
 export const IT_OIF_CODE = 'IT';
 export const CA26421_OIF_CODE = 'CA26421';
 export const IT_MOCK_PREP_HOURS = 7;
+
+/** Trainers who default to an OIF on working days with no timetable classes. */
+export const DEFAULT_NO_CLASS_OIF_BY_EMPLOYEE_ID = {
+  [ADMIN_TRAINER_EMPLOYEE_ID]: CA26421_OIF_CODE,
+};
 
 export const isItOif = (oifNumber) => {
   const value = String(oifNumber || '').trim().toUpperCase();
@@ -31,3 +37,19 @@ export const applyItOifAttendanceRules = ({ oifNumber, mockPrepHours, classHandl
   mockPrepHours: resolveMockPrepHoursForOif(oifNumber, mockPrepHours),
   classHandlingHours: resolveClassHandlingHoursForOif(oifNumber, classHandlingHours),
 });
+
+/**
+ * Default OIF for configured trainers on days with no class hours.
+ * Does not override a saved/entered OIF; callers keep the field editable.
+ */
+export const resolveDefaultNoClassOif = ({
+  employeeId,
+  oifNumber,
+  classHandlingHours = 0,
+} = {}) => {
+  const existing = String(oifNumber || '').trim();
+  if (existing) return existing;
+  if (Number(classHandlingHours) > 0) return '';
+  const fallback = DEFAULT_NO_CLASS_OIF_BY_EMPLOYEE_ID[String(employeeId || '').trim()];
+  return fallback || '';
+};

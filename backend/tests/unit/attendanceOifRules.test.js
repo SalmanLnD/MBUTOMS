@@ -4,8 +4,11 @@ import {
   countsAsOifDay,
   allowsManualClassHandlingHours,
   resolveClassHandlingHoursForOif,
+  resolveDefaultNoClassOif,
   resolveMockPrepHoursForOif,
+  CA26421_OIF_CODE,
 } from '../../utils/attendanceOifRules.js';
+import { ADMIN_TRAINER_EMPLOYEE_ID } from '../../utils/trainerMappings.js';
 
 test('internal training does not count as an OIF day or class hours', () => {
   assert.equal(countsAsOifDay('IT'), false);
@@ -34,4 +37,39 @@ test('only non-campus OIFs allow manual class handling hours', () => {
   assert.equal(allowsManualClassHandlingHours('CT27004'), false);
   assert.equal(allowsManualClassHandlingHours('idsa'), false);
   assert.equal(allowsManualClassHandlingHours('EXT-99'), true);
+});
+
+test('Salman defaults to CA26421 only on no-class days without a saved OIF', () => {
+  assert.equal(
+    resolveDefaultNoClassOif({
+      employeeId: ADMIN_TRAINER_EMPLOYEE_ID,
+      oifNumber: '',
+      classHandlingHours: 0,
+    }),
+    CA26421_OIF_CODE
+  );
+  assert.equal(
+    resolveDefaultNoClassOif({
+      employeeId: ADMIN_TRAINER_EMPLOYEE_ID,
+      oifNumber: '',
+      classHandlingHours: 2,
+    }),
+    ''
+  );
+  assert.equal(
+    resolveDefaultNoClassOif({
+      employeeId: ADMIN_TRAINER_EMPLOYEE_ID,
+      oifNumber: 'CT27008',
+      classHandlingHours: 0,
+    }),
+    'CT27008'
+  );
+  assert.equal(
+    resolveDefaultNoClassOif({
+      employeeId: '135402',
+      oifNumber: '',
+      classHandlingHours: 0,
+    }),
+    ''
+  );
 });

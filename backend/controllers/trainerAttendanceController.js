@@ -27,6 +27,7 @@ import {
   allowsManualClassHandlingHours,
   countsAsOifDay,
   isItOif,
+  resolveDefaultNoClassOif,
   resolveMockPrepHoursForOif,
 } from '../utils/attendanceOifRules.js';
 import { mergeRosterFilter } from '../utils/rosterFilter.js';
@@ -374,7 +375,6 @@ export const buildTrainerAttendanceGridPayload = async ({
         };
         return;
       }
-      const oifNumber = log?.oifNumber || '';
       const isSunday = isAttendanceSundayDate(date);
       const hasSavedLog = Boolean(log);
       const defaultWeekOff = isSunday && !hasSavedLog;
@@ -384,6 +384,19 @@ export const buildTrainerAttendanceGridPayload = async ({
       const sundayNonWorking = isSunday
         && attendanceType !== TRAINER_ATTENDANCE_TYPES.OIF
         && isLeaveAttendanceType(attendanceType);
+      const timetableClassHours = classHoursCache.get(cacheKey) ?? 0;
+      let oifNumber = log?.oifNumber || '';
+      if (
+        !defaultWeekOff
+        && !sundayNonWorking
+        && attendanceType === TRAINER_ATTENDANCE_TYPES.OIF
+      ) {
+        oifNumber = resolveDefaultNoClassOif({
+          employeeId: trainer.employeeId,
+          oifNumber,
+          classHandlingHours: timetableClassHours,
+        });
+      }
       const classHoursEditable = !defaultWeekOff
         && !sundayNonWorking
         && allowsManualClassHandlingHours(oifNumber);
@@ -402,7 +415,7 @@ export const buildTrainerAttendanceGridPayload = async ({
         const resolved = applyItOifAttendanceRules({
           oifNumber,
           mockPrepHours: log?.mockPrepHours ?? 0,
-          classHandlingHours: classHoursCache.get(cacheKey) ?? 0,
+          classHandlingHours: timetableClassHours,
         });
         mockPrepHours = resolved.mockPrepHours;
         classHandlingHours = resolved.classHandlingHours;
