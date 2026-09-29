@@ -6,6 +6,7 @@ const classGroupSchema = new mongoose.Schema(
     section: { type: String, required: true, trim: true },
     py: { type: Number, required: true, min: 2000, max: 2100 },
     currentSemester: { type: String, required: true, trim: true },
+    school: { type: mongoose.Schema.Types.ObjectId, ref: 'School', default: null },
     status: {
       type: String,
       enum: ['active', 'inactive'],

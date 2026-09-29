@@ -3,7 +3,21 @@ import { describe, it } from 'node:test';
 import {
   getAllowedDepartmentCodesForSubject,
   expandAllowedClassDepartments,
+  getDepartmentCodesForClassDepartment,
 } from '../../utils/subjectClassEligibility.js';
+
+describe('getDepartmentCodesForClassDepartment', () => {
+  it('maps combined and aliased class labels to reference department codes', () => {
+    assert.deepEqual(getDepartmentCodesForClassDepartment('ECE & EIE'), ['ECE', 'EIE']);
+    assert.deepEqual(getDepartmentCodesForClassDepartment('CE & ME'), ['CE-ME']);
+    assert.deepEqual(getDepartmentCodesForClassDepartment('B.COM(CA)'), ['BCOM-CA']);
+  });
+
+  it('uses the class department itself when no alias applies', () => {
+    assert.deepEqual(getDepartmentCodesForClassDepartment(' CSE '), ['CSE']);
+    assert.deepEqual(getDepartmentCodesForClassDepartment(''), []);
+  });
+});
 
 describe('getAllowedDepartmentCodesForSubject', () => {
   it('returns specific department codes when populated on the subject', async () => {

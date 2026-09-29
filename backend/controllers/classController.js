@@ -2,7 +2,12 @@ import ClassGroup from '../models/ClassGroup.js';
 import Student from '../models/Student.js';
 import Schedule from '../models/Schedule.js';
 import Subject from '../models/Subject.js';
-import { getAllowedClassDepartmentsForSubject } from '../utils/subjectClassEligibility.js';
+import School from '../models/School.js';
+import Department from '../models/Department.js';
+import {
+  getAllowedClassDepartmentsForSubject,
+  getDepartmentCodesForClassDepartment,
+} from '../utils/subjectClassEligibility.js';
 import {
   buildStudentCountKey,
   getStudentCountForClass,
@@ -111,6 +116,40 @@ export const getClassById = async (req, res) => {
   res.json(withCount);
 };
 
+/**
+ * Validates the school and links the class's reference departments to it, so school-scoped
+ * subjects and filters (which resolve through Department.school) include this class.
+ */
+const resolveClassSchool = async (schoolId, classDepartment) => {
+  if (!schoolId) return null;
+  const school = await School.findById(schoolId).select('_id');
+  if (!school) {
+    const error = new Error('Selected school was not found.');
+    error.statusCode = 400;
+    throw error;
+  }
+
+  const codes = getDepartmentCodesForClassDepartment(classDepartment);
+  if (!codes.length) return school._id;
+
+  await Department.updateMany(
+    { code: { $in: codes }, $or: [{ school: null }, { school: { $exists: false } }] },
+    { $set: { school: school._id } }
+  );
+
+  const existing = await Department.find({ code: { $in: codes } }).select('code').lean();
+  const existingCodes = new Set(existing.map((dept) => dept.code));
+  for (const code of codes.filter((item) => !existingCodes.has(item))) {
+    try {
+      await Department.create({ name: code, code, school: school._id });
+    } catch (err) {
+      if (err?.code !== 11000) throw err;
+    }
+  }
+
+  return school._id;
+};
+
 export const createClass = async (req, res) => {
   const payload = {
     department: String(req.body.department || '').trim(),
@@ -130,6 +169,8 @@ export const createClass = async (req, res) => {
       message: `Class ${payload.department} ${payload.section} (Sem ${payload.currentSemester}) already exists.`,
     });
   }
+
+  payload.school = await resolveClassSchool(req.body.school, payload.department);
 
   const cls = await ClassGroup.create(payload);
   const [withCount] = await attachStudentCounts([cls.toObject()]);
@@ -166,6 +207,9 @@ export const updateClass = async (req, res) => {
   cls.py = nextPy;
   cls.currentSemester = nextSemester;
   if (req.body.status) cls.status = req.body.status;
+  if (req.body.school !== undefined) {
+    cls.school = await resolveClassSchool(req.body.school, nextDepartment);
+  }
 
   await cls.save();
 

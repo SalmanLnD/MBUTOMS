@@ -32,6 +32,15 @@ export const expandAllowedClassDepartments = (departmentCodes) => {
   return [...expanded];
 };
 
+/** Reference department codes behind a class department label (e.g. "ECE & EIE" -> ECE, EIE). */
+export const getDepartmentCodesForClassDepartment = (classDepartment) => {
+  const dept = String(classDepartment || '').trim();
+  if (!dept) return [];
+  const mapping = [...COMBINED_CLASS_DEPARTMENTS, ...CLASS_DEPARTMENT_ALIASES]
+    .find((item) => item.classDepartment === dept);
+  return mapping ? [...mapping.subjectCodes] : [dept];
+};
+
 export const getAllowedDepartmentCodesForSubject = async (subject) => {
   if (!subject) return null;
 

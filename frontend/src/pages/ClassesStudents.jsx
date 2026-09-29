@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import LoadingSpinner from '../components/LoadingSpinner.jsx';
 import Pagination from '../components/Pagination.jsx';
 import { showError, showSuccess } from '../utils/toast.js';
@@ -98,15 +98,25 @@ const ClassesStudents = () => {
     return map;
   }, [departments]);
 
+  const schoolNameById = useMemo(
+    () => new Map(schools.map((school) => [String(school._id), school.name])),
+    [schools]
+  );
+
   const classSchoolName = (cls) =>
-    schoolNameByClassDepartment.get(cls.department) || '-';
+    (cls.school && schoolNameById.get(String(cls.school)))
+    || schoolNameByClassDepartment.get(cls.department)
+    || '-';
+
+  const classMatchesSchool = useCallback((cls, schoolId) => {
+    if (!schoolId) return true;
+    if (cls.school) return String(cls.school) === schoolId;
+    return (departmentCodesBySchoolId.get(schoolId) || new Set()).has(cls.department);
+  }, [departmentCodesBySchoolId]);
 
   const classFilterOptions = useMemo(() => {
-    const schoolDeptCodes = classSchoolFilter
-      ? (departmentCodesBySchoolId.get(classSchoolFilter) || new Set())
-      : null;
-    const schoolScopedClasses = schoolDeptCodes
-      ? classes.filter((cls) => schoolDeptCodes.has(cls.department))
+    const schoolScopedClasses = classSchoolFilter
+      ? classes.filter((cls) => classMatchesSchool(cls, classSchoolFilter))
       : classes;
 
     const pys = [...new Set(schoolScopedClasses.map((c) => c.py).filter(Boolean))].sort((a, b) => a - b);
@@ -120,14 +130,11 @@ const ClassesStudents = () => {
     const semesters = [...new Set(schoolScopedClasses.map((c) => c.currentSemester).filter(Boolean))]
       .sort((a, b) => semesterSortKey(a) - semesterSortKey(b));
     return { pys, depts, sections, semesters };
-  }, [classes, classDeptFilter, classSchoolFilter, departmentCodesBySchoolId]);
+  }, [classes, classDeptFilter, classSchoolFilter, classMatchesSchool]);
 
   const filteredClasses = useMemo(() => {
-    const schoolDeptCodes = classSchoolFilter
-      ? (departmentCodesBySchoolId.get(classSchoolFilter) || new Set())
-      : null;
     const filtered = classes.filter((cls) => {
-      if (schoolDeptCodes && !schoolDeptCodes.has(cls.department)) return false;
+      if (!classMatchesSchool(cls, classSchoolFilter)) return false;
       if (classPyFilter && cls.py !== Number(classPyFilter)) return false;
       if (classDeptFilter && cls.department !== classDeptFilter) return false;
       if (classSectionFilter && cls.section !== classSectionFilter) return false;
@@ -165,7 +172,7 @@ const ClassesStudents = () => {
     classSemFilter,
     classSortBy,
     classSortOrder,
-    departmentCodesBySchoolId,
+    classMatchesSchool,
   ]);
 
   const hasClassFilters = Boolean(
@@ -306,6 +313,9 @@ const ClassesStudents = () => {
     setEditingClass(null);
     showSuccess('Class saved successfully');
     fetchClasses();
+    getDepartments()
+      .then((list) => setDepartments(Array.isArray(list) ? list : []))
+      .catch(() => {});
   };
 
   const handleConfirmClassDelete = async () => {
@@ -751,6 +761,8 @@ const ClassesStudents = () => {
         <ClassFormModal
           show
           classItem={editingClass}
+          schools={schools}
+          departments={departments}
           onClose={() => {
             setShowClassForm(false);
             setEditingClass(null);

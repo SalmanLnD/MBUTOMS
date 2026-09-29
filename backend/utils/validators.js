@@ -79,6 +79,7 @@ export const classValidation = [
   body('py').isInt({ min: 2000, max: 2100 }).withMessage('PY must be a valid year'),
   body('currentSemester').trim().notEmpty().withMessage('Current semester is required'),
   body('status').optional().isIn(['active', 'inactive']).withMessage('Invalid status'),
+  body('school').optional({ values: 'falsy' }).isMongoId().withMessage('Invalid school'),
 ];
 
 export const leaveValidation = [
