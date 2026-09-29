@@ -104,7 +104,7 @@ const getSpecialRangeForSchedule = (schedule) => (
     : null
 );
 
-const enrichSchedulePayload = async (body) => {
+const enrichSchedulePayload = async (body, { allowAnySubjectClass = false } = {}) => {
   const payload = { ...body };
 
   if (payload.startTime >= payload.endTime) {
@@ -149,7 +149,7 @@ const enrichSchedulePayload = async (body) => {
     });
   }
 
-  if (subjectDoc) {
+  if (subjectDoc && !allowAnySubjectClass) {
     await assertClassAllowedForSubject(subjectDoc, payload.department);
   }
 
@@ -424,9 +424,12 @@ export const createSpecialClass = async (req, res) => {
       venue: req.body.venue || null,
       isLab: req.body.isLab,
       isProject: req.body.isProject,
-    });
+    }, { allowAnySubjectClass: true });
   } catch (err) {
     return res.status(err.statusCode || 400).json({ message: err.message });
+  }
+  if (!base.subjectCode) {
+    return res.status(400).json({ message: 'Selected subject was not found.' });
   }
 
   const specialStartDate = normalizeAttendanceDate(dates.startKey);

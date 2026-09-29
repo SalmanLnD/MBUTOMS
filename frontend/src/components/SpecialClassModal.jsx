@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import Modal from './Modal.jsx';
 import ConfirmModal from './ConfirmModal.jsx';
 import StyledSelect from './StyledSelect.jsx';
+import SearchableSelect from './SearchableSelect.jsx';
 import { TrashIcon } from './icons.jsx';
 import {
   createSpecialClass,
@@ -12,8 +13,24 @@ import { getClasses } from '../services/classService.js';
 import { getSubjects } from '../services/subjectService.js';
 import { getActiveVenuesForSelect } from '../services/venueService.js';
 import { getActiveSlotKeys, getSlotTimesForSubject } from '../utils/timetableSlots.js';
-import { getSubjectSemesterRoman } from '../utils/classPy.js';
 import { formatDate, getErrorMessage, toInputDate } from '../utils/helpers.js';
+
+const SUBJECT_PAGE_SIZE = 200;
+
+const loadAllSubjects = async () => {
+  const subjects = [];
+  for (let page = 1; page <= 20; page += 1) {
+    const data = await getSubjects({ page, limit: SUBJECT_PAGE_SIZE, sortBy: 'name' });
+    subjects.push(...(data.subjects || []));
+    if (page >= (data.pagination?.pages || 1)) break;
+  }
+  return subjects;
+};
+
+const defaultTimingForSubject = (subject) => {
+  const keys = subject ? getActiveSlotKeys(subject) : [];
+  return keys[0] || CUSTOM_TIMING;
+};
 
 const WEEKDAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 const ALL_WEEKDAYS = ['Sunday', ...WEEKDAYS];
@@ -67,10 +84,10 @@ const SpecialClassModal = ({ trainers = [], initialDate, initialTab = 'add', onC
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
 
-  const [trainerSubjects, setTrainerSubjects] = useState([]);
-  const [subjectsLoading, setSubjectsLoading] = useState(false);
-  const [classOptions, setClassOptions] = useState([]);
-  const [classesLoading, setClassesLoading] = useState(false);
+  const [allSubjects, setAllSubjects] = useState([]);
+  const [subjectsLoading, setSubjectsLoading] = useState(true);
+  const [allClasses, setAllClasses] = useState([]);
+  const [classesLoading, setClassesLoading] = useState(true);
   const [venueOptions, setVenueOptions] = useState([]);
 
   const [specialClasses, setSpecialClasses] = useState([]);
@@ -78,53 +95,33 @@ const SpecialClassModal = ({ trainers = [], initialDate, initialTab = 'add', onC
   const [pendingDelete, setPendingDelete] = useState(null);
 
   const isRecurring = form.specialType === 'recurring';
-  const selectedSubject = trainerSubjects.find((item) => item._id === form.subjectId) || null;
-  const subjectSemester = getSubjectSemesterRoman(selectedSubject) || '';
+  const selectedSubject = allSubjects.find((item) => item._id === form.subjectId) || null;
 
   useEffect(() => {
-    getActiveVenuesForSelect()
-      .then((venues) => setVenueOptions(venues || []))
-      .catch(() => setVenueOptions([]));
-  }, []);
-
-  useEffect(() => {
-    const trainer = trainers.find((item) => item.employeeId === form.trainerCode);
-    if (!trainer) {
-      setTrainerSubjects([]);
-      return;
-    }
     let cancelled = false;
-    setSubjectsLoading(true);
-    getSubjects({ trainer: trainer._id, limit: 50 })
-      .then((data) => {
-        if (!cancelled) setTrainerSubjects(data.subjects || []);
+    getActiveVenuesForSelect()
+      .then((venues) => {
+        if (!cancelled) setVenueOptions(venues || []);
       })
       .catch(() => {
-        if (!cancelled) setTrainerSubjects([]);
+        if (!cancelled) setVenueOptions([]);
+      });
+    loadAllSubjects()
+      .then((subjects) => {
+        if (!cancelled) setAllSubjects(subjects);
+      })
+      .catch((err) => {
+        if (!cancelled) setError(getErrorMessage(err));
       })
       .finally(() => {
         if (!cancelled) setSubjectsLoading(false);
       });
-    return () => {
-      cancelled = true;
-    };
-  }, [form.trainerCode, trainers]);
-
-  useEffect(() => {
-    if (!form.subjectId) {
-      setClassOptions([]);
-      return;
-    }
-    let cancelled = false;
-    setClassesLoading(true);
-    const params = { subjectId: form.subjectId };
-    if (subjectSemester) params.semester = subjectSemester;
-    getClasses(params)
+    getClasses({ status: 'active' })
       .then((data) => {
-        if (!cancelled) setClassOptions(data || []);
+        if (!cancelled) setAllClasses(Array.isArray(data) ? data : []);
       })
-      .catch(() => {
-        if (!cancelled) setClassOptions([]);
+      .catch((err) => {
+        if (!cancelled) setError(getErrorMessage(err));
       })
       .finally(() => {
         if (!cancelled) setClassesLoading(false);
@@ -132,7 +129,41 @@ const SpecialClassModal = ({ trainers = [], initialDate, initialTab = 'add', onC
     return () => {
       cancelled = true;
     };
-  }, [form.subjectId, subjectSemester]);
+  }, []);
+
+  const trainerSelectOptions = useMemo(
+    () => trainers.map((trainer) => ({
+      value: trainer.employeeId,
+      label: trainerLabel(trainer),
+      keywords: trainer.employeeId,
+    })),
+    [trainers]
+  );
+
+  const subjectSelectOptions = useMemo(
+    () => allSubjects.map((subject) => ({
+      value: subject._id,
+      label: `${subject.name} (${subject.code})`,
+    })),
+    [allSubjects]
+  );
+
+  const classSelectOptions = useMemo(
+    () => allClasses.map((cls) => ({
+      value: cls._id,
+      label: `${cls.department} ${cls.section} · PY ${cls.py} · Sem ${cls.currentSemester}`,
+      keywords: `${cls.department}${cls.section}`,
+    })),
+    [allClasses]
+  );
+
+  const venueSelectOptions = useMemo(
+    () => venueOptions.map((venue) => ({
+      value: venue._id,
+      label: `${venue.name}${venue.building ? ` · ${venue.building}` : ''}`,
+    })),
+    [venueOptions]
+  );
 
   const loadSpecialClasses = useCallback(async () => {
     setListLoading(true);
@@ -185,12 +216,14 @@ const SpecialClassModal = ({ trainers = [], initialDate, initialTab = 'add', onC
     }));
   };
 
-  const handleTrainerChange = (event) => {
-    updateForm({ trainerCode: event.target.value, subjectId: '', classId: '', timing: 'S1' });
-  };
-
   const handleSubjectChange = (event) => {
-    updateForm({ subjectId: event.target.value, classId: '', timing: 'S1' });
+    const subjectId = event.target.value;
+    const subject = allSubjects.find((item) => item._id === subjectId) || null;
+    setForm((prev) => ({
+      ...prev,
+      subjectId,
+      timing: prev.timing === CUSTOM_TIMING ? CUSTOM_TIMING : defaultTimingForSubject(subject),
+    }));
   };
 
   const handleStartDateChange = (event) => {
@@ -407,62 +440,42 @@ const SpecialClassModal = ({ trainers = [], initialDate, initialTab = 'add', onC
 
                 <div className="col-md-6">
                   <label className="form-label" htmlFor="special-trainer">Trainer *</label>
-                  <StyledSelect
+                  <SearchableSelect
                     id="special-trainer"
                     value={form.trainerCode}
-                    onChange={handleTrainerChange}
+                    onChange={(event) => updateForm({ trainerCode: event.target.value })}
                     required
-                    placeholder="Select trainer"
-                    options={[
-                      { value: '', label: 'Select trainer' },
-                      ...trainers.map((trainer) => ({
-                        value: trainer.employeeId,
-                        label: trainerLabel(trainer),
-                      })),
-                    ]}
+                    placeholder="Type trainer name or ID"
+                    emptyMessage="No trainer matches"
+                    options={trainerSelectOptions}
                   />
                 </div>
 
                 <div className="col-md-6">
                   <label className="form-label" htmlFor="special-subject">Subject *</label>
-                  <StyledSelect
+                  <SearchableSelect
                     id="special-subject"
                     value={form.subjectId}
                     onChange={handleSubjectChange}
                     required
-                    disabled={!form.trainerCode || subjectsLoading}
-                    placeholder={subjectsLoading ? 'Loading subjects...' : 'Select subject'}
-                    options={[
-                      { value: '', label: subjectsLoading ? 'Loading subjects...' : 'Select subject' },
-                      ...trainerSubjects.map((subject) => ({
-                        value: subject._id,
-                        label: `${subject.name} (${subject.code})`,
-                      })),
-                    ]}
+                    disabled={subjectsLoading}
+                    placeholder={subjectsLoading ? 'Loading subjects...' : 'Type subject name or code'}
+                    emptyMessage="No subject matches"
+                    options={subjectSelectOptions}
                   />
-                  {form.trainerCode && !subjectsLoading && !trainerSubjects.length && (
-                    <small className="text-muted d-block mt-1">
-                      This trainer has no subjects assigned. Assign one under Subjects first.
-                    </small>
-                  )}
                 </div>
 
                 <div className="col-12">
                   <label className="form-label" htmlFor="special-class">Class *</label>
-                  <StyledSelect
+                  <SearchableSelect
                     id="special-class"
                     value={form.classId}
                     onChange={(event) => updateForm({ classId: event.target.value })}
                     required
-                    disabled={!form.subjectId || classesLoading}
-                    placeholder={classesLoading ? 'Loading classes...' : 'Select a registered class'}
-                    options={[
-                      { value: '', label: classesLoading ? 'Loading classes...' : 'Select a registered class' },
-                      ...classOptions.map((cls) => ({
-                        value: cls._id,
-                        label: `${cls.department} ${cls.section} · PY ${cls.py} · Sem ${cls.currentSemester}`,
-                      })),
-                    ]}
+                    disabled={classesLoading}
+                    placeholder={classesLoading ? 'Loading classes...' : 'Type department, section or semester'}
+                    emptyMessage="No class matches"
+                    options={classSelectOptions}
                   />
                 </div>
 
@@ -511,18 +524,13 @@ const SpecialClassModal = ({ trainers = [], initialDate, initialTab = 'add', onC
 
                 <div className="col-md-6">
                   <label className="form-label" htmlFor="special-venue">Venue</label>
-                  <StyledSelect
+                  <SearchableSelect
                     id="special-venue"
                     value={form.venueId}
                     onChange={(event) => updateForm({ venueId: event.target.value })}
-                    placeholder="No venue assigned"
-                    options={[
-                      { value: '', label: 'No venue assigned' },
-                      ...venueOptions.map((venue) => ({
-                        value: venue._id,
-                        label: `${venue.name}${venue.building ? ` · ${venue.building}` : ''}`,
-                      })),
-                    ]}
+                    placeholder="Type venue name (optional)"
+                    emptyMessage="No venue matches"
+                    options={[{ value: '', label: 'No venue assigned' }, ...venueSelectOptions]}
                   />
                 </div>
                 <div className="col-md-6">
