@@ -11,6 +11,7 @@ import { syncAllTrainerSubjectLinks } from '../utils/syncTrainerSubjectLinks.js'
 import { migrateSubjectTopicsFromCatalog } from '../utils/migrateSubjectTopicsFromCatalog.js';
 import { syncSubjectCoordinators } from '../utils/syncSubjectCoordinators.js';
 import { syncEvaluators } from '../utils/syncEvaluators.js';
+import { syncQavaTrainerLinks } from '../utils/syncQavaTrainerLinks.js';
 import { migrateClassesFromSchedules } from '../utils/migrateClassesFromSchedules.js';
 import { repairClassIndexesAndPy } from '../utils/repairClassIndexesAndPy.js';
 import { ensureOfficialHolidays } from '../utils/officialHolidays.js';
@@ -26,11 +27,15 @@ const getCache = () => {
 const runRoleSync = async () => {
   const coordinatorSync = await syncSubjectCoordinators();
   const evaluatorSync = await syncEvaluators();
+  const qavaLinkSync = await syncQavaTrainerLinks();
   if (coordinatorSync.updated) {
     console.log(`Subject coordinator sync: ${coordinatorSync.updated} coordinator account(s) updated`);
   }
   if (evaluatorSync.updated) {
     console.log(`Evaluator sync: ${evaluatorSync.updated} evaluator account(s) updated`);
+  }
+  if (qavaLinkSync.updated) {
+    console.log(`QAVA trainer link sync: ${qavaLinkSync.linked} trainer(s) linked`);
   }
 };
 
@@ -39,6 +44,7 @@ const runEssentialStartup = async () => {
   const subjectTopicsMigration = await migrateSubjectTopicsFromCatalog();
   const coordinatorSync = await syncSubjectCoordinators();
   const evaluatorSync = await syncEvaluators();
+  const qavaLinkSync = await syncQavaTrainerLinks();
   const officialHolidays = await ensureOfficialHolidays();
   console.log(
     `Reference data ready: ${counts.schoolCount} schools, ${counts.semesterCount} semesters, ${counts.departmentCount} departments`
@@ -54,6 +60,9 @@ const runEssentialStartup = async () => {
   }
   if (evaluatorSync.updated) {
     console.log(`Evaluator sync: ${evaluatorSync.updated} evaluator account(s) updated`);
+  }
+  if (qavaLinkSync.updated) {
+    console.log(`QAVA trainer link sync: ${qavaLinkSync.linked} trainer(s) linked`);
   }
   return counts;
 };

@@ -4,59 +4,87 @@ import Subject from '../models/Subject.js';
 import { ROLES } from './roles.js';
 import { SUBJECT_COORDINATOR_ASSIGNMENTS } from './subjectCoordinatorConfig.js';
 
+const sameIdSet = (left = [], right = []) => {
+  const a = [...new Set(left.map(String))].sort();
+  const b = [...new Set(right.map(String))].sort();
+  if (a.length !== b.length) return false;
+  return a.every((id, index) => id === b[index]);
+};
+
+const groupAssignmentsByEmployee = (assignments) => {
+  const grouped = new Map();
+  assignments.forEach((assignment) => {
+    const current = grouped.get(assignment.employeeId) || [];
+    current.push(assignment);
+    grouped.set(assignment.employeeId, current);
+  });
+  return grouped;
+};
+
 export const syncSubjectCoordinators = async () => {
   let updated = 0;
   const results = [];
 
-  for (const assignment of SUBJECT_COORDINATOR_ASSIGNMENTS) {
-    const subject = await Subject.findOne({ code: assignment.subjectCode }).select('_id code name');
-    const trainer = await Trainer.findOne({ employeeId: assignment.employeeId }).select('_id name employeeId');
+  for (const [employeeId, assignments] of groupAssignmentsByEmployee(SUBJECT_COORDINATOR_ASSIGNMENTS)) {
+    const subjectCodes = [...new Set(assignments.map((assignment) => assignment.subjectCode))];
+    const subjects = await Subject.find({ code: { $in: subjectCodes } }).select('_id code name');
+    const foundCodes = new Set(subjects.map((subject) => subject.code));
+    const missingCodes = subjectCodes.filter((code) => !foundCodes.has(code));
 
-    if (!subject) {
+    if (!subjects.length) {
       results.push({
-        employeeId: assignment.employeeId,
+        employeeId,
         status: 'skipped',
-        reason: `Subject ${assignment.subjectCode} not found`,
+        reason: `Subject(s) not found: ${missingCodes.join(', ')}`,
       });
       continue;
     }
+
+    const trainer = await Trainer.findOne({ employeeId }).select('_id name employeeId email');
 
     if (!trainer) {
       results.push({
-        employeeId: assignment.employeeId,
+        employeeId,
         status: 'skipped',
-        reason: `Trainer ${assignment.employeeId} not found`,
+        reason: `Trainer ${employeeId} not found`,
       });
       continue;
     }
 
+    const email = trainer.email?.trim()?.toLowerCase();
     const user = await User.findOne({
-      $or: [{ trainer: trainer._id }, { email: trainer.email?.trim()?.toLowerCase() }],
+      $or: [
+        { trainer: trainer._id },
+        ...(email ? [{ email }] : []),
+      ],
     });
 
     if (!user) {
       results.push({
-        employeeId: assignment.employeeId,
+        employeeId,
         status: 'skipped',
         reason: 'No user account linked to trainer',
       });
       continue;
     }
 
-    const subjectId = subject._id.toString();
+    const subjectIds = subjects.map((subject) => subject._id);
     const trainerId = trainer._id.toString();
     const currentSubjectIds = (user.coordinatorSubjects || []).map((id) => id.toString());
+    const nextSubjectIds = subjectIds.map((id) => id.toString());
     const needsUpdate =
       user.role !== ROLES.SUBJECT_COORDINATOR
       || user.trainer?.toString() !== trainerId
-      || currentSubjectIds.length !== 1
-      || currentSubjectIds[0] !== subjectId;
+      || !sameIdSet(currentSubjectIds, nextSubjectIds);
+
+    const subjectCodeList = subjects.map((subject) => subject.code);
 
     if (!needsUpdate) {
       results.push({
-        employeeId: assignment.employeeId,
+        employeeId,
         trainerName: trainer.name,
-        subjectCode: subject.code,
+        subjectCodes: subjectCodeList,
+        missingCodes,
         userId: user._id.toString(),
         status: 'unchanged',
       });
@@ -65,15 +93,16 @@ export const syncSubjectCoordinators = async () => {
 
     user.role = ROLES.SUBJECT_COORDINATOR;
     user.trainer = trainer._id;
-    user.coordinatorSubjects = [subject._id];
+    user.coordinatorSubjects = subjectIds;
     user.sessionVersion = (user.sessionVersion || 1) + 1;
     await user.save();
 
     updated += 1;
     results.push({
-      employeeId: assignment.employeeId,
+      employeeId,
       trainerName: trainer.name,
-      subjectCode: subject.code,
+      subjectCodes: subjectCodeList,
+      missingCodes,
       userId: user._id.toString(),
       status: 'updated',
     });

@@ -2,6 +2,8 @@ import { SOLAS_THREE_SLOT_TIMINGS } from './subjectSlotTimings.js';
 
 export const QAVA_SUBJECT_CODE = '22LG101702';
 export const QAVA_TRAINER_EMPLOYEE_ID = '135887';
+/** Suryadeo Kumar Rana and Padarthi Bhargavi — QAVA trainers under Ravi Teja. */
+export const QAVA_TRAINER_EMPLOYEE_IDS = ['135887', '135938'];
 export const QAVA_SEMESTER = 'III';
 
 const qavaSlot = (slotKey) => {

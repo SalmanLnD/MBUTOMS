@@ -2,7 +2,10 @@ import Subject from '../models/Subject.js';
 import Trainer from '../models/Trainer.js';
 import { ROLES, FULL_ACCESS_ROLES } from './roles.js';
 import { EVALUATOR_ASSIGNMENTS } from './evaluatorConfig.js';
-import { buildTrainerFilterForCoordinatorSubjects } from './subjectCoordinatorAccess.js';
+import {
+  buildTrainerFilterForCoordinatorSubjects,
+  getCoordinatorSubjectIds,
+} from './subjectCoordinatorAccess.js';
 
 export const isEvaluatorRole = (user) => user?.role === ROLES.EVALUATOR;
 
@@ -15,8 +18,17 @@ export const getEvaluatorSubjectIds = (user) =>
     })
     .filter(Boolean);
 
+/** Evaluator subjects plus subjects this user coordinates. */
+export const getObservationSubjectIds = (user) => {
+  const ids = new Set([
+    ...getEvaluatorSubjectIds(user),
+    ...getCoordinatorSubjectIds(user),
+  ]);
+  return [...ids];
+};
+
 export const hasEvaluatorObservationAccess = (user) =>
-  isEvaluatorRole(user) || getEvaluatorSubjectIds(user).length > 0;
+  isEvaluatorRole(user) || getObservationSubjectIds(user).length > 0;
 
 export const hasFullObservationAccess = (user) =>
   FULL_ACCESS_ROLES.includes(user?.role);
@@ -43,7 +55,7 @@ export const getEvaluatorPeerTrainerIds = async (subjectIds = []) => {
  * Trainers an evaluator may rate: allocated subjects, excluding self and peer evaluators.
  */
 export const buildTrainerFilterForEvaluator = async (user) => {
-  const subjectIds = getEvaluatorSubjectIds(user);
+  const subjectIds = getObservationSubjectIds(user);
   if (!subjectIds.length) {
     return { _id: { $in: [] } };
   }
@@ -67,7 +79,7 @@ export const evaluatorCanRateTrainer = async (user, trainerId) => {
 };
 
 export const getEvaluatorSubjectCodes = async (user) => {
-  const subjectIds = getEvaluatorSubjectIds(user);
+  const subjectIds = getObservationSubjectIds(user);
   if (!subjectIds.length) return [];
   const subjects = await Subject.find({ _id: { $in: subjectIds } }).select('code').lean();
   return subjects.map((subject) => subject.code).filter(Boolean);
