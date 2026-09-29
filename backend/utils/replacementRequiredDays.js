@@ -16,6 +16,7 @@ import {
 } from './leaveAffectedClasses.js';
 import { loadOfficialHolidayMap } from './officialHolidays.js';
 import { resolveTrainerScheduleCodes } from './trainerMappings.js';
+import { SPECIAL_CLASS_FIELDS } from './specialClass.js';
 
 /**
  * Date keys in a range that count as replacement-required for one trainer.
@@ -108,7 +109,7 @@ export const getReplacementRequiredDaysByTrainer = async ({
       .lean(),
     allScheduleCodes.length
       ? Schedule.find({ trainerCode: { $in: allScheduleCodes } })
-        .select('_id trainerCode day')
+        .select(`_id trainerCode day ${SPECIAL_CLASS_FIELDS}`)
         .lean()
       : [],
     loadOfficialHolidayMap(rangeStart, endDate),
@@ -201,7 +202,7 @@ export const getTrainerRrdDateKeys = async ({
       .select('trainer startDate endDate reason scope affectedSchedules')
       .lean(),
     codes.length
-      ? Schedule.find({ trainerCode: { $in: codes } }).select('_id trainerCode day').lean()
+      ? Schedule.find({ trainerCode: { $in: codes } }).select(`_id trainerCode day ${SPECIAL_CLASS_FIELDS}`).lean()
       : [],
     loadOfficialHolidayMap(rangeStart, endDate),
     getCancellationMapForRange(rangeStart, endDate),

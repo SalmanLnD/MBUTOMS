@@ -1,0 +1,624 @@
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import Modal from './Modal.jsx';
+import ConfirmModal from './ConfirmModal.jsx';
+import StyledSelect from './StyledSelect.jsx';
+import { TrashIcon } from './icons.jsx';
+import {
+  createSpecialClass,
+  deleteSpecialClass,
+  getSpecialClasses,
+} from '../services/scheduleService.js';
+import { getClasses } from '../services/classService.js';
+import { getSubjects } from '../services/subjectService.js';
+import { getActiveVenuesForSelect } from '../services/venueService.js';
+import { getActiveSlotKeys, getSlotTimesForSubject } from '../utils/timetableSlots.js';
+import { getSubjectSemesterRoman } from '../utils/classPy.js';
+import { formatDate, getErrorMessage, toInputDate } from '../utils/helpers.js';
+
+const WEEKDAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+const ALL_WEEKDAYS = ['Sunday', ...WEEKDAYS];
+const CUSTOM_TIMING = 'custom';
+
+const weekdayForInputDate = (value) => {
+  const [year, month, day] = String(value || '').split('-').map(Number);
+  if (!year || !month || !day) return '';
+  return ALL_WEEKDAYS[new Date(Date.UTC(year, month - 1, day, 12)).getUTCDay()];
+};
+
+const weekdaysBetween = (start, end) => {
+  const [sy, sm, sd] = String(start || '').split('-').map(Number);
+  const [ey, em, ed] = String(end || '').split('-').map(Number);
+  if (!sy || !ey) return new Set();
+  const cursor = new Date(Date.UTC(sy, sm - 1, sd, 12));
+  const last = new Date(Date.UTC(ey, em - 1, ed, 12));
+  const days = new Set();
+  while (cursor <= last && days.size < 7) {
+    days.add(ALL_WEEKDAYS[cursor.getUTCDay()]);
+    cursor.setUTCDate(cursor.getUTCDate() + 1);
+  }
+  return days;
+};
+
+const trainerLabel = (trainer) =>
+  trainer.name && trainer.name !== trainer.employeeId
+    ? `${trainer.name} (${trainer.employeeId})`
+    : trainer.employeeId;
+
+const buildInitialForm = (initialDate) => ({
+  specialType: 'one_time',
+  trainerCode: '',
+  subjectId: '',
+  classId: '',
+  timing: 'S1',
+  startTime: '',
+  endTime: '',
+  date: initialDate,
+  startDate: initialDate,
+  endDate: initialDate,
+  days: [weekdayForInputDate(initialDate)].filter(Boolean),
+  venueId: '',
+  reason: '',
+});
+
+const SpecialClassModal = ({ trainers = [], initialDate, initialTab = 'add', onClose, onChanged }) => {
+  const today = toInputDate(new Date());
+  const [activeTab, setActiveTab] = useState(initialTab === 'list' ? 'list' : 'add');
+  const [form, setForm] = useState(() => buildInitialForm(initialDate || today));
+  const [error, setError] = useState('');
+  const [saving, setSaving] = useState(false);
+
+  const [trainerSubjects, setTrainerSubjects] = useState([]);
+  const [subjectsLoading, setSubjectsLoading] = useState(false);
+  const [classOptions, setClassOptions] = useState([]);
+  const [classesLoading, setClassesLoading] = useState(false);
+  const [venueOptions, setVenueOptions] = useState([]);
+
+  const [specialClasses, setSpecialClasses] = useState([]);
+  const [listLoading, setListLoading] = useState(false);
+  const [pendingDelete, setPendingDelete] = useState(null);
+
+  const isRecurring = form.specialType === 'recurring';
+  const selectedSubject = trainerSubjects.find((item) => item._id === form.subjectId) || null;
+  const subjectSemester = getSubjectSemesterRoman(selectedSubject) || '';
+
+  useEffect(() => {
+    getActiveVenuesForSelect()
+      .then((venues) => setVenueOptions(venues || []))
+      .catch(() => setVenueOptions([]));
+  }, []);
+
+  useEffect(() => {
+    const trainer = trainers.find((item) => item.employeeId === form.trainerCode);
+    if (!trainer) {
+      setTrainerSubjects([]);
+      return;
+    }
+    let cancelled = false;
+    setSubjectsLoading(true);
+    getSubjects({ trainer: trainer._id, limit: 50 })
+      .then((data) => {
+        if (!cancelled) setTrainerSubjects(data.subjects || []);
+      })
+      .catch(() => {
+        if (!cancelled) setTrainerSubjects([]);
+      })
+      .finally(() => {
+        if (!cancelled) setSubjectsLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [form.trainerCode, trainers]);
+
+  useEffect(() => {
+    if (!form.subjectId) {
+      setClassOptions([]);
+      return;
+    }
+    let cancelled = false;
+    setClassesLoading(true);
+    const params = { subjectId: form.subjectId };
+    if (subjectSemester) params.semester = subjectSemester;
+    getClasses(params)
+      .then((data) => {
+        if (!cancelled) setClassOptions(data || []);
+      })
+      .catch(() => {
+        if (!cancelled) setClassOptions([]);
+      })
+      .finally(() => {
+        if (!cancelled) setClassesLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [form.subjectId, subjectSemester]);
+
+  const loadSpecialClasses = useCallback(async () => {
+    setListLoading(true);
+    try {
+      const data = await getSpecialClasses({ from: today });
+      setSpecialClasses(data.specialClasses || []);
+    } catch (err) {
+      setError(getErrorMessage(err));
+    } finally {
+      setListLoading(false);
+    }
+  }, [today]);
+
+  useEffect(() => {
+    if (activeTab === 'list') loadSpecialClasses();
+  }, [activeTab, loadSpecialClasses]);
+
+  const availableRecurringDays = useMemo(
+    () => (isRecurring ? weekdaysBetween(form.startDate, form.endDate) : new Set()),
+    [isRecurring, form.startDate, form.endDate]
+  );
+
+  const timingOptions = useMemo(() => {
+    const presets = selectedSubject
+      ? getActiveSlotKeys(selectedSubject).map((slotKey) => {
+        const times = getSlotTimesForSubject(selectedSubject, slotKey);
+        return { value: slotKey, label: `${slotKey} (${times.startTime} – ${times.endTime})` };
+      })
+      : [];
+    return [...presets, { value: CUSTOM_TIMING, label: 'Custom timing' }];
+  }, [selectedSubject]);
+
+  const resolvedTimes = useMemo(() => {
+    if (form.timing === CUSTOM_TIMING || !selectedSubject) {
+      return { startTime: form.startTime, endTime: form.endTime };
+    }
+    return getSlotTimesForSubject(selectedSubject, form.timing);
+  }, [form.timing, form.startTime, form.endTime, selectedSubject]);
+
+  const updateForm = (patch) => setForm((prev) => ({ ...prev, ...patch }));
+
+  const handleTypeChange = (specialType) => {
+    setError('');
+    setForm((prev) => ({
+      ...prev,
+      specialType,
+      days: specialType === 'recurring'
+        ? [weekdayForInputDate(prev.startDate)].filter(Boolean)
+        : prev.days,
+    }));
+  };
+
+  const handleTrainerChange = (event) => {
+    updateForm({ trainerCode: event.target.value, subjectId: '', classId: '', timing: 'S1' });
+  };
+
+  const handleSubjectChange = (event) => {
+    updateForm({ subjectId: event.target.value, classId: '', timing: 'S1' });
+  };
+
+  const handleStartDateChange = (event) => {
+    const startDate = event.target.value;
+    setForm((prev) => {
+      const endDate = prev.endDate && prev.endDate >= startDate ? prev.endDate : startDate;
+      const available = weekdaysBetween(startDate, endDate);
+      const days = prev.days.filter((day) => available.has(day));
+      return {
+        ...prev,
+        startDate,
+        endDate,
+        days: days.length ? days : [weekdayForInputDate(startDate)].filter(Boolean),
+      };
+    });
+  };
+
+  const handleEndDateChange = (event) => {
+    const endDate = event.target.value;
+    setForm((prev) => {
+      const available = weekdaysBetween(prev.startDate, endDate);
+      return { ...prev, endDate, days: prev.days.filter((day) => available.has(day)) };
+    });
+  };
+
+  const toggleDay = (day) => {
+    setForm((prev) => ({
+      ...prev,
+      days: prev.days.includes(day)
+        ? prev.days.filter((item) => item !== day)
+        : [...prev.days, day],
+    }));
+  };
+
+  const handleSubmit = async (event) => {
+    event.preventDefault();
+    setError('');
+
+    if (!resolvedTimes.startTime || !resolvedTimes.endTime) {
+      setError('Enter the start and end time.');
+      return;
+    }
+    if (resolvedTimes.startTime >= resolvedTimes.endTime) {
+      setError('End time must be after start time.');
+      return;
+    }
+    if (isRecurring && !form.days.length) {
+      setError('Select at least one weekday.');
+      return;
+    }
+
+    const payload = {
+      specialType: form.specialType,
+      trainerCode: form.trainerCode,
+      subject: form.subjectId,
+      classId: form.classId,
+      slot: form.timing === CUSTOM_TIMING ? '' : form.timing,
+      startTime: resolvedTimes.startTime,
+      endTime: resolvedTimes.endTime,
+      venue: form.venueId || null,
+      reason: form.reason.trim(),
+      ...(isRecurring
+        ? { startDate: form.startDate, endDate: form.endDate, days: form.days }
+        : { date: form.date }),
+    };
+
+    setSaving(true);
+    try {
+      await createSpecialClass(payload);
+      await onChanged?.(isRecurring ? form.startDate : form.date);
+      onClose();
+    } catch (err) {
+      setError(getErrorMessage(err));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!pendingDelete) return;
+    setError('');
+    try {
+      await deleteSpecialClass(pendingDelete.specialGroupId);
+      setPendingDelete(null);
+      await loadSpecialClasses();
+      await onChanged?.();
+    } catch (err) {
+      setPendingDelete(null);
+      setError(getErrorMessage(err));
+    }
+  };
+
+  const describeDates = (item) => (
+    item.specialType === 'one_time' || item.startDate === item.endDate
+      ? formatDate(item.startDate)
+      : `${formatDate(item.startDate)} – ${formatDate(item.endDate)}`
+  );
+
+  return (
+    <>
+      <Modal show title="Special Classes" onClose={onClose} size="toms-modal-lg">
+        <div className="toms-modal-body">
+          <ul className="nav nav-tabs mb-3" role="tablist">
+            {[
+              { id: 'add', label: 'Add special class' },
+              { id: 'list', label: 'Upcoming special classes' },
+            ].map((tab) => (
+              <li className="nav-item" key={tab.id} role="presentation">
+                <button
+                  type="button"
+                  role="tab"
+                  className={`nav-link ${activeTab === tab.id ? 'active' : ''}`}
+                  aria-selected={activeTab === tab.id}
+                  onClick={() => {
+                    setError('');
+                    setActiveTab(tab.id);
+                  }}
+                >
+                  {tab.label}
+                </button>
+              </li>
+            ))}
+          </ul>
+
+          {error && <div className="alert alert-danger">{error}</div>}
+
+          {activeTab === 'add' && (
+            <form id="special-class-form" onSubmit={handleSubmit}>
+              <fieldset className="mb-3">
+                <legend className="form-label fw-semibold fs-6">Is this a one-time or recurring class?</legend>
+                <div className="btn-group" role="radiogroup" aria-label="Special class type">
+                  {[
+                    { value: 'one_time', label: 'One-time' },
+                    { value: 'recurring', label: 'Recurring' },
+                  ].map((option) => (
+                    <button
+                      key={option.value}
+                      type="button"
+                      role="radio"
+                      aria-checked={form.specialType === option.value}
+                      className={`btn ${form.specialType === option.value ? 'btn-primary' : 'btn-outline-primary'}`}
+                      onClick={() => handleTypeChange(option.value)}
+                    >
+                      {option.label}
+                    </button>
+                  ))}
+                </div>
+              </fieldset>
+
+              <div className="row g-3">
+                {isRecurring ? (
+                  <>
+                    <div className="col-md-6">
+                      <label className="form-label" htmlFor="special-start-date">From date *</label>
+                      <input
+                        id="special-start-date"
+                        type="date"
+                        className="form-control"
+                        value={form.startDate}
+                        onChange={handleStartDateChange}
+                        required
+                      />
+                    </div>
+                    <div className="col-md-6">
+                      <label className="form-label" htmlFor="special-end-date">To date *</label>
+                      <input
+                        id="special-end-date"
+                        type="date"
+                        className="form-control"
+                        value={form.endDate}
+                        min={form.startDate}
+                        onChange={handleEndDateChange}
+                        required
+                      />
+                    </div>
+                    <div className="col-12">
+                      <span className="form-label d-block">Repeats on *</span>
+                      <div className="d-flex flex-wrap gap-2" role="group" aria-label="Repeat weekdays">
+                        {WEEKDAYS.map((day) => {
+                          const available = availableRecurringDays.has(day);
+                          const active = form.days.includes(day);
+                          return (
+                            <button
+                              key={day}
+                              type="button"
+                              className={`btn btn-sm ${active ? 'btn-primary' : 'btn-outline-secondary'}`}
+                              aria-pressed={active}
+                              disabled={!available}
+                              onClick={() => toggleDay(day)}
+                            >
+                              {day.slice(0, 3)}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  </>
+                ) : (
+                  <div className="col-md-6">
+                    <label className="form-label" htmlFor="special-date">Date *</label>
+                    <input
+                      id="special-date"
+                      type="date"
+                      className="form-control"
+                      value={form.date}
+                      onChange={(event) => updateForm({ date: event.target.value })}
+                      required
+                    />
+                    {form.date && (
+                      <small className="text-muted">{weekdayForInputDate(form.date)}</small>
+                    )}
+                  </div>
+                )}
+
+                <div className="col-md-6">
+                  <label className="form-label" htmlFor="special-trainer">Trainer *</label>
+                  <StyledSelect
+                    id="special-trainer"
+                    value={form.trainerCode}
+                    onChange={handleTrainerChange}
+                    required
+                    placeholder="Select trainer"
+                    options={[
+                      { value: '', label: 'Select trainer' },
+                      ...trainers.map((trainer) => ({
+                        value: trainer.employeeId,
+                        label: trainerLabel(trainer),
+                      })),
+                    ]}
+                  />
+                </div>
+
+                <div className="col-md-6">
+                  <label className="form-label" htmlFor="special-subject">Subject *</label>
+                  <StyledSelect
+                    id="special-subject"
+                    value={form.subjectId}
+                    onChange={handleSubjectChange}
+                    required
+                    disabled={!form.trainerCode || subjectsLoading}
+                    placeholder={subjectsLoading ? 'Loading subjects...' : 'Select subject'}
+                    options={[
+                      { value: '', label: subjectsLoading ? 'Loading subjects...' : 'Select subject' },
+                      ...trainerSubjects.map((subject) => ({
+                        value: subject._id,
+                        label: `${subject.name} (${subject.code})`,
+                      })),
+                    ]}
+                  />
+                  {form.trainerCode && !subjectsLoading && !trainerSubjects.length && (
+                    <small className="text-muted d-block mt-1">
+                      This trainer has no subjects assigned. Assign one under Subjects first.
+                    </small>
+                  )}
+                </div>
+
+                <div className="col-12">
+                  <label className="form-label" htmlFor="special-class">Class *</label>
+                  <StyledSelect
+                    id="special-class"
+                    value={form.classId}
+                    onChange={(event) => updateForm({ classId: event.target.value })}
+                    required
+                    disabled={!form.subjectId || classesLoading}
+                    placeholder={classesLoading ? 'Loading classes...' : 'Select a registered class'}
+                    options={[
+                      { value: '', label: classesLoading ? 'Loading classes...' : 'Select a registered class' },
+                      ...classOptions.map((cls) => ({
+                        value: cls._id,
+                        label: `${cls.department} ${cls.section} · PY ${cls.py} · Sem ${cls.currentSemester}`,
+                      })),
+                    ]}
+                  />
+                </div>
+
+                <div className="col-md-6">
+                  <label className="form-label" htmlFor="special-timing">Timing *</label>
+                  <StyledSelect
+                    id="special-timing"
+                    value={form.timing}
+                    onChange={(event) => {
+                      const timing = event.target.value;
+                      if (timing === CUSTOM_TIMING) {
+                        updateForm({ timing, ...resolvedTimes });
+                      } else {
+                        updateForm({ timing });
+                      }
+                    }}
+                    required
+                    disabled={!form.subjectId}
+                    options={timingOptions}
+                  />
+                </div>
+                <div className="col-md-3">
+                  <label className="form-label" htmlFor="special-start-time">Start time</label>
+                  <input
+                    id="special-start-time"
+                    type="time"
+                    className="form-control"
+                    value={resolvedTimes.startTime || ''}
+                    readOnly={form.timing !== CUSTOM_TIMING}
+                    onChange={(event) => updateForm({ startTime: event.target.value })}
+                    required
+                  />
+                </div>
+                <div className="col-md-3">
+                  <label className="form-label" htmlFor="special-end-time">End time</label>
+                  <input
+                    id="special-end-time"
+                    type="time"
+                    className="form-control"
+                    value={resolvedTimes.endTime || ''}
+                    readOnly={form.timing !== CUSTOM_TIMING}
+                    onChange={(event) => updateForm({ endTime: event.target.value })}
+                    required
+                  />
+                </div>
+
+                <div className="col-md-6">
+                  <label className="form-label" htmlFor="special-venue">Venue</label>
+                  <StyledSelect
+                    id="special-venue"
+                    value={form.venueId}
+                    onChange={(event) => updateForm({ venueId: event.target.value })}
+                    placeholder="No venue assigned"
+                    options={[
+                      { value: '', label: 'No venue assigned' },
+                      ...venueOptions.map((venue) => ({
+                        value: venue._id,
+                        label: `${venue.name}${venue.building ? ` · ${venue.building}` : ''}`,
+                      })),
+                    ]}
+                  />
+                </div>
+                <div className="col-md-6">
+                  <label className="form-label" htmlFor="special-reason">Reason / note</label>
+                  <input
+                    id="special-reason"
+                    type="text"
+                    className="form-control"
+                    maxLength={200}
+                    value={form.reason}
+                    onChange={(event) => updateForm({ reason: event.target.value })}
+                    placeholder="e.g. Extra class before mid exam"
+                  />
+                </div>
+              </div>
+
+              <p className="text-muted small mt-3 mb-0">
+                Special classes count toward trainer class hours, attendance, RTET and the topic
+                tracker only on the dates they run.
+              </p>
+            </form>
+          )}
+
+          {activeTab === 'list' && (
+            listLoading ? (
+              <div className="text-muted py-3">Loading special classes...</div>
+            ) : specialClasses.length === 0 ? (
+              <div className="text-muted py-3">No upcoming special classes.</div>
+            ) : (
+              <div className="table-responsive">
+                <table className="table table-sm align-middle mb-0">
+                  <thead>
+                    <tr>
+                      <th>Type</th>
+                      <th>Dates</th>
+                      <th>Days</th>
+                      <th>Time</th>
+                      <th>Trainer</th>
+                      <th>Class</th>
+                      <th>Subject</th>
+                      <th aria-label="Actions" />
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {specialClasses.map((item) => (
+                      <tr key={item.specialGroupId}>
+                        <td>{item.specialType === 'recurring' ? 'Recurring' : 'One-time'}</td>
+                        <td>{describeDates(item)}</td>
+                        <td>{item.days.map((day) => day.slice(0, 3)).join(', ')}</td>
+                        <td>{item.startTime} – {item.endTime}</td>
+                        <td>{item.trainerName}</td>
+                        <td>{item.department} {item.section}</td>
+                        <td>{item.subjectCode}</td>
+                        <td className="text-end">
+                          <button
+                            type="button"
+                            className="btn btn-sm btn-outline-danger"
+                            onClick={() => setPendingDelete(item)}
+                            aria-label={`Delete special class for ${item.trainerName}`}
+                          >
+                            <TrashIcon size={14} aria-hidden="true" />
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )
+          )}
+        </div>
+
+        <div className="toms-modal-footer d-flex justify-content-end gap-2">
+          <button type="button" className="btn btn-secondary" onClick={onClose}>
+            Close
+          </button>
+          {activeTab === 'add' && (
+            <button type="submit" form="special-class-form" className="btn btn-primary" disabled={saving}>
+              {saving ? 'Saving...' : 'Add special class'}
+            </button>
+          )}
+        </div>
+      </Modal>
+
+      {pendingDelete && (
+        <ConfirmModal
+          show
+          title="Delete Special Class"
+          message={`Remove the special class for ${pendingDelete.trainerName} (${pendingDelete.department} ${pendingDelete.section}, ${describeDates(pendingDelete)})? Trainer hours, attendance and RTET will update.`}
+          confirmLabel="Delete"
+          onConfirm={handleConfirmDelete}
+          onClose={() => setPendingDelete(null)}
+        />
+      )}
+    </>
+  );
+};
+
+export default SpecialClassModal;

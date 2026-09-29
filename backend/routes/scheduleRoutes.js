@@ -11,6 +11,9 @@ import {
   updateSchedule,
   deleteSchedule,
   getBatches,
+  createSpecialClass,
+  getSpecialClasses,
+  deleteSpecialClass,
 } from '../controllers/scheduleController.js';
 import { protect, authorize } from '../middleware/auth.js';
 import { validate } from '../middleware/validate.js';
@@ -45,6 +48,15 @@ router.delete(
   '/class-cancellations/:id',
   authorize('admin'),
   asyncHandler(deleteClassCancellation)
+);
+router
+  .route('/special-classes')
+  .get(authorize('admin', 'campus_manager'), asyncHandler(getSpecialClasses))
+  .post(authorize('admin', 'campus_manager'), asyncHandler(createSpecialClass));
+router.delete(
+  '/special-classes/:groupId',
+  authorize('admin', 'campus_manager'),
+  asyncHandler(deleteSpecialClass)
 );
 router.get('/trainer/:id', asyncHandler(getTrainerSchedule));
 router.get('/trainer-code/:code', asyncHandler(getTrainerScheduleByCode));

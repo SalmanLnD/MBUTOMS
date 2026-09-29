@@ -11,6 +11,7 @@ import {
   DEFAULT_SUBJECT_START_DATE,
   DEFAULT_SUBJECT_END_DATE,
 } from './subjectStartDate.js';
+import { SPECIAL_CLASS_FIELDS, isSpecialSchedule, isSpecialScheduleActiveOnDate } from './specialClass.js';
 import { getWeekdaysInLeaveRange } from './trainerScheduleView.js';
 import {
   getLeaveOverlapFilter,
@@ -19,7 +20,7 @@ import {
 import { getCancellationMapForRange } from './leaveAffectedClasses.js';
 import { loadOfficialHolidayMap } from './officialHolidays.js';
 
-const SCHEDULE_FIELDS = 'day startTime endTime trainerCode semester subject subjectCode';
+const SCHEDULE_FIELDS = `day startTime endTime trainerCode semester subject subjectCode ${SPECIAL_CLASS_FIELDS}`;
 
 const resolveStartDate = (schedule, subjectStartMap) => {
   const subjectId = schedule.subject?.toString();
@@ -46,6 +47,7 @@ const resolveEndDate = (schedule, subjectStartMap) => {
 };
 
 const isActiveOnDate = (schedule, referenceDate, subjectStartMap) => {
+  if (isSpecialSchedule(schedule)) return isSpecialScheduleActiveOnDate(schedule, referenceDate);
   const ref = normalizeAttendanceDate(referenceDate);
   const rawStart = resolveStartDate(schedule, subjectStartMap);
   const effectiveStart = rawStart

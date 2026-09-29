@@ -21,6 +21,12 @@ const scheduleSchema = new mongoose.Schema(
     venue: { type: mongoose.Schema.Types.ObjectId, ref: 'Venue', default: null },
     isLab: { type: Boolean, default: false },
     isProject: { type: Boolean, default: false },
+    isSpecial: { type: Boolean, default: false },
+    specialType: { type: String, enum: ['one_time', 'recurring', ''], default: '' },
+    specialStartDate: { type: Date, default: null },
+    specialEndDate: { type: Date, default: null },
+    specialGroupId: { type: String, trim: true, default: '' },
+    specialReason: { type: String, trim: true, default: '' },
   },
   { timestamps: true, collection: 'schedules' }
 );
@@ -30,6 +36,7 @@ scheduleSchema.index({ day: 1, startTime: 1 });
 scheduleSchema.index({ day: 1, subject: 1, startTime: 1 });
 scheduleSchema.index({ department: 1, section: 1, semester: 1 });
 scheduleSchema.index({ semester: 1, trainerCode: 1 });
+scheduleSchema.index({ isSpecial: 1, specialStartDate: 1, specialEndDate: 1 });
 
 const Schedule = mongoose.model('Schedule', scheduleSchema);
 export default Schedule;

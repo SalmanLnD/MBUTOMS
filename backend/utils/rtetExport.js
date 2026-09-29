@@ -25,6 +25,7 @@ import {
 } from './subjectStartDate.js';
 import { loadOfficialHolidayMap } from './officialHolidays.js';
 import { getCancellationMapForRange } from './leaveAffectedClasses.js';
+import { SPECIAL_CLASS_FIELDS, isSpecialSchedule, isSpecialScheduleActiveOnDate } from './specialClass.js';
 
 /** The campus subjects in the fixed RTET display order. */
 export const RTET_SUBJECTS = SUBJECT_OIF_CATALOG.map((entry) => ({
@@ -64,6 +65,7 @@ const getSubjectRange = (schedule, subjectStartMap) => {
 };
 
 export const isRtetScheduleActiveOnDate = (schedule, date, subjectStartMap) => {
+  if (isSpecialSchedule(schedule)) return isSpecialScheduleActiveOnDate(schedule, date);
   const ref = normalizeAttendanceDate(date);
   const { startDate, endDate } = getSubjectRange(schedule, subjectStartMap);
   return ref >= startDate && (!endDate || ref <= endDate);
@@ -86,7 +88,7 @@ export const buildRtetExportPayload = async () => {
 
   const [schedules, holidayMap, cancellationMap] = await Promise.all([
     Schedule.find({ subjectCode: { $in: subjectCodes } })
-      .select('_id day startTime endTime subjectCode section department subject')
+      .select(`_id day startTime endTime subjectCode section department subject ${SPECIAL_CLASS_FIELDS}`)
       .lean(),
     loadOfficialHolidayMap(rangeStart, rangeEnd),
     getCancellationMapForRange(rangeStart, rangeEnd),
@@ -175,7 +177,7 @@ export const buildRtetDebugForSubjectDate = async ({ subjectCode, dateInput } = 
   const dayName = getAttendanceWeekdayName(day);
 
   const schedules = await Schedule.find({ subjectCode: code })
-    .select('_id day startTime endTime department section subjectCode')
+    .select(`_id day startTime endTime department section subjectCode ${SPECIAL_CLASS_FIELDS}`)
     .lean();
 
   const daySchedules = schedules.filter((sched) => sched.day === dayName);

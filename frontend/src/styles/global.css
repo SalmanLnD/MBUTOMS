@@ -64,6 +64,7 @@ img, svg { max-width: 100%; }
 .timetable-cell-tags { display: flex; flex-wrap: wrap; gap: .25rem; }
 .timetable-session-tag { padding: .15rem .4rem; border-radius: 999px; background: var(--teal-soft); color: var(--teal); font-size: .62rem; font-weight: 800; text-transform: uppercase; }
 .timetable-session-tag--project { color: var(--coral); background: var(--coral-soft); }
+.timetable-session-tag--special { color: #6d28d9; background: #ede9fe; }
 .timetable-all-trainers { display: grid; align-items: start; gap: 1rem; }
 .timetable-all-trainers--two-col { grid-template-columns: repeat(2,minmax(0,1fr)); }
 .timetable-trainer-section { min-width: 0; padding: .65rem; border: 1px solid var(--line); border-radius: var(--radius-lg); background: var(--surface); }

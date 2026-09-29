@@ -3,6 +3,7 @@ import Schedule from '../models/Schedule.js';
 import { timesOverlap } from './timetableSlots.js';
 import { isDateWithinLeave, toLeaveDateKey } from './leaveDateRange.js';
 import { isScheduleDayInLeaveRange } from './trainerScheduleView.js';
+import { isSpecialScheduleActiveOnDate } from './specialClass.js';
 
 /**
  * Load campus replacement assignments that keep a trainer busy in a date range.
@@ -126,6 +127,7 @@ export const trainerHasOverlappingOwnedSchedule = ({
     const canceledIds = cancellationMap.get(dateKey) || new Set();
     return ownedSchedules.some((slot) => {
       if (slot.day !== day) return false;
+      if (!isSpecialScheduleActiveOnDate(slot, dateKey)) return false;
       const slotId = slot._id?.toString?.() || slot._id;
       if (slotId && canceledIds.has(String(slotId))) return false;
       return timesOverlap(startTime, endTime, slot.startTime, slot.endTime);

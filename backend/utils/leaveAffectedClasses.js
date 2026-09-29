@@ -5,6 +5,7 @@ import {
   getLeaveDateKeysForWeekday,
   toLeaveDateKey,
 } from './leaveDateRange.js';
+import { isSpecialScheduleActiveOnDate } from './specialClass.js';
 
 const getScheduleId = (schedule) =>
   schedule?._id?.toString?.() || schedule?.toString?.() || '';
@@ -76,6 +77,7 @@ export const hasUncancelledClassOnDate = (
 ) =>
   schedules.some((schedule) => {
     if (schedule.day !== weekdayName) return false;
+    if (!isSpecialScheduleActiveOnDate(schedule, dateKey)) return false;
     const scheduleId = getScheduleId(schedule);
     return Boolean(scheduleId) && !canceledScheduleIdsByDate.get(dateKey)?.has(scheduleId);
   });
@@ -90,6 +92,7 @@ export const getUncancelledScheduleDateKeys = (
   const scheduleId = getScheduleId(schedule);
   return getLeaveDateKeysForWeekday(leave, schedule?.day).filter((dateKey) => {
     if (holidays.has(dateKey)) return false;
+    if (!isSpecialScheduleActiveOnDate(schedule, dateKey)) return false;
     return !canceledScheduleIdsByDate.get(dateKey)?.has(scheduleId);
   });
 };

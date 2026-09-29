@@ -14,7 +14,8 @@ import {
 } from '../services/sheetsService.js';
 import TimetableSheetSetupModal from '../components/TimetableSheetSetupModal.jsx';
 import ClassCancellationModal from '../components/ClassCancellationModal.jsx';
-import { CalendarIcon, SheetIcon, ExternalLinkIcon } from '../components/icons.jsx';
+import SpecialClassModal from '../components/SpecialClassModal.jsx';
+import { CalendarIcon, SheetIcon, ExternalLinkIcon, PlusIcon } from '../components/icons.jsx';
 import { getErrorMessage, toInputDate } from '../utils/helpers.js';
 import { isAbortError } from '../services/api.js';
 import { scheduleMatchesSubject, resolveScheduleTrainerCode } from '../utils/scheduleSubject.js';
@@ -107,6 +108,7 @@ const Timetable = () => {
   const isViewOnly = !user;
   const canEdit = Boolean(user) && hasManagementRole();
   const canCancelClasses = user?.role === 'admin';
+  const canManageSpecialClasses = ['admin', 'campus_manager'].includes(user?.role);
 
   const [trainers, setTrainers] = useState([]);
   const [schedulesByTrainer, setSchedulesByTrainer] = useState({});
@@ -119,6 +121,7 @@ const Timetable = () => {
   const [slotModal, setSlotModal] = useState(null);
   const [referenceDate, setReferenceDate] = useState(() => toInputDate(new Date()));
   const [showCancellation, setShowCancellation] = useState(false);
+  const [showSpecialClass, setShowSpecialClass] = useState(false);
 
   const [sheetStatus, setSheetStatus] = useState(null);
   const [showSheetSetup, setShowSheetSetup] = useState(false);
@@ -131,6 +134,7 @@ const Timetable = () => {
     setSlotModal(null);
     setShowSheetSetup(false);
     setShowCancellation(false);
+    setShowSpecialClass(false);
     setSheetStatus(null);
   }, [isViewOnly]);
 
@@ -246,6 +250,11 @@ const Timetable = () => {
   const handleCellClick = useCallback(async ({ trainerCode, schedule, day, slot }) => {
     if (isViewOnly || !canEdit || !editMode) return;
 
+    if (schedule?.isSpecial) {
+      if (canManageSpecialClasses) setShowSpecialClass('list');
+      return;
+    }
+
     const trainer = trainerOptions.find((item) => item.employeeId === trainerCode);
     if (!trainer) return;
 
@@ -285,6 +294,7 @@ const Timetable = () => {
   }, [
     isViewOnly,
     canEdit,
+    canManageSpecialClasses,
     editMode,
     trainerOptions,
     selectedSubject,
@@ -410,6 +420,16 @@ const Timetable = () => {
 
       {canEdit && (
         <div className="d-flex flex-wrap align-items-center gap-2 mb-3">
+          {canManageSpecialClasses && (
+            <button
+              type="button"
+              className="btn btn-outline-primary d-inline-flex align-items-center gap-2"
+              onClick={() => setShowSpecialClass(true)}
+            >
+              <PlusIcon size={16} aria-hidden="true" />
+              Special class
+            </button>
+          )}
           {canCancelClasses && (
             <button
               type="button"
@@ -509,6 +529,23 @@ const Timetable = () => {
           initialUrl={sheetStatus?.spreadsheetUrl || ''}
           onClose={() => setShowSheetSetup(false)}
           onLinked={handleSheetLinked}
+        />
+      )}
+
+      {showSpecialClass && canManageSpecialClasses && (
+        <SpecialClassModal
+          trainers={trainerOptions}
+          initialDate={referenceDate}
+          initialTab={showSpecialClass === 'list' ? 'list' : 'add'}
+          onClose={() => setShowSpecialClass(false)}
+          onChanged={async (changedDate) => {
+            if (changedDate && changedDate !== referenceDate) {
+              setReferenceDate(changedDate);
+            } else {
+              await loadData();
+            }
+            if (changedDate) showSuccess('Special class added.');
+          }}
         />
       )}
 

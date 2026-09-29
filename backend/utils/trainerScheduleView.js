@@ -9,6 +9,7 @@ import {
   toLeaveDateKey,
 } from './leaveDateRange.js';
 import { getCanceledScheduleIdsForDate } from './classCancellations.js';
+import { getWeekRangeForDate, isSpecialScheduleInRange } from './specialClass.js';
 
 const WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
@@ -65,8 +66,10 @@ export const buildTrainerSchedulesForDate = async ({
       .populate('affectedSchedules'),
     getCanceledScheduleIdsForDate(ref),
   ]);
+  const week = getWeekRangeForDate(ref);
   const owned = ownedSchedules.filter(
     (schedule) => !canceledScheduleIds.has(schedule._id.toString())
+      && isSpecialScheduleInRange(schedule, week.start, week.end)
   );
 
   const ownedIds = new Set(owned.map((schedule) => schedule._id.toString()));
@@ -86,6 +89,7 @@ export const buildTrainerSchedulesForDate = async ({
       if (!schedule) return;
       const scheduleId = schedule._id.toString();
       if (canceledScheduleIds.has(scheduleId)) return;
+      if (!isSpecialScheduleInRange(schedule, week.start, week.end)) return;
       if (semester && schedule.semester !== semester) return;
       if (!isScheduleDayInLeaveRange(schedule.day, leave)) return;
       if (ownedIds.has(scheduleId)) return;

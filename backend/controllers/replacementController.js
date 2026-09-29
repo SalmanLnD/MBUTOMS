@@ -24,6 +24,7 @@ import {
   trainerHasSlotConflict,
 } from '../utils/replacementSlotConflicts.js';
 import { dedupeReplacementsBySchedule } from '../utils/leaveReplacements.js';
+import { SPECIAL_CLASS_FIELDS } from '../utils/specialClass.js';
 import { syncTrainerUser } from '../utils/trainerUserSync.js';
 import { INITIAL_TRAINER_PASSWORD } from '../constants/trainerAuth.js';
 import mongoose from 'mongoose';
@@ -207,7 +208,7 @@ const trainerCanCoverTargets = async ({
   const scheduleCodes = resolveTrainerScheduleCodes(trainer);
   const [ownedSchedules, replacementBusyByTrainer] = await Promise.all([
     Schedule.find({ trainerCode: { $in: scheduleCodes } })
-      .select('day startTime endTime')
+      .select(`day startTime endTime ${SPECIAL_CLASS_FIELDS}`)
       .lean(),
     loadReplacementBusySlotsByTrainer({
       trainerIds: [trainer._id],
@@ -310,7 +311,7 @@ export const getReplacementSuggestions = async (req, res) => {
           .lean()
       : [],
     Schedule.find({ trainerCode: { $in: allCodes } })
-      .select('trainerCode day startTime endTime')
+      .select(`trainerCode day startTime endTime ${SPECIAL_CLASS_FIELDS}`)
       .lean(),
     loadReplacementBusySlotsByTrainer({
       trainerIds: trainers.map((trainer) => trainer._id),
@@ -456,7 +457,7 @@ export const getBulkReplacementSuggestions = async (req, res) => {
     if (!canCover) continue;
 
     const scheduleCodes = resolveTrainerScheduleCodes(candidate);
-    const weeklySlots = await Schedule.find({ trainerCode: { $in: scheduleCodes } })
+    const weeklySlots = await Schedule.find({ trainerCode: { $in: scheduleCodes }, isSpecial: { $ne: true } })
       .select('startTime endTime')
       .lean();
     const weeklyHours = weeklySlots.reduce((sum, slot) => {
@@ -934,7 +935,7 @@ export const assignReplacement = async (req, res) => {
     const scheduleCodes = resolveTrainerScheduleCodes(trainer);
     const [ownedSchedules, replacementBusyByTrainer] = await Promise.all([
       Schedule.find({ trainerCode: { $in: scheduleCodes } })
-        .select('day startTime endTime')
+        .select(`day startTime endTime ${SPECIAL_CLASS_FIELDS}`)
         .lean(),
       loadReplacementBusySlotsByTrainer({
         trainerIds: [trainer._id],

@@ -41,6 +41,7 @@ import {
   getLeaveWeekdayScheduleIds,
   isFullDayLeave,
 } from '../utils/leaveScope.js';
+import { SPECIAL_CLASS_FIELDS } from '../utils/specialClass.js';
 import Schedule from '../models/Schedule.js';
 import { resolveTrainerScheduleCodes } from '../utils/trainerMappings.js';
 import {
@@ -197,7 +198,7 @@ export const buildTrainerAttendanceGridPayload = async ({
       : [],
     allScheduleCodes.length
       ? Schedule.find({ trainerCode: { $in: allScheduleCodes } })
-        .select('_id trainerCode day')
+        .select(`_id trainerCode day ${SPECIAL_CLASS_FIELDS}`)
         .lean()
       : [],
     loadOfficialHolidayMap(rangeStart, rangeEnd),
@@ -564,7 +565,7 @@ export const upsertTrainerDailyAttendance = async (req, res) => {
       ? await Schedule.find({
         trainerCode: { $in: resolveTrainerScheduleCodes(trainerDoc) },
       })
-        .select('_id day')
+        .select(`_id day ${SPECIAL_CLASS_FIELDS}`)
         .lean()
       : [];
 

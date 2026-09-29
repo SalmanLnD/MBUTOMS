@@ -5,10 +5,15 @@ import { normalizeDate } from './scheduleHelpers.js';
 import { resolveTrainerScheduleCodes } from './trainerMappings.js';
 import { isScheduleDayInLeaveRange } from './trainerScheduleView.js';
 import { getCanceledScheduleIdsForDate } from './classCancellations.js';
+import {
+  SPECIAL_CLASS_FIELDS,
+  getWeekRangeForDate,
+  isSpecialScheduleInRange,
+} from './specialClass.js';
 
 // Only the fields the timetable grid renders — keeps the board payload small.
 const BOARD_SCHEDULE_FIELDS =
-  'trainerCode day startTime endTime department section subjectCode subject slot semester replacementFor venue isLab isProject';
+  `trainerCode day startTime endTime department section subjectCode subject slot semester replacementFor venue isLab isProject ${SPECIAL_CLASS_FIELDS} specialGroupId specialReason`;
 
 const buildTrainerCodeIndex = (trainers) => {
   const codeToTrainers = new Map();
@@ -64,9 +69,11 @@ export const buildTimetableBoardForDate = async ({
   ]);
 
   const ownedIds = new Set();
+  const week = getWeekRangeForDate(referenceDate);
 
   ownedSchedules.forEach((schedule) => {
     if (canceledScheduleIds.has(schedule._id.toString())) return;
+    if (!isSpecialScheduleInRange(schedule, week.start, week.end)) return;
     const matches = codeToTrainers.get(schedule.trainerCode) || [];
     matches.forEach((trainer) => {
       ownedIds.add(schedule._id.toString());
@@ -99,6 +106,7 @@ export const buildTimetableBoardForDate = async ({
         const schedule = scheduleById.get(entry.schedule?.toString());
         if (!schedule) return;
         if (canceledScheduleIds.has(schedule._id.toString())) return;
+        if (!isSpecialScheduleInRange(schedule, week.start, week.end)) return;
         if (semester && schedule.semester !== semester) return;
         if (!isScheduleDayInLeaveRange(schedule.day, leave)) return;
         if (ownedIds.has(schedule._id.toString())) return;

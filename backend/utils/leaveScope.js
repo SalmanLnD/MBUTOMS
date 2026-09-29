@@ -1,4 +1,5 @@
 import { toLeaveDateKey } from './leaveDateRange.js';
+import { isSpecialScheduleInRange } from './specialClass.js';
 
 export const LEAVE_SCOPES = {
   FULL_DAY: 'full_day',
@@ -56,5 +57,6 @@ export const getLeaveWeekdayScheduleIds = (leave, trainerSchedules = []) => {
   const weekdays = new Set(getLeaveWeekdays(leave));
   return trainerSchedules
     .filter((schedule) => weekdays.has(schedule.day))
+    .filter((schedule) => isSpecialScheduleInRange(schedule, leave?.startDate, leave?.endDate))
     .map((schedule) => schedule._id.toString());
 };

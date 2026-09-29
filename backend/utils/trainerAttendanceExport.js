@@ -20,6 +20,7 @@ import {
 import { resolveTrainerScheduleCodes } from './trainerMappings.js';
 import { getLeaveOverlapFilter, isDateWithinLeave } from './leaveDateRange.js';
 import { getLeaveWeekdayScheduleIds, isFullDayLeave } from './leaveScope.js';
+import { SPECIAL_CLASS_FIELDS } from './specialClass.js';
 import { applyItOifAttendanceRules, allowsManualClassHandlingHours, resolveDefaultNoClassOif } from './attendanceOifRules.js';
 import {
   attendanceTypeUsesOifNumber,
@@ -116,7 +117,7 @@ export const buildTrainerAttendanceExportPayload = async () => {
       .select('trainer startDate endDate reason scope affectedSchedules')
       .lean(),
     Schedule.find({ trainerCode: { $in: allScheduleCodes } })
-      .select('_id trainerCode day')
+      .select(`_id trainerCode day ${SPECIAL_CLASS_FIELDS}`)
       .lean(),
     loadOfficialHolidayMap(TRAINER_ATTENDANCE_TRACKING_START, rangeEnd),
   ]);

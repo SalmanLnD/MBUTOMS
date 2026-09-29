@@ -7,6 +7,7 @@ import TopicTrackerEntry from '../models/TopicTrackerEntry.js';
 import Leave from '../models/Leave.js';
 import ClassCancellation from '../models/ClassCancellation.js';
 import { filterSchedulesActiveOnDate } from './activeSchedulesForDate.js';
+import { SPECIAL_CLASS_FIELDS } from './specialClass.js';
 import { getCanceledScheduleIdsForDate } from './classCancellations.js';
 import { buildCanceledScheduleIdsByDate } from './leaveAffectedClasses.js';
 import { computeHours } from './trainerClassHours.js';
@@ -275,7 +276,7 @@ export const buildRemainingTrainingHoursByClass = async ({
       ],
     })
       .populate('subject', 'name code startDate endDate')
-      .select('day startTime endTime slot department section semester subject subjectCode trainerCode')
+      .select(`day startTime endTime slot department section semester subject subjectCode trainerCode ${SPECIAL_CLASS_FIELDS}`)
       .lean(),
     buildTrainerLookup(),
     buildClassGroupMap(),
@@ -772,7 +773,7 @@ export const buildTopicTrackerPendingBacklog = async ({
   ] = await Promise.all([
     Schedule.find({})
       .populate('subject', 'name code')
-      .select('day startTime endTime slot department section semester subject subjectCode trainerCode')
+      .select(`day startTime endTime slot department section semester subject subjectCode trainerCode ${SPECIAL_CLASS_FIELDS}`)
       .lean(),
     buildTrainerLookup(),
     buildSubjectStartDateMap(),

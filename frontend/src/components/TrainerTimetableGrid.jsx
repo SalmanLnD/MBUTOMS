@@ -130,7 +130,7 @@ const TrainerTimetableGrid = ({
                       .filter(Boolean)
                       .join(' ');
 
-                    const hasSessionTag = Boolean(schedule?.isLab || schedule?.isProject);
+                    const hasSessionTag = Boolean(schedule?.isLab || schedule?.isProject || schedule?.isSpecial);
 
                     return (
                       <td
@@ -173,6 +173,9 @@ const TrainerTimetableGrid = ({
                       >
                         {hasSessionTag && (
                           <div className="timetable-cell-tags" aria-hidden="true">
+                            {schedule?.isSpecial && (
+                              <span className="timetable-session-tag timetable-session-tag--special">Special</span>
+                            )}
                             {schedule?.isProject && (
                               <span className="timetable-session-tag timetable-session-tag--project">Project</span>
                             )}

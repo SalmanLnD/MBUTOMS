@@ -8,8 +8,17 @@ import { resolveTrainerScheduleCodes } from '../utils/trainerMappings.js';
 import { assertClassRegistered } from '../utils/classRegistry.js';
 import { assertClassAllowedForSubject } from '../utils/subjectClassEligibility.js';
 import ClassGroup from '../models/ClassGroup.js';
+import crypto from 'node:crypto';
 
 import { buildTimetableBoardForDate } from '../utils/timetableBoard.js';
+import { clearAttendanceGridCache } from '../utils/attendanceGridCache.js';
+import { normalizeAttendanceDate, toAttendanceDateKey } from '../utils/attendanceTracking.js';
+import {
+  SPECIAL_CLASS_TYPES,
+  getWeekdayForDateKey,
+  getWeekdaysBetween,
+  isSpecialScheduleInRange,
+} from '../utils/specialClass.js';
 import { mergeRosterFilter } from '../utils/rosterFilter.js';
 import { buildLiveTrainerVenues, parseIstClockTime } from '../utils/liveTrainerVenues.js';
 import {
@@ -70,20 +79,30 @@ const findTrainerTimeConflict = async ({
   startTime,
   endTime,
   excludeId,
+  specialRange = null,
 }) => {
   const query = { trainerCode, day };
   if (excludeId) query._id = { $ne: excludeId };
 
   const sameDay = await Schedule.find(query);
-  return sameDay.find((entry) =>
-    timesOverlap(startTime, endTime, entry.startTime, entry.endTime)
-  );
+  return sameDay.find((entry) => {
+    if (!timesOverlap(startTime, endTime, entry.startTime, entry.endTime)) return false;
+    if (!specialRange) return true;
+    return isSpecialScheduleInRange(entry, specialRange.start, specialRange.end);
+  });
 };
 
 const formatConflictMessage = (conflict) => {
   const subjectPart = conflict.subjectCode ? ` (${conflict.subjectCode})` : '';
-  return `Trainer already has ${conflict.department} ${conflict.section}${subjectPart} on ${conflict.day} from ${conflict.startTime} to ${conflict.endTime}. A trainer cannot be in two places at the same time.`;
+  const specialPart = conflict.isSpecial ? ' special class' : '';
+  return `Trainer already has ${conflict.department} ${conflict.section}${subjectPart}${specialPart} on ${conflict.day} from ${conflict.startTime} to ${conflict.endTime}. A trainer cannot be in two places at the same time.`;
 };
+
+const getSpecialRangeForSchedule = (schedule) => (
+  schedule?.isSpecial && schedule.specialStartDate
+    ? { start: schedule.specialStartDate, end: schedule.specialEndDate || schedule.specialStartDate }
+    : null
+);
 
 const enrichSchedulePayload = async (body) => {
   const payload = { ...body };
@@ -222,7 +241,7 @@ export const getSchedules = async (req, res) => {
   const filter = await buildFilter(req.query);
   const schedules = sortSchedules(
     await Schedule.find(filter)
-      .select('trainerCode day startTime endTime department section subjectCode subject slot semester venue isLab isProject')
+      .select('trainerCode day startTime endTime department section subjectCode subject slot semester venue isLab isProject isSpecial specialType specialStartDate specialEndDate specialGroupId specialReason')
       .populate('venue', 'name building floor type')
       .lean()
   );
@@ -288,6 +307,7 @@ export const createSchedule = async (req, res) => {
 
   const schedule = await Schedule.create(payload);
   await schedule.populate('venue', 'name building floor type');
+  clearAttendanceGridCache();
   res.status(201).json(schedule);
 };
 
@@ -308,6 +328,7 @@ export const updateSchedule = async (req, res) => {
     startTime: payload.startTime,
     endTime: payload.endTime,
     excludeId: schedule._id,
+    specialRange: getSpecialRangeForSchedule(schedule),
   });
   if (conflict) {
     return res.status(409).json({ message: formatConflictMessage(conflict) });
@@ -316,6 +337,7 @@ export const updateSchedule = async (req, res) => {
   Object.assign(schedule, payload);
   await schedule.save();
   await schedule.populate('venue', 'name building floor type');
+  clearAttendanceGridCache();
   res.json(schedule);
 };
 
@@ -323,7 +345,196 @@ export const deleteSchedule = async (req, res) => {
   const schedule = await Schedule.findById(req.params.id);
   if (!schedule) return res.status(404).json({ message: 'Schedule not found' });
   await schedule.deleteOne();
+  clearAttendanceGridCache();
   res.json({ message: 'Schedule removed' });
+};
+
+const MAX_SPECIAL_RANGE_DAYS = 366;
+const TIME_PATTERN = /^([01]\d|2[0-3]):[0-5]\d$/;
+
+const badRequest = (message) => Object.assign(new Error(message), { statusCode: 400 });
+
+const resolveSpecialDates = (body) => {
+  const type = body.specialType;
+  if (!Object.values(SPECIAL_CLASS_TYPES).includes(type)) {
+    throw badRequest('Choose one-time or recurring special class.');
+  }
+
+  if (type === SPECIAL_CLASS_TYPES.ONE_TIME) {
+    const dateKey = toAttendanceDateKey(body.date);
+    if (!dateKey) throw badRequest('Select a valid date for the special class.');
+    return { type, startKey: dateKey, endKey: dateKey, days: [getWeekdayForDateKey(dateKey)] };
+  }
+
+  const startKey = toAttendanceDateKey(body.startDate);
+  const endKey = toAttendanceDateKey(body.endDate);
+  if (!startKey || !endKey) throw badRequest('Select a valid start and end date.');
+  if (endKey < startKey) throw badRequest('End date must be on or after the start date.');
+
+  const spanDays = Math.round(
+    (normalizeAttendanceDate(endKey) - normalizeAttendanceDate(startKey)) / 86_400_000
+  ) + 1;
+  if (spanDays > MAX_SPECIAL_RANGE_DAYS) {
+    throw badRequest('Recurring special classes can span at most one year.');
+  }
+
+  const available = new Set(getWeekdaysBetween(startKey, endKey));
+  const requested = [...new Set((Array.isArray(body.days) ? body.days : []).map(String))];
+  if (!requested.length) throw badRequest('Select at least one weekday for the recurring class.');
+  const missing = requested.filter((day) => !available.has(day));
+  if (missing.length) {
+    throw badRequest(`${missing.join(', ')} does not fall between the selected dates.`);
+  }
+
+  return { type, startKey, endKey, days: requested };
+};
+
+export const createSpecialClass = async (req, res) => {
+  let dates;
+  try {
+    dates = resolveSpecialDates(req.body);
+  } catch (err) {
+    return res.status(err.statusCode || 400).json({ message: err.message });
+  }
+
+  const trainerCode = String(req.body.trainerCode || '').trim();
+  if (!trainerCode) return res.status(400).json({ message: 'Select a trainer.' });
+  const trainer = await Trainer.findOne({
+    $or: [{ employeeId: trainerCode }, { scheduleTrainerCodes: trainerCode }],
+  }).select('_id');
+  if (!trainer) return res.status(400).json({ message: 'Selected trainer was not found.' });
+
+  const startTime = String(req.body.startTime || '').trim();
+  const endTime = String(req.body.endTime || '').trim();
+  if (!TIME_PATTERN.test(startTime) || !TIME_PATTERN.test(endTime)) {
+    return res.status(400).json({ message: 'Enter valid start and end times.' });
+  }
+  if (!req.body.classId) return res.status(400).json({ message: 'Select a class.' });
+  if (!req.body.subject) return res.status(400).json({ message: 'Select a subject.' });
+
+  let base;
+  try {
+    base = await enrichSchedulePayload({
+      trainerCode,
+      startTime,
+      endTime,
+      classId: req.body.classId,
+      subject: req.body.subject,
+      slot: ['S1', 'S2', 'S3', 'S4'].includes(req.body.slot) ? req.body.slot : '',
+      venue: req.body.venue || null,
+      isLab: req.body.isLab,
+      isProject: req.body.isProject,
+    });
+  } catch (err) {
+    return res.status(err.statusCode || 400).json({ message: err.message });
+  }
+
+  const specialStartDate = normalizeAttendanceDate(dates.startKey);
+  const specialEndDate = normalizeAttendanceDate(dates.endKey);
+  const specialRange = { start: specialStartDate, end: specialEndDate };
+
+  for (const day of dates.days) {
+    const conflict = await findTrainerTimeConflict({
+      trainerCode,
+      day,
+      startTime,
+      endTime,
+      specialRange,
+    });
+    if (conflict) {
+      return res.status(409).json({ message: formatConflictMessage(conflict) });
+    }
+  }
+
+  const specialGroupId = crypto.randomUUID();
+  const specialReason = String(req.body.reason || '').trim().slice(0, 200);
+  const created = await Schedule.insertMany(
+    dates.days.map((day) => ({
+      ...base,
+      day,
+      isSpecial: true,
+      specialType: dates.type,
+      specialStartDate,
+      specialEndDate,
+      specialGroupId,
+      specialReason,
+    }))
+  );
+
+  clearAttendanceGridCache();
+  res.status(201).json({
+    specialGroupId,
+    count: created.length,
+    schedules: created,
+  });
+};
+
+export const getSpecialClasses = async (req, res) => {
+  const filter = { isSpecial: true };
+  const fromKey = toAttendanceDateKey(req.query.from);
+  if (fromKey) filter.specialEndDate = { $gte: normalizeAttendanceDate(fromKey) };
+
+  const schedules = await Schedule.find(filter)
+    .select('trainerCode day startTime endTime department section semester subjectCode slot specialType specialStartDate specialEndDate specialGroupId specialReason')
+    .sort({ specialStartDate: 1, startTime: 1 })
+    .limit(500)
+    .lean();
+
+  const trainerCodes = [...new Set(schedules.map((schedule) => schedule.trainerCode))];
+  const trainers = await Trainer.find({
+    $or: [{ employeeId: { $in: trainerCodes } }, { scheduleTrainerCodes: { $in: trainerCodes } }],
+  })
+    .select('name employeeId scheduleTrainerCodes')
+    .lean();
+  const nameByCode = new Map();
+  trainers.forEach((trainer) => {
+    [trainer.employeeId, ...(trainer.scheduleTrainerCodes || [])].forEach((code) => {
+      if (code && !nameByCode.has(code)) nameByCode.set(code, trainer.name);
+    });
+  });
+
+  const groups = new Map();
+  schedules.forEach((schedule) => {
+    const key = schedule.specialGroupId || schedule._id.toString();
+    if (!groups.has(key)) {
+      groups.set(key, {
+        specialGroupId: key,
+        specialType: schedule.specialType,
+        trainerCode: schedule.trainerCode,
+        trainerName: nameByCode.get(schedule.trainerCode) || schedule.trainerCode,
+        department: schedule.department,
+        section: schedule.section,
+        semester: schedule.semester,
+        subjectCode: schedule.subjectCode,
+        startTime: schedule.startTime,
+        endTime: schedule.endTime,
+        startDate: toAttendanceDateKey(schedule.specialStartDate),
+        endDate: toAttendanceDateKey(schedule.specialEndDate),
+        reason: schedule.specialReason || '',
+        days: [],
+        scheduleIds: [],
+      });
+    }
+    const group = groups.get(key);
+    group.days.push(schedule.day);
+    group.scheduleIds.push(schedule._id);
+  });
+
+  res.json({ specialClasses: [...groups.values()] });
+};
+
+export const deleteSpecialClass = async (req, res) => {
+  const groupId = String(req.params.groupId || '').trim();
+  const filter = /^[a-f\d]{24}$/i.test(groupId)
+    ? { isSpecial: true, $or: [{ specialGroupId: groupId }, { _id: groupId }] }
+    : { isSpecial: true, specialGroupId: groupId };
+
+  const result = await Schedule.deleteMany(filter);
+  if (!result.deletedCount) {
+    return res.status(404).json({ message: 'Special class not found' });
+  }
+  clearAttendanceGridCache();
+  res.json({ message: 'Special class removed', count: result.deletedCount });
 };
 
 export const getBatches = async (req, res) => {

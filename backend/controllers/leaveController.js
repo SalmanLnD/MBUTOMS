@@ -11,6 +11,7 @@ import {
 import { notifyReplacementCancellation } from '../utils/replacementNotifications.js';
 import { clearAttendanceGridCache } from '../utils/attendanceGridCache.js';
 import { LEAVE_SCOPES } from '../utils/leaveScope.js';
+import { SPECIAL_CLASS_FIELDS, isSpecialScheduleInRange } from '../utils/specialClass.js';
 import {
   buildAffectedClassOccurrences,
   getEffectiveAffectedSchedules,
@@ -36,7 +37,7 @@ const populateLeave = [
   { path: 'approvedBy', select: 'name email' },
   {
     path: 'affectedSchedules',
-    select: 'trainerCode day startTime endTime department section subjectCode slot semester',
+    select: `trainerCode day startTime endTime department section subjectCode slot semester ${SPECIAL_CLASS_FIELDS}`,
   },
 ];
 
@@ -99,10 +100,11 @@ const findAffectedSchedules = async (trainerId, startDate, endDate) => {
 
   const days = getDaysInRange(startDate, endDate);
 
-  return Schedule.find({
+  const schedules = await Schedule.find({
     trainerCode: { $in: resolveTrainerScheduleCodes(trainer) },
     day: { $in: days },
   }).sort({ day: 1, startTime: 1 });
+  return schedules.filter((schedule) => isSpecialScheduleInRange(schedule, startDate, endDate));
 };
 
 export const getLeaves = async (req, res) => {

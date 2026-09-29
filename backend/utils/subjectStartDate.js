@@ -61,6 +61,12 @@ export const buildSubjectStartDateMap = () => readSubjectMap('subjects', async (
 export const clearSubjectStartDateCache = invalidateDerivedData;
 
 export const getScheduleSubjectRange = (schedule, map) => {
+  if (schedule?.isSpecial && schedule.specialStartDate) {
+    return {
+      startDate: normalizeDate(schedule.specialStartDate),
+      endDate: normalizeDate(schedule.specialEndDate || schedule.specialStartDate),
+    };
+  }
   const id = schedule.subject?._id?.toString() || schedule.subject?.toString();
   const code = String(schedule.subjectCode || schedule.subject?.code || '').trim();
   const meta = map.byId.get(id) || map.byCode.get(code);

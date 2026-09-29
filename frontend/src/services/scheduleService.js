@@ -69,6 +69,21 @@ export const deleteSchedule = async (id) => {
   return data;
 };
 
+export const getSpecialClasses = async (params = {}) => {
+  const { data } = await api.get('/schedules/special-classes', { params });
+  return data;
+};
+
+export const createSpecialClass = async (payload) => {
+  const { data } = await api.post('/schedules/special-classes', payload);
+  return data;
+};
+
+export const deleteSpecialClass = async (groupId) => {
+  const { data } = await api.delete(`/schedules/special-classes/${groupId}`);
+  return data;
+};
+
 export const getBatches = async () => {
   const { data } = await api.get('/schedules/batches/list');
   return data;

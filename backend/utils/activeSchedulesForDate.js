@@ -7,6 +7,7 @@ import { normalizeDate } from './scheduleHelpers.js';
 import { getCanceledScheduleIdsForDate } from './classCancellations.js';
 import { loadOfficialHolidayMap } from './officialHolidays.js';
 import { toAttendanceDateKey } from './attendanceDates.js';
+import { SPECIAL_CLASS_FIELDS } from './specialClass.js';
 
 export async function filterSchedulesActiveOnDate(schedules, referenceDate = new Date()) {
   if (!schedules.length) return [];
@@ -21,7 +22,7 @@ export async function getActiveSchedulesForDay(dayName, referenceDate = new Date
   const day = normalizeDate(referenceDate);
   const [schedules, canceledScheduleIds, holidayMap] = await Promise.all([
     Schedule.find({ day: dayName })
-      .select('day startTime endTime department section subjectCode trainerCode subject semester')
+      .select(`day startTime endTime department section subjectCode trainerCode subject semester ${SPECIAL_CLASS_FIELDS}`)
       .sort({ startTime: 1 })
       .lean(),
     getCanceledScheduleIdsForDate(day),
