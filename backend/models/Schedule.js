@@ -27,6 +27,7 @@ const scheduleSchema = new mongoose.Schema(
     specialEndDate: { type: Date, default: null },
     specialGroupId: { type: String, trim: true, default: '' },
     specialReason: { type: String, trim: true, default: '' },
+    includeInRtet: { type: Boolean, default: true },
   },
   { timestamps: true, collection: 'schedules' }
 );

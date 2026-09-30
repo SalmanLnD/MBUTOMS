@@ -34,3 +34,29 @@ test('RTET reads startDate from cached subject range objects', () => {
   );
   assert.equal(getRtetRangeStart().toISOString().slice(0, 10), '2026-07-12');
 });
+
+test('excluded special classes are inactive for RTET even on their date', () => {
+  const special = {
+    isSpecial: true,
+    includeInRtet: false,
+    specialStartDate: new Date(Date.UTC(2026, 9, 3)),
+    specialEndDate: new Date(Date.UTC(2026, 9, 3)),
+  };
+  assert.equal(
+    isRtetScheduleActiveOnDate(special, new Date(Date.UTC(2026, 9, 3)), { byId: new Map(), byCode: new Map() }),
+    false
+  );
+});
+
+test('included special classes stay active for RTET on their date', () => {
+  const special = {
+    isSpecial: true,
+    includeInRtet: true,
+    specialStartDate: new Date(Date.UTC(2026, 9, 3)),
+    specialEndDate: new Date(Date.UTC(2026, 9, 3)),
+  };
+  assert.equal(
+    isRtetScheduleActiveOnDate(special, new Date(Date.UTC(2026, 9, 3)), { byId: new Map(), byCode: new Map() }),
+    true
+  );
+});

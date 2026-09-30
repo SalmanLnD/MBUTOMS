@@ -12,6 +12,12 @@ const WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Frida
 
 export const isSpecialSchedule = (schedule) => Boolean(schedule?.isSpecial);
 
+/** Missing or true keeps current RTET behaviour; false is complementary-only. */
+export const isIncludedInRtet = (schedule) => {
+  if (!isSpecialSchedule(schedule)) return true;
+  return schedule.includeInRtet !== false;
+};
+
 export const getSpecialDateKeys = (schedule) => ({
   startKey: toAttendanceDateKey(schedule?.specialStartDate),
   endKey: toAttendanceDateKey(schedule?.specialEndDate || schedule?.specialStartDate),

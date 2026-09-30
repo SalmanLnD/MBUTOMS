@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
+  isIncludedInRtet,
   isSpecialScheduleActiveOnDate,
   isSpecialScheduleInRange,
   getWeekRangeForDate,
@@ -65,4 +66,11 @@ test('subject range for a special schedule uses its own dates', () => {
   const range = getScheduleSubjectRange(recurring);
   assert.equal(range.startDate.getTime(), recurring.specialStartDate.getTime());
   assert.equal(range.endDate.getTime(), recurring.specialEndDate.getTime());
+});
+
+test('special classes are included in RTET unless explicitly excluded', () => {
+  assert.equal(isIncludedInRtet({ day: 'Monday' }), true);
+  assert.equal(isIncludedInRtet(oneTime), true);
+  assert.equal(isIncludedInRtet({ ...oneTime, includeInRtet: true }), true);
+  assert.equal(isIncludedInRtet({ ...oneTime, includeInRtet: false }), false);
 });

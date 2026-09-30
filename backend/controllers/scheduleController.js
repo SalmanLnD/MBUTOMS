@@ -451,6 +451,7 @@ export const createSpecialClass = async (req, res) => {
 
   const specialGroupId = crypto.randomUUID();
   const specialReason = String(req.body.reason || '').trim().slice(0, 200);
+  const includeInRtet = req.body.includeInRtet !== false && req.body.includeInRtet !== 'false';
   const created = await Schedule.insertMany(
     dates.days.map((day) => ({
       ...base,
@@ -461,6 +462,7 @@ export const createSpecialClass = async (req, res) => {
       specialEndDate,
       specialGroupId,
       specialReason,
+      includeInRtet,
     }))
   );
 
@@ -478,7 +480,7 @@ export const getSpecialClasses = async (req, res) => {
   if (fromKey) filter.specialEndDate = { $gte: normalizeAttendanceDate(fromKey) };
 
   const schedules = await Schedule.find(filter)
-    .select('trainerCode day startTime endTime department section semester subjectCode slot specialType specialStartDate specialEndDate specialGroupId specialReason')
+    .select('trainerCode day startTime endTime department section semester subjectCode slot specialType specialStartDate specialEndDate specialGroupId specialReason includeInRtet')
     .sort({ specialStartDate: 1, startTime: 1 })
     .limit(500)
     .lean();
@@ -514,6 +516,7 @@ export const getSpecialClasses = async (req, res) => {
         startDate: toAttendanceDateKey(schedule.specialStartDate),
         endDate: toAttendanceDateKey(schedule.specialEndDate),
         reason: schedule.specialReason || '',
+        includeInRtet: schedule.includeInRtet !== false,
         days: [],
         scheduleIds: [],
       });

@@ -75,6 +75,7 @@ const buildInitialForm = (initialDate) => ({
   days: [weekdayForInputDate(initialDate)].filter(Boolean),
   venueId: '',
   reason: '',
+  includeInRtet: true,
 });
 
 const SpecialClassModal = ({ trainers = [], initialDate, initialTab = 'add', onClose, onChanged }) => {
@@ -285,6 +286,7 @@ const SpecialClassModal = ({ trainers = [], initialDate, initialTab = 'add', onC
       endTime: resolvedTimes.endTime,
       venue: form.venueId || null,
       reason: form.reason.trim(),
+      includeInRtet: form.includeInRtet,
       ...(isRecurring
         ? { startDate: form.startDate, endDate: form.endDate, days: form.days }
         : { date: form.date }),
@@ -545,11 +547,36 @@ const SpecialClassModal = ({ trainers = [], initialDate, initialTab = 'add', onC
                     placeholder="e.g. Extra class before mid exam"
                   />
                 </div>
+                <div className="col-12">
+                  <fieldset>
+                    <legend className="form-label fw-semibold fs-6">Include in RTET?</legend>
+                    <div className="btn-group" role="radiogroup" aria-label="Include in RTET">
+                      {[
+                        { value: true, label: 'Include in RTET' },
+                        { value: false, label: 'Exclude from RTET' },
+                      ].map((option) => (
+                        <button
+                          key={String(option.value)}
+                          type="button"
+                          role="radio"
+                          aria-checked={form.includeInRtet === option.value}
+                          className={`btn ${form.includeInRtet === option.value ? 'btn-primary' : 'btn-outline-primary'}`}
+                          onClick={() => updateForm({ includeInRtet: option.value })}
+                        >
+                          {option.label}
+                        </button>
+                      ))}
+                    </div>
+                    <small className="text-muted d-block mt-1">
+                      Complementary classes can be excluded from RTET. Trainer load and attendance still count.
+                    </small>
+                  </fieldset>
+                </div>
               </div>
 
               <p className="text-muted small mt-3 mb-0">
-                Special classes count toward trainer class hours, attendance, RTET and the topic
-                tracker only on the dates they run.
+                Special classes count toward trainer class hours, attendance and the topic
+                tracker only on the dates they run. RTET includes them only when that option is on.
               </p>
             </form>
           )}
@@ -571,6 +598,7 @@ const SpecialClassModal = ({ trainers = [], initialDate, initialTab = 'add', onC
                       <th>Trainer</th>
                       <th>Class</th>
                       <th>Subject</th>
+                      <th>RTET</th>
                       <th aria-label="Actions" />
                     </tr>
                   </thead>
@@ -584,6 +612,7 @@ const SpecialClassModal = ({ trainers = [], initialDate, initialTab = 'add', onC
                         <td>{item.trainerName}</td>
                         <td>{item.department} {item.section}</td>
                         <td>{item.subjectCode}</td>
+                        <td>{item.includeInRtet === false ? 'Excluded' : 'Included'}</td>
                         <td className="text-end">
                           <button
                             type="button"
@@ -619,7 +648,7 @@ const SpecialClassModal = ({ trainers = [], initialDate, initialTab = 'add', onC
         <ConfirmModal
           show
           title="Delete Special Class"
-          message={`Remove the special class for ${pendingDelete.trainerName} (${pendingDelete.department} ${pendingDelete.section}, ${describeDates(pendingDelete)})? Trainer hours, attendance and RTET will update.`}
+          message={`Remove the special class for ${pendingDelete.trainerName} (${pendingDelete.department} ${pendingDelete.section}, ${describeDates(pendingDelete)})? Trainer hours and attendance will update${pendingDelete.includeInRtet === false ? '' : ', along with RTET'}.`}
           confirmLabel="Delete"
           onConfirm={handleConfirmDelete}
           onClose={() => setPendingDelete(null)}
