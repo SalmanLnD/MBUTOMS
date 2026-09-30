@@ -2,6 +2,52 @@
 
 All notable changes to MBU TOMS are documented here.
 
+## [2.2.0] - 2026-09-30
+
+Previous package release: **2.1.0** (`35d714b`). Frontend and backend versions are both **2.2.0**.
+
+### Mobile-first interface
+
+- Introduced a restrained navy and slate theme, clearer typography, simpler controls, and consistent dark-mode styling throughout the website.
+- Added labeled mobile navigation and improved dashboard, trainer directory, and live-venue layouts for phones.
+- Fixed page scrolling, content overlap, wide-table scrolling, and action visibility across phone, laptop, and large-screen layouts.
+- Made dialogs fit the available viewport with scrollable content and accessible actions; improved dropdown positioning, keyboard focus, and nested-dialog handling.
+
+### Live venues and replacements
+
+- Corrected live trainer occupancy to include active replacement assignments, so the covering trainer appears in class and the original trainer's leave is respected.
+- Isolated live-view date checks from shared attendance and RTET calculations, and corrected replacement availability and date sorting.
+- Archived expired external replacement trainers from active screens while retaining historical records.
+- Kept approved replacements editable after their leave dates end.
+
+### Timetable and class management
+
+- Added one-time and recurring special classes with editable details and searchable trainer, subject, class, and venue selectors.
+- Allowed special classes to be excluded from RTET while still contributing to trainer workload and attendance.
+- Added school selection when creating or editing classes and venue details in Google Sheets timetable exports.
+- Updated coordinator observation access and corrected specific trainer/class venue assignments.
+
+### Attendance, reports, and topic tracker
+
+- Improved attendance cache invalidation after saves and excluded cancelled classes from class-hour calculations.
+- Corrected RRD eligibility when leave days have no remaining classes; additional monthly RRD approvals default to E-Leave.
+- Restored missing topic-tracker scheduled sessions and class summaries, refined hour calculations, and made topics optional for cancelled sessions.
+- Improved RTET subject hours, date-column alignment, refresh error handling, and attendance-sheet date formatting.
+
+### WhatsApp bridge and maintenance
+
+- Improved recovery of missed punch messages, phone resolution, reconnection handling, and remote QR relinking.
+- Removed unused debug scripts, one-time venue seed scripts, and unused attendance imports.
+- Added frontend viewport and browser regression checks covering pages, dialogs, dropdowns, and stacked modals.
+
+### Validation and upgrade behavior
+
+- The interface change passed 98 screen checks, 148 modal checks, and 105 page-to-dialog checks, plus nested-dialog keyboard checks.
+- Frontend unit tests, the frontend production build, and all 191 backend tests passed during release verification.
+- Backend sessions include the package version. After deploying 2.2.0, users with older sessions must sign in again.
+
+---
+
 ## [2.1.0] - 2026-09-12
 
 ### Complete interface redesign
