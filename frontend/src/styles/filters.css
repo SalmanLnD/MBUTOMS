@@ -1,7 +1,7 @@
 .toms-collapsible-filters { margin-bottom: .85rem; }
 .timetable-filter-panel .timetable-controls { margin: 0 !important; padding: .65rem; row-gap: .5rem; }
 .timetable-filter-panel .timetable-controls > div { margin-top: 0; }
-.timetable-filter-panel .timetable-controls .form-label { font-size: .69rem; margin-bottom: .25rem; }
+.timetable-filter-panel .timetable-controls .form-label { font-size: .8125rem; margin-bottom: .25rem; }
 @media (max-width: 767.98px) {
   .timetable-filter-panel .timetable-controls { display: grid; grid-template-columns: minmax(0,1fr) minmax(0,1fr); }
   .timetable-filter-panel .timetable-controls > div { width: auto; min-width: 0; padding-inline: .25rem; }
@@ -12,7 +12,7 @@
 .toms-collapsible-filters__toggle { min-height: 40px; margin-bottom: .45rem; }
 .toms-collapsible-filters__chevron { transition: transform var(--transition-base); }
 .toms-collapsible-filters.is-open .toms-collapsible-filters__chevron { transform: rotate(180deg); }
-.toms-collapsible-filters__content { padding: .85rem; background: var(--surface-soft); border: 1px solid var(--line); border-radius: 12px; }
+.toms-collapsible-filters__content { padding: .85rem; background: var(--surface-soft); border: 1px solid var(--line); border-radius: 6px; }
 .toms-collapsible-filters__content > .row:last-child, .toms-collapsible-filters__content > .timetable-controls:last-child { margin-bottom: 0 !important; }
 .mark-entry-filters { display: grid; grid-template-columns: repeat(auto-fit,minmax(190px,1fr)); gap: .7rem; align-items: end; margin-bottom: .8rem; }
 .mark-entry-filters__field { min-width: 0; }

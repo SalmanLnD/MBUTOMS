@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
+import { getPopoverPosition, visibleViewport } from '../utils/popoverPosition.js';
 
 const ChevronIcon = () => (
   <svg width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden="true">
@@ -68,30 +69,7 @@ const StyledSelect = ({
     const trigger = triggerRef.current;
     if (!trigger) return;
 
-    const rect = trigger.getBoundingClientRect();
-    const viewportPadding = 8;
-    const gap = 6;
-    const spaceBelow = window.innerHeight - rect.bottom - viewportPadding;
-    const spaceAbove = rect.top - viewportPadding;
-    const preferredMax = 280;
-    const openUp = spaceBelow < 180 && spaceAbove > spaceBelow;
-    const maxHeight = Math.max(120, Math.min(preferredMax, openUp ? spaceAbove - gap : spaceBelow - gap));
-    const width = Math.min(
-      Math.max(rect.width, 180),
-      Math.max(rect.width, window.innerWidth - viewportPadding * 2)
-    );
-    const left = Math.min(
-      Math.max(viewportPadding, rect.left),
-      Math.max(viewportPadding, window.innerWidth - width - viewportPadding)
-    );
-
-    setMenuStyle({
-      top: openUp ? rect.top - gap : rect.bottom + gap,
-      left,
-      width,
-      maxHeight,
-      transform: openUp ? 'translateY(-100%)' : 'none',
-    });
+    setMenuStyle(getPopoverPosition(trigger.getBoundingClientRect(), visibleViewport()));
   }, []);
 
   const closeMenu = useCallback(() => {
@@ -122,10 +100,14 @@ const StyledSelect = ({
       }
       updateMenuPosition();
     };
+    window.visualViewport?.addEventListener('resize', handleReposition);
+    window.visualViewport?.addEventListener('scroll', handleReposition);
     window.addEventListener('resize', handleReposition);
     window.addEventListener('scroll', handleReposition, true);
 
     return () => {
+      window.visualViewport?.removeEventListener('resize', handleReposition);
+      window.visualViewport?.removeEventListener('scroll', handleReposition);
       window.removeEventListener('resize', handleReposition);
       window.removeEventListener('scroll', handleReposition, true);
     };

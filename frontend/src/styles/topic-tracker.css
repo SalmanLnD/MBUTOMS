@@ -50,8 +50,8 @@
   background: var(--tracker-subtle);
   color: var(--tracker-muted);
   font-size: 0.67rem;
-  font-weight: 820;
-  letter-spacing: 0.075em;
+  font-weight: 600;
+  letter-spacing: normal;
   text-transform: uppercase;
 }
 

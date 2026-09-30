@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
+import { getPopoverPosition, visibleViewport } from '../utils/popoverPosition.js';
 
 const ChevronIcon = () => (
   <svg width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden="true">
@@ -71,22 +72,7 @@ const StyledMultiSelect = ({
     const trigger = triggerRef.current;
     if (!trigger) return;
 
-    const rect = trigger.getBoundingClientRect();
-    const viewportPadding = 8;
-    const gap = 6;
-    const spaceBelow = window.innerHeight - rect.bottom - viewportPadding;
-    const spaceAbove = rect.top - viewportPadding;
-    const preferredMax = 320;
-    const openUp = spaceBelow < 180 && spaceAbove > spaceBelow;
-    const maxHeight = Math.max(140, Math.min(preferredMax, openUp ? spaceAbove - gap : spaceBelow - gap));
-
-    setMenuStyle({
-      top: openUp ? rect.top - gap : rect.bottom + gap,
-      left: rect.left,
-      width: rect.width,
-      maxHeight,
-      transform: openUp ? 'translateY(-100%)' : 'none',
-    });
+    setMenuStyle(getPopoverPosition(trigger.getBoundingClientRect(), visibleViewport(), { preferredHeight: 320 }));
   }, []);
 
   const closeMenu = useCallback(() => {
@@ -123,10 +109,14 @@ const StyledMultiSelect = ({
       }
       updateMenuPosition();
     };
+    window.visualViewport?.addEventListener('resize', handleReposition);
+    window.visualViewport?.addEventListener('scroll', handleReposition);
     window.addEventListener('resize', handleReposition);
     window.addEventListener('scroll', handleReposition, true);
 
     return () => {
+      window.visualViewport?.removeEventListener('resize', handleReposition);
+      window.visualViewport?.removeEventListener('scroll', handleReposition);
       window.removeEventListener('resize', handleReposition);
       window.removeEventListener('scroll', handleReposition, true);
     };

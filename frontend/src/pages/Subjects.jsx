@@ -292,15 +292,16 @@ const Subjects = () => {
                 onChange={(e) => { setSearch(e.target.value); resetPage(); }}
               />
             </div>
+
+          </div>
+          </CollapsibleFilters>
             {canManage && (
-              <div className="col-md-6 text-md-end">
+              <div className="page-create-action">
                 <button className="btn btn-primary" onClick={() => { setEditingSubject(null); setShowModal(true); }}>
                   + Add Subject
                 </button>
               </div>
             )}
-          </div>
-          </CollapsibleFilters>
           <p className="text-muted small mb-3">
             {canManage
               ? 'Click a subject row to view details, or use Edit to manage syllabus, CHO, practice portal, and topic tracker topics.'

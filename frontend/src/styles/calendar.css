@@ -42,7 +42,7 @@
 .schedule-calendar .fc-toolbar-title {
   color: var(--calendar-ink);
   font-size: clamp(1rem, 0.92rem + 0.45vw, 1.28rem);
-  font-weight: 800;
+  font-weight: 600;
   letter-spacing: -0.03em;
 }
 
@@ -55,7 +55,7 @@
   color: var(--calendar-ink);
   font-family: inherit;
   font-size: 0.76rem;
-  font-weight: 730;
+  font-weight: 600;
   line-height: 1.2;
   text-transform: capitalize;
   box-shadow: none;
@@ -80,7 +80,7 @@
   border-color: var(--calendar-primary);
   background: var(--calendar-primary);
   color: #ffffff;
-  box-shadow: 0 3px 8px rgba(91, 92, 226, 0.22);
+  box-shadow: none;
 }
 
 .schedule-calendar .fc .fc-button:disabled {
@@ -114,8 +114,8 @@
   padding: 0.68rem 0.35rem;
   color: var(--calendar-muted);
   font-size: 0.68rem;
-  font-weight: 820;
-  letter-spacing: 0.085em;
+  font-weight: 600;
+  letter-spacing: normal;
   text-decoration: none;
   text-transform: uppercase;
 }
@@ -124,7 +124,7 @@
   padding: 0.45rem 0.55rem;
   color: var(--calendar-muted);
   font-size: 0.76rem;
-  font-weight: 720;
+  font-weight: 600;
   text-decoration: none;
 }
 
@@ -166,7 +166,7 @@
   color: #ffffff !important;
   cursor: pointer;
   font-size: 0.75rem;
-  font-weight: 700;
+  font-weight: 600;
   line-height: 1.3;
   transition: filter 150ms ease, transform 150ms ease;
 }

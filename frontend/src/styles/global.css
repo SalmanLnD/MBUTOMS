@@ -5,39 +5,41 @@
 @import './topic-tracker.css';
 
 *, *::before, *::after { box-sizing: border-box; }
-html { min-width: 320px; min-height: 100%; background: var(--canvas); scroll-behavior: smooth; }
-body { min-width: 320px; min-height: 100vh; margin: 0; overflow-x: hidden; }
+html { min-height: 100%; background: var(--canvas); scroll-padding-block: 1rem; }
+body { min-height: 100vh; min-height: 100dvh; margin: 0; }
+#root, .app-layout, .main-content { min-width: 0; }
+/* Document owns page scrolling; data grids own only their own overflow. */
+.main-content { overflow: visible; }
 button, input, select, textarea { font: inherit; }
 img, svg { max-width: 100%; }
 
-.app-layout { min-height: 100vh; padding-left: var(--sidebar-width); transition: padding-left var(--transition-smooth); }
-.app-layout.sidebar-collapsed { padding-left: var(--sidebar-collapsed-width); }
+.app-layout { min-height: 100vh; min-height: 100dvh; padding-left: 0; }
 .app-layout--public { padding-left: 0; }
-.main-content { min-height: 100vh; padding: 24px clamp(18px, 2.4vw, 38px) 42px; background: radial-gradient(circle at 90% 0, rgba(91,92,226,.09), transparent 28rem), var(--canvas); }
-.main-content--public { padding: 20px clamp(14px,3vw,42px) 40px; }
+.main-content { min-height: 100vh; min-height: 100dvh; padding: 16px max(12px,env(safe-area-inset-right,0px)) calc(var(--mobile-nav-height) + 28px + env(safe-area-inset-bottom,0px)) max(12px,env(safe-area-inset-left,0px)); background: var(--canvas); }
+.main-content--public { padding-bottom: 32px; }
+.skip-link { position: fixed; top: 8px; left: 8px; z-index: 1800; padding: .65rem 1rem; background: var(--surface); color: var(--primary); border: 1px solid var(--primary); border-radius: 4px; transform: translateY(-200%); }
+.skip-link:focus { transform: none; }
 
-.page-header { display: flex; align-items: flex-end; justify-content: space-between; gap: 1rem; margin-bottom: 1rem; }
-.page-header h1, .page-header h2 { margin: 0; color: var(--ink-950); font-weight: 850; letter-spacing: -.045em; }
+.page-header { display: flex; flex-direction: column; align-items: stretch; justify-content: space-between; gap: 1rem; margin-bottom: 1rem; }
+.page-header h1, .page-header h2 { margin: 0; color: var(--ink-950); font-weight: 650; letter-spacing: -.02em; }
 .page-header p { max-width: 66ch; margin: .35rem 0 0; color: var(--text-muted); }
 
-.table-card { overflow: hidden; }
+.table-card { overflow: visible; }
 .table-card > .card-body { padding: 1rem; }
 .table-card > .card-header, .table-card > .card-footer, .table-card .card-body > .p-3 { padding: 1rem 1.15rem !important; }
 
-.stat-card { position: relative; min-height: 130px; overflow: hidden; }
-.stat-card::after { content: ''; position: absolute; inset: 0 0 auto; height: 3px; background: var(--stat-color,var(--primary)); }
+.stat-card { min-height: 112px; }
 .stat-card .card-body { position: relative; z-index: 1; padding: 1.2rem; }
-.stat-card .stat-icon { display: grid; place-items: center; width: 44px; height: 44px; color: var(--stat-color,var(--primary)); background: var(--stat-wash,var(--primary-soft)); border-radius: 11px; }
-.stat-card h3 { margin: .8rem 0 .15rem; color: var(--ink-950); font-size: clamp(1.55rem,3vw,2.1rem); font-weight: 850; letter-spacing: -.055em; }
+.stat-card .stat-icon { display: grid; place-items: center; width: 32px; height: 32px; color: var(--text-muted); }
+.stat-card h3 { margin: .7rem 0 .15rem; color: var(--ink-950); font-size: clamp(1.65rem,3vw,2.2rem); font-weight: 650; letter-spacing: -.025em; }
 .stat-card--teal { --stat-color: var(--teal); --stat-wash: var(--teal-soft); }
 .stat-card--violet { --stat-color: var(--primary); --stat-wash: var(--primary-soft); }
 .stat-card--amber, .stat-card--gold { --stat-color: var(--amber); --stat-wash: var(--amber-soft); }
 .stat-card--rose { --stat-color: var(--coral); --stat-wash: var(--coral-soft); }
 .stat-card--cyan { --stat-color: var(--info); --stat-wash: var(--info-soft); }
 
-.login-page { min-height: 100vh; display: grid; place-items: center; padding: 1rem; background: linear-gradient(145deg,#11162a 0%,#242968 55%,#126b72 100%); }
-.login-card { width: min(100%,440px); padding: clamp(1.25rem,4vw,2.2rem); border: 1px solid rgba(255,255,255,.16); border-radius: 24px; background: rgba(255,255,255,.96); box-shadow: var(--shadow-lg); }
-[data-theme='dark'] .login-card { background: rgba(21,27,48,.96); }
+.login-page { min-height: 100dvh; display: grid; place-items: center; padding: 1rem; background: var(--canvas); }
+.login-card { width: min(100%,440px); padding: clamp(1.25rem,4vw,2.2rem); border: 1px solid var(--line); border-radius: 8px; background: var(--surface); }
 
 .timetable-controls, .trainer-attendance-toolbar { padding: 1rem; border: 1px solid var(--line); border-radius: var(--radius-lg); background: var(--surface); box-shadow: var(--shadow-xs); }
 .timetable-summary-bar { display: flex; flex-wrap: wrap; gap: .5rem; }
@@ -45,12 +47,12 @@ img, svg { max-width: 100%; }
 .timetable-card .card-body { padding: 0; }
 .timetable-card-header { padding: 1rem 1.15rem; border-bottom: 1px solid var(--line); background: var(--surface-soft); }
 .timetable-grid-wrap, .trainer-attendance-grid { width: 100%; overflow: auto; overscroll-behavior-inline: contain; scrollbar-color: var(--line-strong) transparent; }
-.timetable-grid { width: 100%; min-width: 0; table-layout: fixed; }
+.timetable-grid { width: 100%; min-width: 640px; table-layout: fixed; }
 .timetable-grid th, .timetable-grid td { border-color: var(--line); }
 .timetable-grid thead th { position: sticky; top: 0; z-index: 3; background: var(--surface-strong); color: #fff; }
 .timetable-grid .timetable-day-col { position: sticky; left: 0; z-index: 2; width: 44px; color: var(--ink-950); background: var(--surface-soft); }
 .timetable-slot-col { min-width: 0; }
-.timetable-slot-key { display: block; font-weight: 850; }
+.timetable-slot-key { display: block; font-weight: 600; }
 .timetable-slot-time { display: block; margin-top: .15rem; opacity: .7; font-size: .72rem; font-weight: 600; letter-spacing: 0; text-transform: none; }
 .table.timetable-grid th, .table.timetable-grid td { padding: .3rem .25rem; border-radius: 0; white-space: normal; overflow-wrap: anywhere; }
 .timetable-cell { padding: .3rem .25rem; }
@@ -58,11 +60,11 @@ img, svg { max-width: 100%; }
 .timetable-cell-filled { color: var(--primary-strong); background: var(--primary-soft); border: 1px solid color-mix(in srgb,var(--primary) 25%,transparent); }
 .timetable-cell-empty { color: var(--text-muted); background: transparent; border: 1px dashed var(--line); }
 .timetable-cell-editable { cursor: pointer; transition: transform var(--transition-fast),border-color var(--transition-fast),background var(--transition-fast); }
-.timetable-cell-editable:hover { transform: translateY(-1px); border-color: var(--primary); background: var(--primary-soft); }
-.timetable-cell-class { color: var(--ink-950); font-size: .75rem; font-weight: 750; }
-.timetable-cell-meta { color: var(--text-secondary); font-size: .69rem; line-height: 1.25; }
+.timetable-cell-editable:hover { border-color: var(--primary); background: var(--primary-soft); }
+.timetable-cell-class { color: var(--ink-950); font-size: .8125rem; font-weight: 600; }
+.timetable-cell-meta { color: var(--text-secondary); font-size: .75rem; line-height: 1.35; }
 .timetable-cell-tags { display: flex; flex-wrap: wrap; gap: .25rem; }
-.timetable-session-tag { padding: .15rem .4rem; border-radius: 999px; background: var(--teal-soft); color: var(--teal); font-size: .62rem; font-weight: 800; text-transform: uppercase; }
+.timetable-session-tag { padding: .15rem .4rem; border-radius: 999px; background: var(--teal-soft); color: var(--teal); font-size: .62rem; font-weight: 600; text-transform: uppercase; }
 .timetable-session-tag--project { color: var(--coral); background: var(--coral-soft); }
 .timetable-session-tag--special { color: #6d28d9; background: #ede9fe; }
 .timetable-all-trainers { display: grid; align-items: start; gap: 1rem; }
@@ -71,11 +73,11 @@ img, svg { max-width: 100%; }
 .timetable-trainer-section h6 { font-size: .85rem; margin-bottom: .4rem; }
 .timetable-card > .timetable-card-header { padding: .4rem .55rem !important; font-size: .78rem; }
 .timetable-card > .card-body { padding: 0; }
-.timetable-slot-time { font-size: .65rem; }
+.timetable-slot-time { font-size: .75rem; }
 .timetable-filter-panel + .timetable-summary-bar { margin-bottom: .25rem !important; }
 .timetable-filter-panel > .d-flex { padding: .5rem .15rem 0; margin-bottom: 0 !important; }
 .timetable-trainer-section .timetable-card { box-shadow: none; border-radius: 8px; }
-.timetable-trainer-title { color: var(--ink-950); font-weight: 850; }
+.timetable-trainer-title { color: var(--ink-950); font-weight: 600; }
 
 .trainer-attendance-month-table { width: max-content; min-width: 100%; table-layout: fixed; }
 .trainer-attendance-month-table col.trainer-attendance-sticky-col { width: 180px; }
@@ -96,7 +98,7 @@ img, svg { max-width: 100%; }
 .trainer-attendance-grid .trainer-attendance-food-cell { width: 82px; }
 .trainer-attendance-grid .trainer-attendance-totals-col { width: 150px; min-width: 150px; }
 .trainer-attendance-class-input, .trainer-attendance-oif-input { width: 100%; min-width: 68px; height: 34px; padding: .25rem .4rem; text-align: center; border: 1px solid var(--line); border-radius: 7px; background: var(--surface); color: var(--text-primary); }
-.trainer-attendance-class-value { display: inline-grid; place-items: center; min-width: 36px; min-height: 30px; padding: .2rem .4rem; border-radius: 7px; background: var(--surface-soft); font-weight: 800; }
+.trainer-attendance-class-value { display: inline-grid; place-items: center; min-width: 36px; min-height: 30px; padding: .2rem .4rem; border-radius: 7px; background: var(--surface-soft); font-weight: 600; }
 .trainer-attendance-future { opacity: .55; }
 .trainer-attendance-weekend { background: var(--surface-soft) !important; }
 .trainer-attendance-holiday { background: var(--amber-soft) !important; }
@@ -110,7 +112,7 @@ img, svg { max-width: 100%; }
 }
 .trainer-attendance-totals-col { background: var(--primary-soft) !important; }
 .trainer-attendance-summary { display: flex; flex-wrap: wrap; gap: .5rem; }
-.trainer-attendance-pill { display: inline-flex; align-items: center; gap: .35rem; padding: .4rem .7rem; border: 1px solid var(--line); border-radius: 999px; color: var(--text-secondary); background: var(--surface); font-size: .78rem; font-weight: 750; }
+.trainer-attendance-pill { display: inline-flex; align-items: center; gap: .35rem; padding: .4rem .7rem; border: 1px solid var(--line); border-radius: 4px; color: var(--text-secondary); background: var(--surface); font-size: .78rem; font-weight: 600; }
 .trainer-attendance-month-controls, .trainer-attendance-leave-controls { display: flex; align-items: center; flex-wrap: wrap; gap: .5rem; }
 .class-cancellation-schedule-list { display: grid; gap: .55rem; max-height: 50vh; overflow: auto; }
 .class-cancellation-schedule-option { display: flex; gap: .65rem; padding: .75rem; border: 1px solid var(--line); border-radius: 10px; background: var(--surface-soft); }
@@ -119,18 +121,19 @@ img, svg { max-width: 100%; }
 .venue-campus-map { min-width: 760px; }
 .venue-detail-list dt { color: var(--text-muted); font-size: .74rem; letter-spacing: .05em; text-transform: uppercase; }
 
-@media (max-width: 991.98px) {
+@media (min-width: 768px) {
   .app-layout { padding-left: var(--sidebar-collapsed-width); }
-  .main-content { padding-inline: 20px; }
-  .timetable-all-trainers--two-col { grid-template-columns: 1fr; }
+  .app-layout.sidebar-collapsed { padding-left: var(--sidebar-collapsed-width); }
+  .main-content { padding: 24px clamp(20px,2.5vw,48px) 48px; }
+  .app-layout--public { padding-left: 0; }
+  .page-header { flex-direction: row; align-items: center; }
 }
+@media (min-width: 992px) { .app-layout { padding-left: var(--sidebar-width); } .app-layout--public { padding-left: 0; } }
+@media (max-width: 1199.98px) { .timetable-all-trainers--two-col { grid-template-columns: 1fr; } }
 @media (max-width: 767.98px) {
-  .app-layout, .app-layout.sidebar-collapsed { padding-left: 0; }
-  .main-content, .main-content--public { padding: 14px 12px calc(92px + env(safe-area-inset-bottom,0px)); }
-  .page-header { align-items: stretch; flex-direction: column; }
   .page-header .btn, .page-header .btn-group { width: 100%; }
-  .table-card, .timetable-card, .timetable-controls, .trainer-attendance-toolbar { border-radius: 14px; }
-  .timetable-grid { min-width: 0; }
+  .trainer-attendance-grid .trainer-attendance-sticky-col { min-width: 128px; max-width: 128px; overflow-wrap: anywhere; }
+  .trainer-attendance-month-table col.trainer-attendance-sticky-col { width: 128px; }
   .timetable-trainer-section { padding: .7rem; }
   .trainer-attendance-toolbar { position: static; }
 }
@@ -138,5 +141,5 @@ img, svg { max-width: 100%; }
   .card-body { padding: 1rem; }
   .btn:not(.action-btn):not(.page-link) { min-height: 44px; }
   .table thead th, .table tbody td, .table tbody th { padding: .68rem .65rem; }
-  .login-card { border-radius: 18px; }
+  .login-card { border-radius: 8px; }
 }

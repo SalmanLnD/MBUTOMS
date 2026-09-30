@@ -238,7 +238,7 @@ const VenueLiveTab = () => {
         </div>
 
         <div className="table-responsive">
-          <table className="table table-hover align-middle mb-0">
+          <table className="table table-hover align-middle mb-0 venue-live-table">
             <thead className="table-light">
               <tr>
                 <th>Trainer</th>
@@ -271,21 +271,21 @@ const VenueLiveTab = () => {
                         </span>
                       ) : null}
                     </td>
-                    <td>{row.employeeId || '—'}</td>
+                    <td data-label="Employee ID">{row.employeeId || '—'}</td>
                     <td>
                       <span className={`badge ${statusBadgeClass(row.status)}`}>
                         {statusLabel(row.status)}
                       </span>
                     </td>
-                    <td>{venueLabel(row)}</td>
-                    <td>
+                    <td data-label="Venue">{venueLabel(row)}</td>
+                    <td data-label="Class">
                       {classLabel(row.schedule)}
                       {row.schedule?.isReplacementAssignment ? (
                         <span className="badge bg-secondary ms-2">Replacement</span>
                       ) : null}
                     </td>
-                    <td>{row.schedule?.slot || '—'}</td>
-                    <td>
+                    <td data-label="Slot">{row.schedule?.slot || '—'}</td>
+                    <td data-label="Time">
                       {row.schedule
                         ? `${row.schedule.startTime}–${row.schedule.endTime}`
                         : '—'}

@@ -43,35 +43,39 @@ const ResetPasswordModal = ({ show, onComplete }) => {
       onClose={() => {}}
     >
       <form onSubmit={handleSubmit}>
-        <p className="text-muted mb-3">
-          You signed in with the initial OTP. Please choose a new password to continue.
-        </p>
-        <div className="mb-3">
-          <label htmlFor="newPassword" className="form-label">New password</label>
-          <input
-            id="newPassword"
-            type="password"
-            className="form-control"
-            value={newPassword}
-            onChange={(e) => setNewPassword(e.target.value)}
-            required
-            autoFocus
-          />
+        <div className="toms-modal-body">
+          <p className="text-muted mb-3">
+            You signed in with the initial OTP. Please choose a new password to continue.
+          </p>
+          <div className="mb-3">
+            <label htmlFor="newPassword" className="form-label">New password</label>
+            <input
+              id="newPassword"
+              type="password"
+              className="form-control"
+              value={newPassword}
+              onChange={(e) => setNewPassword(e.target.value)}
+              required
+              autoFocus
+            />
+          </div>
+          <div className="mb-4">
+            <label htmlFor="confirmPassword" className="form-label">Confirm password</label>
+            <input
+              id="confirmPassword"
+              type="password"
+              className="form-control"
+              value={confirmPassword}
+              onChange={(e) => setConfirmPassword(e.target.value)}
+              required
+            />
+          </div>
         </div>
-        <div className="mb-4">
-          <label htmlFor="confirmPassword" className="form-label">Confirm password</label>
-          <input
-            id="confirmPassword"
-            type="password"
-            className="form-control"
-            value={confirmPassword}
-            onChange={(e) => setConfirmPassword(e.target.value)}
-            required
-          />
+        <div className="toms-modal-footer">
+          <button type="submit" className="btn btn-primary w-100" disabled={saving}>
+            {saving ? 'Saving...' : 'Save password'}
+          </button>
         </div>
-        <button type="submit" className="btn btn-primary w-100" disabled={saving}>
-          {saving ? 'Saving...' : 'Save password'}
-        </button>
       </form>
     </Modal>
   );

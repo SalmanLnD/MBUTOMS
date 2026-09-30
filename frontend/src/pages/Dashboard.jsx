@@ -23,6 +23,7 @@ import {
 } from '../components/icons.jsx';
 import { getDashboardStats } from '../services/dashboardService.js';
 import { getErrorMessage } from '../utils/helpers.js';
+import { useTheme } from '../context/ThemeContext.jsx';
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, ArcElement, Title, Tooltip, Legend);
 
@@ -32,6 +33,9 @@ const formatRating = (value) => {
 };
 
 const Dashboard = () => {
+  const { isDark } = useTheme();
+  const chartText = isDark ? '#b3c4cf' : '#526570';
+  const chartLine = isDark ? '#334550' : '#dce3e8';
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
 
@@ -65,7 +69,7 @@ const Dashboard = () => {
           attendanceSummary?.od || 0,
           attendanceSummary?.holiday || 0,
         ],
-        backgroundColor: ['#10b981', '#f43f5e', '#f59e0b', '#06b6d4', '#8b5cf6', '#64748b'],
+        backgroundColor: ['#23756d', '#aa4545', '#a87325', '#416a82', '#75849a', '#64748b'],
       },
     ],
   };
@@ -76,9 +80,9 @@ const Dashboard = () => {
       {
         label: 'Average Feedback Rating',
         data: topTrainersByFeedback?.map((t) => t.averageRating) || [],
-        backgroundColor: 'rgba(20, 184, 166, 0.85)',
-        hoverBackgroundColor: 'rgba(6, 182, 212, 0.95)',
-        borderRadius: 12,
+        backgroundColor: '#416a82',
+        hoverBackgroundColor: '#275773',
+        borderRadius: 3,
         borderSkipped: false,
       },
     ],
@@ -86,7 +90,7 @@ const Dashboard = () => {
 
   return (
     <div className="spatial-stack">
-      <div className="bento-grid">
+      <div className="bento-grid dashboard-stats">
         <div className="bento-cell bento-span-4">
           <StatCard title="Total Trainers" value={cards?.totalTrainers} icon={<TrainerIcon size={24} />} accent="teal" />
         </div>
@@ -113,10 +117,10 @@ const Dashboard = () => {
             <div className="card-body">
               <h5 className="bento-panel__title">Attendance Summary</h5>
               {attendanceChartData.datasets[0].data.some((v) => v > 0) ? (
-                <Doughnut data={attendanceChartData} options={{ maintainAspectRatio: true }} />
+                <Doughnut data={attendanceChartData} options={{ maintainAspectRatio: true, plugins: { legend: { position: 'bottom', labels: { color: chartText, boxWidth: 12, padding: 16 } } } }} />
               ) : (
                 <p className="text-muted text-center py-5">
-                  Attendance data will appear after Phase 3 implementation.
+                  No attendance recorded for today.
                 </p>
               )}
             </div>
@@ -150,8 +154,11 @@ const Dashboard = () => {
                         max: 5,
                         ticks: {
                           stepSize: 1,
+                          color: chartText,
                         },
+                        grid: { color: chartLine },
                       },
+                      x: { ticks: { color: chartText }, grid: { display: false } },
                     },
                   }}
                 />

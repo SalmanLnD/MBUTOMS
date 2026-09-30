@@ -36,7 +36,7 @@
   margin-bottom: 1rem;
   padding: clamp(1.25rem, 3vw, 2rem);
   border: 1px solid var(--feedback-line);
-  border-top: 0.34rem solid var(--feedback-indigo);
+  border-top: 2px solid var(--feedback-indigo);
   border-radius: var(--radius-lg, 1rem);
   background: var(--feedback-surface);
   color: var(--feedback-ink);
@@ -59,7 +59,7 @@
   margin: 0 0 0.55rem;
   color: var(--feedback-ink);
   font-size: clamp(1.45rem, 1.12rem + 1.2vw, 2.15rem);
-  font-weight: 820;
+  font-weight: 600;
   letter-spacing: -0.045em;
   line-height: 1.08;
 }
@@ -95,7 +95,7 @@
   margin-bottom: 0.8rem;
   color: var(--feedback-ink);
   font-size: 0.95rem;
-  font-weight: 720;
+  font-weight: 600;
   line-height: 1.45;
 }
 
@@ -176,7 +176,7 @@
   color: var(--feedback-ink);
   font: inherit;
   font-size: 0.9rem;
-  font-weight: 760;
+  font-weight: 600;
   cursor: pointer;
   transition: border-color 150ms ease, background-color 150ms ease, color 150ms ease, transform 150ms ease;
 }
@@ -194,7 +194,7 @@
   border-color: var(--feedback-indigo);
   background: var(--feedback-indigo);
   color: #ffffff;
-  box-shadow: 0 3px 8px rgba(91, 92, 226, 0.22);
+  box-shadow: none;
 }
 
 .feedback-rating-btn:disabled {

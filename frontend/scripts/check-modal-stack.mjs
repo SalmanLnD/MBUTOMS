@@ -1,0 +1,34 @@
+import assert from 'node:assert/strict';
+import {pathToFileURL} from 'node:url';
+import {fixture,user} from './responsive-fixtures.mjs';
+const {chromium}=await import(process.env.PLAYWRIGHT_MODULE_PATH ? pathToFileURL(process.env.PLAYWRIGHT_MODULE_PATH).href : 'playwright');
+const base=process.env.RESPONSIVE_BASE_URL || 'http://127.0.0.1:5176';assert.match(base,/^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/);
+const browser=await chromium.launch({headless:true,...(process.env.CHROME_PATH?{executablePath:process.env.CHROME_PATH}:{})});
+for(const viewport of [{width:390,height:844},{width:568,height:320}]){
+  const context=await browser.newContext({viewport,reducedMotion:'reduce'});
+  await context.addInitScript(u=>{localStorage.setItem('toms_token','responsive-test');localStorage.setItem('toms_user',JSON.stringify(u));},user);
+  await context.route('**/api/**',async r=>{assert.equal(r.request().method(),'GET');const url=new URL(r.request().url());await r.fulfill({json:fixture(url.pathname.replace(/^\/api/,''),url.searchParams)});});
+  const page=await context.newPage();
+  await page.goto(`${base}/scripts/ui-audit/index.html`);await page.waitForFunction(()=>window.modalAudit);
+  const trainer=fixture('/trainers').trainers[0],subject=fixture('/subjects').subjects[0];
+  await page.evaluate(async props=>window.modalAudit.mount('TimetableSlotModal',props),{trainerCode:trainer.employeeId,day:'Monday',slot:'S1',subject,subjects:[subject],schedule:fixture('/schedules/timetable-board').schedulesByTrainer[trainer.employeeId][0]});
+  await page.getByRole('dialog').waitFor();
+  await page.getByRole('button',{name:'Delete',exact:true}).click();
+  await page.getByRole('dialog',{name:'Delete Timetable Slot'}).waitFor();
+  assert.equal(await page.getByRole('dialog').count(),2);
+  await page.keyboard.press('Tab');
+  assert.ok(await page.getByRole('dialog',{name:'Delete Timetable Slot'}).evaluate(e=>e.contains(document.activeElement)));
+  await page.keyboard.press('Escape');await page.waitForTimeout(100);
+  assert.equal(await page.getByRole('dialog').count(),1);
+  assert.equal(await page.evaluate(()=>document.body.style.overflow),'hidden');
+  const trigger=page.locator('.toms-styled-select__trigger:not(:disabled)').first();await trigger.click();
+  await page.locator('.toms-styled-select__menu').waitFor();
+  await page.keyboard.press('Escape');await page.waitForTimeout(100);
+  assert.equal(await page.locator('.toms-styled-select__menu').count(),0);
+  assert.equal(await page.getByRole('dialog').count(),1);
+  await page.keyboard.press('Escape');await page.waitForTimeout(100);
+  assert.equal(await page.getByRole('dialog').count(),0);
+  assert.equal(await page.evaluate(()=>document.body.style.overflow),'');
+  await context.close();console.log(`Nested dialog / dropdown Escape checks passed at ${viewport.width}x${viewport.height}`);
+}
+await browser.close();

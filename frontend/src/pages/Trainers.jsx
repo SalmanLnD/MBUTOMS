@@ -253,29 +253,30 @@ const Trainers = () => {
                   aria-label="Filter trainers by subject"
                 />
               </div>
-              {canManage && (
-                <div className="col-md-4 text-md-end">
+
+            </div>
+            </CollapsibleFilters>
+            {canManage && (
+                <div className="page-create-action">
                   <button type="button" className="btn btn-primary" onClick={handleAdd}>
                     + Add Trainer
                   </button>
                 </div>
               )}
-            </div>
-            </CollapsibleFilters>
 
             {loading ? (
               <LoadingSpinner />
             ) : (
               <>
                 <div className="table-responsive">
-                  <table className="table table-hover align-middle">
+                  <table className="table table-hover align-middle trainer-directory-table">
                     <thead className="table-light">
                       <tr>
-                        <th role="button" onClick={() => handleSort('employeeId')}>
-                          Employee ID{sortIcon('employeeId')}
+                        <th aria-sort={sortBy === 'employeeId' ? (sortOrder === 'asc' ? 'ascending' : 'descending') : 'none'}>
+                          <button type="button" className="table-sort" onClick={() => handleSort('employeeId')}>Employee ID{sortIcon('employeeId')}</button>
                         </th>
-                        <th role="button" onClick={() => handleSort('name')}>
-                          Name{sortIcon('name')}
+                        <th aria-sort={sortBy === 'name' ? (sortOrder === 'asc' ? 'ascending' : 'descending') : 'none'}>
+                          <button type="button" className="table-sort" onClick={() => handleSort('name')}>Name{sortIcon('name')}</button>
                         </th>
                         <th>Subjects</th>
                         <th>Actions</th>
@@ -291,13 +292,13 @@ const Trainers = () => {
                       ) : (
                         trainers.map((trainer) => (
                           <tr key={trainer._id}>
-                            <td><code>{trainer.employeeId}</code></td>
+                            <td data-label="Employee ID"><code>{trainer.employeeId}</code></td>
                             <td>
                               <Link to={`/trainers/${trainer._id}`} className="text-decoration-none fw-medium">
                                 {trainer.name}
                               </Link>
                             </td>
-                            <td>
+                            <td data-label="Subjects">
                               {trainer.subjects?.length > 0
                                 ? trainer.subjects.map((s) => s.code).join(', ')
                                 : '-'}

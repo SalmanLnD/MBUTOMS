@@ -1,7 +1,7 @@
 import { memo, useCallback, useEffect, useState } from 'react';
 import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 import Sidebar from '../components/Sidebar.jsx';
-import MobileBubbleNav from '../components/MobileBubbleNav.jsx';
+import MobileNavigation from '../components/MobileNavigation.jsx';
 import ResetPasswordModal from '../components/ResetPasswordModal.jsx';
 import Topbar from '../components/Topbar.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
@@ -22,7 +22,7 @@ const readCollapsedPreference = () => {
 
 const MainContent = memo(function MainContent({ children }) {
   return (
-    <main className="main-content">
+    <main className="main-content" id="main-content" tabIndex={-1}>
       <div className="spatial-page spatial-layer">{children}</div>
     </main>
   );
@@ -49,13 +49,14 @@ const AppShell = ({ children }) => {
 
   return (
     <div className={`app-layout ${effectiveCollapsed ? 'sidebar-collapsed' : ''}`}>
+      <a className="skip-link" href="#main-content">Skip to content</a>
       <Sidebar
         collapsed={effectiveCollapsed}
         labelsVisible={!effectiveCollapsed}
         onToggle={isTablet ? undefined : toggleSidebar}
       />
       <MainContent>{children}</MainContent>
-      <MobileBubbleNav />
+      <MobileNavigation />
     </div>
   );
 };

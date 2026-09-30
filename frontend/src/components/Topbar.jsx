@@ -115,10 +115,18 @@ const Topbar = ({ title }) => {
         </div>
       )}
 
-      <header className="topbar d-flex justify-content-between align-items-center mb-4 gap-3">
-        <h1 className="h4 mb-0 fw-semibold">{title}</h1>
-        {showAcademicCalendars && (
-          <div className="topbar-spacer d-flex justify-content-center">
+      <header className="topbar">
+        <h1>{title}</h1>
+        {(showAcademicCalendars || (user && canImpersonateUsers())) && (
+          <div className="topbar-tools">
+            {user && canImpersonateUsers() && (
+              <div className="topbar-view-as">
+                <StyledSelect value="" onChange={(event) => handleViewAsTrainer(event.target.value)}
+                  options={impersonationOptions} placeholder="View as trainer..." aria-label="View as trainer"
+                  disabled={switchingView || loadingTargets} />
+              </div>
+            )}
+            {showAcademicCalendars && (
             <a
               href={ACADEMIC_CALENDARS_URL}
               target="_blank"
@@ -129,24 +137,12 @@ const Topbar = ({ title }) => {
               <span className="d-none d-sm-inline">Academic Calendars</span>
               <span className="d-inline d-sm-none">Calendars</span>
             </a>
+            )}
           </div>
         )}
-        <div className="topbar-actions d-flex align-items-center gap-2 gap-md-3 flex-wrap justify-content-end">
+        <div className="topbar-actions">
           {user ? (
             <>
-              {canImpersonateUsers() && (
-                <div className="topbar-view-as">
-                  <StyledSelect
-                    value=""
-                    onChange={(event) => handleViewAsTrainer(event.target.value)}
-                    options={impersonationOptions}
-                    placeholder="View as trainer..."
-                    aria-label="View as trainer"
-                    disabled={switchingView || loadingTargets}
-                  />
-                </div>
-              )}
-
               <NotificationBell />
 
               <button
@@ -159,7 +155,7 @@ const Topbar = ({ title }) => {
                 {isDark ? <SunIcon size={16} /> : <MoonIcon size={16} />}
               </button>
 
-              <span className="topbar-user small">
+              <span className="topbar-user small" title={`${user.name} · ${formatRole(user.role)}`}>
                 {user.name} · {formatRole(user.role)}
               </span>
 

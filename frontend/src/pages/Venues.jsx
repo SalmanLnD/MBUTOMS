@@ -199,15 +199,16 @@ const Venues = () => {
                   ]}
                 />
               </div>
-              {canManage && (
-                <div className="col-md-5 text-md-end">
+
+            </div>
+            </CollapsibleFilters>
+            {canManage && (
+                <div className="page-create-action">
                   <button className="btn btn-primary" onClick={() => { setEditingVenue(null); setShowModal(true); }}>
                     + Add Venue
                   </button>
                 </div>
               )}
-            </div>
-            </CollapsibleFilters>
 
             {loading ? (
               <LoadingSpinner />

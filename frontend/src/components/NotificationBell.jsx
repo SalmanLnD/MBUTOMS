@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
+import { getPopoverPosition, visibleViewport } from '../utils/popoverPosition.js';
 import { useNavigate } from 'react-router-dom';
 import { BellIcon, CheckReadIcon } from './icons.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
@@ -54,22 +55,9 @@ const NotificationBell = () => {
 
   const updatePanelPosition = useCallback(() => {
     if (!open || !rootRef.current) return;
-    const rect = rootRef.current.getBoundingClientRect();
-    const width = Math.min(22 * 16, window.innerWidth - 24);
-    // Anchor to the bell, but clamp so the panel never overflows the left edge.
-    const right = Math.min(
-      Math.max(12, window.innerWidth - rect.right),
-      Math.max(12, window.innerWidth - width - 12)
-    );
-    const top = rect.bottom + 8;
-    const maxHeight = Math.max(12 * 16, Math.min(24 * 16, window.innerHeight - top - 16));
-
     setPanelStyle({
+      ...getPopoverPosition(rootRef.current.getBoundingClientRect(), visibleViewport(), { minWidth: 352, preferredHeight: 384, alignRight: true }),
       position: 'fixed',
-      top: `${top}px`,
-      right: `${right}px`,
-      width: `${width}px`,
-      maxHeight: `${maxHeight}px`,
       zIndex: 1400,
     });
   }, [open]);
@@ -80,9 +68,13 @@ const NotificationBell = () => {
       return undefined;
     }
     updatePanelPosition();
+    window.visualViewport?.addEventListener('resize', updatePanelPosition);
+    window.visualViewport?.addEventListener('scroll', updatePanelPosition);
     window.addEventListener('resize', updatePanelPosition);
     window.addEventListener('scroll', updatePanelPosition, true);
     return () => {
+      window.visualViewport?.removeEventListener('resize', updatePanelPosition);
+      window.visualViewport?.removeEventListener('scroll', updatePanelPosition);
       window.removeEventListener('resize', updatePanelPosition);
       window.removeEventListener('scroll', updatePanelPosition, true);
     };

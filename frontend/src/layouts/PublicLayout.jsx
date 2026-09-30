@@ -11,7 +11,8 @@ const LayoutTopbar = () => {
 const PublicLayout = () => (
   <PageTitleProvider>
     <div className="app-layout app-layout--public">
-      <main className="main-content main-content--public">
+      <a className="skip-link" href="#main-content">Skip to content</a>
+      <main className="main-content main-content--public" id="main-content" tabIndex={-1}>
         <div className="spatial-page spatial-layer">
           <LayoutTopbar />
           <Outlet />
