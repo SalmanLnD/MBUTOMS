@@ -13,6 +13,7 @@ import {
   getBatches,
   createSpecialClass,
   getSpecialClasses,
+  updateSpecialClass,
   deleteSpecialClass,
 } from '../controllers/scheduleController.js';
 import { protect, authorize } from '../middleware/auth.js';
@@ -53,11 +54,10 @@ router
   .route('/special-classes')
   .get(authorize('admin', 'campus_manager'), asyncHandler(getSpecialClasses))
   .post(authorize('admin', 'campus_manager'), asyncHandler(createSpecialClass));
-router.delete(
-  '/special-classes/:groupId',
-  authorize('admin', 'campus_manager'),
-  asyncHandler(deleteSpecialClass)
-);
+router
+  .route('/special-classes/:groupId')
+  .put(authorize('admin', 'campus_manager'), asyncHandler(updateSpecialClass))
+  .delete(authorize('admin', 'campus_manager'), asyncHandler(deleteSpecialClass));
 router.get('/trainer/:id', asyncHandler(getTrainerSchedule));
 router.get('/trainer-code/:code', asyncHandler(getTrainerScheduleByCode));
 

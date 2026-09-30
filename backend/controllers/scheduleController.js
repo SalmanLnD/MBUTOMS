@@ -79,10 +79,17 @@ const findTrainerTimeConflict = async ({
   startTime,
   endTime,
   excludeId,
+  excludeIds,
   specialRange = null,
 }) => {
   const query = { trainerCode, day };
-  if (excludeId) query._id = { $ne: excludeId };
+  const excluded = [...new Set(
+    [excludeId, ...(excludeIds || [])]
+      .filter(Boolean)
+      .map((id) => id.toString())
+  )];
+  if (excluded.length === 1) query._id = { $ne: excluded[0] };
+  else if (excluded.length > 1) query._id = { $nin: excluded };
 
   const sameDay = await Schedule.find(query);
   return sameDay.find((entry) => {
@@ -389,48 +396,42 @@ const resolveSpecialDates = (body) => {
   return { type, startKey, endKey, days: requested };
 };
 
-export const createSpecialClass = async (req, res) => {
-  let dates;
-  try {
-    dates = resolveSpecialDates(req.body);
-  } catch (err) {
-    return res.status(err.statusCode || 400).json({ message: err.message });
-  }
+const specialGroupFilter = (groupId) => (
+  /^[a-f\d]{24}$/i.test(groupId)
+    ? { isSpecial: true, $or: [{ specialGroupId: groupId }, { _id: groupId }] }
+    : { isSpecial: true, specialGroupId: groupId }
+);
 
-  const trainerCode = String(req.body.trainerCode || '').trim();
-  if (!trainerCode) return res.status(400).json({ message: 'Select a trainer.' });
+const prepareSpecialClass = async (body, { excludeIds = [] } = {}) => {
+  const dates = resolveSpecialDates(body);
+
+  const trainerCode = String(body.trainerCode || '').trim();
+  if (!trainerCode) throw badRequest('Select a trainer.');
   const trainer = await Trainer.findOne({
     $or: [{ employeeId: trainerCode }, { scheduleTrainerCodes: trainerCode }],
   }).select('_id');
-  if (!trainer) return res.status(400).json({ message: 'Selected trainer was not found.' });
+  if (!trainer) throw badRequest('Selected trainer was not found.');
 
-  const startTime = String(req.body.startTime || '').trim();
-  const endTime = String(req.body.endTime || '').trim();
+  const startTime = String(body.startTime || '').trim();
+  const endTime = String(body.endTime || '').trim();
   if (!TIME_PATTERN.test(startTime) || !TIME_PATTERN.test(endTime)) {
-    return res.status(400).json({ message: 'Enter valid start and end times.' });
+    throw badRequest('Enter valid start and end times.');
   }
-  if (!req.body.classId) return res.status(400).json({ message: 'Select a class.' });
-  if (!req.body.subject) return res.status(400).json({ message: 'Select a subject.' });
+  if (!body.classId) throw badRequest('Select a class.');
+  if (!body.subject) throw badRequest('Select a subject.');
 
-  let base;
-  try {
-    base = await enrichSchedulePayload({
-      trainerCode,
-      startTime,
-      endTime,
-      classId: req.body.classId,
-      subject: req.body.subject,
-      slot: ['S1', 'S2', 'S3', 'S4'].includes(req.body.slot) ? req.body.slot : '',
-      venue: req.body.venue || null,
-      isLab: req.body.isLab,
-      isProject: req.body.isProject,
-    }, { allowAnySubjectClass: true });
-  } catch (err) {
-    return res.status(err.statusCode || 400).json({ message: err.message });
-  }
-  if (!base.subjectCode) {
-    return res.status(400).json({ message: 'Selected subject was not found.' });
-  }
+  const base = await enrichSchedulePayload({
+    trainerCode,
+    startTime,
+    endTime,
+    classId: body.classId,
+    subject: body.subject,
+    slot: ['S1', 'S2', 'S3', 'S4'].includes(body.slot) ? body.slot : '',
+    venue: body.venue || null,
+    isLab: body.isLab,
+    isProject: body.isProject,
+  }, { allowAnySubjectClass: true });
+  if (!base.subjectCode) throw badRequest('Selected subject was not found.');
 
   const specialStartDate = normalizeAttendanceDate(dates.startKey);
   const specialEndDate = normalizeAttendanceDate(dates.endKey);
@@ -442,27 +443,46 @@ export const createSpecialClass = async (req, res) => {
       day,
       startTime,
       endTime,
+      excludeIds,
       specialRange,
     });
     if (conflict) {
-      return res.status(409).json({ message: formatConflictMessage(conflict) });
+      const error = new Error(formatConflictMessage(conflict));
+      error.statusCode = 409;
+      throw error;
     }
   }
 
+  return {
+    dates,
+    base,
+    specialStartDate,
+    specialEndDate,
+    specialReason: String(body.reason || '').trim().slice(0, 200),
+    includeInRtet: body.includeInRtet !== false && body.includeInRtet !== 'false',
+  };
+};
+
+export const createSpecialClass = async (req, res) => {
+  let prepared;
+  try {
+    prepared = await prepareSpecialClass(req.body);
+  } catch (err) {
+    return res.status(err.statusCode || 400).json({ message: err.message });
+  }
+
   const specialGroupId = crypto.randomUUID();
-  const specialReason = String(req.body.reason || '').trim().slice(0, 200);
-  const includeInRtet = req.body.includeInRtet !== false && req.body.includeInRtet !== 'false';
   const created = await Schedule.insertMany(
-    dates.days.map((day) => ({
-      ...base,
+    prepared.dates.days.map((day) => ({
+      ...prepared.base,
       day,
       isSpecial: true,
-      specialType: dates.type,
-      specialStartDate,
-      specialEndDate,
+      specialType: prepared.dates.type,
+      specialStartDate: prepared.specialStartDate,
+      specialEndDate: prepared.specialEndDate,
       specialGroupId,
-      specialReason,
-      includeInRtet,
+      specialReason: prepared.specialReason,
+      includeInRtet: prepared.includeInRtet,
     }))
   );
 
@@ -474,13 +494,52 @@ export const createSpecialClass = async (req, res) => {
   });
 };
 
+export const updateSpecialClass = async (req, res) => {
+  const groupId = String(req.params.groupId || '').trim();
+  const existing = await Schedule.find(specialGroupFilter(groupId)).select('_id').lean();
+  if (!existing.length) {
+    return res.status(404).json({ message: 'Special class not found' });
+  }
+
+  let prepared;
+  try {
+    prepared = await prepareSpecialClass(req.body, {
+      excludeIds: existing.map((schedule) => schedule._id),
+    });
+  } catch (err) {
+    return res.status(err.statusCode || 400).json({ message: err.message });
+  }
+
+  await Schedule.deleteMany(specialGroupFilter(groupId));
+  const updated = await Schedule.insertMany(
+    prepared.dates.days.map((day) => ({
+      ...prepared.base,
+      day,
+      isSpecial: true,
+      specialType: prepared.dates.type,
+      specialStartDate: prepared.specialStartDate,
+      specialEndDate: prepared.specialEndDate,
+      specialGroupId: groupId,
+      specialReason: prepared.specialReason,
+      includeInRtet: prepared.includeInRtet,
+    }))
+  );
+
+  clearAttendanceGridCache();
+  res.json({
+    specialGroupId: groupId,
+    count: updated.length,
+    schedules: updated,
+  });
+};
+
 export const getSpecialClasses = async (req, res) => {
   const filter = { isSpecial: true };
   const fromKey = toAttendanceDateKey(req.query.from);
   if (fromKey) filter.specialEndDate = { $gte: normalizeAttendanceDate(fromKey) };
 
   const schedules = await Schedule.find(filter)
-    .select('trainerCode day startTime endTime department section semester subjectCode slot specialType specialStartDate specialEndDate specialGroupId specialReason includeInRtet')
+    .select('trainerCode day startTime endTime department section semester subject subjectCode slot venue specialType specialStartDate specialEndDate specialGroupId specialReason includeInRtet')
     .sort({ specialStartDate: 1, startTime: 1 })
     .limit(500)
     .lean();
@@ -498,6 +557,24 @@ export const getSpecialClasses = async (req, res) => {
     });
   });
 
+  const classKeys = [...new Set(schedules.map((schedule) => (
+    `${schedule.department}|${schedule.section}|${schedule.semester}`
+  )))];
+  const classDocs = classKeys.length
+    ? await ClassGroup.find({
+      $or: classKeys.map((key) => {
+        const [department, section, currentSemester] = key.split('|');
+        return { department, section, currentSemester };
+      }),
+    }).select('_id department section currentSemester').lean()
+    : [];
+  const classIdByKey = new Map(
+    classDocs.map((cls) => [
+      `${cls.department}|${cls.section}|${cls.currentSemester}`,
+      cls._id.toString(),
+    ])
+  );
+
   const groups = new Map();
   schedules.forEach((schedule) => {
     const key = schedule.specialGroupId || schedule._id.toString();
@@ -510,7 +587,11 @@ export const getSpecialClasses = async (req, res) => {
         department: schedule.department,
         section: schedule.section,
         semester: schedule.semester,
+        classId: classIdByKey.get(`${schedule.department}|${schedule.section}|${schedule.semester}`) || '',
+        subjectId: schedule.subject?.toString() || '',
         subjectCode: schedule.subjectCode,
+        venueId: schedule.venue?.toString() || '',
+        slot: schedule.slot || '',
         startTime: schedule.startTime,
         endTime: schedule.endTime,
         startDate: toAttendanceDateKey(schedule.specialStartDate),
@@ -531,11 +612,7 @@ export const getSpecialClasses = async (req, res) => {
 
 export const deleteSpecialClass = async (req, res) => {
   const groupId = String(req.params.groupId || '').trim();
-  const filter = /^[a-f\d]{24}$/i.test(groupId)
-    ? { isSpecial: true, $or: [{ specialGroupId: groupId }, { _id: groupId }] }
-    : { isSpecial: true, specialGroupId: groupId };
-
-  const result = await Schedule.deleteMany(filter);
+  const result = await Schedule.deleteMany(specialGroupFilter(groupId));
   if (!result.deletedCount) {
     return res.status(404).json({ message: 'Special class not found' });
   }

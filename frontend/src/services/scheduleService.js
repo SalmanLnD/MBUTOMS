@@ -79,6 +79,11 @@ export const createSpecialClass = async (payload) => {
   return data;
 };
 
+export const updateSpecialClass = async (groupId, payload) => {
+  const { data } = await api.put(`/schedules/special-classes/${groupId}`, payload);
+  return data;
+};
+
 export const deleteSpecialClass = async (groupId) => {
   const { data } = await api.delete(`/schedules/special-classes/${groupId}`);
   return data;

@@ -544,7 +544,7 @@ const Timetable = () => {
             } else {
               await loadData();
             }
-            if (changedDate) showSuccess('Special class added.');
+            if (changedDate) showSuccess('Special class saved.');
           }}
         />
       )}

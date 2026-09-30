@@ -1,11 +1,13 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import Modal from './Modal.jsx';
 import ConfirmModal from './ConfirmModal.jsx';
+import ActionIconButton from './ActionIconButton.jsx';
 import StyledSelect from './StyledSelect.jsx';
 import SearchableSelect from './SearchableSelect.jsx';
-import { TrashIcon } from './icons.jsx';
+import { EditIcon, TrashIcon } from './icons.jsx';
 import {
   createSpecialClass,
+  updateSpecialClass,
   deleteSpecialClass,
   getSpecialClasses,
 } from '../services/scheduleService.js';
@@ -94,6 +96,7 @@ const SpecialClassModal = ({ trainers = [], initialDate, initialTab = 'add', onC
   const [specialClasses, setSpecialClasses] = useState([]);
   const [listLoading, setListLoading] = useState(false);
   const [pendingDelete, setPendingDelete] = useState(null);
+  const [editingGroupId, setEditingGroupId] = useState('');
 
   const isRecurring = form.specialType === 'recurring';
   const selectedSubject = allSubjects.find((item) => item._id === form.subjectId) || null;
@@ -294,7 +297,11 @@ const SpecialClassModal = ({ trainers = [], initialDate, initialTab = 'add', onC
 
     setSaving(true);
     try {
-      await createSpecialClass(payload);
+      if (editingGroupId) {
+        await updateSpecialClass(editingGroupId, payload);
+      } else {
+        await createSpecialClass(payload);
+      }
       await onChanged?.(isRecurring ? form.startDate : form.date);
       onClose();
     } catch (err) {
@@ -324,13 +331,62 @@ const SpecialClassModal = ({ trainers = [], initialDate, initialTab = 'add', onC
       : `${formatDate(item.startDate)} – ${formatDate(item.endDate)}`
   );
 
+  const startEdit = (item) => {
+    const subject = allSubjects.find((entry) => (
+      entry._id === item.subjectId || entry.code === item.subjectCode
+    )) || null;
+    const classId = item.classId
+      || allClasses.find((cls) => (
+        cls.department === item.department
+        && cls.section === item.section
+        && cls.currentSemester === item.semester
+      ))?._id
+      || '';
+    let timing = CUSTOM_TIMING;
+    if (subject) {
+      const slotKeys = getActiveSlotKeys(subject);
+      const matchingSlot = (item.slot && slotKeys.includes(item.slot) ? item.slot : null)
+        || slotKeys.find((slotKey) => {
+          const times = getSlotTimesForSubject(subject, slotKey);
+          return times.startTime === item.startTime && times.endTime === item.endTime;
+        });
+      if (matchingSlot) timing = matchingSlot;
+    }
+    setForm({
+      specialType: item.specialType === 'recurring' ? 'recurring' : 'one_time',
+      trainerCode: item.trainerCode || '',
+      subjectId: subject?._id || item.subjectId || '',
+      classId,
+      timing,
+      startTime: item.startTime || '',
+      endTime: item.endTime || '',
+      date: item.startDate || today,
+      startDate: item.startDate || today,
+      endDate: item.endDate || item.startDate || today,
+      days: item.specialType === 'recurring'
+        ? [...(item.days || [])]
+        : [weekdayForInputDate(item.startDate)].filter(Boolean),
+      venueId: item.venueId || '',
+      reason: item.reason || '',
+      includeInRtet: item.includeInRtet !== false,
+    });
+    setEditingGroupId(item.specialGroupId);
+    setError('');
+    setActiveTab('add');
+  };
+
+  const cancelEdit = () => {
+    setEditingGroupId('');
+    setForm(buildInitialForm(initialDate || today));
+  };
+
   return (
     <>
-      <Modal show title="Special Classes" onClose={onClose} size="toms-modal-lg">
+      <Modal show title="Special Classes" onClose={onClose} size="toms-modal-lg" scrollable>
         <div className="toms-modal-body">
           <ul className="nav nav-tabs mb-3" role="tablist">
             {[
-              { id: 'add', label: 'Add special class' },
+              { id: 'add', label: editingGroupId ? 'Edit special class' : 'Add special class' },
               { id: 'list', label: 'Upcoming special classes' },
             ].map((tab) => (
               <li className="nav-item" key={tab.id} role="presentation">
@@ -613,15 +669,23 @@ const SpecialClassModal = ({ trainers = [], initialDate, initialTab = 'add', onC
                         <td>{item.department} {item.section}</td>
                         <td>{item.subjectCode}</td>
                         <td>{item.includeInRtet === false ? 'Excluded' : 'Included'}</td>
-                        <td className="text-end">
-                          <button
-                            type="button"
-                            className="btn btn-sm btn-outline-danger"
-                            onClick={() => setPendingDelete(item)}
-                            aria-label={`Delete special class for ${item.trainerName}`}
-                          >
-                            <TrashIcon size={14} aria-hidden="true" />
-                          </button>
+                        <td className="text-end text-nowrap">
+                          <div className="btn-group btn-group-sm action-btn-group d-inline-flex">
+                            <ActionIconButton
+                              variant="edit"
+                              icon={EditIcon}
+                              title="Edit special class"
+                              aria-label={`Edit special class for ${item.trainerName}`}
+                              onClick={() => startEdit(item)}
+                            />
+                            <ActionIconButton
+                              variant="delete"
+                              icon={TrashIcon}
+                              title="Delete special class"
+                              aria-label={`Delete special class for ${item.trainerName}`}
+                              onClick={() => setPendingDelete(item)}
+                            />
+                          </div>
                         </td>
                       </tr>
                     ))}
@@ -637,9 +701,16 @@ const SpecialClassModal = ({ trainers = [], initialDate, initialTab = 'add', onC
             Close
           </button>
           {activeTab === 'add' && (
-            <button type="submit" form="special-class-form" className="btn btn-primary" disabled={saving}>
-              {saving ? 'Saving...' : 'Add special class'}
-            </button>
+            <>
+              {editingGroupId && (
+                <button type="button" className="btn btn-outline-secondary" onClick={cancelEdit}>
+                  Cancel edit
+                </button>
+              )}
+              <button type="submit" form="special-class-form" className="btn btn-primary" disabled={saving}>
+                {saving ? 'Saving...' : editingGroupId ? 'Save changes' : 'Add special class'}
+              </button>
+            </>
           )}
         </div>
       </Modal>
