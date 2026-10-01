@@ -3,6 +3,7 @@ import { sendAiMessage } from '../services/aiService.js';
 import { isAbortError } from '../services/api.js';
 import { AI_SUGGESTED_QUESTIONS } from '../utils/aiAssistantAccess.js';
 import SalluAvatar from './SalluAvatar.jsx';
+import { SALLU_LOADING_MESSAGES } from '../utils/salluLoadingMessages.js';
 import '../styles/ai-assistant.css';
 
 const AiAssistant = ({ open, onClose }) => {
@@ -10,6 +11,8 @@ const AiAssistant = ({ open, onClose }) => {
   const [draft, setDraft] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+  const [loadingIndex, setLoadingIndex] = useState(0);
+  const [speaking, setSpeaking] = useState(false);
   const input = useRef(null);
   const end = useRef(null);
   const panel = useRef(null);
@@ -17,6 +20,16 @@ const AiAssistant = ({ open, onClose }) => {
   const lastQuestion = useRef('');
 
   useEffect(() => () => request.current?.abort(), []);
+  useEffect(() => {
+    if (!busy || !open) return undefined;
+    const timer = setInterval(() => setLoadingIndex((index) => (index + 1) % SALLU_LOADING_MESSAGES.length), 3000);
+    return () => clearInterval(timer);
+  }, [busy, open]);
+  useEffect(() => {
+    if (!speaking) return undefined;
+    const timer = setTimeout(() => setSpeaking(false), 1000);
+    return () => clearTimeout(timer);
+  }, [speaking]);
   useEffect(() => {
     if (open) requestAnimationFrame(() => input.current?.focus({ preventScroll: true }));
   }, [open]);
@@ -36,12 +49,16 @@ const AiAssistant = ({ open, onClose }) => {
     const text = question.trim();
     if (!text || busy || text.length > 2000) return;
     lastQuestion.current = text;
-    setError(''); setBusy(true); setDraft('');
+    setError(''); setBusy(true); setDraft(''); setSpeaking(false);
+    setLoadingIndex(Math.floor(Math.random() * SALLU_LOADING_MESSAGES.length));
     if (!retry) setMessages((current) => [...current.slice(-39), { role: 'user', text }]);
     const controller = new AbortController(); request.current = controller;
     try {
       const data = await sendAiMessage(text, controller.signal);
-      if (!controller.signal.aborted) setMessages((current) => [...current.slice(-39), { role: 'assistant', text: data.message || 'No answer was returned. Please try again.' }]);
+      if (!controller.signal.aborted) {
+        setMessages((current) => [...current.slice(-39), { role: 'assistant', text: data.message || 'No answer was returned. Please try again.' }]);
+        setSpeaking(true);
+      }
     } catch (failure) {
       if (!isAbortError(failure)) setError(failure.response?.status === 429
         ? 'The assistant is busy. Wait a moment, then retry.'
@@ -58,7 +75,7 @@ const AiAssistant = ({ open, onClose }) => {
         if (event.key === 'Escape') { event.stopPropagation(); onClose(); }
       }}>
       <header className="ai-assistant__header">
-        <div className="ai-assistant__identity"><SalluAvatar size={40} /><div><h2 id="ai-assistant-title">Sallu</h2><p>Your TOMS assistant · Read-only</p></div></div>
+        <div className="ai-assistant__identity"><SalluAvatar size={40} state={open && busy ? 'thinking' : open && speaking ? 'speaking' : 'idle'} /><div><h2 id="ai-assistant-title">Sallu</h2><p>Your TOMS assistant · Read-only</p></div></div>
         <button type="button" className="ai-assistant__close" onClick={onClose} aria-label="Close Sallu">×</button>
       </header>
       <div className="ai-assistant__messages" role="log" aria-label="Assistant conversation" aria-live="polite" aria-relevant="additions text">
@@ -69,9 +86,9 @@ const AiAssistant = ({ open, onClose }) => {
           </div>
         </div>}
         {messages.map((message, index) => <article key={index} className={`ai-assistant__message ai-assistant__message--${message.role}`}>
-          <span>{message.role === 'user' ? 'You' : <><SalluAvatar size={22} />Sallu</>}</span><p>{message.text}</p>
+          <span>{message.role === 'user' ? 'You' : <><SalluAvatar size={22} state={open && speaking && index === messages.length - 1 ? 'speaking' : 'idle'} />Sallu</>}</span><p>{message.text}</p>
         </article>)}
-        {busy && <p className="ai-assistant__status" role="status">Checking TOMS data…</p>}
+        {busy && <p className="ai-assistant__status" role="status"><SalluAvatar size={32} state={open ? 'thinking' : 'idle'} /><span>{SALLU_LOADING_MESSAGES[loadingIndex]}</span></p>}
         {error && <div className="ai-assistant__error" role="alert"><p>{error}</p><button type="button" onClick={() => send(lastQuestion.current, true)}>Retry</button></div>}
         <div ref={end} />
       </div>

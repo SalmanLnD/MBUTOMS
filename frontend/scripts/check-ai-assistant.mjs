@@ -15,7 +15,8 @@ try {
   for (const role of ['admin', 'subject_coordinator']) {
     for (const [width, height] of sizes) {
       const account = { ...user, role, trainer: 'trainer-0' };
-      const context = await browser.newContext({ viewport: { width, height }, reducedMotion: 'reduce' });
+      const checkAnimation = role === 'admin' && width === 390;
+      const context = await browser.newContext({ viewport: { width, height }, reducedMotion: checkAnimation ? 'no-preference' : 'reduce' });
       await context.addInitScript((u) => { localStorage.setItem('toms_token', 'synthetic-ai-test'); localStorage.setItem('toms_user', JSON.stringify(u)); }, account);
       let calls = 0;
       await context.route('**/api/**', async (route) => {
@@ -25,6 +26,7 @@ try {
           assert.deepEqual(Object.keys(route.request().postDataJSON()), ['message']);
           assert.equal(route.request().headers().authorization, 'Bearer synthetic-ai-test');
           calls++;
+          if (checkAnimation && calls === 1) await new Promise((resolve) => setTimeout(resolve, 4500));
           if (calls === 2) return route.fulfill({ status: 503, json: { message: 'Temporary failure' } });
           return route.fulfill({ json: { message: calls === 1 ? 'Live data answer.\n' + 'A long operational answer to test scrolling and wrapping. '.repeat(55) : 'Retry succeeded.', toolCalls: [] } });
         }
@@ -58,7 +60,21 @@ try {
         await page.setViewportSize({ width, height });
       }
       await page.locator('.ai-assistant__suggestions button').first().click();
+      if (checkAnimation) {
+        await page.locator('.ai-assistant__status').waitFor();
+        const firstLine = await page.locator('.ai-assistant__status').textContent();
+        assert.equal(await page.locator('.ai-assistant__header .sallu-avatar--thinking').count(), 1);
+        await page.waitForFunction((first) => document.querySelector('.ai-assistant__status')?.textContent !== first, firstLine);
+        await page.screenshot({ path: `${output}/sallu-thinking-mobile.png` });
+      }
       await page.getByText('Live data answer.', { exact: false }).waitFor();
+      if (checkAnimation) {
+        assert.equal(await page.locator('.ai-assistant__header .sallu-avatar--speaking').count(), 1);
+        await page.screenshot({ path: `${output}/sallu-speaking-mobile.png` });
+        await page.waitForFunction(() => !document.querySelector('.sallu-avatar--speaking'));
+        assert.equal(await page.locator('.ai-assistant__status').count(), 0);
+        assert.equal(await page.locator('.ai-assistant__header .sallu-avatar--idle').count(), 1);
+      }
       const bounds = await page.evaluate(() => {
         const p = document.querySelector('.ai-assistant').getBoundingClientRect();
         const composer = document.querySelector('.ai-assistant__composer').getBoundingClientRect();

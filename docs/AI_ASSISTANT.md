@@ -3,6 +3,9 @@
 This implementation adds `POST /api/ai/chat`
 using the official `@google/genai` SDK and defaults to `gemini-3.1-flash-lite`.
 Sallu has a shared vector avatar in the chat header, replies, and navigation.
+While a request runs, user-supplied humorous status lines rotate every three seconds
+and the chat avatar holds a finger to its lips. Replies trigger a one-second mouth
+animation. Avatar motion respects the device's reduced-motion setting.
 The frontend has a compact, modeless chat panel, closed initially and opened from
 the desktop sidebar or mobile **All pages** menu. It has a close button and three
 suggested questions. Closing preserves the current session's messages; signing out,

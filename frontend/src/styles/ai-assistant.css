@@ -23,7 +23,7 @@
 .ai-assistant__message > span { display: flex; align-items: center; gap: 6px; font-size: .68rem; font-weight: 650; color: var(--text-secondary, #59697d); margin-bottom: 5px; }
 .ai-assistant__message p { margin: 0; white-space: pre-wrap; font-size: .85rem; line-height: 1.6; }
 .ai-assistant__message--user { margin-left: 20px; padding: 10px 12px; background: var(--surface-soft, #f1f4f8); border-radius: 6px; }
-.ai-assistant__status { font-size: .8rem; color: var(--text-secondary, #59697d); }
+.ai-assistant__status { display: flex; align-items: center; gap: 8px; font-size: .8rem; color: var(--text-secondary, #59697d); }
 .ai-assistant__error { padding: 12px; border: 1px solid #cf8b8b; border-radius: 5px; font-size: .82rem; }
 .ai-assistant__error p { margin-bottom: 8px; }
 .ai-assistant__error button { border: 0; background: transparent; color: inherit; text-decoration: underline; }
