@@ -1,10 +1,10 @@
 export const canUseAiAssistant = (user) => Boolean(user
-  && ['admin', 'subject_coordinator'].includes(user.role)
+  && ['admin', 'subject_coordinator', 'trainer', 'evaluator', 'manager', 'campus_manager'].includes(user.role)
   && !user.impersonating && !user.impersonator
   && !user.mustResetPassword && !user.requiresPasswordReset);
 
 export const AI_SUGGESTED_QUESTIONS = [
-  'Which trainers are in class right now?',
-  'What replacements are assigned today?',
-  'What special classes are scheduled today?',
+  'What is my timetable today?',
+  'How many class-handling hours do I have this week?',
+  'Show my attendance for today.',
 ];

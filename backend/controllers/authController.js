@@ -17,6 +17,7 @@ const generateToken = (user, impersonatedBy = null) => {
 };
 
 const userResponse = (user, { impersonator = null } = {}) => ({
+  appVersion: APP_VERSION,
   _id: user._id,
   name: user.name,
   email: user.email,
@@ -79,6 +80,7 @@ export const getMe = async (req, res) => {
     .populate('evaluatorSubjects', 'name code');
   res.json({
     ...user.toObject(),
+    appVersion: APP_VERSION,
     requiresPasswordReset: Boolean(user.mustResetPassword),
     impersonating: Boolean(req.impersonator),
     impersonator: req.impersonator

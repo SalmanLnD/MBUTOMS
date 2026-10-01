@@ -12,20 +12,24 @@ const browser = await chromium.launch({ headless: true, ...(process.env.CHROME_P
 const sizes = [[320,568], [390,844], [768,1024], [1366,768], [1920,1080], [3840,2160], [844,390]];
 let checks = 0;
 try {
-  for (const role of ['admin', 'subject_coordinator']) {
-    for (const [width, height] of sizes) {
-      const account = { ...user, role, trainer: 'trainer-0' };
+  for (const role of ['admin', 'subject_coordinator', 'trainer', 'manager', 'campus_manager', 'evaluator']) {
+    for (const [width, height] of (['admin', 'subject_coordinator'].includes(role) ? sizes : [[390,844], [1366,768]])) {
+      const account = { ...user, role, trainer: 'trainer-0', appVersion: '2.2.1' };
       const checkAnimation = role === 'admin' && width === 390;
       const context = await browser.newContext({ viewport: { width, height }, reducedMotion: checkAnimation ? 'no-preference' : 'reduce' });
       await context.addInitScript((u) => { localStorage.setItem('toms_token', 'synthetic-ai-test'); localStorage.setItem('toms_user', JSON.stringify(u)); }, account);
-      let calls = 0;
+      let calls = 0; let quotaMode = 'ready';
       await context.route('**/api/**', async (route) => {
         const path = new URL(route.request().url()).pathname.replace(/^\/api/, '');
+        if (path === '/ai/usage') return quotaMode === 'unavailable' ? route.fulfill({ status: 503, json: { message: 'Usage unavailable' } })
+          : route.fulfill({ json: { configured: quotaMode !== 'setup', sharedExhausted: quotaMode === 'shared', questionsPerDay: 5, questionsPerMinute: 2,
+            remaining: quotaMode === 'personal' ? 0 : Math.max(0, 5 - calls), used: quotaMode === 'personal' ? 5 : calls, resetAt: '2026-10-02T07:00:00Z' } });
         if (path === '/ai/chat') {
           assert.equal(route.request().method(), 'POST');
           assert.deepEqual(Object.keys(route.request().postDataJSON()), ['message']);
           assert.equal(route.request().headers().authorization, 'Bearer synthetic-ai-test');
           calls++;
+          if (checkAnimation && calls === 4) { quotaMode = 'personal'; return route.fulfill({ status: 429, json: { code: 'AI_DAILY_LIMIT', message: 'You have used your 5 Sallu questions for today. Please try again after the daily reset.' } }); }
           if (checkAnimation && calls === 1) await new Promise((resolve) => setTimeout(resolve, 4500));
           if (calls === 2) return route.fulfill({ status: 503, json: { message: 'Temporary failure' } });
           return route.fulfill({ json: { message: calls === 1 ? 'Live data answer.\n' + 'A long operational answer to test scrolling and wrapping. '.repeat(55) : 'Retry succeeded.', toolCalls: [] } });
@@ -37,9 +41,14 @@ try {
       const errors = []; page.on('pageerror', (e) => errors.push(e.message));
       await page.goto(`${baseURL}/dashboard`);
       await page.locator('main').waitFor();
+      await page.getByRole('dialog', { name: 'Welcome to TOMS v2.2.1' }).waitFor();
+      assert.ok(await page.getByText('5 questions per day', { exact: true }).isVisible());
+      if (role === 'admin' && [390,1366].includes(width)) await page.screenshot({ path: `${output}/release-notice-${width}.png` });
+      await page.getByRole('button', { name: 'Got it', exact: true }).click();
       const open = async () => {
         if (width < 768) await page.getByRole('button', { name: 'Open all pages' }).click();
-        await page.getByRole('button', { name: 'Open Sallu' }).click();
+        try { await page.getByRole('button', { name: 'Open Sallu' }).click(); }
+        catch (error) { await page.screenshot({ path: `${output}/failure-${role}-${width}.png` }); console.error(`Assistant launcher failed: ${role}, ${width}x${height}`); throw error; }
         await page.getByRole('dialog', { name: 'Sallu' }).waitFor();
       };
       assert.equal(await page.getByRole('dialog', { name: 'Sallu' }).count(), 0);
@@ -94,14 +103,38 @@ try {
       assert.equal(calls, 2, 'AI POST must not retry automatically');
       await page.getByRole('button', { name: 'Retry', exact: true }).click();
       await page.getByText('Retry succeeded.', { exact: true }).waitFor();
+      if (checkAnimation) {
+        await input.fill('One more question'); await input.press('Enter');
+        await page.getByText('You have used your 5 Sallu questions for today. Please try again after the daily reset.', { exact: true }).waitFor();
+        await page.waitForFunction(() => document.querySelector('.ai-assistant__quota')?.textContent.includes('0 of 5'));
+        assert.ok(await input.isDisabled());
+        assert.equal(calls, 4);
+        checks++;
+        quotaMode = 'shared'; await page.evaluate(() => window.dispatchEvent(new Event('focus')));
+        await page.getByText('The shared free API budget is exhausted.', { exact: false }).waitFor();
+        assert.ok(await input.isDisabled()); checks++;
+        quotaMode = 'setup'; await page.evaluate(() => window.dispatchEvent(new Event('focus')));
+        await page.getByText('Sallu is paused until the free API quotas are configured.', { exact: true }).waitFor();
+        assert.ok(await input.isDisabled()); checks++;
+        quotaMode = 'unavailable'; await page.evaluate(() => window.dispatchEvent(new Event('focus')));
+        await page.getByText('Usage unavailable.', { exact: false }).waitFor();
+        assert.ok(await input.isDisabled());
+        quotaMode = 'ready'; await page.getByRole('button', { name: 'Refresh', exact: true }).click();
+        await page.waitForFunction(() => !document.querySelector('#ai-assistant-question').disabled);
+        checks++;
+      }
       if (width === 390 || width === 1366) await page.screenshot({ path: `${output}/${role}-${width}.png` });
       await input.focus(); await input.press('Escape');
       assert.equal(await page.getByRole('dialog', { name: 'Sallu' }).count(), 0);
+      if (checkAnimation) {
+        await page.reload(); await page.locator('main').waitFor();
+        assert.equal(await page.getByRole('dialog', { name: 'Welcome to TOMS v2.2.1' }).count(), 0);
+      }
       assert.deepEqual(errors, []);
       checks++; await context.close();
     }
   }
-  for (const account of [ ...['trainer','manager','campus_manager','evaluator'].map((role) => ({ ...user, role })), { ...user, impersonating: true } ]) {
+  for (const account of [{ ...user, impersonating: true }, { ...user, mustResetPassword: true }]) {
     const context = await browser.newContext({ viewport: { width: 1366, height: 768 } });
     await context.addInitScript((u) => { localStorage.setItem('toms_token', 'synthetic-ai-test'); localStorage.setItem('toms_user', JSON.stringify(u)); }, account);
     await context.route('**/api/**', (route) => route.fulfill({ json: new URL(route.request().url()).pathname === '/api/auth/me' ? account : fixture(new URL(route.request().url()).pathname.replace(/^\/api/, '')) }));

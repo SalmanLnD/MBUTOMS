@@ -1,6 +1,7 @@
 import { GoogleGenAI } from '@google/genai';
 import { buildAiPrompt } from './aiPrompt.js';
 import { executeAiTool, getAiToolDeclarations } from './aiTools.js';
+import { aiQuota, AiQuotaError } from './aiQuota.js';
 
 export const AI_UNAVAILABLE_MESSAGE = 'Sallu is temporarily unavailable. Please try again.';
 export const MAX_TOOL_ROUNDS = 3;
@@ -31,7 +32,9 @@ export const redactAiText = (text, env = process.env) => {
 export const chatWithAi = async ({ message, req }, deps = {}) => {
   const env = deps.env || process.env;
   if (!env.GEMINI_API_KEY?.trim() && !deps.client) throw new AiUnavailableError();
-  const client = deps.client || new GoogleGenAI({ apiKey: env.GEMINI_API_KEY, httpOptions: { timeout: 20_000 } });
+  if (env.GEMINI_MODEL?.trim() && env.GEMINI_MODEL.trim() !== 'gemini-3.1-flash-lite') throw new AiUnavailableError();
+  const client = deps.client || new GoogleGenAI({ apiKey: env.GEMINI_API_KEY, httpOptions: { timeout: 20_000, retryOptions: { attempts: 1 } } });
+  const reserve = deps.reserveProviderCall || aiQuota.reserveProviderCall;
   const execute = deps.executeTool || executeAiTool;
   const now = deps.now || new Date();
   const tools = getAiToolDeclarations(req);
@@ -40,6 +43,9 @@ export const chatWithAi = async ({ message, req }, deps = {}) => {
   let callCount = 0;
   try {
     for (let round = 0; round <= MAX_TOOL_ROUNDS; round += 1) {
+      // UTF-8 byte count conservatively bounds text tokens, including schemas/history.
+      const inputUpperBound = Buffer.byteLength(JSON.stringify({ contents, tools, system: buildAiPrompt(req.user, now) }), 'utf8') + 1024;
+      await withinDeadline(reserve(inputUpperBound), signal);
       const response = await withinDeadline(client.models.generateContent({
         model: env.GEMINI_MODEL?.trim() || 'gemini-3.1-flash-lite', contents,
         config: {
@@ -83,7 +89,9 @@ export const chatWithAi = async ({ message, req }, deps = {}) => {
       contents.push({ role: 'user', parts });
     }
     throw new AiUnavailableError();
-  } catch {
+  } catch (error) {
+    if (error instanceof AiQuotaError) throw error;
+    if (error?.status === 429 || error?.code === 429) throw new AiQuotaError('AI_PROVIDER_LIMIT', 'Gemini’s free quota is temporarily exhausted. Please wait before trying again.');
     throw new AiUnavailableError();
   }
 };

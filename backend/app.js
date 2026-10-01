@@ -26,6 +26,7 @@ import topicTrackerRoutes from './routes/topicTrackerRoutes.js';
 import studentTestReportRoutes from './routes/studentTestReportRoutes.js';
 import compOffRoutes from './routes/compOffRoutes.js';
 import aiRoutes from './routes/aiRoutes.js';
+import { APP_VERSION } from './utils/sessionVersion.js';
 
 dotenv.config();
 const app = express();
@@ -40,7 +41,7 @@ app.use(express.json({ limit: '2mb' }));
 app.use(express.urlencoded({ extended: true }));
 
 app.get('/api/health', (req, res) => {
-  res.json({ status: 'ok', message: 'TOMS API is running' });
+  res.json({ status: 'ok', message: 'TOMS API is running', version: APP_VERSION });
 });
 
 app.use(async (req, res, next) => {

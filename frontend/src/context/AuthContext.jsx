@@ -24,6 +24,7 @@ import { resetAllModalArtifacts } from '../utils/modalCleanup.js';
 const AuthContext = createContext(null);
 
 const buildUserData = (data) => ({
+  appVersion: data.appVersion,
   _id: data._id,
   name: data.name,
   email: data.email,

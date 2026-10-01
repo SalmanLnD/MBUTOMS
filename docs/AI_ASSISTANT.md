@@ -12,9 +12,10 @@ suggested questions. Closing preserves the current session's messages; signing o
 switching accounts, or entering trainer view removes them. There is no persistent
 conversation store. The UI keeps at most 40 messages in memory.
 
-Access is limited to exact `admin` and `subject_coordinator` roles in both the API
-and frontend. Managers, campus managers, trainers, evaluators, and impersonation
-sessions are denied. Existing role aliases do not widen this restriction.
+Since v2.2.1, every signed-in role can use Sallu: admin, manager, campus manager,
+subject coordinator, evaluator, and trainer. Impersonation and pending password-reset
+sessions are denied. Access to individual tools/data retains the existing role rules;
+opening the assistant does not grant management permissions.
 
 ## Manual setup
 
@@ -24,13 +25,18 @@ sessions are denied. Existing role aliases do not widen this restriction.
    ```dotenv
    GEMINI_API_KEY=your_key_here
    GEMINI_MODEL=gemini-3.1-flash-lite
+   AI_GEMINI_FREE_TIER_CONFIRMED=true
+   AI_GEMINI_FREE_RPM=15
+   AI_GEMINI_FREE_TPM=250000
+   AI_GEMINI_FREE_RPD=500
    ```
 
    Never paste the key into chat, a frontend file, or a `VITE_*` variable.
 3. Check that the local backend's existing `MONGODB_URI` points to the database
    you intend to use for local development. The normal server startup can run
    existing TOMS migrations; do not start it against production for this test.
-   This implementation does not copy production data or change any deployed service.
+   The quota integration audit uses a uniquely named temporary collection and does
+   not start the app, seed data, or run migrations.
 4. Start the existing backend with `npm run dev` in `backend`. Sign in to that
    local backend using a development account and its normal TOMS authentication.
 5. Call the endpoint with the resulting Bearer token. For example, in PowerShell:
@@ -48,8 +54,11 @@ sessions are denied. Existing role aliases do not widen this restriction.
 
 Without a configured key, authenticated requests return a clean 503 response.
 For deployment, set `GEMINI_API_KEY` in the backend hosting service's environment
-and set `GEMINI_MODEL=gemini-3.1-flash-lite`. The local `.env` is excluded from Git
-and pushing the code does not copy its key to the hosting service.
+and set `GEMINI_MODEL=gemini-3.1-flash-lite` plus the four quota settings above.
+The values shown were supplied by the project owner, who confirmed Free tier.
+Use the actual AI Studio quotas when deploying to another project. Keep this
+Gemini project on Free tier; application limits do not make paid-tier usage free.
+The local `.env` is excluded from Git; hosting credentials are configured separately.
 The configured key was verified against `gemini-3.1-flash-lite`, including real
 function-calling round trips. A read-only check using the stored timetable confirmed
 Salman's 28 September–4 October 2026 total of four hours, with 2 October excluded
@@ -97,8 +106,27 @@ and replacement/date/cancellation helpers, rather than invoking that mutating ha
   clarifications must include enough context because previous chat history is not stored.
 - Maximum three tool rounds, eight total tool calls, four calls per round, 1,200 output
   tokens, a 20-second provider timeout, and a 45-second overall response deadline.
-- Per process: ten requests per account per minute, one active request per account,
-  and four active requests overall. These are local in-memory limits, not distributed limits.
+- Each account gets five questions per Pacific calendar day and two per rolling
+  minute. One active request per account and four active requests overall use
+  MongoDB leases, expiring after 90 seconds if a process dies.
+- Gemini calls are reserved atomically before every provider round, including
+  failed requests. The shared budgets are 12 calls/minute, 200,000 input tokens/minute,
+  and 400 calls/day: 80% of the confirmed 15 RPM / 250,000 TPM / 500 RPD quotas.
+  Input text tokens use a conservative UTF-8 byte upper bound including history,
+  schemas and signatures. Provider retries are disabled; no model fallback is used.
+- Counters survive restarts and are shared by all backend instances using this
+  database. Quota records contain counts/timestamps/leases, never prompts or answers.
+  Atomic reservations may conservatively consume an allowance if a later step fails.
+  Questions admitted for processing count, including failed answers and manual retries.
+- Missing/invalid/unconfirmed free-tier settings or unavailable quota storage stop
+  outbound requests. Known shared daily exhaustion rejects questions before charging
+  the personal allowance. A dedicated Gemini project avoids untracked usage by other
+  applications sharing the same Google project.
+- Daily resets follow midnight America/Los_Angeles, including daylight saving.
+  The frontend displays the next reset in IST, personal remaining questions, and
+  an admin-only shared usage summary via authenticated `GET /api/ai/usage`.
+  A v2.2.1 welcome notice appears once per account/browser after signing in to the
+  new backend version. Versioned JWT validation expires v2.2.0 sessions.
 - Results are bounded and explicitly mark truncation. Leaves search the latest 50
   authorized records, special classes use the existing 500-schedule cap, and other
   lists/summaries have smaller limits. Incomplete results must not be presented as
@@ -115,6 +143,7 @@ cd backend
 node --test tests/unit/ai*.test.js
 npm test
 node --check app.js
+node scripts/check-ai-quota.mjs
 ```
 
 In `frontend`, use `npm test` and `npm run build`. With local Vite running and

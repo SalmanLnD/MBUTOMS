@@ -28,6 +28,9 @@
 .ai-assistant__error p { margin-bottom: 8px; }
 .ai-assistant__error button { border: 0; background: transparent; color: inherit; text-decoration: underline; }
 .ai-assistant__composer { flex-shrink: 0; padding: 12px 16px; border-top: 1px solid var(--line, #d7dee7); }
+.ai-assistant__quota { margin-bottom: 8px; font-size: .72rem; color: var(--text-secondary, #59697d); overflow-wrap: anywhere; }
+.ai-assistant__quota small { display: block; margin-top: 3px; font-size: inherit; }
+.ai-assistant__quota button { border: 0; background: transparent; color: inherit; text-decoration: underline; }
 .ai-assistant__input-row { display: flex; align-items: flex-end; gap: 8px; }
 .ai-assistant__input-row textarea { flex: 1; min-width: 0; max-height: 100px; resize: none; padding: 10px; font-size: .85rem; border: 1px solid var(--line, #d7dee7); border-radius: 6px; background: transparent; color: inherit; }
 .ai-assistant__input-row button { min-height: 44px; padding: 10px 12px; border: 0; border-radius: 5px; background: #193653; color: #fff; font-size: .8rem; }

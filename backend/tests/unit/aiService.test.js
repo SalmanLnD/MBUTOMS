@@ -1,12 +1,14 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { chatWithAi, AiUnavailableError, MAX_TOOL_ROUNDS, MAX_TOOL_CALLS } from '../../ai/aiService.js';
+import { chatWithAi as realChatWithAi, AiUnavailableError, MAX_TOOL_ROUNDS, MAX_TOOL_CALLS } from '../../ai/aiService.js';
+import { AiQuotaError } from '../../ai/aiQuota.js';
 import { getAiToolDeclarations, executeAiTool, resolveAiTrainer, validateToolArguments } from '../../ai/aiTools.js';
 import { buildAiPrompt } from '../../ai/aiPrompt.js';
 
 const req = { user: { _id: 'user', role: 'trainer', trainer: 'own', password: 'private-password', camuPassword: 'camu-secret' } };
 const response = (parts) => ({ candidates: [{ content: { role: 'model', parts } }] });
 const clientFor = (generateContent) => ({ models: { generateContent } });
+const chatWithAi = (args, deps = {}) => realChatWithAi(args, { reserveProviderCall: async () => {}, ...deps });
 const timetableDeps = {
   findTrainers: async () => [{ _id: 'own', name: 'Own Trainer', employeeId: '123456', password: 'private-password' }],
   subjectNames: new Map(), venueNames: new Map(), trainerNames: new Map(),
@@ -172,4 +174,23 @@ test('failed live tool sends sanitized error to model without internal exception
     }),
     executeTool: async () => { throw new Error('private-stack'); },
   });
+});
+
+test('every provider round reserves quota; exhaustion stops the next call without retries', async () => {
+  let reservations = 0; let calls = 0;
+  const deps = {
+    client: clientFor(async () => { calls++; return response([{ functionCall: { name: 'get_my_timetable', args: {} } }]); }),
+    executeTool: async () => ({ totalHours: 2 }),
+    reserveProviderCall: async (tokens) => {
+      assert.ok(tokens > 1000);
+      if (++reservations === 2) throw new AiQuotaError('AI_SHARED_DAILY_LIMIT', 'Daily limit reached.');
+    },
+  };
+  await assert.rejects(chatWithAi({ message: 'My timetable', req }, deps), (error) => error.code === 'AI_SHARED_DAILY_LIMIT');
+  assert.equal(reservations, 2); assert.equal(calls, 1);
+  calls = 0;
+  await assert.rejects(chatWithAi({ message: 'Hello', req }, { ...deps, reserveProviderCall: async () => { throw new Error('DB unavailable'); } }), AiUnavailableError);
+  assert.equal(calls, 0);
+  await assert.rejects(chatWithAi({ message: 'Hello', req }, { ...deps, env: { GEMINI_MODEL: 'other-paid-model' } }), AiUnavailableError);
+  assert.equal(calls, 0);
 });

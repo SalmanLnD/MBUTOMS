@@ -6,7 +6,7 @@ import SalluAvatar from './SalluAvatar.jsx';
 import { SALLU_LOADING_MESSAGES } from '../utils/salluLoadingMessages.js';
 import '../styles/ai-assistant.css';
 
-const AiAssistant = ({ open, onClose }) => {
+const AiAssistant = ({ open, onClose, usage, usageError, refreshUsage }) => {
   const [messages, setMessages] = useState([]);
   const [draft, setDraft] = useState('');
   const [busy, setBusy] = useState(false);
@@ -18,6 +18,7 @@ const AiAssistant = ({ open, onClose }) => {
   const panel = useRef(null);
   const request = useRef(null);
   const lastQuestion = useRef('');
+  const unavailable = !usage || usageError || !usage.configured || usage.sharedExhausted || usage.remaining <= 0;
 
   useEffect(() => () => request.current?.abort(), []);
   useEffect(() => {
@@ -32,6 +33,7 @@ const AiAssistant = ({ open, onClose }) => {
   }, [speaking]);
   useEffect(() => {
     if (open) requestAnimationFrame(() => input.current?.focus({ preventScroll: true }));
+    if (open) refreshUsage();
   }, [open]);
   useEffect(() => { if (open) end.current?.scrollIntoView({ block: 'nearest' }); }, [open, messages, busy, error]);
   useEffect(() => {
@@ -47,7 +49,7 @@ const AiAssistant = ({ open, onClose }) => {
 
   const send = async (question, retry = false) => {
     const text = question.trim();
-    if (!text || busy || text.length > 2000) return;
+    if (!text || busy || unavailable || text.length > 2000) return;
     lastQuestion.current = text;
     setError(''); setBusy(true); setDraft(''); setSpeaking(false);
     setLoadingIndex(Math.floor(Math.random() * SALLU_LOADING_MESSAGES.length));
@@ -60,12 +62,13 @@ const AiAssistant = ({ open, onClose }) => {
         setSpeaking(true);
       }
     } catch (failure) {
-      if (!isAbortError(failure)) setError(failure.response?.status === 429
+      if (!isAbortError(failure)) setError(failure.response?.data?.code?.startsWith('AI_') ? failure.response.data.message : failure.response?.status === 429
         ? 'The assistant is busy. Wait a moment, then retry.'
         : failure.response?.status === 403 ? 'Your account no longer has access to this assistant.'
           : 'Could not get an answer. Please try again.');
     } finally {
       if (!controller.signal.aborted) { setBusy(false); request.current = null; }
+      refreshUsage();
     }
   };
 
@@ -82,25 +85,33 @@ const AiAssistant = ({ open, onClose }) => {
         {!messages.length && <div className="ai-assistant__welcome">
           <h3>Hi, I’m Sallu.</h3><p>Ask about schedules, replacements, hours or topic tracking.</p>
           <div className="ai-assistant__suggestions">
-            {AI_SUGGESTED_QUESTIONS.map((question) => <button key={question} type="button" disabled={busy} onClick={() => send(question)}>{question}<span aria-hidden="true">↗</span></button>)}
+            {AI_SUGGESTED_QUESTIONS.map((question) => <button key={question} type="button" disabled={busy || unavailable} onClick={() => send(question)}>{question}<span aria-hidden="true">↗</span></button>)}
           </div>
         </div>}
         {messages.map((message, index) => <article key={index} className={`ai-assistant__message ai-assistant__message--${message.role}`}>
           <span>{message.role === 'user' ? 'You' : <><SalluAvatar size={22} state={open && speaking && index === messages.length - 1 ? 'speaking' : 'idle'} />Sallu</>}</span><p>{message.text}</p>
         </article>)}
         {busy && <p className="ai-assistant__status" role="status"><SalluAvatar size={32} state={open ? 'thinking' : 'idle'} /><span>{SALLU_LOADING_MESSAGES[loadingIndex]}</span></p>}
-        {error && <div className="ai-assistant__error" role="alert"><p>{error}</p><button type="button" onClick={() => send(lastQuestion.current, true)}>Retry</button></div>}
+        {error && <div className="ai-assistant__error" role="alert"><p>{error}</p><button type="button" disabled={busy || unavailable} onClick={() => send(lastQuestion.current, true)}>Retry</button></div>}
         <div ref={end} />
       </div>
       <form className="ai-assistant__composer" onSubmit={(event) => { event.preventDefault(); send(draft); }}>
+        <div className="ai-assistant__quota" aria-live="polite">
+          {usageError ? <>Usage unavailable. <button type="button" onClick={() => refreshUsage()}>Refresh</button></>
+            : !usage ? 'Loading your allowance…' : !usage.configured ? 'Sallu is paused until the free API quotas are configured.'
+              : usage.sharedExhausted ? <>The shared free API budget is exhausted.<small>Resets {new Date(usage.resetAt).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', dateStyle: 'medium', timeStyle: 'short' })} IST</small></>
+              : <>{usage.remaining} of {usage.questionsPerDay} questions left today · {usage.questionsPerMinute}/minute
+                <small>Resets {new Date(usage.resetAt).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', dateStyle: 'medium', timeStyle: 'short' })} IST</small>
+                {usage.sharedRemaining !== undefined && <small>Shared Gemini budget: {usage.sharedRemaining}/{usage.providerCallsPerDay} calls left</small>}</>}
+        </div>
         <label className="visually-hidden" htmlFor="ai-assistant-question">Ask Sallu</label>
         <div className="ai-assistant__input-row">
           <textarea id="ai-assistant-question" ref={input} rows={2} maxLength={2000} value={draft}
-            onChange={(event) => setDraft(event.target.value)} placeholder="Ask Sallu about TOMS…" disabled={busy}
+            onChange={(event) => setDraft(event.target.value)} placeholder="Ask Sallu about TOMS…" disabled={busy || unavailable}
             onKeyDown={(event) => {
               if (event.key === 'Enter' && !event.shiftKey && !event.nativeEvent.isComposing) { event.preventDefault(); send(draft); }
             }} />
-          <button type="submit" disabled={busy || !draft.trim()} aria-label="Send question">Send</button>
+          <button type="submit" disabled={busy || unavailable || !draft.trim()} aria-label="Send question">Send</button>
         </div>
         <p>Each question is independent. Verify important details in TOMS.</p>
       </form>

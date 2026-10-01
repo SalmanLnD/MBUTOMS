@@ -1,13 +1,40 @@
-import { createContext, useCallback, useContext, useRef, useState } from 'react';
+import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
 import { useAuth } from './AuthContext.jsx';
 import { canUseAiAssistant } from '../utils/aiAssistantAccess.js';
 import AiAssistant from '../components/AiAssistant.jsx';
+import Modal from '../components/Modal.jsx';
+import { getAiUsage } from '../services/aiService.js';
+import { version } from '../../package.json';
 
 const AiAssistantContext = createContext(null);
 export const useAiAssistant = () => useContext(AiAssistantContext);
 
-const AssistantSession = ({ children, enabled }) => {
+const AssistantSession = ({ children, enabled, userId, showRelease }) => {
   const [open, setOpen] = useState(false);
+  const [usage, setUsage] = useState(null);
+  const [usageError, setUsageError] = useState(false);
+  const noticeKey = `toms_sallu_notice:${userId}:${version}`;
+  const [notice, setNotice] = useState(() => localStorage.getItem(noticeKey) !== 'seen');
+  const mounted = useRef(true);
+  const usageRequest = useRef(0);
+  const refreshUsage = useCallback(async (signal) => {
+    const requestId = ++usageRequest.current;
+    try {
+      const data = await getAiUsage(signal);
+      if (mounted.current && requestId === usageRequest.current && !signal?.aborted) { setUsage(data); setUsageError(false); }
+    } catch { if (mounted.current && requestId === usageRequest.current && !signal?.aborted) setUsageError(true); }
+  }, []);
+  useEffect(() => {
+    mounted.current = true;
+    if (!enabled) return undefined;
+    const controller = new AbortController();
+    refreshUsage(controller.signal);
+    const refresh = () => refreshUsage(controller.signal);
+    const timer = setInterval(refresh, 60_000);
+    window.addEventListener('focus', refresh);
+    return () => { mounted.current = false; controller.abort(); clearInterval(timer); window.removeEventListener('focus', refresh); };
+  }, [enabled, refreshUsage]);
+  const dismissNotice = () => { localStorage.setItem(noticeKey, 'seen'); setNotice(false); };
   const launcher = useRef(null);
   const openAssistant = useCallback((event) => {
     launcher.current = event?.currentTarget || document.activeElement;
@@ -23,14 +50,30 @@ const AssistantSession = ({ children, enabled }) => {
   return (
     <AiAssistantContext.Provider value={{ enabled, open, openAssistant, closeAssistant }}>
       {children}
-      {enabled && <AiAssistant open={open} onClose={closeAssistant} />}
+      {enabled && <AiAssistant open={open} onClose={closeAssistant} usage={usage} usageError={usageError} refreshUsage={refreshUsage} />}
+      <Modal show={enabled && showRelease && notice && Boolean(usage || usageError)} title={`Welcome to TOMS v${version}`} onClose={dismissNotice} scrollable
+        footer={<button type="button" className="btn btn-primary" onClick={dismissNotice}>Got it</button>}>
+        <div className="toms-modal-body">
+          <h3 className="h5">Sallu is now available to everyone</h3>
+          <p>Ask about TOMS data you are permitted to view. Your existing account permissions still apply.</p>
+          <ul>
+            <li><strong>{usage?.questionsPerDay || 5} questions per day</strong> for each account.</li>
+            <li><strong>{usage?.questionsPerMinute || 2} questions per minute</strong>, with one question processing at a time.</li>
+            <li>Questions accepted for processing count toward your allowance, including failed answers and retries.</li>
+            <li>A shared free API budget applies to everyone. Sallu pauses when it is exhausted.</li>
+          </ul>
+          <p>Daily limits reset at midnight Pacific time{usage?.resetAt ? ` — next reset: ${new Date(usage.resetAt).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', dateStyle: 'medium', timeStyle: 'short' })} IST` : ''}.</p>
+          {usage?.configured === false && <p role="status">The administrator still needs to configure the free API quotas before Sallu can answer.</p>}
+          {usageError && <p role="status">Usage could not be loaded. Sallu’s backend still enforces all limits.</p>}
+        </div>
+      </Modal>
     </AiAssistantContext.Provider>
   );
 };
 
 export const AiAssistantProvider = ({ children }) => {
-  const { user } = useAuth();
+  const { user, loading } = useAuth();
   // Switching accounts, role, or trainer view destroys all private chat state.
   const sessionKey = `${user?._id}:${user?.role}:${user?.trainer}:${user?.impersonating}:${user?.mustResetPassword}`;
-  return <AssistantSession key={sessionKey} enabled={canUseAiAssistant(user)}>{children}</AssistantSession>;
+  return <AssistantSession key={sessionKey} userId={user?._id} showRelease={user?.appVersion === version} enabled={!loading && canUseAiAssistant(user)}>{children}</AssistantSession>;
 };
