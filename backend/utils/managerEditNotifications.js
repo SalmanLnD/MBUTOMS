@@ -37,6 +37,8 @@ const SKIP_PATH_PREFIXES = [
   '/api/notifications',
   '/api/webhooks',
   '/api/health',
+  // The assistant uses POST for read-only queries, not management edits.
+  '/api/ai',
   // These resources create richer, record-specific notifications in their controllers.
   '/api/tickets',
   '/api/topic-tracker',

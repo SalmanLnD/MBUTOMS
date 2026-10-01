@@ -1,5 +1,6 @@
 .sidebar { position: fixed; inset: 0 auto 0 0; z-index: 1000; display: none; width: var(--sidebar-width); flex-direction: column; color: #d2dce3; background: #203340; border-right: 1px solid #ffffff14; }
 .sidebar-brand { display: flex; align-items: center; gap: .75rem; min-height: 88px; padding: 1.25rem 1rem; color: #fff; }
+.sidebar-assistant { width: 100%; border: 0; background: transparent; text-align: left; }
 .brand-icon { display: grid; place-items: center; width: 36px; height: 36px; flex: 0 0 36px; color: #fff; background: #ffffff14; border: 1px solid #ffffff30; border-radius: 6px; font-weight: 600; }
 .sidebar-brand-text strong { font-size: 1.0625rem; letter-spacing: .03em; }
 .sidebar-brand-text small { font-size: .75rem; }

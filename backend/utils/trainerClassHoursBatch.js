@@ -21,6 +21,7 @@ import { getCancellationMapForRange } from './leaveAffectedClasses.js';
 import { loadOfficialHolidayMap } from './officialHolidays.js';
 
 const SCHEDULE_FIELDS = `day startTime endTime trainerCode semester subject subjectCode ${SPECIAL_CLASS_FIELDS}`;
+const EXPLANATION_FIELDS = 'department section slot venue specialReason includeInRtet';
 
 const resolveStartDate = (schedule, subjectStartMap) => {
   const subjectId = schedule.subject?.toString();
@@ -88,7 +89,7 @@ export const buildSlotIdentityKey = (schedule) =>
     schedule.semester || '',
   ].join('|');
 
-const indexSchedulesByTrainerDay = (schedules, codeToTrainerId) => {
+const indexSchedulesByTrainerDay = (schedules, codeToTrainerId, includeDetails = false) => {
   const schedulesByTrainerDay = new Map();
   const seenSlotKeys = new Map();
 
@@ -101,7 +102,11 @@ const indexSchedulesByTrainerDay = (schedules, codeToTrainerId) => {
       seen = new Set();
       seenSlotKeys.set(trainerId, seen);
     }
-    const slotKey = buildSlotIdentityKey(schedule);
+    // Explanation-only fields must not change the identity used by the existing
+    // attendance projection (which does not select department or section).
+    const slotKey = buildSlotIdentityKey(includeDetails
+      ? { ...schedule, department: undefined, section: undefined }
+      : schedule);
     if (seen.has(slotKey)) return;
     seen.add(slotKey);
 
@@ -141,7 +146,8 @@ export const computeClassHandlingHoursBatch = async (
   trainerIds,
   dates,
   semester = null,
-  trainersInput = null
+  trainersInput = null,
+  { includeDetails = false } = {}
 ) => {
   const result = new Map();
   if (!trainerIds.length || !dates.length) return result;
@@ -168,7 +174,7 @@ export const computeClassHandlingHoursBatch = async (
     canceledIdsByDate,
     holidayMap,
   ] = await Promise.all([
-    Schedule.find(ownedFilter).select(SCHEDULE_FIELDS).lean(),
+    Schedule.find(ownedFilter).select(`${SCHEDULE_FIELDS} ${includeDetails ? EXPLANATION_FIELDS : ''}`).lean(),
     buildSubjectStartDateMap(),
     Leave.find({
       status: 'approved',
@@ -184,7 +190,7 @@ export const computeClassHandlingHoursBatch = async (
     loadOfficialHolidayMap(rangeStart, rangeEnd),
   ]);
 
-  const schedulesByTrainerDay = indexSchedulesByTrainerDay(ownedSchedules, codeToTrainerId);
+  const schedulesByTrainerDay = indexSchedulesByTrainerDay(ownedSchedules, codeToTrainerId, includeDetails);
 
   const replacementScheduleIds = [
     ...new Set(
@@ -195,7 +201,7 @@ export const computeClassHandlingHoursBatch = async (
   ];
 
   const replacementSchedules = replacementScheduleIds.length
-    ? await Schedule.find({ _id: { $in: replacementScheduleIds } }).select(SCHEDULE_FIELDS).lean()
+    ? await Schedule.find({ _id: { $in: replacementScheduleIds } }).select(`${SCHEDULE_FIELDS} ${includeDetails ? EXPLANATION_FIELDS : ''}`).lean()
     : [];
 
   const scheduleById = new Map(
@@ -211,6 +217,7 @@ export const computeClassHandlingHoursBatch = async (
 
   const replacementByTrainerDate = new Map();
   const replacedOwnedScheduleIdsByTrainerDate = new Map();
+  const replacementDetails = new Map();
   const seenReplacementKeys = new Set();
 
   dates.forEach((date) => {
@@ -245,6 +252,11 @@ export const computeClassHandlingHoursBatch = async (
             replacedOwnedScheduleIdsByTrainerDate.set(originalKey, replacedIds);
           }
           replacedIds.add(scheduleId);
+          if (includeDetails) replacementDetails.set(`${originalKey}|${scheduleId}`, {
+            trainerId: entry.replacementTrainer?.toString() || '',
+            isExternal: Boolean(entry.isExternal),
+            externalTrainerName: entry.isExternal ? entry.externalTrainerName || '' : '',
+          });
         }
 
         const replacementTrainerId = entry.replacementTrainer?.toString();
@@ -261,7 +273,7 @@ export const computeClassHandlingHoursBatch = async (
           entries = [];
           replacementByTrainerDate.set(key, entries);
         }
-        entries.push(schedule);
+        entries.push(includeDetails ? { ...schedule, isReplacementAssignment: true, replacementForTrainerId: leave.trainer?.toString() || '' } : schedule);
       });
     });
   });
@@ -274,7 +286,14 @@ export const computeClassHandlingHoursBatch = async (
     trainers.forEach((trainer) => {
       const trainerId = trainer._id.toString();
       if (holidayMap.has(dateKey) || isBeforeTrainerJoiningDate(trainer, date)) {
-        result.set(`${trainerId}|${dateKey}`, 0);
+        result.set(`${trainerId}|${dateKey}`, includeDetails ? {
+          totalHours: 0,
+          schedules: [],
+          excludedSchedules: (schedulesByTrainerDay.get(trainerId)?.get(dayName) || []).map((schedule) => ({
+            ...schedule,
+            exclusion: holidayMap.has(dateKey) ? 'official_holiday' : 'before_joining_date',
+          })),
+        } : 0);
         return;
       }
       const replacedOwnedIds =
@@ -295,7 +314,20 @@ export const computeClassHandlingHoursBatch = async (
         0
       );
 
-      result.set(`${trainerId}|${dateKey}`, Math.round(hours * 10) / 10);
+      const totalHours = Math.round(hours * 10) / 10;
+      result.set(`${trainerId}|${dateKey}`, includeDetails ? {
+        totalHours,
+        schedules: [...owned, ...replacements],
+        excludedSchedules: (schedulesByTrainerDay.get(trainerId)?.get(dayName) || [])
+          .filter((schedule) => !owned.includes(schedule))
+          .map((schedule) => ({
+            ...schedule,
+            replacement: replacementDetails.get(`${trainerId}|${dateKey}|${schedule._id}`) || null,
+            exclusion: canceledIds.has(schedule._id.toString()) ? 'cancelled_class'
+              : replacedOwnedIds.has(schedule._id.toString()) ? 'replacement_covered_class'
+                : 'outside_subject_or_special_dates',
+          })),
+      } : totalHours);
     });
   });
 

@@ -7,6 +7,7 @@ import LoadingSpinner from './components/LoadingSpinner.jsx';
 import LoginModal from './components/LoginModal.jsx';
 import SessionExpiredModal from './components/SessionExpiredModal.jsx';
 import MainLayout from './layouts/MainLayout.jsx';
+import { AiAssistantProvider } from './context/AiAssistantContext.jsx';
 import OptionalAuthLayout from './layouts/OptionalAuthLayout.jsx';
 import { needsPasswordReset, MANAGEMENT_ROLES, PERFORMANCE_ACCESS_ROLES } from './utils/roles.js';
 
@@ -56,7 +57,7 @@ const HomeRedirect = () => {
 };
 
 const App = () => (
-  <>
+  <AiAssistantProvider>
     <Suspense fallback={<LoadingSpinner fullPage message="Loading page..." />}>
     <Routes>
       <Route path="/login" element={<LoginRedirect />} />
@@ -108,7 +109,7 @@ const App = () => (
     </Suspense>
     <LoginModal />
     <SessionExpiredModal />
-  </>
+  </AiAssistantProvider>
 );
 
 export default App;
