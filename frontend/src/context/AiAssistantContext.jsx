@@ -17,7 +17,7 @@ const AssistantSession = ({ children, enabled }) => {
     setOpen(false);
     requestAnimationFrame(() => {
       if (launcher.current?.isConnected) launcher.current.focus();
-      else document.querySelector('[aria-label="Open all pages"], [aria-label="Open TOMS Assistant"]')?.focus();
+      else document.querySelector('[aria-label="Open all pages"], [aria-label="Open Sallu"]')?.focus();
     });
   }, []);
   return (

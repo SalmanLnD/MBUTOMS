@@ -7,7 +7,7 @@ export const AI_ACCESS_ROLES = ['admin', 'subject_coordinator'];
 export const createAiController = (service = chatWithAi) => async (req, res) => {
   if (!req.user) return res.status(401).json({ message: 'Not authorized' });
   if (req.impersonator || !AI_ACCESS_ROLES.includes(req.user.role)) {
-    return res.status(403).json({ message: 'TOMS Assistant is available only to admins and subject coordinators outside trainer view.' });
+    return res.status(403).json({ message: 'Sallu is available only to admins and subject coordinators outside trainer view.' });
   }
   if (!req.body || Object.keys(req.body).some((key) => key !== 'message')
     || typeof req.body.message !== 'string' || !req.body.message.trim() || req.body.message.length > 2000) {
@@ -21,7 +21,7 @@ export const createAiController = (service = chatWithAi) => async (req, res) => 
   const window = requestWindows.get(userId) || { start: now, count: 0 };
   if (window.count >= 10 || inFlight.has(userId) || inFlight.size >= 4) {
     res.setHeader('Retry-After', '60');
-    return res.status(429).json({ message: 'The TOMS Assistant is busy. Please try again shortly.' });
+    return res.status(429).json({ message: 'Sallu is busy. Please try again shortly.' });
   }
   window.count += 1;
   requestWindows.set(userId, window);

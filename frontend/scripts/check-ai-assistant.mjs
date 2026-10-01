@@ -37,10 +37,10 @@ try {
       await page.locator('main').waitFor();
       const open = async () => {
         if (width < 768) await page.getByRole('button', { name: 'Open all pages' }).click();
-        await page.getByRole('button', { name: 'Open TOMS Assistant' }).click();
-        await page.getByRole('dialog', { name: 'TOMS Assistant' }).waitFor();
+        await page.getByRole('button', { name: 'Open Sallu' }).click();
+        await page.getByRole('dialog', { name: 'Sallu' }).waitFor();
       };
-      assert.equal(await page.getByRole('dialog', { name: 'TOMS Assistant' }).count(), 0);
+      assert.equal(await page.getByRole('dialog', { name: 'Sallu' }).count(), 0);
       await open();
       assert.equal(await page.locator('.ai-assistant__suggestions button').count(), 3);
       await page.waitForTimeout(120);
@@ -69,10 +69,10 @@ try {
       assert.ok(bounds.composerBottom <= bounds.bottom);
       assert.ok(bounds.scroll <= width + 2);
       assert.notEqual(bounds.bodyOverflow, 'hidden', 'Modeless assistant must not lock page scrolling');
-      await page.getByRole('button', { name: 'Close TOMS Assistant' }).click();
+      await page.getByRole('button', { name: 'Close Sallu' }).click();
       await open();
       await page.getByText('Live data answer.', { exact: false }).waitFor();
-      const input = page.getByRole('textbox', { name: 'Ask TOMS Assistant' });
+      const input = page.getByRole('textbox', { name: 'Ask Sallu' });
       await input.fill('Show today’s timetable'); await input.press('Enter');
       await page.getByText('Could not get an answer. Please try again.').waitFor();
       assert.equal(calls, 2, 'AI POST must not retry automatically');
@@ -80,7 +80,7 @@ try {
       await page.getByText('Retry succeeded.', { exact: true }).waitFor();
       if (width === 390 || width === 1366) await page.screenshot({ path: `${output}/${role}-${width}.png` });
       await input.focus(); await input.press('Escape');
-      assert.equal(await page.getByRole('dialog', { name: 'TOMS Assistant' }).count(), 0);
+      assert.equal(await page.getByRole('dialog', { name: 'Sallu' }).count(), 0);
       assert.deepEqual(errors, []);
       checks++; await context.close();
     }
@@ -90,7 +90,7 @@ try {
     await context.addInitScript((u) => { localStorage.setItem('toms_token', 'synthetic-ai-test'); localStorage.setItem('toms_user', JSON.stringify(u)); }, account);
     await context.route('**/api/**', (route) => route.fulfill({ json: new URL(route.request().url()).pathname === '/api/auth/me' ? account : fixture(new URL(route.request().url()).pathname.replace(/^\/api/, '')) }));
     const page = await context.newPage(); await page.goto(`${baseURL}/dashboard`); await page.locator('main').waitFor();
-    assert.equal(await page.getByRole('button', { name: 'Open TOMS Assistant' }).count(), 0);
+    assert.equal(await page.getByRole('button', { name: 'Open Sallu' }).count(), 0);
     checks++; await context.close();
   }
   console.log(`${checks} assistant UI scenarios passed (roles, viewports, close/reopen, requests, errors, retries and scrolling).`);

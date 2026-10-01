@@ -7,6 +7,7 @@ import { formatRole } from '../utils/helpers.js';
 import Modal from './Modal.jsx';
 import '../styles/mobile-nav.css';
 import { useAiAssistant } from '../context/AiAssistantContext.jsx';
+import SalluAvatar from './SalluAvatar.jsx';
 
 const MobileNavigation = () => {
   const { user, hasRole } = useAuth();
@@ -42,9 +43,9 @@ const MobileNavigation = () => {
         <div className="toms-modal-body mobile-pages-body">
           <div className="mobile-pages-user"><strong>{user.name}</strong><span>{formatRole(user.role)}</span></div>
           <nav className="mobile-pages-list" aria-label="All app pages">
-            {assistant?.enabled && <button type="button" className="mobile-pages-link" aria-label="Open TOMS Assistant"
+            {assistant?.enabled && <button type="button" className="mobile-pages-link" aria-label="Open Sallu"
               onClick={(event) => { setOpen(false); assistant.openAssistant(event); }}>
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" aria-hidden="true"><path d="M20 15a3 3 0 0 1-3 3H9l-5 3V6a3 3 0 0 1 3-3h10a3 3 0 0 1 3 3z" /><path d="M8 8h8M8 12h5" /></svg><span>TOMS Assistant</span><span aria-hidden="true">›</span>
+              <SalluAvatar size={24} /><span>Sallu</span><span aria-hidden="true">›</span>
             </button>}
             {visibleItems.map(({ path, label, Icon }) => (
               <NavLink key={path} to={path} onClick={() => setOpen(false)} className={({ isActive }) => `mobile-pages-link${isActive ? ' is-active' : ''}`}>

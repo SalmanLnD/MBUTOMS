@@ -1,7 +1,8 @@
-# TOMS Assistant (V1)
+# Sallu — TOMS Assistant (V1)
 
 This implementation adds `POST /api/ai/chat`
 using the official `@google/genai` SDK and defaults to `gemini-3.1-flash-lite`.
+Sallu has a shared vector avatar in the chat header, replies, and navigation.
 The frontend has a compact, modeless chat panel, closed initially and opened from
 the desktop sidebar or mobile **All pages** menu. It has a close button and three
 suggested questions. Closing preserves the current session's messages; signing out,

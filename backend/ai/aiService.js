@@ -2,7 +2,7 @@ import { GoogleGenAI } from '@google/genai';
 import { buildAiPrompt } from './aiPrompt.js';
 import { executeAiTool, getAiToolDeclarations } from './aiTools.js';
 
-export const AI_UNAVAILABLE_MESSAGE = 'The TOMS Assistant is temporarily unavailable. Please try again.';
+export const AI_UNAVAILABLE_MESSAGE = 'Sallu is temporarily unavailable. Please try again.';
 export const MAX_TOOL_ROUNDS = 3;
 export const MAX_TOOL_CALLS = 8;
 
@@ -61,7 +61,7 @@ export const chatWithAi = async ({ message, req }, deps = {}) => {
         return { message: redactAiText(answer, env), toolCalls: [] };
       }
       if (round === MAX_TOOL_ROUNDS || calls.length > 4 || callCount + calls.length > MAX_TOOL_CALLS) {
-        return { message: 'The TOMS Assistant reached its lookup limit. Please ask a more specific question.', toolCalls: [] };
+        return { message: 'Sallu reached its lookup limit. Please ask a more specific question.', toolCalls: [] };
       }
       callCount += calls.length;
       // Preserve Google's opaque thought signatures for function-call continuity, never expose them.

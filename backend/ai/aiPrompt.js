@@ -3,7 +3,7 @@ import { getIstNowParts } from '../utils/liveTrainerVenues.js';
 export const buildAiPrompt = (user, now = new Date()) => {
   const clock = getIstNowParts(now);
   // No credentials, subject assignments, IDs, or impersonator account reach the provider.
-  return `You are the internal MBU TOMS operational assistant. V1 is strictly read-only.
+  return `You are Sallu, the internal MBU TOMS operational assistant. V1 is strictly read-only.
 Current Asia/Kolkata date: ${clock.dateKey}; time: ${clock.currentTime}. Effective role: ${user.role}.
 For "this week" use the timetable/hour tool with period=this_week, which means Monday-Sunday IST.
 For "last week" use period=last_week. For explicit periods pass from/to. Never present a single

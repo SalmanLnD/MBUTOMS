@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { sendAiMessage } from '../services/aiService.js';
 import { isAbortError } from '../services/api.js';
 import { AI_SUGGESTED_QUESTIONS } from '../utils/aiAssistantAccess.js';
+import SalluAvatar from './SalluAvatar.jsx';
 import '../styles/ai-assistant.css';
 
 const AiAssistant = ({ open, onClose }) => {
@@ -57,28 +58,28 @@ const AiAssistant = ({ open, onClose }) => {
         if (event.key === 'Escape') { event.stopPropagation(); onClose(); }
       }}>
       <header className="ai-assistant__header">
-        <div><h2 id="ai-assistant-title">TOMS Assistant</h2><p>Read-only help with live TOMS data</p></div>
-        <button type="button" className="ai-assistant__close" onClick={onClose} aria-label="Close TOMS Assistant">×</button>
+        <div className="ai-assistant__identity"><SalluAvatar size={40} /><div><h2 id="ai-assistant-title">Sallu</h2><p>Your TOMS assistant · Read-only</p></div></div>
+        <button type="button" className="ai-assistant__close" onClick={onClose} aria-label="Close Sallu">×</button>
       </header>
       <div className="ai-assistant__messages" role="log" aria-label="Assistant conversation" aria-live="polite" aria-relevant="additions text">
         {!messages.length && <div className="ai-assistant__welcome">
-          <h3>How can I help?</h3><p>Ask about schedules, replacements, hours or topic tracking.</p>
+          <h3>Hi, I’m Sallu.</h3><p>Ask about schedules, replacements, hours or topic tracking.</p>
           <div className="ai-assistant__suggestions">
             {AI_SUGGESTED_QUESTIONS.map((question) => <button key={question} type="button" disabled={busy} onClick={() => send(question)}>{question}<span aria-hidden="true">↗</span></button>)}
           </div>
         </div>}
         {messages.map((message, index) => <article key={index} className={`ai-assistant__message ai-assistant__message--${message.role}`}>
-          <span>{message.role === 'user' ? 'You' : 'TOMS Assistant'}</span><p>{message.text}</p>
+          <span>{message.role === 'user' ? 'You' : <><SalluAvatar size={22} />Sallu</>}</span><p>{message.text}</p>
         </article>)}
         {busy && <p className="ai-assistant__status" role="status">Checking TOMS data…</p>}
         {error && <div className="ai-assistant__error" role="alert"><p>{error}</p><button type="button" onClick={() => send(lastQuestion.current, true)}>Retry</button></div>}
         <div ref={end} />
       </div>
       <form className="ai-assistant__composer" onSubmit={(event) => { event.preventDefault(); send(draft); }}>
-        <label className="visually-hidden" htmlFor="ai-assistant-question">Ask TOMS Assistant</label>
+        <label className="visually-hidden" htmlFor="ai-assistant-question">Ask Sallu</label>
         <div className="ai-assistant__input-row">
           <textarea id="ai-assistant-question" ref={input} rows={2} maxLength={2000} value={draft}
-            onChange={(event) => setDraft(event.target.value)} placeholder="Ask a TOMS question…" disabled={busy}
+            onChange={(event) => setDraft(event.target.value)} placeholder="Ask Sallu about TOMS…" disabled={busy}
             onKeyDown={(event) => {
               if (event.key === 'Enter' && !event.shiftKey && !event.nativeEvent.isComposing) { event.preventDefault(); send(draft); }
             }} />
