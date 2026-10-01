@@ -46,11 +46,10 @@ Without a configured key, authenticated requests return a clean 503 response.
 For deployment, set `GEMINI_API_KEY` in the backend hosting service's environment
 and set `GEMINI_MODEL=gemini-3.1-flash-lite`. The local `.env` is excluded from Git
 and pushing the code does not copy its key to the hosting service.
-The configured key was verified against `gemini-3.1-flash-lite`, including a real
-function-calling round trip with synthetic tool results. No live TOMS database
-records were sent for that smoke test. Real local-data answers still need a smoke
-test in a development database. Automated tests use fixtures and do not contact
-Gemini or MongoDB.
+The configured key was verified against `gemini-3.1-flash-lite`, including real
+function-calling round trips. A read-only check using the stored timetable confirmed
+Salman's 28 September–4 October 2026 total of four hours, with 2 October excluded
+for Gandhi Jayanthi. Automated tests use fixtures and do not contact Gemini or MongoDB.
 
 ## Tools and permissions
 
@@ -77,6 +76,11 @@ and replacement/date/cancellation helpers, rather than invoking that mutating ha
 - Official hours come from `computeClassHandlingHoursBatch`, with an optional
   `includeDetails` result. Existing callers still receive the original numeric map.
   Explanation fields preserve the existing attendance deduplication identity.
+- Timetable/hour tools accept one `date`, an inclusive `from`/`to` range, or
+  `period=today|this_week|last_week`. Weeks run Monday–Sunday in Asia/Kolkata.
+  The backend sums all requested days and returns the range, daily hours, and dated
+  contributing/excluded classes. Missing calculations return unavailable, not zero.
+  This assistant adapter does not change attendance or RTET calculation rules.
 - Details identify regular/special classes, cancellation exclusions, replacement
   coverage, incoming campus replacements, subject-date exclusions, holidays, and
   joining-date exclusions. External replacements receive no campus trainer hours.

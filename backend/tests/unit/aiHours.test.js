@@ -108,3 +108,36 @@ test('real class controllers enforce trainer access before exposing counts', asy
   const permitted = await executeAiTool('get_class_student_count', { department: 'CSE', section: 'A1', semester: 'III' }, req);
   assert.equal(permitted.activeStudentCount, 40);
 });
+
+test('Salman current week totals 4 hours across September/October, excluding Gandhi Jayanthi', async (t) => {
+  const trainer = { _id: 'salman', name: 'Muhammed Salman S F', employeeId: '131665', joiningDate: '2026-07-01' };
+  const slot = (key, day, startTime, endTime) => ({ _id: key, trainerCode: '131665', day, startTime, endTime,
+    semester: 'III', department: 'MCA', section: '1', subjectCode: '25CA202009', subject: 'dsap' });
+  const slots = [slot('mon', 'Monday', '09:00', '11:00'), slot('tue', 'Tuesday', '11:30', '13:30'), slot('fri', 'Friday', '14:45', '16:45')];
+  t.mock.method(Schedule, 'find', () => query(slots));
+  t.mock.method(Subject, 'find', () => query([{ _id: 'dsap', code: '25CA202009', startDate: '2026-07-13', endDate: '2026-11-10' }]));
+  t.mock.method(Leave, 'find', () => query([]));
+  const cancellations = t.mock.method(ClassCancellation, 'find', () => query([]));
+  t.mock.method(OfficialHoliday, 'find', () => query([{ date: '2026-10-02', name: 'Gandhi Jayanthi' }]));
+  clearSubjectStartDateCache(); t.after(clearSubjectStartDateCache);
+  const deps = { now: new Date('2026-10-01T04:00:00Z'), findTrainers: async () => [trainer],
+    subjectNames: new Map([['dsap', 'Data Structures and Algorithms Using Python']]), venueNames: new Map(), trainerNames: new Map() };
+  const req = { user: { role: 'admin', trainer: 'salman' } };
+  const week = await executeAiTool('get_trainer_hours', { employeeId: '131665', period: 'this_week' }, req, deps);
+  assert.equal(week.from, '2026-09-28'); assert.equal(week.to, '2026-10-04');
+  assert.equal(week.totalHours, 4);
+  assert.deepEqual(week.schedules.map((s) => s.date), ['2026-09-28', '2026-09-29']);
+  assert.equal(week.excludedSchedules[0].date, '2026-10-02');
+  assert.equal(week.excludedSchedules[0].kind, 'official_holiday');
+  assert.equal(week.excludedSchedules[0].holidayName, 'Gandhi Jayanthi');
+  assert.equal(week.days.length, 7);
+  assert.equal(week.days.find((day) => day.date === '2026-10-02').totalHours, 0);
+  const today = await executeAiTool('get_trainer_hours', {}, req, deps);
+  assert.equal(today.date, '2026-10-01'); assert.equal(today.totalHours, 0);
+  const range = await executeAiTool('get_my_timetable', { from: '2026-09-28', to: '2026-10-04' }, req, deps);
+  assert.equal(range.totalHours, 4);
+  cancellations.mock.mockImplementation(() => query([{ date: '2026-09-29', schedules: ['tue'] }]));
+  const cancelled = await executeAiTool('get_trainer_hours', { period: 'this_week' }, req, deps);
+  assert.equal(cancelled.totalHours, 2);
+  assert.equal(cancelled.excludedSchedules.find((s) => s.date === '2026-09-29').kind, 'cancelled_class');
+});

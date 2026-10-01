@@ -12,7 +12,9 @@ import { getSpecialClasses } from '../controllers/scheduleController.js';
 import { getClasses } from '../controllers/classController.js';
 import { getTopicTrackerSessions, getTopicTrackerClassSummary } from '../controllers/topicTrackerController.js';
 import { buildTrainerAttendanceGridPayload, getTrainerPunchInLogs } from '../controllers/trainerAttendanceController.js';
-import { toAttendanceDateKey, normalizeAttendanceDate } from '../utils/attendanceDates.js';
+import { toAttendanceDateKey, normalizeAttendanceDate, getAttendanceCalendarDates } from '../utils/attendanceDates.js';
+import { getWeekRangeForDate } from '../utils/specialClass.js';
+import { loadOfficialHolidayMap } from '../utils/officialHolidays.js';
 import { getLeaveOverlapFilter } from '../utils/leaveDateRange.js';
 import { getLeaveClassExclusionsForRange, getUncancelledScheduleDateKeys } from '../utils/leaveAffectedClasses.js';
 import { dedupeReplacementsBySchedule } from '../utils/leaveReplacements.js';
@@ -29,9 +31,9 @@ const management = (req) => !req.impersonator && isAuthorizedRole(req.user?.role
 const fullAccess = (req) => !req.impersonator && FULL_ACCESS_ROLES.includes(req.user?.role);
 
 const definitions = [
-  ['get_my_timetable', 'Read my scheduled workload and official class-handling hours for a date.', ['date', 'semester']],
-  ['get_trainer_timetable', 'Read an authorized trainer timetable. Never guess a trainer; resolve by employee ID or name.', ['trainerName', 'employeeId', 'date', 'semester']],
-  ['get_trainer_hours', 'Explain official class-handling hours, with contributing and excluded records. Omit trainer identifiers for myself.', ['trainerName', 'employeeId', 'date', 'semester']],
+  ['get_my_timetable', 'Read my workload for a date or inclusive range. For this week use period=this_week; returns backend total and daily breakdown.', ['date', 'from', 'to', 'period', 'semester']],
+  ['get_trainer_timetable', 'Read an authorized trainer timetable for a date or period. For this week use period=this_week. Never guess a trainer.', ['trainerName', 'employeeId', 'date', 'from', 'to', 'period', 'semester']],
+  ['get_trainer_hours', 'Explain official hours for a date or inclusive range, including cancellations and holidays. For this week use period=this_week; totalHours covers the WHOLE returned period. Omit trainer identifiers for myself.', ['trainerName', 'employeeId', 'date', 'from', 'to', 'period', 'semester']],
   ['get_live_venues', 'Read today\'s scheduled trainer occupancy at the current IST time or HH:mm.', ['time']],
   ['get_leaves', 'Read only permitted leave records overlapping an inclusive date range.', ['from', 'to', 'status']],
   ['get_replacements', 'Read permitted class replacement coverage for one date; omit trainer identifiers for myself.', ['date', 'trainerName', 'employeeId']],
@@ -46,7 +48,9 @@ export const getAiToolDeclarations = (req) => definitions
   .map(([name, description, fields, required = []]) => ({
     name, description,
     parameters: { type: 'OBJECT', properties: Object.fromEntries(fields.map((field) => [field, {
-      type: 'STRING', description: ['date', 'from', 'to'].includes(field) ? 'IST calendar date YYYY-MM-DD. Omit for today.' : field,
+      type: 'STRING', description: field === 'period' ? 'today, this_week or last_week (Monday-Sunday IST). Do not combine with date/from/to.'
+        : ['date', 'from', 'to'].includes(field) ? 'IST calendar date YYYY-MM-DD. Use date for one day OR from/to for an inclusive range, not both.' : field,
+      ...(field === 'period' ? { enum: ['today', 'this_week', 'last_week'] } : {}),
     }])), required },
   }));
 
@@ -65,8 +69,21 @@ export const validateToolArguments = (name, args = {}, now = new Date()) => {
   if (cleaned.semester && !/^(I|II|III|IV|V|VI|VII|VIII)$/.test(cleaned.semester)) throw new Error('Invalid semester');
   if (cleaned.status && !['pending', 'approved', 'rejected', 'cancelled'].includes(cleaned.status)) throw new Error('Invalid status');
   const today = getIstNowParts(now).dateKey;
-  if (fields.includes('date')) cleaned.date ||= today;
-  if (fields.includes('from')) {
+  const hoursTool = ['get_my_timetable', 'get_trainer_timetable', 'get_trainer_hours'].includes(name);
+  if (cleaned.period) {
+    if (!['today', 'this_week', 'last_week'].includes(cleaned.period) || cleaned.date || cleaned.from || cleaned.to) throw new Error('Use one period or date range');
+    if (cleaned.period === 'today') cleaned.date = today;
+    else {
+      const anchor = normalizeAttendanceDate(today);
+      if (cleaned.period === 'last_week') anchor.setUTCDate(anchor.getUTCDate() - 7);
+      const week = getWeekRangeForDate(anchor);
+      cleaned.from = toAttendanceDateKey(week.start);
+      cleaned.to = toAttendanceDateKey(week.end);
+    }
+  }
+  if (hoursTool && cleaned.date && (cleaned.from || cleaned.to)) throw new Error('Use date or range, not both');
+  if (fields.includes('date') && (!hoursTool || (!cleaned.from && !cleaned.to))) cleaned.date ||= today;
+  if (fields.includes('from') && (!hoursTool || cleaned.from || cleaned.to)) {
     cleaned.from ||= cleaned.to || today;
     cleaned.to ||= cleaned.from;
     const days = (new Date(cleaned.to) - new Date(cleaned.from)) / 86400000;
@@ -115,6 +132,8 @@ export const resolveAiTrainer = async (req, args, deps = {}) => {
 };
 
 const compactSchedule = (schedule, subjects = new Map(), venues = new Map(), trainers = new Map()) => ({
+  ...(schedule.date ? { date: schedule.date } : {}),
+  ...(schedule.holidayName ? { holidayName: schedule.holidayName } : {}),
   day: schedule.day, startTime: schedule.startTime, endTime: schedule.endTime,
   department: schedule.department || '', section: schedule.section || '', semester: schedule.semester || '',
   subject: subjects.get(id(schedule.subject)) || schedule.subject?.name || schedule.subjectCode || '',
@@ -133,14 +152,31 @@ const timetable = async (req, args, deps) => {
   const trainer = await resolveAiTrainer(req, args, deps);
   if (trainer.error) return trainer;
   const compute = deps.computeHours || computeClassHandlingHoursBatch;
-  const details = (await compute([trainer._id], [normalizeAttendanceDate(args.date)], args.semester || null, [trainer], { includeDetails: true }))
-    .get(`${id(trainer)}|${args.date}`) || { totalHours: 0, schedules: [], excludedSchedules: [] };
+  const from = args.from || args.date;
+  const to = args.to || args.date;
+  const dates = getAttendanceCalendarDates(from, to);
+  const computed = await compute([trainer._id], dates, args.semester || null, [trainer], { includeDetails: true });
+  const days = dates.map((day) => {
+    const date = toAttendanceDateKey(day);
+    const details = computed.get(`${id(trainer)}|${date}`);
+    if (!details || !Number.isFinite(details.totalHours)) throw new Error('Incomplete hours calculation');
+    return { date, ...details };
+  });
+  const details = {
+    totalHours: Math.round(days.reduce((sum, day) => sum + day.totalHours, 0) * 10) / 10,
+    schedules: days.flatMap((day) => day.schedules.map((schedule) => ({ ...schedule, date: day.date }))),
+    excludedSchedules: days.flatMap((day) => day.excludedSchedules.map((schedule) => ({ ...schedule, date: day.date }))),
+  };
   const records = [...details.schedules, ...details.excludedSchedules];
+  const holidayNames = records.some((s) => s.exclusion === 'official_holiday')
+    ? (deps.holidayNames || await loadOfficialHolidayMap(normalizeAttendanceDate(from), normalizeAttendanceDate(to))) : new Map();
+  details.excludedSchedules = details.excludedSchedules.map((s) => ({ ...s, holidayName: holidayNames.get(s.date) || '' }));
   const subjects = deps.subjectNames || new Map((await Subject.find({ _id: { $in: [...new Set(records.map((s) => id(s.subject)).filter(Boolean))] } }).select('name').lean()).map((s) => [id(s), s.name]));
   const venues = deps.venueNames || new Map((await Venue.find({ _id: { $in: [...new Set(records.map((s) => id(s.venue)).filter(Boolean))] } }).select('name').lean()).map((v) => [id(v), v.name]));
   const replacementIds = [...new Set(records.flatMap((s) => [s.replacementForTrainerId, s.replacement?.trainerId]).filter(Boolean))];
   const trainers = deps.trainerNames || new Map((await Trainer.find({ _id: { $in: replacementIds } }).select('name employeeId').lean()).map((t) => [id(t), trainerInfo(t)]));
-  return { date: args.date, trainer: trainerInfo(trainer), totalHours: details.totalHours,
+  return { ...(from === to ? { date: from } : {}), from, to, trainer: trainerInfo(trainer), totalHours: details.totalHours,
+    days: days.map((day) => ({ date: day.date, totalHours: day.totalHours, ...(holidayNames.has(day.date) ? { holidayName: holidayNames.get(day.date) } : {}) })),
     calculation: 'TOMS attendance class-handling calculation; this is not an RTET total or proof of attendance.',
     schedules: details.schedules.slice(0, MAX_RECORDS).map((s) => compactSchedule(s, subjects, venues, trainers)),
     excludedSchedules: details.excludedSchedules.slice(0, MAX_RECORDS).map((s) => compactSchedule(s, subjects, venues, trainers)),

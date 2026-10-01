@@ -34,6 +34,24 @@ test('trainer tools hide management operations and reject private attendance sel
   assert.equal((await executeAiTool('run_mongo_query', {}, req)).error, 'forbidden');
 });
 
+test('week ranges use Monday-Sunday IST; mixed selectors and overlong periods are rejected', async () => {
+  const now = new Date('2026-09-30T20:00:00Z');
+  const week = validateToolArguments('get_trainer_hours', { period: 'this_week' }, now);
+  assert.equal(week.from, '2026-09-28'); assert.equal(week.to, '2026-10-04'); assert.equal(week.date, undefined);
+  const previous = validateToolArguments('get_my_timetable', { period: 'last_week' }, now);
+  assert.equal(previous.from, '2026-09-21'); assert.equal(previous.to, '2026-09-27');
+  assert.equal(validateToolArguments('get_trainer_timetable', { period: 'today' }, now).date, '2026-10-01');
+  for (const args of [{ period: 'this_week', date: '2026-10-01' }, { date: '2026-10-01', from: '2026-09-28' },
+    { period: 'this_year' }, { from: '2026-09-01', to: '2026-10-31' }, { from: '2026-10-02', to: '2026-10-01' }]) {
+    assert.throws(() => validateToolArguments('get_trainer_hours', args, now));
+  }
+  const incomplete = await executeAiTool('get_my_timetable', { date: '2026-10-01' }, req, {
+    ...timetableDeps, computeHours: async () => new Map(),
+  });
+  assert.equal(incomplete.error, 'unavailable');
+  assert.equal(incomplete.totalHours, undefined);
+});
+
 test('unlinked trainer cannot retrieve leaves, topics, classes or attendance', async () => {
   const unlinked = { user: { role: 'trainer' } };
   for (const [name, args] of [['get_leaves', {}], ['get_topic_tracker', {}], ['get_class_student_count', { department: 'CSE', section: 'A1', semester: 'III' }]]) {
