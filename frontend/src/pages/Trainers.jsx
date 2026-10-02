@@ -231,7 +231,11 @@ const Trainers = () => {
       ) : (
         <div className="card table-card">
           <div className="card-body">
-            <CollapsibleFilters label="Trainer filters">
+            <CollapsibleFilters label="Trainer filters" actions={canManage && (
+              <button type="button" className="btn btn-primary" onClick={handleAdd}>
+                + Add Trainer
+              </button>
+            )}>
             <div className="row g-2 mb-3 align-items-center">
               <div className="col-md-4">
                 <input
@@ -256,13 +260,6 @@ const Trainers = () => {
 
             </div>
             </CollapsibleFilters>
-            {canManage && (
-                <div className="page-create-action">
-                  <button type="button" className="btn btn-primary" onClick={handleAdd}>
-                    + Add Trainer
-                  </button>
-                </div>
-              )}
 
             {loading ? (
               <LoadingSpinner />

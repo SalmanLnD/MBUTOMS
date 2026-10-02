@@ -15,7 +15,7 @@ import {
 import TimetableSheetSetupModal from '../components/TimetableSheetSetupModal.jsx';
 import ClassCancellationModal from '../components/ClassCancellationModal.jsx';
 import SpecialClassModal from '../components/SpecialClassModal.jsx';
-import { CalendarIcon, SheetIcon, ExternalLinkIcon, PlusIcon } from '../components/icons.jsx';
+import { CalendarIcon, SheetIcon, ExternalLinkIcon, PlusIcon, EditIcon } from '../components/icons.jsx';
 import { getErrorMessage, toInputDate } from '../utils/helpers.js';
 import { isAbortError } from '../services/api.js';
 import { scheduleMatchesSubject, resolveScheduleTrainerCode } from '../utils/scheduleSubject.js';
@@ -406,75 +406,30 @@ const Timetable = () => {
         </div>
 
         {canEdit && (
-          <div className="col-md-3 d-flex flex-wrap gap-2">
-            <button
-              type="button"
-              className={`btn ${editMode ? 'btn-success' : 'btn-outline-success'}`}
-              onClick={() => setEditMode((current) => !current)}
-            >
-              {editMode ? 'Exit Edit Mode' : 'Edit Mode'}
+          <div className="timetable-icon-actions" role="group" aria-label="Timetable actions">
+            <button type="button" className={`btn timetable-icon-btn ${editMode ? 'btn-success' : 'btn-outline-success'}`}
+              title={editMode ? 'Exit Edit Mode' : 'Edit Mode'} aria-label={editMode ? 'Exit Edit Mode' : 'Edit Mode'}
+              aria-pressed={editMode} onClick={() => setEditMode((current) => !current)}>
+              <EditIcon size={18} aria-hidden="true" />
             </button>
+            {canManageSpecialClasses && (
+              <button type="button" className="btn btn-outline-primary timetable-icon-btn" title="Special classes" aria-label="Special classes"
+                onClick={() => setShowSpecialClass(true)}><PlusIcon size={18} aria-hidden="true" /></button>
+            )}
+            {canCancelClasses && (
+              <button type="button" className="btn btn-outline-danger timetable-icon-btn" title="Cancel classes" aria-label="Cancel classes"
+                onClick={() => setShowCancellation(true)}><CalendarIcon size={18} aria-hidden="true" /></button>
+            )}
+            {sheetStatus?.linked && (
+              <a className="btn btn-outline-primary timetable-icon-btn" title="Open Sheet" aria-label="Open Sheet"
+                href={sheetStatus.spreadsheetUrl} target="_blank" rel="noreferrer"><ExternalLinkIcon size={18} aria-hidden="true" /></a>
+            )}
+            <button type="button" className="btn btn-outline-secondary timetable-icon-btn"
+              title={sheetStatus?.linked ? 'Sheet setup' : 'Link to Sheets'} aria-label={sheetStatus?.linked ? 'Sheet setup' : 'Link to Sheets'}
+              onClick={() => setShowSheetSetup(true)}><SheetIcon size={18} aria-hidden="true" /></button>
           </div>
         )}
-      </div>
-
-      {canEdit && (
-        <div className="d-flex flex-wrap align-items-center gap-2 mb-3">
-          {canManageSpecialClasses && (
-            <button
-              type="button"
-              className="btn btn-outline-primary d-inline-flex align-items-center gap-2"
-              onClick={() => setShowSpecialClass(true)}
-            >
-              <PlusIcon size={16} aria-hidden="true" />
-              Special class
-            </button>
-          )}
-          {canCancelClasses && (
-            <button
-              type="button"
-              className="btn btn-outline-danger d-inline-flex align-items-center gap-2"
-              onClick={() => setShowCancellation(true)}
-            >
-              <CalendarIcon size={16} aria-hidden="true" />
-              Cancel classes
-            </button>
-          )}
-          {sheetStatus?.linked ? (
-            <>
-              <a
-                className="btn btn-outline-primary d-inline-flex align-items-center gap-2"
-                href={sheetStatus.spreadsheetUrl}
-                target="_blank"
-                rel="noreferrer"
-              >
-                <ExternalLinkIcon size={16} />
-                Open Sheet
-              </a>
-              <button
-                type="button"
-                className="btn btn-outline-secondary d-inline-flex align-items-center gap-2"
-                onClick={() => setShowSheetSetup(true)}
-              >
-                <SheetIcon size={16} />
-                Sheet setup
-              </button>
-              <span className="text-muted small">
-                Auto-refreshes every 5 min from TOMS (or use menu TOMS Timetable → Refresh now)
-              </span>
-            </>
-          ) : (
-            <button
-              type="button"
-              className="btn btn-outline-primary d-inline-flex align-items-center gap-2"
-              onClick={() => setShowSheetSetup(true)}
-            >
-              <SheetIcon size={16} />
-              Link to Sheets
-            </button>
-          )}
         </div>
-      )}
       </div>
 
       <div className="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3 timetable-summary-bar">

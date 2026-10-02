@@ -42,9 +42,15 @@
 .notification-target-highlight, .notification-target-highlight > * { animation: targetFlash 2.4s ease; }
 
 @media (min-width: 768px) {
-  .topbar-view-as { width: 240px; }
+  .topbar { grid-template-columns: minmax(0,1fr) auto auto; gap: .65rem; }
+  .topbar h1 { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .topbar-tools { grid-column: 2; grid-row: 1; flex-wrap: nowrap; }
+  .topbar-actions { grid-column: 3; }
+  .topbar-view-as { width: clamp(170px,18vw,240px); flex-shrink: 0; }
   .topbar-view-as .toms-styled-select__trigger { font-size: .875rem; }
 }
 @media (min-width: 1200px) { .topbar-user { display: inline; } }
-@media (min-width: 1600px) { .topbar { grid-template-columns: minmax(0,1fr) auto auto; } .topbar-tools { grid-column: 2; grid-row: 1; } .topbar-actions { grid-column: 3; } }
 @media (max-width: 359.98px) { .topbar { grid-template-columns: minmax(0,1fr); } .topbar-actions { grid-row: 2; grid-column: 1; justify-content: flex-start; } .topbar-tools { grid-row: 3; } }
+
+@media (min-width: 992px) { .topbar-user { display: inline; max-width: 160px; } }
+@media (min-width: 768px) and (max-width: 1199.98px) { .topbar-calendars-btn span { display: none !important; } .topbar-calendars-btn { min-width: 44px; justify-content: center; } }

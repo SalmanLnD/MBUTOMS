@@ -3,13 +3,12 @@ import {
   Chart as ChartJS,
   CategoryScale,
   LinearScale,
-  BarElement,
   ArcElement,
   Title,
   Tooltip,
   Legend,
 } from 'chart.js';
-import { Bar, Doughnut } from 'react-chartjs-2';
+import { Doughnut } from 'react-chartjs-2';
 import StatCard from '../components/StatCard.jsx';
 import LoadingSpinner from '../components/LoadingSpinner.jsx';
 import { showError } from '../utils/toast.js';
@@ -25,17 +24,11 @@ import { getDashboardStats } from '../services/dashboardService.js';
 import { getErrorMessage } from '../utils/helpers.js';
 import { useTheme } from '../context/ThemeContext.jsx';
 
-ChartJS.register(CategoryScale, LinearScale, BarElement, ArcElement, Title, Tooltip, Legend);
-
-const formatRating = (value) => {
-  if (value == null || Number.isNaN(Number(value))) return '—';
-  return `${Number(value).toFixed(2)}/5`;
-};
+ChartJS.register(CategoryScale, LinearScale, ArcElement, Title, Tooltip, Legend);
 
 const Dashboard = () => {
   const { isDark } = useTheme();
   const chartText = isDark ? '#b3c4cf' : '#526570';
-  const chartLine = isDark ? '#334550' : '#dce3e8';
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
 
@@ -55,7 +48,7 @@ const Dashboard = () => {
 
   if (loading) return <LoadingSpinner message="Loading dashboard..." />;
 
-  const { cards, attendanceSummary, topTrainersByFeedback } = stats || {};
+  const { cards, attendanceSummary } = stats || {};
 
   const attendanceChartData = {
     labels: ['Present', 'Absent', 'Late', 'Leave', 'OD', 'Holiday'],
@@ -69,21 +62,7 @@ const Dashboard = () => {
           attendanceSummary?.od || 0,
           attendanceSummary?.holiday || 0,
         ],
-        backgroundColor: ['#23756d', '#aa4545', '#a87325', '#416a82', '#75849a', '#64748b'],
-      },
-    ],
-  };
-
-  const feedbackChartData = {
-    labels: topTrainersByFeedback?.map((t) => t.name) || [],
-    datasets: [
-      {
-        label: 'Average Feedback Rating',
-        data: topTrainersByFeedback?.map((t) => t.averageRating) || [],
-        backgroundColor: '#416a82',
-        hoverBackgroundColor: '#275773',
-        borderRadius: 3,
-        borderSkipped: false,
+        backgroundColor: ['#0d9488', '#e05272', '#f59e0b', '#6366f1', '#0284c7', '#a78bfa'],
       },
     ],
   };
@@ -112,58 +91,16 @@ const Dashboard = () => {
       </div>
 
       <div className="bento-grid">
-        <div className="bento-cell bento-span-5">
+        <div className="bento-cell bento-span-12">
           <div className="card table-card bento-panel h-100 clay-pressable">
             <div className="card-body">
               <h5 className="bento-panel__title">Attendance Summary</h5>
               {attendanceChartData.datasets[0].data.some((v) => v > 0) ? (
-                <Doughnut data={attendanceChartData} options={{ maintainAspectRatio: true, plugins: { legend: { position: 'bottom', labels: { color: chartText, boxWidth: 12, padding: 16 } } } }} />
+                <div className="dashboard-attendance-chart"><Doughnut data={attendanceChartData} options={{ maintainAspectRatio: true, plugins: { legend: { position: 'bottom', labels: { color: chartText, boxWidth: 12, padding: 16 } } } }} /></div>
               ) : (
                 <p className="text-muted text-center py-5">
                   No attendance recorded for today.
                 </p>
-              )}
-            </div>
-          </div>
-        </div>
-        <div className="bento-cell bento-span-7">
-          <div className="card table-card bento-panel h-100 clay-pressable">
-            <div className="card-body">
-              <h5 className="bento-panel__title">Top Trainers by Feedback</h5>
-              {topTrainersByFeedback?.length > 0 ? (
-                <Bar
-                  data={feedbackChartData}
-                  options={{
-                    responsive: true,
-                    plugins: {
-                      legend: { display: false },
-                      tooltip: {
-                        callbacks: {
-                          label: (context) => {
-                            const trainer = topTrainersByFeedback[context.dataIndex];
-                            const rating = formatRating(context.parsed.y);
-                            const responses = trainer?.responseCount || 0;
-                            return `${rating} (${responses} response${responses === 1 ? '' : 's'})`;
-                          },
-                        },
-                      },
-                    },
-                    scales: {
-                      y: {
-                        beginAtZero: true,
-                        max: 5,
-                        ticks: {
-                          stepSize: 1,
-                          color: chartText,
-                        },
-                        grid: { color: chartLine },
-                      },
-                      x: { ticks: { color: chartText }, grid: { display: false } },
-                    },
-                  }}
-                />
-              ) : (
-                <p className="text-muted text-center py-5">No feedback ratings yet.</p>
               )}
             </div>
           </div>

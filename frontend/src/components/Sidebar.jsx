@@ -2,13 +2,12 @@ import { NavLink } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.jsx';
 import { ChevronLeftIcon } from './icons.jsx';
 import { navItems } from '../config/navItems.js';
-import { formatRole } from '../utils/helpers.js';
 import '../styles/sidebar.css';
 import { useAiAssistant } from '../context/AiAssistantContext.jsx';
 import SalluAvatar from './SalluAvatar.jsx';
 
 const Sidebar = ({ collapsed = false, labelsVisible = true, onToggle }) => {
-  const { user, hasRole } = useAuth();
+  const { hasRole } = useAuth();
   const assistant = useAiAssistant();
 
   const visibleItems = navItems.filter((item) =>
@@ -68,15 +67,6 @@ const Sidebar = ({ collapsed = false, labelsVisible = true, onToggle }) => {
           </button>
         )}
 
-        <div className="user-info">
-          <div className="user-avatar" title={user?.name || 'User'}>
-            {user?.name?.charAt(0) || 'U'}
-          </div>
-          <div className="sidebar-user-text">
-            <div className="user-name">{user?.name}</div>
-            <small className="text-white-50">{formatRole(user?.role)}</small>
-          </div>
-        </div>
       </div>
     </aside>
   );

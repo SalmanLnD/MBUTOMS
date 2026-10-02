@@ -1,3 +1,5 @@
+import TopicTrackerEntry from '../../models/TopicTrackerEntry.js';
+import { buildTopicTrackerSessions, buildTopicTrackerOverview } from '../../utils/topicTrackerSessions.js';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import Schedule from '../../models/Schedule.js';
@@ -20,7 +22,7 @@ const schedule = (overrides = {}) => ({
   day: 'Wednesday', startTime: '10:00', endTime: '12:00', department: 'CSE', section: 'A',
   venue: { _id: 'venue', name: 'Room 101', building: 'Block A', floor: '1' }, ...overrides,
 });
-function fixtures(t, { schedules = [schedule()], leaves = [], cancellations = [], trainers = [trainer] } = {}) {
+function fixtures(t, { schedules = [schedule()], leaves = [], cancellations = [], holidays = [], trainers = [trainer] } = {}) {
   const query = (rows) => ({
     select() { return this; }, sort() { return this; }, populate() { return this; },
     lean: async () => rows,
@@ -38,7 +40,8 @@ function fixtures(t, { schedules = [schedule()], leaves = [], cancellations = []
     filter['replacements.0'] ? leave.replacements?.length : true
   )));
   t.mock.method(ClassCancellation, 'find', () => query(cancellations));
-  t.mock.method(OfficialHoliday, 'find', () => query([]));
+  t.mock.method(OfficialHoliday, 'find', () => query(holidays));
+  t.mock.method(TopicTrackerEntry, 'find', () => query([]));
   clearSubjectStartDateCache();
   t.after(clearSubjectStartDateCache);
 }
@@ -147,4 +150,40 @@ test('Venue Live leaves the subject-cache contract, attendance hours and RTET ou
   assert.deepEqual(await buildSubjectStartDateMap(), beforeMap);
   assert.equal(await computeClassHandlingHours(trainer._id, date), beforeHours);
   assert.deepEqual(await buildRtetExportPayload(), beforeRtet);
+});
+
+ test('holidays suppress owned, special, and replacement classes on any operational date', async (t) => {
+   for (const date of ['2026-09-16', '2026-09-23']) {
+     await t.test(date, async (t) => {
+       const leave = { trainer: trainer._id, startDate: new Date(date), endDate: new Date(date),
+         scope: 'full_day', affectedSchedules: ['slot'], replacements: [{ schedule: 'slot', isExternal: true, externalTrainerName: 'Guest' }] };
+       fixtures(t, { schedules: [schedule(), schedule({ _id: 'special-slot', isSpecial: true, specialType: 'one_time',
+         specialStartDate: new Date(date), specialEndDate: new Date(date) })],
+         holidays: [{ date: new Date(date), name: 'Test holiday' }], leaves: [leave] });
+       const result = await live(date);
+       assert.equal(result.trainers.length, 1);
+       assert.equal(result.trainers[0].status, 'free');
+       assert.equal(result.trainers[0].venue, null);
+       assert.equal(result.trainers[0].schedule, null);
+     });
+   }
+ });
+
+test('day overview and tracker sessions exclude holidays and selected cancellations across dates', async (t) => {
+  for (const date of ['2026-09-16', '2026-09-23']) {
+    for (const mode of ['working', 'holiday', 'cancelled', 'partial cancellation']) {
+      await t.test(date + ' ' + mode, async (t) => {
+        const schedules = [schedule({ subject }), schedule({ _id: 'other-slot', subject, startTime: '13:00', endTime: '15:00' })];
+        fixtures(t, { schedules, holidays: mode === 'holiday' ? [{ date: new Date(date) }] : [],
+          cancellations: mode === 'cancelled' ? [{ schedules: ['slot', 'other-slot'] }]
+            : mode === 'partial cancellation' ? [{ schedules: ['slot'] }] : [] });
+        const expected = mode === 'working' ? 2 : mode === 'partial cancellation' ? 1 : 0;
+        const sessions = await buildTopicTrackerSessions({ date, user: { role: 'admin' }, lite: true });
+        assert.equal(sessions.sessions.length, expected);
+        const overview = await buildTopicTrackerOverview({ date, user: { role: 'admin' } });
+        assert.equal(overview.subjects.reduce((sum, row) => sum + row.allottedSlots, 0), expected);
+        if (mode === 'partial cancellation') assert.equal(sessions.sessions[0].scheduleId, 'other-slot');
+      });
+    }
+  }
 });

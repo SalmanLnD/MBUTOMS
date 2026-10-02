@@ -1,5 +1,6 @@
 import ClassCancellation from '../models/ClassCancellation.js';
-import { normalizeAttendanceDate } from './attendanceTracking.js';
+import { normalizeAttendanceDate, toAttendanceDateKey } from './attendanceTracking.js';
+import { loadOfficialHolidayMap } from './officialHolidays.js';
 
 export const getCanceledScheduleIdsForDate = async (dateInput) => {
   const date = normalizeAttendanceDate(dateInput);
@@ -12,6 +13,16 @@ export const getCanceledScheduleIdsForDate = async (dateInput) => {
       (entry.schedules || []).map((schedule) => schedule.toString())
     )
   );
+};
+
+/** Shared exclusions for actual classes on an IST calendar date. */
+export const getClassExclusionsForDate = async (dateInput) => {
+  const date = normalizeAttendanceDate(dateInput);
+  const [canceledScheduleIds, holidayMap] = await Promise.all([
+    getCanceledScheduleIdsForDate(date),
+    loadOfficialHolidayMap(date, date),
+  ]);
+  return { canceledScheduleIds, isOfficialHoliday: holidayMap.has(toAttendanceDateKey(date)) };
 };
 
 export const excludeCanceledSchedules = (schedules, canceledScheduleIds) =>

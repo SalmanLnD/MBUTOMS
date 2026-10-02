@@ -2,7 +2,6 @@ import { useState, useEffect, useLayoutEffect, useCallback, Fragment, useMemo, u
 import LoadingSpinner from '../components/LoadingSpinner.jsx';
 import TrainerAttendanceRow from './TrainerAttendanceRow.jsx';
 import StyledSelect from './StyledSelect.jsx';
-import CollapsibleFilters from './CollapsibleFilters.jsx';
 import { showError, showSuccess } from '../utils/toast.js';
 import { useAuth } from '../context/AuthContext.jsx';
 import {
@@ -369,17 +368,18 @@ const TrainerAttendanceTab = () => {
 
   return (
     <>
-      <div className="trainer-attendance-toolbar mb-3">
+      <div className="trainer-attendance-toolbar mb-2">
         <h5 className="mb-0">Monthly Trainer Attendance</h5>
 
         <div className="trainer-attendance-month-controls">
           <button
             type="button"
             className="btn btn-outline-secondary btn-sm"
+            aria-label="Previous month"
             disabled={atEarliestMonth}
             onClick={() => setMonthParts((current) => shiftMonth(current, -1))}
           >
-            Previous Month
+            ‹
           </button>
           <StyledSelect
             size="sm"
@@ -395,10 +395,11 @@ const TrainerAttendanceTab = () => {
           <button
             type="button"
             className="btn btn-outline-secondary btn-sm"
+            aria-label="Next month"
             disabled={atLatestMonth}
             onClick={() => setMonthParts((current) => shiftMonth(current, 1))}
           >
-            Next Month
+            ›
           </button>
           <button
             type="button"
@@ -434,7 +435,7 @@ const TrainerAttendanceTab = () => {
       )}
 
       {(canManageAll || canManageHolidays) && (
-        <div className="d-flex flex-wrap align-items-center gap-2 mb-3">
+        <div className="trainer-attendance-tools d-flex flex-wrap align-items-center gap-2 mb-2">
           {canManageHolidays && (
             <button
               type="button"
@@ -465,9 +466,6 @@ const TrainerAttendanceTab = () => {
                   <SheetIcon size={16} aria-hidden="true" />
                   Sheet setup
                 </button>
-                <span className="text-muted small">
-                  Continuous attendance timeline refreshes every 15 minutes
-                </span>
               </>
             ) : (
               <button
@@ -484,7 +482,7 @@ const TrainerAttendanceTab = () => {
       )}
 
       {!loading && grid && (
-        <div className="trainer-attendance-summary mb-3">
+        <div className="trainer-attendance-summary mb-2">
           <span className="trainer-attendance-pill">{monthLabel}</span>
           {refreshing && (
             <span className="trainer-attendance-pill text-muted">Refreshing...</span>
@@ -507,9 +505,7 @@ const TrainerAttendanceTab = () => {
       )}
 
       {canManageAll && !loading && grid?.rows?.length > 0 && (
-        <CollapsibleFilters label="Filter trainers">
-        <div className="row g-2 mb-3">
-          <div className="col-md-4">
+        <div className="trainer-attendance-search mb-2">
             <input
               type="search"
               className="form-control form-control-sm"
@@ -518,9 +514,7 @@ const TrainerAttendanceTab = () => {
               onChange={(e) => setTrainerSearch(e.target.value)}
               aria-label="Filter trainers in attendance grid"
             />
-          </div>
         </div>
-        </CollapsibleFilters>
       )}
 
       {loading && (!grid || grid.month !== monthKey) ? (

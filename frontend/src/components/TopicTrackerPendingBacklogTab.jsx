@@ -79,12 +79,6 @@ const TopicTrackerPendingBacklogTab = ({ refreshKey = 0, onOpenTracker }) => {
       <div className="d-flex flex-wrap align-items-end justify-content-between gap-3 mb-3">
         <div>
           <h2 className="h6 fw-semibold mb-1">Pending unclosed trackers</h2>
-          <p className="text-muted small mb-0">
-            All open slots from{' '}
-            {backlog?.from ? formatDate(backlog.from) : 'tracking start'} through{' '}
-            {backlog?.until ? formatDate(backlog.until) : 'today'}. Day overview still shows one
-            date at a time.
-          </p>
         </div>
         <div className="d-flex flex-wrap align-items-end gap-2">
           <div style={{ minWidth: 180 }}>

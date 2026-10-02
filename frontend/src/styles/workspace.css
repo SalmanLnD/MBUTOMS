@@ -21,3 +21,47 @@
   .bento-panel .card-body { padding: 1.25rem; }
 }
 @media (min-width: 1200px) { .bento-span-3 { --bento-span: 3; } .bento-span-4 { --bento-span: 4; } .bento-span-5 { --bento-span: 5; } .bento-span-6 { --bento-span: 6; } .bento-span-7 { --bento-span: 7; } .bento-span-8 { --bento-span: 8; } .bento-span-12 { --bento-span: 12; } }
+/* Shared color, density, and grid readability. */
+.card, .table-card { box-shadow: var(--shadow-sm); }
+.stat-card { border-top: 3px solid var(--stat-color,var(--primary)); background: linear-gradient(130deg,var(--surface) 45%,var(--stat-wash,var(--primary-soft))); }
+.stat-card .stat-icon { width: 42px; height: 42px; border-radius: 12px; color: var(--stat-color); background: var(--stat-wash); }
+.dashboard-attendance-chart { max-width: 380px; margin: auto; }
+.sidebar { background: linear-gradient(175deg,#253569,#172544); }
+.sidebar-link.active { background: #635bdb; box-shadow: inset 3px 0 #63e4cf; }
+.sidebar-link-label { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; overflow-wrap: normal; }
+.main-content .table:not(.timetable-grid):not(.trainer-attendance-month-table) { min-width: 760px; }
+.table .badge { width: max-content; max-width: none; }
+.trainer-attendance-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: .65rem 1rem; padding: .7rem .85rem; background: var(--primary-soft); }
+.trainer-attendance-toolbar h5 { flex: 1 0 180px; font-size: .95rem; }
+.trainer-attendance-month-controls { flex: 1 1 540px; gap: .35rem; }
+.trainer-attendance-month-controls .trainer-attendance-month-select { flex: 1 1 160px; width: auto; max-width: 220px; }
+.trainer-attendance-month-controls .btn { white-space: nowrap; }
+.trainer-attendance-search { max-width: 360px; }
+.trainer-attendance-pill { padding: .2rem .5rem; border: 0; border-radius: 999px; background: var(--primary-soft); color: var(--primary-strong); }
+.trainer-attendance-grid { max-height: 65vh; min-height: 260px; isolation: isolate; border: 1px solid var(--line); border-radius: 10px; }
+.trainer-attendance-month-table { border-collapse: separate; border-spacing: 0; }
+.trainer-attendance-month-table thead { position: sticky; top: 0; z-index: 6; }
+.trainer-attendance-month-table thead tr:first-child th { height: 42px; }
+.trainer-attendance-month-table thead tr:nth-child(2) th { height: 36px; }
+.trainer-attendance-month-table col.trainer-attendance-oif-col, .trainer-attendance-grid .trainer-attendance-oif-cell { width: 148px; }
+.trainer-attendance-month-table col.trainer-attendance-mock-col, .trainer-attendance-grid .trainer-attendance-mock-cell { width: 76px; }
+.trainer-attendance-month-table col.trainer-attendance-class-col, .trainer-attendance-grid .trainer-attendance-class-cell { width: 76px; }
+.trainer-attendance-month-table col.trainer-attendance-food-col, .trainer-attendance-grid .trainer-attendance-food-cell { width: 124px; }
+.trainer-attendance-month-table tbody td, .trainer-attendance-month-table tbody th { padding: .5rem .55rem; }
+.trainer-attendance-grid .toms-styled-select--table-cell { width: 100%; min-width: 0; }
+.trainer-attendance-grid .trainer-attendance-oif-input, .trainer-attendance-grid .trainer-attendance-class-input { min-width: 0; padding-inline: .45rem; }
+.trainer-attendance-grid .trainer-attendance-future { opacity: 1; color: var(--text-secondary); }
+.trainer-attendance-grid .form-control:disabled, .trainer-attendance-grid .toms-styled-select__trigger:disabled { opacity: 1; color: var(--text-secondary); }
+@media (min-width: 768px) {
+.main-content .btn-sm, .toms-collapsible-filters__content .btn { min-height: 34px; padding: .35rem .65rem; }
+.toms-collapsible-filters__content .form-control, .toms-collapsible-filters__content .form-select, .toms-collapsible-filters__content .toms-styled-select__trigger, .trainer-attendance-toolbar .toms-styled-select__trigger, .trainer-attendance-grid .form-control, .trainer-attendance-grid .toms-styled-select__trigger { min-height: 34px; font-size: .875rem; }
+}
+@media (max-width: 575.98px) {
+  .main-content .trainer-directory-table, .main-content .venue-live-table { min-width: 0 !important; }
+}
+.trainer-attendance-grid .trainer-attendance-day-header.trainer-attendance-future { color: #fff; }
+.trainer-attendance-grid .trainer-attendance-day-header.trainer-attendance-weekend { color: var(--text-secondary); }
+.trainer-attendance-grid .trainer-attendance-day-header.trainer-attendance-holiday { color: var(--amber); }
+.trainer-attendance-month-table col.trainer-attendance-totals-col, .trainer-attendance-grid .trainer-attendance-totals-col { width: 210px; min-width: 210px; }
+.trainer-attendance-totals-cell { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: .15rem .6rem; font-size: .75rem; }
+.trainer-attendance-totals-cell > div { display: flex; justify-content: space-between; gap: .3rem; white-space: nowrap; }

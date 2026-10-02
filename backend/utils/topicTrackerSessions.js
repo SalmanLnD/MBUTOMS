@@ -8,7 +8,7 @@ import Leave from '../models/Leave.js';
 import ClassCancellation from '../models/ClassCancellation.js';
 import { filterSchedulesActiveOnDate } from './activeSchedulesForDate.js';
 import { SPECIAL_CLASS_FIELDS } from './specialClass.js';
-import { getCanceledScheduleIdsForDate } from './classCancellations.js';
+import { getClassExclusionsForDate } from './classCancellations.js';
 import { buildCanceledScheduleIdsByDate } from './leaveAffectedClasses.js';
 import { computeHours } from './trainerClassHours.js';
 import { resolveTrainerScheduleCodes } from './trainerMappings.js';
@@ -441,6 +441,8 @@ export const buildTopicTrackerSessions = async ({
   const dayWindow = getLeaveDayWindow(dateKey);
   const ref = toOperationalNoon(dateKey);
   const dayName = WEEKDAYS[ref.getUTCDay()];
+  const { canceledScheduleIds, isOfficialHoliday } = await getClassExclusionsForDate(dateKey);
+  if (isOfficialHoliday) return { date: dateKey, day: dayName, sessions: [] };
 
   const scheduleFilter = { day: dayName };
   if (subjectId) scheduleFilter.subject = subjectId;
@@ -454,13 +456,11 @@ export const buildTopicTrackerSessions = async ({
 
   const [
     activeSchedules,
-    canceledScheduleIds,
     trainerLookup,
     studentCountMap,
     classGroupMap,
   ] = await Promise.all([
     filterSchedulesActiveOnDate(schedules, ref),
-    getCanceledScheduleIdsForDate(ref),
     buildTrainerLookup(),
     lite ? new Map() : buildStudentCountMap(),
     lite ? new Map() : buildClassGroupMap(),

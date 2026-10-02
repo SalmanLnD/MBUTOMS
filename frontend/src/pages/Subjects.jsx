@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import Modal from '../components/Modal.jsx';
 import LoadingSpinner from '../components/LoadingSpinner.jsx';
 import Pagination from '../components/Pagination.jsx';
 import { showError, showSuccess } from '../utils/toast.js';
@@ -60,6 +61,7 @@ const Subjects = () => {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [selectedSubject, setSelectedSubject] = useState(null);
+  const [detailsOpen, setDetailsOpen] = useState(false);
   const [showModal, setShowModal] = useState(false);
   const [editingSubject, setEditingSubject] = useState(null);
   const [pendingDelete, setPendingDelete] = useState(null);
@@ -141,6 +143,7 @@ const Subjects = () => {
   };
 
   const handleRowSelect = (subject) => {
+    setDetailsOpen(true);
     setSelectedSubject(subject);
   };
 
@@ -281,7 +284,11 @@ const Subjects = () => {
     <>
       <div className="card table-card mb-3">
         <div className="card-body">
-          <CollapsibleFilters label="Subject filters">
+          <CollapsibleFilters label="Subject filters" actions={canManage && (
+            <button className="btn btn-primary" onClick={() => { setEditingSubject(null); setShowModal(true); }}>
+              + Add Subject
+            </button>
+          )}>
           <div className="row g-2 mb-3 align-items-center">
             <div className="col-md-6">
               <input
@@ -295,13 +302,6 @@ const Subjects = () => {
 
           </div>
           </CollapsibleFilters>
-            {canManage && (
-              <div className="page-create-action">
-                <button className="btn btn-primary" onClick={() => { setEditingSubject(null); setShowModal(true); }}>
-                  + Add Subject
-                </button>
-              </div>
-            )}
           <p className="text-muted small mb-3">
             {canManage
               ? 'Click a subject row to view details, or use Edit to manage syllabus, CHO, practice portal, and topic tracker topics.'
@@ -346,7 +346,17 @@ const Subjects = () => {
                           <tr
                             key={subject._id}
                             className={isSelected ? 'table-active' : ''}
-                            onClick={() => handleRowSelect(subject)}
+                            tabIndex={0}
+                            aria-label={`View details for ${subject.name}`}
+                            onClick={(event) => {
+                              if (!event.target.closest('button, a, input, select')) handleRowSelect(subject);
+                            }}
+                            onKeyDown={(event) => {
+                              if (event.target === event.currentTarget && (event.key === 'Enter' || event.key === ' ')) {
+                                event.preventDefault();
+                                handleRowSelect(subject);
+                              }
+                            }}
                             style={{ cursor: 'pointer' }}
                           >
                             <td><code>{subject.code}</code></td>
@@ -360,7 +370,7 @@ const Subjects = () => {
                               </>
                             )}
                             {canManage && (
-                              <td onClick={(event) => event.stopPropagation()}>
+                              <td>
                                 <div className="btn-group btn-group-sm action-btn-group">
                                   <ActionIconButton
                                     variant="edit"
@@ -401,10 +411,11 @@ const Subjects = () => {
         </div>
       </div>
 
-      {selectedSubject && (
-        <div className="card table-card">
-          <div className="card-body">
-            <h2 className="h5 fw-semibold mb-3">{selectedSubject.name}</h2>
+      {detailsOpen && selectedSubject && (
+        <Modal show title={selectedSubject.name} size="toms-modal-lg" scrollable
+          onClose={() => setDetailsOpen(false)}
+          footer={<button type="button" className="btn btn-outline-secondary" onClick={() => setDetailsOpen(false)}>Close</button>}>
+          <div className="toms-modal-body">
             <div className="row g-3 mb-3">
               <div className="col-sm-4">
                 <label className="text-muted small">Subject Code</label>
@@ -442,7 +453,7 @@ const Subjects = () => {
             {renderResourceButtons()}
             {renderTopicsSection()}
           </div>
-        </div>
+        </Modal>
       )}
 
       {showModal && canManage && (

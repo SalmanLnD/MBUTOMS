@@ -1,7 +1,7 @@
 import Leave from '../models/Leave.js';
 import Trainer from '../models/Trainer.js';
 import Schedule from '../models/Schedule.js';
-import { getCanceledScheduleIdsForDate } from './classCancellations.js';
+import { getClassExclusionsForDate } from './classCancellations.js';
 import { buildTimetableBoardForDate } from './timetableBoard.js';
 import {
   buildSubjectStartDateMap,
@@ -320,13 +320,14 @@ export const buildLiveTrainerVenues = async ({ now = new Date(), time } = {}) =>
     : now;
 
   const rosterFilter = await mergeRosterFilter({}, { rosterOnly: true });
-  const [{ schedulesByTrainer }, trainers, subjectStarts] = await Promise.all([
+  const [{ schedulesByTrainer }, trainers, subjectStarts, exclusions] = await Promise.all([
     buildTimetableBoardForDate({ referenceDate }),
     Trainer.find(rosterFilter)
       .select('name employeeId')
       .sort({ employeeId: 1 })
       .lean(),
     buildSubjectStartDateMap(),
+    getClassExclusionsForDate(clock.dateKey),
   ]);
 
   const trainerIds = trainers.map((trainer) => trainer._id);
@@ -375,20 +376,19 @@ export const buildLiveTrainerVenues = async ({ now = new Date(), time } = {}) =>
   // Keep exactly one row per roster trainer and assign coverage to that trainer.
   const liveSchedules = Object.fromEntries(Object.entries(schedulesByTrainer)
     .filter(([key]) => !key.startsWith('external:'))
-    .map(([key, schedules]) => [key, schedules.filter((s) => !s.isReplacementAssignment)]));
+    .map(([key, schedules]) => [key, schedules.filter((s) => !exclusions.isOfficialHoliday
+      && !exclusions.canceledScheduleIds.has(recordId(s)) && !s.isReplacementAssignment)]));
   const replacementIds = [...replacementBySchedule.keys()];
-  if (replacementIds.length) {
-    const [replacementSchedules, canceledIds] = await Promise.all([
+  if (replacementIds.length && !exclusions.isOfficialHoliday) {
+    const replacementSchedules = await
       Schedule.find({ _id: { $in: replacementIds } })
         .select('day startTime endTime department section subjectCode subject slot venue isLab isProject')
-        .populate('venue', 'name building floor').lean(),
-      getCanceledScheduleIdsForDate(referenceDate),
-    ]);
+        .populate('venue', 'name building floor').lean();
     const scheduleById = new Map(replacementSchedules.map((s) => [recordId(s), s]));
     for (const [scheduleId, replacement] of replacementBySchedule) {
       const schedule = scheduleById.get(scheduleId);
       const leave = sourceLeaveBySchedule.get(scheduleId);
-      if (!schedule || canceledIds.has(scheduleId) || !isScheduleDayInLeaveRange(schedule.day, leave)) continue;
+      if (!schedule || exclusions.canceledScheduleIds.has(scheduleId) || !isScheduleDayInLeaveRange(schedule.day, leave)) continue;
       const source = trainerById.get(recordId(leave.trainer));
       const key = replacement.isExternal ? `external:${replacement.name.toLowerCase()}` : replacement.employeeId;
       if (!liveSchedules[key]) liveSchedules[key] = [];
@@ -406,7 +406,7 @@ export const buildLiveTrainerVenues = async ({ now = new Date(), time } = {}) =>
     byId,
     byCode,
     replacementBySchedule,
-    leaves,
+    leaves: exclusions.isOfficialHoliday ? [] : leaves,
   }));
 
   const representedScheduleIds = new Set(

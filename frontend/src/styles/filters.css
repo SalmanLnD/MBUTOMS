@@ -26,3 +26,22 @@
 .mark-entry-score-filter__value { width: 66px; flex: 0 0 66px; }
 .mark-entry-marks-heading { display: flex; min-width: 190px; flex-direction: column; gap: .3rem; }
 @media (max-width: 575.98px) { .toms-collapsible-filters__content { padding: .7rem; } .mark-entry-filters { grid-template-columns: 1fr; } .mark-entry-filters__actions .btn { min-height: 44px; } }
+.toms-collapsible-filters__toggle { width: auto; min-width: 130px; min-height: 34px; padding: .35rem .65rem; border-radius: 999px; }
+.toms-collapsible-filters__content { padding: .65rem; background: var(--surface); border-radius: 10px; box-shadow: var(--shadow-xs); }
+.toms-collapsible-filters__content .row { row-gap: .5rem; }
+.toms-collapsible-filters__content .form-label { margin-bottom: .2rem; font-size: .78rem; }
+.toms-collapsible-filters__content > .row { margin-bottom: 0 !important; }
+@media (pointer: coarse) { .toms-collapsible-filters__toggle { min-height: 44px; } }
+.toms-collapsible-filters__header { display: flex; align-items: center; justify-content: space-between; gap: .5rem; margin-bottom: .5rem; }
+.toms-collapsible-filters__header .toms-collapsible-filters__toggle { margin-bottom: 0; }
+.toms-collapsible-filters__actions { display: flex; align-items: center; flex-shrink: 0; }
+.toms-collapsible-filters__actions .btn { white-space: nowrap; }
+.timetable-filter-panel .timetable-controls { display: flex; flex-wrap: wrap; align-items: end; gap: .65rem; }
+.timetable-filter-panel .timetable-controls > .col-md-3 { flex: 1 1 180px; width: auto; min-width: 0; padding-inline: 0; }
+.timetable-filter-panel .timetable-icon-actions { display: flex; flex: 0 0 auto; align-items: center; gap: .4rem; padding: 0; }
+.timetable-icon-actions .timetable-icon-btn { display: inline-grid; place-items: center; width: 44px; height: 44px; min-height: 44px; padding: 0; border-radius: 8px; }
+@media (max-width: 767.98px) {
+  .timetable-filter-panel .timetable-controls > .col-md-3 { flex-basis: calc(50% - .65rem); }
+  .timetable-filter-panel .timetable-controls > .col-md-3:first-child { flex-basis: 100%; }
+  .timetable-filter-panel .timetable-icon-actions { flex-basis: 100%; justify-content: flex-end; }
+}
