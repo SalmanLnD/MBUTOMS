@@ -31,8 +31,8 @@ const Sidebar = ({ collapsed = false, labelsVisible = true, onToggle }) => {
       </div>
 
       <nav className="sidebar-nav" aria-label="Main navigation">
-        {assistant?.enabled && <button type="button" className={`sidebar-link sidebar-assistant${assistant.open ? ' active' : ''}`}
-          onClick={assistant.openAssistant} aria-label="Open Sallu" aria-haspopup="dialog" aria-expanded={assistant.open}>
+        {assistant?.enabled && <button type="button" className={`sidebar-link sidebar-assistant${assistant.petVisible ? ' active' : ''}`}
+          onClick={assistant.togglePet} aria-label="Toggle Sallu pet" aria-pressed={assistant.petVisible}>
           <span className="nav-icon" aria-hidden="true"><SalluAvatar size={24} /></span><span className="sidebar-link-label">Sallu</span>
         </button>}
         {visibleItems.map(({ path, label, Icon }) => (

@@ -1,10 +1,7 @@
-.sallu-avatar { display: block; flex-shrink: 0; }
-.sallu-avatar__hand, .sallu-avatar__mouth { display: none; }
-.sallu-avatar--thinking .sallu-avatar__hand { display: block; animation: sallu-think 1.8s ease-in-out infinite; transform-origin: 29px 42px; }
-.sallu-avatar--speaking .sallu-avatar__smile { display: none; }
-.sallu-avatar--speaking .sallu-avatar__mouth { display: block; transform-box: fill-box; transform-origin: center; animation: sallu-talk .2s ease-in-out 5; }
-@keyframes sallu-think { 0%, 100% { transform: rotate(-3deg); } 50% { transform: rotate(3deg); } }
-@keyframes sallu-talk { 0%, 100% { transform: scaleY(.15); } 50% { transform: scaleY(1); } }
-@media (prefers-reduced-motion: reduce) {
-  .sallu-avatar--thinking .sallu-avatar__hand, .sallu-avatar--speaking .sallu-avatar__mouth { animation: none; }
-}
+.sallu-avatar { display: inline-block; position: relative; overflow: hidden; flex-shrink: 0; border-radius: 50%; background: var(--teal-soft,#e4f0f0); }
+.sallu-avatar__portrait { position: absolute; width: 220%; height: 220%; left: -65%; top: -7%; background: url('/images/sallu/character-atlas.png') 0 0 / 300% 300% no-repeat; transform-origin: 50% 25%; }
+.sallu-avatar--thinking .sallu-avatar__portrait { animation: sallu-portrait-think 1.8s ease-in-out infinite; }
+.sallu-avatar--speaking .sallu-avatar__portrait { animation: sallu-portrait-talk .25s ease-in-out 4; }
+@keyframes sallu-portrait-think { 0%,100% { transform: rotate(-4deg); } 50% { transform: rotate(4deg); } }
+@keyframes sallu-portrait-talk { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-2px); } }
+@media (prefers-reduced-motion: reduce) { .sallu-avatar__portrait { animation: none !important; } }

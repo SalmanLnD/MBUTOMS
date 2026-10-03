@@ -1,0 +1,66 @@
+export const punchReactions = [
+  'ouch', 'surprised', 'offended', 'recoil-left', 'recoil-right',
+  'belly-rub', 'dizzy', 'startled', 'duck', 'ticklish',
+  'cheeky', 'grumpy', 'pleading', 'gasp', 'boxing',
+];
+
+// A shuffled bag gives every expression a turn and avoids repeated boundaries.
+export const nextPunchReaction = (bag, previous, random = Math.random) => {
+  if (!bag.length) {
+    bag.push(...punchReactions.map((_, index) => index));
+    for (let i = bag.length - 1; i > 0; i--) {
+      const j = Math.floor(random() * (i + 1));
+      [bag[i], bag[j]] = [bag[j], bag[i]];
+    }
+    if (bag[bag.length - 1] === previous) [bag[0], bag[bag.length - 1]] = [bag[bag.length - 1], bag[0]];
+  }
+  return bag.pop();
+};
+
+export const cursorPose = (dx, dy) => {
+  const x = Math.abs(dx), ratio = x / Math.max(1, Math.abs(dy));
+  if (x < 55 && Math.abs(dy) < 65) return 'front';
+  if (dy < -70) {
+    if (x < 55) return 'gaze-2';
+    if (x > 650 && ratio > 2.4) return dx < 0 ? 'gaze-14' : 'gaze-15';
+    if (dx < 0) return `gaze-${ratio < .65 ? 0 : ratio < 1.4 ? 1 : 5}`;
+    return ratio < .65 ? 'gaze-3' : 'gaze-6';
+  }
+  if (dy > 70) {
+    if (x < 55) return 'gaze-10';
+    if (dx < 0) return ratio < .65 ? 'gaze-8' : 'gaze-9';
+    return 'gaze-11';
+  }
+  if (x > 480) return dx < 0 ? 'gaze-4' : 'gaze-7';
+  return dx < 0 ? 'gaze-12' : 'gaze-13';
+};
+
+export const playPunchSound = async ctx => {
+  // Resume must finish before scheduling; embedded browsers can suspend audio.
+  if (ctx.state !== 'running') await ctx.resume();
+  if (ctx.state !== 'running') throw new Error('Audio is paused by the browser');
+  const now = ctx.currentTime;
+  const oscillator = ctx.createOscillator(), thump = ctx.createGain();
+  oscillator.type = 'sine';
+  oscillator.frequency.setValueAtTime(230, now);
+  oscillator.frequency.exponentialRampToValueAtTime(75, now + .22);
+  thump.gain.setValueAtTime(.65, now);
+  thump.gain.exponentialRampToValueAtTime(.001, now + .3);
+  oscillator.connect(thump); thump.connect(ctx.destination);
+  oscillator.start(now); oscillator.stop(now + .32);
+  oscillator.onended = () => { oscillator.disconnect(); thump.disconnect(); };
+
+  // Short filtered noise adds an audible impact on small speakers.
+  const buffer = ctx.createBuffer(1, Math.ceil(ctx.sampleRate * .13), ctx.sampleRate);
+  const samples = buffer.getChannelData(0);
+  let seed = 5731;
+  for (let i = 0; i < samples.length; i++) {
+    seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0;
+    samples[i] = (seed / 4294967296 * 2 - 1) * Math.exp(-i / (ctx.sampleRate * .035));
+  }
+  const noise = ctx.createBufferSource(), filter = ctx.createBiquadFilter(), impact = ctx.createGain();
+  noise.buffer = buffer; filter.type = 'lowpass'; filter.frequency.value = 1800; impact.gain.value = .55;
+  noise.connect(filter); filter.connect(impact); impact.connect(ctx.destination);
+  noise.start(now);
+  noise.onended = () => { noise.disconnect(); filter.disconnect(); impact.disconnect(); };
+};

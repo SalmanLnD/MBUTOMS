@@ -2,6 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useRef, useState } f
 import { useAuth } from './AuthContext.jsx';
 import { canUseAiAssistant } from '../utils/aiAssistantAccess.js';
 import AiAssistant from '../components/AiAssistant.jsx';
+import SalluPet from '../components/SalluPet.jsx';
 import Modal from '../components/Modal.jsx';
 import { getAiUsage } from '../services/aiService.js';
 import { version } from '../../package.json';
@@ -11,6 +12,8 @@ export const useAiAssistant = () => useContext(AiAssistantContext);
 
 const AssistantSession = ({ children, enabled, userId, showRelease }) => {
   const [open, setOpen] = useState(false);
+  const [petVisible, setPetVisible] = useState(() => window.innerWidth >= 768);
+  const togglePet = useCallback(() => { setPetVisible(current => !current); setOpen(false); }, []);
   const [usage, setUsage] = useState(null);
   const [usageError, setUsageError] = useState(false);
   const noticeKey = `toms_sallu_notice:${userId}:${version}`;
@@ -48,8 +51,9 @@ const AssistantSession = ({ children, enabled, userId, showRelease }) => {
     });
   }, []);
   return (
-    <AiAssistantContext.Provider value={{ enabled, open, openAssistant, closeAssistant }}>
+    <AiAssistantContext.Provider value={{ enabled, open, openAssistant, closeAssistant, petVisible, togglePet }}>
       {children}
+      {enabled && <SalluPet open={open} onOpen={openAssistant} visible={petVisible} onVisibilityChange={setPetVisible} />}
       {enabled && <AiAssistant open={open} onClose={closeAssistant} usage={usage} usageError={usageError} refreshUsage={refreshUsage} />}
       <Modal show={enabled && showRelease && notice && Boolean(usage || usageError)} title={`Welcome to TOMS v${version}`} onClose={dismissNotice} scrollable
         footer={<button type="button" className="btn btn-primary" onClick={dismissNotice}>Got it</button>}>

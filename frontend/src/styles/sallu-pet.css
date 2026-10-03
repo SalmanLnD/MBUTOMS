@@ -1,0 +1,50 @@
+.sallu-pet { position: fixed; z-index: 1030; width: var(--pet-size); height: var(--pet-size);  pointer-events: none; }
+.sallu-pet.is-walking { transition: left 4s linear, bottom 4s linear; }
+.sallu-pet__sprite--profile-left { background-position: 50% 0; }
+.sallu-pet__sprite--profile-right { background-position: 50% 0; transform: scaleX(-1); }
+.sallu-pet[hidden] { display: none; }
+.sallu-pet__sprite { width: 100%; height: 100%; background: url('/images/sallu/character-atlas.png') 0 0 / 300% 300% no-repeat; transform-origin: center 85%; filter: drop-shadow(0 3px 2px #17233725); }
+.sallu-pet__sprite--back { background-position: 100% 0; }
+.sallu-pet__sprite--look-left { background-position: 50% 100%; }
+.sallu-pet__sprite--look-right { background-position: 100% 100%; }
+.sallu-pet__sprite--ouch, .sallu-pet__sprite--gaze { background: none; position: relative; }
+/* Generated atlas cells have a small overlap at the grid seams. Hide the
+   seam inside each sprite, before transforms, so neighbouring feet/heads
+   cannot appear as stray marks above or below the current character. */
+.sallu-pet__sprite { clip-path: inset(2%); }
+.sallu-pet.is-walking .sallu-pet__sprite { animation: sallu-pet-walk .65s steps(1,end) infinite; }
+.sallu-pet.is-walking[data-direction='left'] .sallu-pet__sprite { transform: scaleX(-1); }
+.sallu-pet.is-ouch .sallu-pet__sprite { animation: sallu-pet-recoil .5s ease-out; }
+.sallu-pet[data-reaction='dizzy'] .sallu-pet__sprite,
+.sallu-pet[data-reaction='ticklish'] .sallu-pet__sprite { animation: sallu-pet-wobble .65s ease-in-out; }
+.sallu-pet[data-reaction='startled'] .sallu-pet__sprite,
+.sallu-pet[data-reaction='gasp'] .sallu-pet__sprite { animation: sallu-pet-hop .55s ease-out; }
+.sallu-pet[data-reaction='duck'] .sallu-pet__sprite,
+.sallu-pet[data-reaction='belly-rub'] .sallu-pet__sprite { animation: sallu-pet-squash .55s ease-out; }
+.sallu-pet[data-reaction='boxing'] .sallu-pet__sprite { animation: sallu-pet-wobble .4s ease-in-out; }
+.sallu-pet__audio-status { display: block; padding: .4rem .6rem; font-size: .75rem; }
+.sallu-pet__hit { position: absolute; pointer-events: auto; border: 0; background: transparent; border-radius: 50%; padding: 0; touch-action: none; user-select: none; -webkit-user-select: none; }
+.sallu-pet.is-dragging { transition: none; }
+.sallu-pet.is-dragging .sallu-pet__hit { cursor: grabbing; }
+.sallu-pet__face { top: 5%; left: 23%; width: 58%; height: 43%; cursor: pointer; }
+.sallu-pet__body { top: 48%; left: 15%; width: 75%; height: 47%; cursor: grab; }
+.sallu-pet__hit:focus-visible { outline: 2px dashed var(--primary); outline-offset: 2px; background: var(--primary-soft); }
+.sallu-pet__settings { position: absolute; right: 0; top: 0; min-width: 28px; min-height: 28px; pointer-events: auto; background: var(--surface); color: var(--text-secondary); border: 1px solid var(--line); border-radius: 50%; font-size: 18px; opacity: 0; transition: opacity 150ms ease; }
+.sallu-pet:hover .sallu-pet__settings, .sallu-pet:focus-within .sallu-pet__settings { opacity: 1; }
+.sallu-pet__bubble { position: absolute; bottom: 100%; left: 50%; transform: translateX(-50%); padding: .4rem .7rem; border-radius: 12px 12px 12px 2px; color: var(--text-primary); background: var(--surface); border: 1px solid var(--line); box-shadow: var(--shadow-sm); font-size: .85rem; font-weight: 600; white-space: nowrap; }
+.sallu-pet__bubble:empty { display: none; }
+.sallu-pet__menu { position: absolute; right: 0; bottom: 100%; width: 165px; padding: .3rem; pointer-events: auto; background: var(--surface); color: var(--text-primary); border: 1px solid var(--line); border-radius: 8px; box-shadow: var(--shadow-md); }
+.sallu-pet__menu button { display: block; width: 100%; min-height: 40px; padding: .4rem .6rem; text-align: left; border: 0; border-radius: 5px; background: transparent; color: inherit; font-size: .8rem; }
+.sallu-pet__menu button:hover { background: var(--primary-soft); }
+.sallu-pet-return { position: fixed; z-index: 1030; right: 16px; bottom: 18px; background: var(--surface); }
+@keyframes sallu-pet-walk { 0%,100% { background-position: 0 50%; } 33% { background-position: 50% 50%; } 66% { background-position: 100% 50%; } }
+@keyframes sallu-pet-recoil { 0% { transform: rotate(0); } 25% { transform: rotate(-12deg) translateX(-8px); } 55% { transform: rotate(8deg) translateX(4px); } 100% { transform: rotate(0); } }
+@keyframes sallu-pet-wobble { 0%, 100% { transform: rotate(0); } 20%, 60% { transform: rotate(-9deg); } 40%, 80% { transform: rotate(9deg); } }
+@keyframes sallu-pet-hop { 0%, 100% { transform: translateY(0); } 40% { transform: translateY(-15px) rotate(4deg); } 75% { transform: scaleY(.95); } }
+@keyframes sallu-pet-squash { 0%, 100% { transform: scale(1); } 40% { transform: scale(1.06, .88); } 70% { transform: scale(.98, 1.03); } }
+.sallu-pet__nod-head { display: none; position: absolute; inset: 0; clip-path: inset(0 0 55% 0); transform-origin: 50% 43%; }
+.sallu-pet.is-nodding > .sallu-pet__sprite:not(.sallu-pet__nod-head) { clip-path: inset(44% 0 0 0); }
+.sallu-pet.is-nodding .sallu-pet__nod-head { display: block; animation: sallu-pet-nod .9s ease-in-out; }
+@keyframes sallu-pet-nod { 0%, 45%, 100% { transform: perspective(240px) rotateX(0); } 22%, 67% { transform: perspective(240px) rotateX(-22deg) translateY(3px); } }
+@media (max-width: 767.98px) { .sallu-pet__settings { opacity: 1; min-width: 32px; min-height: 32px; } .sallu-pet-return { bottom: 80px; } }
+@media (prefers-reduced-motion: reduce) { .sallu-pet { transition: none; } .sallu-pet.is-walking .sallu-pet__sprite, .sallu-pet.is-ouch .sallu-pet__sprite { animation: none; } }
