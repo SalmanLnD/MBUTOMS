@@ -1,3 +1,4 @@
+import { executeAiTool } from '../../ai/aiTools.js';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import Schedule from '../../models/Schedule.js';
@@ -105,4 +106,21 @@ test('cancelled classes and holidays preserve free time', async (t) => {
   const holiday = dayFor(await read('2026-09-21'));
   assert.equal(holiday.isOfficialHoliday, true);
   assert.deepEqual(holiday.slots, fullDay);
+});
+
+test('Sallu availability uses real holiday, cancellation, and replacement calculations', async (t) => {
+  for (const mode of ['working', 'cancelled', 'holiday', 'replacement']) {
+    await t.test(mode, async (t) => {
+      const leave = { trainer: 'main', status: 'approved', startDate: new Date('2026-09-14'), endDate: new Date('2026-09-14'),
+        replacements: [{ schedule: 'class', replacementTrainer: 'cover' }] };
+      fixtures(t, { cancellations: mode === 'cancelled' ? [{ date: new Date('2026-09-14'), schedules: ['class'] }] : [],
+        holidays: mode === 'holiday' ? [{ date: new Date('2026-09-14') }] : [], leaves: mode === 'replacement' ? [leave] : [] });
+      const trainer = mode === 'replacement' ? trainers[1] : trainers[0];
+      const result = await executeAiTool('get_trainer_availability', { date: '2026-09-14' }, { user: { role: 'trainer', trainer: trainer._id } },
+        { findTrainers: async () => [trainer] });
+      assert.equal(result.hourly[0].availableCount, 1);
+      assert.equal(result.hourly[1].availableCount, ['cancelled', 'holiday'].includes(mode) ? 1 : 0);
+      assert.equal(result.hourly[2].availableCount, 1);
+    });
+  }
 });

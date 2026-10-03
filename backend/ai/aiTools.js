@@ -3,7 +3,7 @@ import Subject from '../models/Subject.js';
 import Venue from '../models/Venue.js';
 import Leave from '../models/Leave.js';
 import { FULL_ACCESS_ROLES, MANAGEMENT_ROLES, ROLES, isAuthorizedRole } from '../utils/roles.js';
-import { coordinatorCanAccessTrainer, isSubjectCoordinator } from '../utils/subjectCoordinatorAccess.js';
+import { coordinatorCanAccessTrainer, isSubjectCoordinator, getCoordinatorSubjectIds, buildTrainerFilterForCoordinatorSubjects } from '../utils/subjectCoordinatorAccess.js';
 import { excludeArchivedExternalTrainers } from '../utils/externalTrainerArchive.js';
 import { getIstNowParts, buildLiveTrainerVenues } from '../utils/liveTrainerVenues.js';
 import { computeClassHandlingHoursBatch } from '../utils/trainerClassHoursBatch.js';
@@ -20,6 +20,10 @@ import { getLeaveClassExclusionsForRange, getUncancelledScheduleDateKeys } from 
 import { dedupeReplacementsBySchedule } from '../utils/leaveReplacements.js';
 import { filterSchedulesActiveOnDate } from '../utils/activeSchedulesForDate.js';
 
+import { buildTrainerAvailabilityForRange, WORK_DAY_START, WORK_DAY_END } from '../utils/trainerAvailability.js';
+import { mergeRosterFilter } from '../utils/rosterFilter.js';
+import { buildHourlyTrainerAvailability } from '../utils/hourlyTrainerAvailability.js';
+
 const id = (value) => String(value?._id || value || '');
 const trainerInfo = (trainer) => trainer ? { name: trainer.name, employeeId: trainer.employeeId || '' } : null;
 const denied = () => ({ error: 'forbidden', message: 'You are not authorized to view this data.' });
@@ -34,6 +38,7 @@ const definitions = [
   ['get_my_timetable', 'Read my workload for a date or inclusive range. For this week use period=this_week; returns backend total and daily breakdown.', ['date', 'from', 'to', 'period', 'semester']],
   ['get_trainer_timetable', 'Read an authorized trainer timetable for a date or period. For this week use period=this_week. Never guess a trainer.', ['trainerName', 'employeeId', 'date', 'from', 'to', 'period', 'semester']],
   ['get_trainer_hours', 'Explain official hours for a date or inclusive range, including cancellations and holidays. For this week use period=this_week; totalHours covers the WHOLE returned period. Omit trainer identifiers for myself.', ['trainerName', 'employeeId', 'date', 'from', 'to', 'period', 'semester']],
+  ['get_trainer_availability', 'Read scheduled free intervals and hour-by-hour available trainers on ANY IST date, including future dates. Includes leave, replacements, holidays and cancellations. Without trainer identifiers returns all permitted active roster trainers; otherwise one authorized trainer. Available means free for the entire time window, not physically present.', ['date', 'trainerName', 'employeeId', 'startTime', 'endTime'], ['date']],
   ['get_live_venues', 'Read today\'s scheduled trainer occupancy at the current IST time or HH:mm.', ['time']],
   ['get_leaves', 'Read only permitted leave records overlapping an inclusive date range.', ['from', 'to', 'status']],
   ['get_replacements', 'Read permitted class replacement coverage for one date; omit trainer identifiers for myself.', ['date', 'trainerName', 'employeeId']],
@@ -65,6 +70,14 @@ export const validateToolArguments = (name, args = {}, now = new Date()) => {
     if (['date', 'from', 'to'].includes(key) && (!/^\d{4}-\d{2}-\d{2}$/.test(value) || !toAttendanceDateKey(value))) throw new Error('Invalid date');
   }
   if (required.some((key) => !cleaned[key])) throw new Error('Missing tool arguments');
+  if (name === 'get_trainer_availability') {
+    for (const field of ['startTime', 'endTime']) {
+      if (cleaned[field] && !/^([01]\d|2[0-3]):[0-5]\d$/.test(cleaned[field])) throw new Error('Invalid time');
+    }
+    cleaned.startTime ||= WORK_DAY_START;
+    cleaned.endTime ||= WORK_DAY_END;
+    if (cleaned.startTime < WORK_DAY_START || cleaned.endTime > WORK_DAY_END || cleaned.endTime <= cleaned.startTime) throw new Error('Use an interval within working hours');
+  }
   if (cleaned.time && !/^([01]\d|2[0-3]):[0-5]\d$/.test(cleaned.time)) throw new Error('Invalid time');
   if (cleaned.semester && !/^(I|II|III|IV|V|VI|VII|VIII)$/.test(cleaned.semester)) throw new Error('Invalid semester');
   if (cleaned.status && !['pending', 'approved', 'rejected', 'cancelled'].includes(cleaned.status)) throw new Error('Invalid status');
@@ -312,6 +325,30 @@ const attendance = async (req, args, read, deps) => {
     truncated: !punches.error && punches.pagination.total > 50 };
 };
 
+const trainerAvailability = async (req, args, deps) => {
+  let trainerIds;
+  if (args.trainerName || args.employeeId || !management(req)) {
+    const trainer = await resolveAiTrainer(req, args, deps);
+    if (trainer.error) return trainer;
+    trainerIds = [id(trainer)];
+  } else {
+    let scope = {};
+    if (!fullAccess(req)) {
+      scope = await buildTrainerFilterForCoordinatorSubjects(getCoordinatorSubjectIds(req.user));
+    }
+    scope = await mergeRosterFilter(scope, { rosterOnly: true });
+    const trainers = await (deps.availabilityRoster || (async (filter) => Trainer.find(filter).select('_id').lean()))(scope);
+    trainerIds = trainers.map(id);
+  }
+  const result = trainerIds.length ? await (deps.availability || buildTrainerAvailabilityForRange)({
+    // Calendar strings preserve the requested date in both IST and UTC deployments.
+    startDate: args.date, endDate: args.date, trainerIds,
+    slotStart: args.startTime, slotEnd: args.endTime,
+  }) : { trainers: [] };
+  const permittedIds = new Set(trainerIds);
+  return buildHourlyTrainerAvailability({ trainers: (result.trainers || []).filter((trainer) => permittedIds.has(id(trainer))) }, args, MAX_RECORDS);
+};
+
 export const executeAiTool = async (name, rawArgs, req, deps = {}) => {
   if (!req.user || !Object.values(ROLES).includes(req.user.role)) return denied();
   if (!getAiToolDeclarations(req).some((tool) => tool.name === name)) return denied();
@@ -331,6 +368,7 @@ export const executeAiTool = async (name, rawArgs, req, deps = {}) => {
       case 'get_class_student_count': return await classCount(req, args, read);
       case 'get_topic_tracker': return await topicTracker(req, args, read, deps);
       case 'get_my_attendance': return await attendance(req, args, read, deps);
+      case 'get_trainer_availability': return await trainerAvailability(req, args, deps);
       case 'get_live_venues': {
         const result = await (deps.liveVenues || buildLiveTrainerVenues)({ time: args.time, now: deps.now || new Date() });
         return { date: result.date, currentTime: result.currentTime, isLive: result.isLive,
