@@ -121,6 +121,7 @@ const StudentMonthlyTestReportsTab = () => {
   const [loadingSummary, setLoadingSummary] = useState(false);
   const [grid, setGrid] = useState(null);
   const [drafts, setDrafts] = useState({});
+  const [clearedDrafts, setClearedDrafts] = useState(null);
   const [loadingGrid, setLoadingGrid] = useState(false);
   const [loadingSubjects, setLoadingSubjects] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -270,6 +271,7 @@ const StudentMonthlyTestReportsTab = () => {
   }, [activeSubTab, deptFilter, sectionFilter, semFilter]);
 
   const loadGrid = useCallback(async () => {
+    setClearedDrafts(null);
     if (!canLoadGrid) {
       setGrid(null);
       setDrafts({});
@@ -320,6 +322,7 @@ const StudentMonthlyTestReportsTab = () => {
   }, [activeSubTab, loadGrid]);
 
   const updateDraft = (studentId, field, value) => {
+    setClearedDrafts(null);
     const nextValue = field === 'marksObtained' || field === 'maxMarks'
       ? sanitizeWholeNumberInput(value)
       : value;
@@ -348,6 +351,27 @@ const StudentMonthlyTestReportsTab = () => {
     if (!input) return;
     input.scrollIntoView({ behavior: 'smooth', block: 'center' });
     input.focus({ preventScroll: true });
+  };
+
+  const handleClearAll = () => {
+    if (saving || loadingGrid || !grid?.students?.length) return;
+    setClearedDrafts(drafts);
+    setDrafts(Object.fromEntries(grid.students.map((row) => [row._id, {
+      ...drafts[row._id],
+      attendance: DEFAULT_ATTENDANCE,
+      marksObtained: '',
+      maxMarks: drafts[row._id]?.maxMarks ?? String(DEFAULT_MAX_MARKS),
+    }])));
+    setFieldErrors({});
+    setMarksFilterOp('any');
+    setMarksFilterValue('');
+    showSuccess('Mark entries cleared. Enter replacement marks, then Save Marks.');
+  };
+
+  const handleUndoClear = () => {
+    if (!clearedDrafts || saving || loadingGrid) return;
+    setDrafts(clearedDrafts);
+    setClearedDrafts(null);
   };
 
   const handleSave = async () => {
@@ -843,14 +867,6 @@ const StudentMonthlyTestReportsTab = () => {
                   Clear
                 </button>
               )}
-              <button
-                type="button"
-                className="btn btn-sm btn-primary"
-                disabled={!canLoadGrid || !grid?.students?.length || saving}
-                onClick={handleSave}
-              >
-                {saving ? 'Saving...' : 'Save Marks'}
-              </button>
             </div>
           </div>
           </CollapsibleFilters>
@@ -1079,6 +1095,23 @@ const StudentMonthlyTestReportsTab = () => {
                     )}
                   </tbody>
                 </table>
+              </div>
+              <div className="card-footer d-flex flex-wrap justify-content-end gap-2 mark-entry-save-actions">
+                {clearedDrafts && (
+                  <button type="button" className="btn btn-outline-secondary"
+                    disabled={saving || loadingGrid} onClick={handleUndoClear}>
+                    Undo Clear
+                  </button>
+                )}
+                <button type="button" className="btn btn-outline-danger"
+                  disabled={!grid.students.length || saving || loadingGrid || Boolean(clearedDrafts)}
+                  onClick={handleClearAll} title="Clear mark entries for this class and subject to re-enter them">
+                  Clear All
+                </button>
+                <button type="button" className="btn btn-primary"
+                  disabled={!grid.students.length || saving || loadingGrid} onClick={handleSave}>
+                  {saving ? 'Saving...' : 'Save Marks'}
+                </button>
               </div>
             </div>
           ) : null}
