@@ -126,7 +126,10 @@ export const resolveAiTrainer = async (req, args, deps = {}) => {
   const find = deps.findTrainers || (async (filter) => Trainer.find(excludeArchivedExternalTrainers(filter))
     .select('name employeeId scheduleTrainerCodes joiningDate').limit(11).lean());
   if (!args.employeeId && !args.trainerName) {
-    if (!linkedId(req)) return notFound('linked trainer');
+    if (!linkedId(req)) return management(req) ? {
+      error: 'trainer_required',
+      message: 'This management account has no linked trainer profile. You can still view authorized trainers. Ask which trainer name or employee ID to use, then call the trainer timetable or hours tool for the requested period. Do not assume a trainer or report zero hours.',
+    } : notFound('linked trainer');
     const matches = await find({ _id: linkedId(req) });
     return matches[0] || notFound('trainer');
   }

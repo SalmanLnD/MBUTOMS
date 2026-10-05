@@ -69,6 +69,23 @@ test('management reads permitted timetable; minimal projection excludes trainer 
   assert.ok(!JSON.stringify(result).includes('private-password'));
 });
 
+test('unlinked admin self-hours asks for a trainer while named and linked queries still work', async () => {
+  const admin = { user: { role: 'admin', name: 'MBU Campus Manager' } };
+  const clarification = await executeAiTool('get_my_timetable', { period: 'this_week' }, admin, {
+    findTrainers: async () => { throw Error('An unlinked account must not guess a trainer'); },
+  });
+  assert.equal(clarification.error, 'trainer_required');
+  assert.match(clarification.message, /trainer name or employee ID/);
+  assert.equal(clarification.totalHours, undefined);
+  const identified = await executeAiTool('get_trainer_hours', { employeeId: '123456', date: '2026-10-01' }, admin, timetableDeps);
+  assert.equal(identified.totalHours, 2.5);
+  const linked = await executeAiTool('get_my_timetable', { date: '2026-10-01' }, { user: { role: 'admin', trainer: 'own' } }, timetableDeps);
+  assert.equal(linked.totalHours, 2.5);
+  assert.match(buildAiPrompt(admin.user), /does not have a linked trainer profile/);
+  assert.match(buildAiPrompt(admin.user), /ask which trainer name or employee ID/);
+  assert.match(buildAiPrompt({ role: 'admin', trainer: 'own' }), /has a linked trainer profile/);
+});
+
 test('unknown and ambiguous trainers are never guessed', async () => {
   const admin = { user: { role: 'admin' } };
   assert.equal((await resolveAiTrainer(admin, { trainerName: 'Nobody' }, { findTrainers: async () => [] })).error, 'not_found');
