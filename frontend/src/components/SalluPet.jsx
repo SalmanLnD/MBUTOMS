@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useMediaQuery } from '../hooks/useMediaQuery.js';
 import '../styles/sallu-pet.css';
 import { spriteFrameStyle } from '../utils/salluSpriteStyle.js';
-import { cursorPose, nextPunchReaction, punchReactions, playPunchSound } from '../utils/salluPetBehavior.js';
+import { cursorPose, nextPunchReaction, punchReactions, playPunchSound, reactionDialogue, recentPunches, isStomachSwipe } from '../utils/salluPetBehavior.js';
 
 const stored = (key) => { try { return localStorage.getItem(key) === 'true'; } catch { return false; } };
 const persist = (key, value) => { try { localStorage.setItem(key, String(value)); } catch {} };
@@ -19,6 +19,11 @@ const SalluPet = ({ open, onOpen, visible, onVisibilityChange }) => {
   const [soundStatus, setSoundStatus] = useState('ready');
   const reactionBag = useRef([]);
   const lastReaction = useRef(-1);
+  const punchHistory = useRef([]);
+  const lastDialogues = useRef({});
+  const hoverStroke = useRef(null);
+  const lastTickle = useRef(-Infinity);
+  const [reactionSerial, setReactionSerial] = useState(0);
   const [reaction, setReaction] = useState(0);
   const [paused, setPaused] = useState(() => stored('toms_sallu_pet_paused'));
   const [position, setPosition] = useState({ x: Math.max(12, window.innerWidth - size - (mobile ? 12 : 24)), y: mobile ? 78 : 20 });
@@ -52,6 +57,12 @@ const SalluPet = ({ open, onOpen, visible, onVisibilityChange }) => {
     clearTimeout(menuCloseTimer.current);
     audio.current?.close().catch(() => {});
   }, []);
+  useEffect(() => {
+    if (!open && !hidden) return;
+    clearTimeout(reactionTimer.current); clearTimeout(bubbleTimer.current);
+    reacting.current = false; punchHistory.current = []; hoverStroke.current = null; drag.current = null;
+    setDragging(false); setNodding(false); setPose('front'); setBubble('');
+  }, [open, hidden]);
   useEffect(() => {
     const fit = () => {
       setPosition(current => ({ x: clamp(current.x, 8, Math.max(8, window.innerWidth - size - 8)), y: clamp(current.y, 12, Math.max(12, window.innerHeight - size - 12)) }));
@@ -118,7 +129,8 @@ const SalluPet = ({ open, onOpen, visible, onVisibilityChange }) => {
     if (!event.isPrimary || event.button !== 0) return;
     const rect = pet.current.getBoundingClientRect();
     stop(); suppressClick.current = false;
-    drag.current = { id: event.pointerId, x: event.clientX, y: event.clientY, left: rect.left, bottom: window.innerHeight - rect.bottom, moved: false };
+    hoverStroke.current = null;
+    drag.current = { id: event.pointerId, x: event.clientX, y: event.clientY, left: rect.left, bottom: window.innerHeight - rect.bottom, started: Date.now(), body: event.currentTarget.classList.contains('sallu-pet__body'), moved: false };
     event.currentTarget.setPointerCapture(event.pointerId);
   };
   const moveDrag = event => {
@@ -126,13 +138,26 @@ const SalluPet = ({ open, onOpen, visible, onVisibilityChange }) => {
     if (!current || current.id !== event.pointerId) return;
     const dx = event.clientX - current.x, dy = event.clientY - current.y;
     if (!current.moved && Math.hypot(dx, dy) < 6) return;
+    if (!current.moved && current.body && isStomachSwipe(dx, dy, Date.now() - current.started, size)) {
+      current.swiping = true; suppressClick.current = true; return;
+    }
+    // Wait for enough horizontal travel to distinguish a tickle from a drag.
+    if (!current.moved && current.body && Date.now() - current.started <= 260
+      && Math.abs(dx) > Math.abs(dy) * 1.6 && Math.abs(dy) <= size * .18) return;
     current.moved = true; suppressClick.current = true; setDragging(true);
     clearTimeout(reactionTimer.current); clearTimeout(bubbleTimer.current);
     reacting.current = false; setNodding(false); setPose('front'); setBubble(''); setMenu(false);
     setPosition({ x: clamp(current.left + dx, 8, Math.max(8, window.innerWidth - size - 8)), y: clamp(current.bottom - dy, 12, Math.max(12, window.innerHeight - size - 12)) });
   };
   const endDrag = event => {
-    if (drag.current?.id !== event.pointerId) return;
+    const current = drag.current;
+    if (current?.id !== event.pointerId) return;
+    if (event.type === 'pointerup' && !current.moved && current.body
+      && !isStomachSwipe(event.clientX - current.x, event.clientY - current.y, Date.now() - current.started, size)) moveDrag(event);
+    if (event.type === 'pointerup' && !current.moved && current.body
+      && isStomachSwipe(event.clientX - current.x, event.clientY - current.y, Date.now() - current.started, size)) {
+      suppressClick.current = true; tickle();
+    } else if (!current.moved && current.swiping) suppressClick.current = true;
     drag.current = null; setDragging(false);
     if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId);
   };
@@ -164,13 +189,35 @@ const SalluPet = ({ open, onOpen, visible, onVisibilityChange }) => {
       setSoundStatus('playing');
     } catch { setSoundStatus('blocked'); }
   };
-  const react = () => {
+  const showReaction = (nextPose, expression, duration) => {
     stop(); clearTimeout(reactionTimer.current); clearTimeout(bubbleTimer.current);
+    const line = reactionDialogue(expression, lastDialogues.current[expression]);
+    lastDialogues.current[expression] = line;
+    setNodding(false); reacting.current = true; setPose(nextPose); setBubble(line);
+    setReactionSerial(current => current + 1);
+    reactionTimer.current = setTimeout(() => { reacting.current = false; setPose('front'); }, duration);
+    bubbleTimer.current = setTimeout(() => setBubble(''), duration + 600);
+  };
+  const tickle = () => {
+    if (Date.now() - lastTickle.current < 450) return;
+    lastTickle.current = Date.now(); punchHistory.current = [];
+    showReaction('laughing', 'laughing', 1800);
+  };
+  const hoverTickle = event => {
+    if (drag.current || event.pointerType !== 'mouse' || event.buttons) return;
+    const now = Date.now(), previous = hoverStroke.current;
+    if (!previous || now - previous.time > 260) { hoverStroke.current = { x: event.clientX, y: event.clientY, time: now }; return; }
+    if (isStomachSwipe(event.clientX - previous.x, event.clientY - previous.y, now - previous.time, size)) {
+      hoverStroke.current = null; tickle();
+    }
+  };
+  const react = () => {
+    punchHistory.current = recentPunches(punchHistory.current, Date.now());
+    punchSound();
+    if (punchHistory.current.length >= 4) { showReaction('crying', 'crying', 3200); return; }
     const next = nextPunchReaction(reactionBag.current, lastReaction.current);
     lastReaction.current = next; setReaction(next);
-    punchSound(); setNodding(false); reacting.current = true; setPose('ouch'); setBubble('Ouch!');
-    reactionTimer.current = setTimeout(() => { reacting.current = false; setPose('front'); }, 1100);
-    bubbleTimer.current = setTimeout(() => setBubble(''), 2200);
+    showReaction('ouch', punchReactions[next], 1600);
   };
   const chat = (event) => { stop(); setBubble(''); setMenu(false); onOpen(event); };
   const hide = () => { stop(); onVisibilityChange(false); setMenu(false); };
@@ -196,18 +243,23 @@ const SalluPet = ({ open, onOpen, visible, onVisibilityChange }) => {
 
   if (hidden) return mobile && !open && <button className="sallu-pet-return btn btn-sm btn-outline-primary" onClick={() => onVisibilityChange(true)} aria-label="Show Sallu pet">Sallu</button>;
   return <div ref={pet} className={`sallu-pet ${walking ? 'is-walking' : ''} ${pose === 'ouch' ? 'is-ouch' : ''} ${nodding ? 'is-nodding' : ''} ${dragging ? 'is-dragging' : ''}`}
-    hidden={open} data-pose={pose} data-direction={direction} data-reaction={pose === 'ouch' ? punchReactions[reaction] : undefined} data-sound={muted ? 'muted' : soundStatus}
+    hidden={open} data-pose={pose} data-direction={direction} data-reaction={pose === 'ouch' ? punchReactions[reaction] : ['laughing', 'crying'].includes(pose) ? pose : undefined} data-sound={muted ? 'muted' : soundStatus}
     style={{ '--pet-size': `${size}px`, left: position.x, bottom: position.y }}
     onPointerEnter={event => { hoverStoppedWalk.current = walkingRef.current; if (event.target.closest('.sallu-pet__settings, .sallu-pet__menu')) return; stop(); if (!reacting.current) setPose('front'); }}
     onPointerLeave={() => { if (!menu) hoverStoppedWalk.current = false; }}
     >
-    <div className="sallu-pet__bubble" role="status" aria-live="polite">{bubble}</div>
-    <div key={pose === 'ouch' ? `reaction-${reaction}` : 'idle'} className={`sallu-pet__sprite sallu-pet__sprite--${pose} ${pose.startsWith('gaze-') ? 'sallu-pet__sprite--gaze' : ''}`} aria-hidden="true">
-      {(pose === 'ouch' || pose.startsWith('gaze-')) && <span style={spriteFrameStyle(pose === 'ouch' ? 'reactions' : 'gaze', pose === 'ouch' ? reaction : Number(pose.slice(5)), size)} />}
+    <div className="sallu-pet__bubble" role="status" aria-live="polite"
+      style={{ left: clamp(size / 2, 108 - position.x, window.innerWidth - 108 - position.x),
+        ...(window.innerHeight - position.y - size < 90 ? { top: '100%', bottom: 'auto' } : {}) }}>{bubble}</div>
+    <div key={['ouch', 'crying'].includes(pose) ? `reaction-${reactionSerial}` : pose} className={`sallu-pet__sprite sallu-pet__sprite--${pose} ${pose.startsWith('gaze-') ? 'sallu-pet__sprite--gaze' : ''}`} aria-hidden="true">
+      {(pose === 'ouch' || pose.startsWith('gaze-') || pose === 'laughing' || pose === 'crying') && <span style={spriteFrameStyle(pose.startsWith('gaze-') ? 'gaze' : 'reactions', pose === 'laughing' ? 9 : pose === 'crying' ? 12 : pose === 'ouch' ? reaction : Number(pose.slice(5)), size)} />}
+      {pose === 'crying' && <span className="sallu-pet__tears"><i /><i /></span>}
     </div>
     <div className="sallu-pet__nod-head sallu-pet__sprite" aria-hidden="true" />
     <button type="button" className="sallu-pet__hit sallu-pet__face" {...dragEvents} onClick={event => clickPet(event, chat)} aria-label="Chat with Sallu" title="Click to chat; drag to move" />
-    <button type="button" className="sallu-pet__hit sallu-pet__body" {...dragEvents} onClick={event => clickPet(event, react)} aria-label="Poke Sallu" title="Click to poke; drag to move" />
+    <button type="button" className="sallu-pet__hit sallu-pet__body" {...dragEvents}
+      onPointerMove={event => { moveDrag(event); hoverTickle(event); }} onPointerLeave={() => { hoverStroke.current = null; }}
+      onClick={event => clickPet(event, react)} aria-label="Poke Sallu" title="Click to poke; swipe belly to tickle; hold and drag to move" />
     <button type="button" className="sallu-pet__settings" aria-label="Sallu pet options" aria-expanded={menu} onPointerEnter={cancelMenuClose} onPointerLeave={scheduleMenuClose} onClick={() => { cancelMenuClose(); setMenuWasWalking(walkingRef.current || hoverStoppedWalk.current); stop(); setMenu(!menu); }}>⋯</button>
     {menu && <div className="sallu-pet__menu" onPointerEnter={cancelMenuClose} onPointerLeave={scheduleMenuClose} onFocus={cancelMenuClose}>
       {soundStatus === 'blocked' && !muted && <span className="sallu-pet__audio-status" role="status">Sound is blocked. Check this tab’s audio permission.</span>}

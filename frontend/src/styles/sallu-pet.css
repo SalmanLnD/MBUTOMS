@@ -7,7 +7,7 @@
 .sallu-pet__sprite--back { background-position: 100% 0; }
 .sallu-pet__sprite--look-left { background-position: 50% 100%; }
 .sallu-pet__sprite--look-right { background-position: 100% 100%; }
-.sallu-pet__sprite--ouch, .sallu-pet__sprite--gaze { background: none; position: relative; }
+.sallu-pet__sprite--ouch, .sallu-pet__sprite--gaze, .sallu-pet__sprite--laughing, .sallu-pet__sprite--crying { background: none; position: relative; }
 /* Generated atlas cells have a small overlap at the grid seams. Hide the
    seam inside each sprite, before transforms, so neighbouring feet/heads
    cannot appear as stray marks above or below the current character. */
@@ -22,6 +22,11 @@
 .sallu-pet[data-reaction='duck'] .sallu-pet__sprite,
 .sallu-pet[data-reaction='belly-rub'] .sallu-pet__sprite { animation: sallu-pet-squash .55s ease-out; }
 .sallu-pet[data-reaction='boxing'] .sallu-pet__sprite { animation: sallu-pet-wobble .4s ease-in-out; }
+.sallu-pet[data-reaction='laughing'] .sallu-pet__sprite { animation: sallu-pet-laugh .48s ease-in-out infinite; }
+.sallu-pet[data-reaction='crying'] .sallu-pet__sprite { animation: sallu-pet-sob .85s ease-in-out infinite; }
+.sallu-pet__tears { position: absolute; inset: 0; pointer-events: none; }
+.sallu-pet__tears i { position: absolute; top: 29%; left: 42%; width: 4.5%; height: 7%; border-radius: 10% 60% 65% 60%; background: linear-gradient(135deg, #e0f8ff, #64b8e6); animation: sallu-pet-tear .9s ease-in infinite; }
+.sallu-pet__tears i + i { left: 57%; animation-delay: .4s; }
 .sallu-pet__audio-status { display: block; padding: .4rem .6rem; font-size: .75rem; }
 .sallu-pet__hit { position: absolute; pointer-events: auto; border: 0; background: transparent; border-radius: 50%; padding: 0; touch-action: none; user-select: none; -webkit-user-select: none; }
 .sallu-pet.is-dragging { transition: none; }
@@ -31,7 +36,7 @@
 .sallu-pet__hit:focus-visible { outline: 2px dashed var(--primary); outline-offset: 2px; background: var(--primary-soft); }
 .sallu-pet__settings { position: absolute; right: 0; top: 0; min-width: 28px; min-height: 28px; pointer-events: auto; background: var(--surface); color: var(--text-secondary); border: 1px solid var(--line); border-radius: 50%; font-size: 18px; opacity: 0; transition: opacity 150ms ease; }
 .sallu-pet:hover .sallu-pet__settings, .sallu-pet:focus-within .sallu-pet__settings { opacity: 1; }
-.sallu-pet__bubble { position: absolute; bottom: 100%; left: 50%; transform: translateX(-50%); padding: .4rem .7rem; border-radius: 12px 12px 12px 2px; color: var(--text-primary); background: var(--surface); border: 1px solid var(--line); box-shadow: var(--shadow-sm); font-size: .85rem; font-weight: 600; white-space: nowrap; }
+.sallu-pet__bubble { position: absolute; bottom: 100%; left: 50%; transform: translateX(-50%); padding: .4rem .7rem; border-radius: 12px 12px 12px 2px; color: var(--text-primary); background: var(--surface); border: 1px solid var(--line); box-shadow: var(--shadow-sm); font-size: .85rem; font-weight: 600; width: max-content; max-width: min(200px, calc(100vw - 24px)); white-space: normal; text-align: center; }
 .sallu-pet__bubble:empty { display: none; }
 .sallu-pet__menu { position: absolute; right: 0; bottom: 100%; width: 165px; padding: .3rem; pointer-events: auto; background: var(--surface); color: var(--text-primary); border: 1px solid var(--line); border-radius: 8px; box-shadow: var(--shadow-md); }
 .sallu-pet__menu button { display: block; width: 100%; min-height: 40px; padding: .4rem .6rem; text-align: left; border: 0; border-radius: 5px; background: transparent; color: inherit; font-size: .8rem; }
@@ -42,9 +47,12 @@
 @keyframes sallu-pet-wobble { 0%, 100% { transform: rotate(0); } 20%, 60% { transform: rotate(-9deg); } 40%, 80% { transform: rotate(9deg); } }
 @keyframes sallu-pet-hop { 0%, 100% { transform: translateY(0); } 40% { transform: translateY(-15px) rotate(4deg); } 75% { transform: scaleY(.95); } }
 @keyframes sallu-pet-squash { 0%, 100% { transform: scale(1); } 40% { transform: scale(1.06, .88); } 70% { transform: scale(.98, 1.03); } }
+@keyframes sallu-pet-laugh { 0%,100% { transform: rotate(-2deg) scale(1.01,.99); } 50% { transform: translateY(-2px) rotate(2deg) scale(.99,1.02); } }
+@keyframes sallu-pet-sob { 0%,100% { transform: rotate(-1deg) scale(1); } 40% { transform: translateY(1px) rotate(1deg) scale(1.02,.975); } 70% { transform: scale(.99,1.01); } }
+@keyframes sallu-pet-tear { 0% { transform: translateY(0) rotate(45deg); opacity: 0; } 15% { opacity: .95; } 75% { opacity: .8; } 100% { transform: translateY(240%) rotate(45deg); opacity: 0; } }
 .sallu-pet__nod-head { display: none; position: absolute; inset: 0; clip-path: inset(0 0 55% 0); transform-origin: 50% 43%; }
 .sallu-pet.is-nodding > .sallu-pet__sprite:not(.sallu-pet__nod-head) { clip-path: inset(44% 0 0 0); }
 .sallu-pet.is-nodding .sallu-pet__nod-head { display: block; animation: sallu-pet-nod .9s ease-in-out; }
 @keyframes sallu-pet-nod { 0%, 45%, 100% { transform: perspective(240px) rotateX(0); } 22%, 67% { transform: perspective(240px) rotateX(-22deg) translateY(3px); } }
 @media (max-width: 767.98px) { .sallu-pet__settings { opacity: 1; min-width: 32px; min-height: 32px; } .sallu-pet-return { bottom: 80px; } }
-@media (prefers-reduced-motion: reduce) { .sallu-pet { transition: none; } .sallu-pet.is-walking .sallu-pet__sprite, .sallu-pet.is-ouch .sallu-pet__sprite { animation: none; } }
+@media (prefers-reduced-motion: reduce) { .sallu-pet { transition: none; } .sallu-pet.is-walking .sallu-pet__sprite, .sallu-pet.is-ouch .sallu-pet__sprite, .sallu-pet[data-reaction='laughing'] .sallu-pet__sprite, .sallu-pet[data-reaction='crying'] .sallu-pet__sprite, .sallu-pet__tears i { animation: none; } .sallu-pet__tears i { opacity: .9; transform: rotate(45deg); } }

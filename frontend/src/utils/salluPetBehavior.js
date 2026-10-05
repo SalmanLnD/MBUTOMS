@@ -4,6 +4,38 @@ export const punchReactions = [
   'cheeky', 'grumpy', 'pleading', 'gasp', 'boxing',
 ];
 
+export const reactionDialogues = {
+  ouch: ['Ouch! Easy there!', 'Ow! That surprised me!'],
+  surprised: ['Whoa! Where did that come from?', 'You caught me off guard!'],
+  offended: ['Excuse me, this belly is precious!', 'Hmph! I was being helpful!'],
+  'recoil-left': ['Whoa, leaning left!', 'Easy! I nearly lost my balance!'],
+  'recoil-right': ['Hey! I am wobbling over here!', 'A little gentler, please!'],
+  'belly-rub': ['My tummy needs a break!', 'Careful with the belly!'],
+  dizzy: ['Is the room spinning?', 'Give me a second... whoa!'],
+  startled: ['Eek! You startled me!', 'My tiny feet almost jumped!'],
+  duck: ['Duck and cover!', 'Missed me... almost!'],
+  ticklish: ['Heehee! That tickles!', 'Haha! You found my ticklish spot!'],
+  cheeky: ['You cannot catch this smile!', 'Hehe! Nice try!'],
+  grumpy: ['Hmph! Behave yourself!', 'I am giving you my grumpy face!'],
+  pleading: ['Please be gentle with me!', 'A little kindness for Sallu?'],
+  gasp: ['Gasp! My goodness!', 'Well, that was dramatic!'],
+  boxing: ['Tiny fists, big courage!', 'Playful sparring only!'],
+  laughing: ['Hahaha! That tickles!', 'Heehee! My belly is ticklish!', 'Stop, I cannot stop laughing!'],
+  crying: ['Sniff... gentler, please!', 'Too many pokes! I need a break.', 'Aww... a little kindness, please!'],
+};
+
+export const reactionDialogue = (expression, previous, random = Math.random) => {
+  const options = (reactionDialogues[expression] || reactionDialogues.ouch).filter(line => line !== previous);
+  return options[Math.min(options.length - 1, Math.floor(random() * options.length))];
+};
+
+export const recentPunches = (history, now) => [...history.filter(time => now - time < 4000), now];
+
+// A short horizontal swipe tickles. Holding or pulling vertically still moves him.
+export const isStomachSwipe = (dx, dy, duration, size) =>
+  duration <= 260 && Math.abs(dx) >= Math.max(12, size * .12)
+  && Math.abs(dx) > Math.abs(dy) * 1.6 && Math.abs(dy) <= size * .18;
+
 // A shuffled bag gives every expression a turn and avoids repeated boundaries.
 export const nextPunchReaction = (bag, previous, random = Math.random) => {
   if (!bag.length) {
