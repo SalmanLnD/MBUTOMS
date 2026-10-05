@@ -1,7 +1,24 @@
 import api from './api.js';
 import { decodeApplicationKey, pushSupportReason } from '../utils/pwaSupport.js';
+import { version } from '../../package.json';
 
 const PREFERENCE_KEY = 'toms_push_device';
+const INSTALLED_KEY = 'toms_installed_on_device';
+const setupSessionKey = (userId) => `toms_device_setup_session:${userId}:${version}`;
+export const hasAcknowledgedDeviceSetup = (userId) => {
+  try { return sessionStorage.getItem(setupSessionKey(userId)) === 'done'; }
+  catch { return false; }
+};
+export const acknowledgeDeviceSetup = (userId) => {
+  try { sessionStorage.setItem(setupSessionKey(userId), 'done'); } catch { /* Current modal still closes when storage is unavailable. */ }
+};
+export const hasInstalledToms = () => {
+  try { return localStorage.getItem(INSTALLED_KEY) === 'true'; } catch { return false; }
+};
+export const acknowledgeTomsInstallation = () => {
+  try { localStorage.setItem(INSTALLED_KEY, 'true'); } catch { /* Standalone detection remains available. */ }
+  changed();
+};
 let workerPromise;
 let installPrompt = null;
 const changed = () => window.dispatchEvent(new Event('toms-device-change'));
@@ -9,9 +26,11 @@ export const getInstallPrompt = () => installPrompt;
 
 export const initializeDeviceFeatures = () => {
   window.addEventListener('beforeinstallprompt', event => {
-    event.preventDefault(); installPrompt = event; changed();
+    event.preventDefault(); installPrompt = event;
+    try { localStorage.removeItem(INSTALLED_KEY); } catch { /* Storage can be restricted. */ }
+    changed();
   });
-  window.addEventListener('appinstalled', () => { installPrompt = null; changed(); });
+  window.addEventListener('appinstalled', () => { installPrompt = null; acknowledgeTomsInstallation(); });
   if (window.isSecureContext && 'serviceWorker' in navigator) {
     workerPromise = navigator.serviceWorker.register('/sw.js', { scope: '/', updateViaCache: 'none' })
       .then(() => navigator.serviceWorker.ready);
@@ -89,6 +108,10 @@ export const disableDevicePush = async () => {
       data: { endpoint: subscription.endpoint }, timeout: 3000, skipRetry: true, skipSessionExpired: true,
     }).catch(() => {});
   } catch { /* Unsupported browsers have nothing to revoke. */ }
+};
+
+export const endDeviceSetupSession = (userId) => {
+  try { sessionStorage.removeItem(setupSessionKey(userId)); } catch { /* No stored prompt to clear. */ }
 };
 
 export const syncDeviceSession = async (user) => {

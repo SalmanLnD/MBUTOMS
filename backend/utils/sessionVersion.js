@@ -7,6 +7,9 @@ const { version: packageVersion } = require('../package.json');
 export const SESSION_EXPIRED_CODE = 'SESSION_EXPIRED';
 export const APP_VERSION_UPDATED_CODE = 'APP_VERSION_UPDATED';
 export const APP_VERSION = packageVersion;
+// Increment only when a release must invalidate sessions, not for compatible patches.
+export const SESSION_APP_VERSION = '2.2.1';
+export const isCompatibleAppVersion = (version) => version === SESSION_APP_VERSION || version === APP_VERSION;
 
 export const SESSION_EXPIRED_MESSAGE =
   'Your session has expired. Please sign in again to continue with your updated access.';

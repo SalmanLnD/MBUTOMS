@@ -3,6 +3,7 @@ import User from '../models/User.js';
 import { isAuthorizedRole } from '../utils/roles.js';
 import {
   APP_VERSION,
+  isCompatibleAppVersion,
   APP_VERSION_UPDATED_CODE,
   APP_VERSION_UPDATED_MESSAGE,
   SESSION_EXPIRED_CODE,
@@ -23,7 +24,7 @@ export const protect = async (req, res, next) => {
 
   try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    if (decoded.av !== APP_VERSION) {
+    if (!isCompatibleAppVersion(decoded.av)) {
       return res.status(401).json({
         message: APP_VERSION_UPDATED_MESSAGE,
         code: APP_VERSION_UPDATED_CODE,

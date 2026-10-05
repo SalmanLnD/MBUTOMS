@@ -20,7 +20,7 @@ import {
   resetSessionExpiredState,
 } from '../utils/sessionManager.js';
 import { resetAllModalArtifacts } from '../utils/modalCleanup.js';
-import { disableDevicePush, syncDeviceSession } from '../services/deviceService.js';
+import { disableDevicePush, syncDeviceSession, endDeviceSetupSession } from '../services/deviceService.js';
 
 const AuthContext = createContext(null);
 
@@ -139,6 +139,7 @@ export const AuthProvider = ({ children }) => {
   }, [applySession]);
 
   const logout = useCallback(async () => {
+    endDeviceSetupSession(user?._id);
     await disableDevicePush();
     resetAllModalArtifacts();
     resetSessionExpiredState();
@@ -146,7 +147,7 @@ export const AuthProvider = ({ children }) => {
     localStorage.removeItem('toms_user');
     localStorage.removeItem('toms_admin_token');
     setUser(null);
-  }, []);
+  }, [user?._id]);
 
   const userRole = user?.role;
   const isImpersonating = Boolean(user?.impersonating);

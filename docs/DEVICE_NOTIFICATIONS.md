@@ -2,6 +2,14 @@
 
 The download icon in the top bar opens **TOMS on this device**. Users can add a dashboard shortcut and explicitly enable or disable notifications for their signed-in account on that browser/device.
 
+## v2.2.2 setup prompt and compatible patch sessions
+
+On the next fresh authenticated app session, devices that have not completed installation and notification setup show a setup modal before continuing. Native installation completion, standalone display mode, or a user's confirmation of a manually added shortcut records installation. Notification permission is requested only from the Enable notifications button. On iOS, users finish setup by opening the installed Home Screen app.
+
+Continue unlocks after both steps. Unsupported notifications, a browser/OS permission denial, an unavailable backend configuration, or a failed connection provide an explicit Continue without notifications fallback. That acknowledgement lasts for the current tab session; incomplete devices are prompted again in the next session. Complete devices skip the prompt, and signing out clears the account's session acknowledgement. Password reset and trainer-preview screens do not show setup prompts.
+
+The release version is 2.2.2, while the JWT session compatibility version remains 2.2.1. Existing 2.2.1 tokens remain valid and new tokens use that compatibility version. Earlier incompatible versions, invalid signatures, expired tokens, deactivated users and revoked user session versions remain rejected. Update `SESSION_APP_VERSION` only when session invalidation is intended.
+
 ## Install
 
 - Chrome/Edge and supported Android browsers offer a native install prompt when available. Otherwise the panel gives browser-menu instructions.

@@ -1,6 +1,6 @@
 {
   "name": "toms-backend",
-  "version": "2.2.1",
+  "version": "2.2.2",
   "description": "Training Operations Management System - Backend",
   "main": "server.js",
   "type": "module",

@@ -5,7 +5,8 @@ import AiAssistant from '../components/AiAssistant.jsx';
 import SalluPet from '../components/SalluPet.jsx';
 import Modal from '../components/Modal.jsx';
 import { getAiUsage } from '../services/aiService.js';
-import { version } from '../../package.json';
+// This announcement belongs to its original feature release; patch updates must not repeat it.
+const SALLU_NOTICE_VERSION = '2.2.1';
 
 const AiAssistantContext = createContext(null);
 export const useAiAssistant = () => useContext(AiAssistantContext);
@@ -16,7 +17,7 @@ const AssistantSession = ({ children, enabled, userId, showRelease }) => {
   const togglePet = useCallback(() => { setPetVisible(current => !current); setOpen(false); }, []);
   const [usage, setUsage] = useState(null);
   const [usageError, setUsageError] = useState(false);
-  const noticeKey = `toms_sallu_notice:${userId}:${version}`;
+  const noticeKey = `toms_sallu_notice:${userId}:${SALLU_NOTICE_VERSION}`;
   const [notice, setNotice] = useState(() => localStorage.getItem(noticeKey) !== 'seen');
   const mounted = useRef(true);
   const usageRequest = useRef(0);
@@ -55,7 +56,7 @@ const AssistantSession = ({ children, enabled, userId, showRelease }) => {
       {children}
       {enabled && <SalluPet open={open} onOpen={openAssistant} visible={petVisible} onVisibilityChange={setPetVisible} />}
       {enabled && <AiAssistant open={open} onClose={closeAssistant} usage={usage} usageError={usageError} refreshUsage={refreshUsage} />}
-      <Modal show={enabled && showRelease && notice && Boolean(usage || usageError)} title={`Welcome to TOMS v${version}`} onClose={dismissNotice} scrollable
+      <Modal show={enabled && showRelease && notice && Boolean(usage || usageError)} title={`Welcome to TOMS v${SALLU_NOTICE_VERSION}`} onClose={dismissNotice} scrollable
         footer={<button type="button" className="btn btn-primary" onClick={dismissNotice}>Got it</button>}>
         <div className="toms-modal-body">
           <h3 className="h5">Sallu is now available to everyone</h3>
@@ -79,5 +80,5 @@ export const AiAssistantProvider = ({ children }) => {
   const { user, loading } = useAuth();
   // Switching accounts, role, or trainer view destroys all private chat state.
   const sessionKey = `${user?._id}:${user?.role}:${user?.trainer}:${user?.impersonating}:${user?.mustResetPassword}`;
-  return <AssistantSession key={sessionKey} userId={user?._id} showRelease={user?.appVersion === version} enabled={!loading && canUseAiAssistant(user)}>{children}</AssistantSession>;
+  return <AssistantSession key={sessionKey} userId={user?._id} showRelease={user?.appVersion === SALLU_NOTICE_VERSION} enabled={!loading && canUseAiAssistant(user)}>{children}</AssistantSession>;
 };
