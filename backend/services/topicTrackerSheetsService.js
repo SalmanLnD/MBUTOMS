@@ -70,7 +70,7 @@ export const getTopicTrackerAppsScriptStatus = async () => {
 };
 
 export const getTopicTrackerAppsScriptSetup = async (req) => {
-  const apiKey = await getOrCreateTopicTrackerExportKey();
+  const apiKey = req.isDemo ? 'DEMO_LOCAL_ONLY' : await getOrCreateTopicTrackerExportKey();
   const baseUrl = getPublicApiBaseUrl(req);
   const exportUrl = `${baseUrl}/api/topic-tracker/export`;
 

@@ -72,7 +72,7 @@ const saveSubscription = async (subscription, publicKey) => {
 export const enableDevicePush = async ({ registration, config, user }) => {
   const reason = pushSupportReason(window, navigator);
   if (reason) throw new Error(reason);
-  if (!config?.configured || !registration?.active || !user || user.impersonating) throw new Error('Device notifications are not ready yet.');
+  if (!config?.configured || !registration?.active || !user || user.impersonating || user.isDemo || user.role === 'demo') throw new Error('Device notifications are not ready yet.');
   // Called directly from the button: Safari requires a user gesture for permission.
   const permission = await Notification.requestPermission();
   if (permission !== 'granted') throw new Error(permission === 'denied'
@@ -96,6 +96,7 @@ export const enableDevicePush = async ({ registration, config, user }) => {
 };
 
 export const disableDevicePush = async () => {
+  if (JSON.parse(localStorage.getItem('toms_user') || 'null')?.isDemo) return;
   localStorage.removeItem(PREFERENCE_KEY); changed();
   try {
     const registration = await getDeviceWorker();
@@ -115,7 +116,7 @@ export const endDeviceSetupSession = (userId) => {
 };
 
 export const syncDeviceSession = async (user) => {
-  if (user?.impersonating) return;
+  if (user?.impersonating || user?.isDemo || user?.role === 'demo') return;
   const preference = getPushPreference();
   // Browser storage can be cleared separately from the worker's IndexedDB.
   // An unbound/new account must not inherit the previous worker identity.

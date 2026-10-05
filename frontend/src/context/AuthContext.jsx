@@ -29,7 +29,10 @@ const buildUserData = (data) => ({
   _id: data._id,
   name: data.name,
   email: data.email,
-  role: data.role,
+  role: data.role === 'demo' ? 'admin' : data.role,
+  accountRole: data.role,
+  isDemo: Boolean(data.isDemo || data.role === 'demo'),
+  demoAccountId: data.demoAccountId || (data.role === 'demo' ? data._id : null),
   trainer: resolveLinkedTrainerId(data.trainer),
   coordinatorSubjects: data.coordinatorSubjects || [],
   evaluatorSubjects: data.evaluatorSubjects || [],
@@ -100,7 +103,7 @@ export const AuthProvider = ({ children }) => {
         const fresh = await getMe();
         const freshVersion = fresh.sessionVersion ?? 1;
         const cachedVersion = user.sessionVersion ?? 1;
-        if (freshVersion !== cachedVersion || fresh.role !== user.role) {
+        if (freshVersion !== cachedVersion || fresh.role !== (user.accountRole || user.role)) {
           notifySessionExpired({
             code: 'SESSION_EXPIRED',
             message: 'Your session has expired. Please sign in again to continue with your updated access.',

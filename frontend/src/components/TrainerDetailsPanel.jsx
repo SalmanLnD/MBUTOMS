@@ -9,9 +9,11 @@ import { getTrainerById } from '../services/trainerService.js';
 import { getCompOffSummary } from '../services/compOffService.js';
 import { formatDate, getErrorMessage, resolveLinkedTrainerId } from '../utils/helpers.js';
 import { useAuth } from '../context/AuthContext.jsx';
+import { maskDemoValue } from '../utils/demoMask.js';
 
 const TrainerDetailsPanel = ({ trainerId, canEdit = false }) => {
   const { user } = useAuth();
+  const display = (value) => user?.isDemo ? maskDemoValue(value) : value;
   const resolvedTrainerId = resolveLinkedTrainerId(trainerId);
   const ownTrainerId = resolveLinkedTrainerId(user?.trainer);
   const showCamuPassword = canEdit || Boolean(
@@ -88,9 +90,9 @@ const TrainerDetailsPanel = ({ trainerId, canEdit = false }) => {
       {trainer.employmentStatus === 'resigned' && (
         <div className="alert alert-warning mb-3">
           Resigned
-          {trainer.resignationDate ? ` — last working day ${formatDate(trainer.resignationDate)}` : ''}
+          {trainer.resignationDate ? ` — last working day ${display(formatDate(trainer.resignationDate))}` : ''}
           {trainer.successorTrainer?.name
-            ? `. Replaced by ${trainer.successorTrainer.name} (${trainer.successorTrainer.employeeId}).`
+            ? `. Replaced by ${display(trainer.successorTrainer.name)} (${display(trainer.successorTrainer.employeeId)}).`
             : '.'}
         </div>
       )}
@@ -113,8 +115,8 @@ const TrainerDetailsPanel = ({ trainerId, canEdit = false }) => {
               >
                 {trainer.name.charAt(0)}
               </div>
-              <h4 className="mb-1">{trainer.name}</h4>
-              <p className="text-muted mb-0">{trainer.employeeId}</p>
+              <h4 className="mb-1">{display(trainer.name)}</h4>
+              <p className="text-muted mb-0">{display(trainer.employeeId)}</p>
             </div>
           </div>
         </div>
@@ -126,29 +128,29 @@ const TrainerDetailsPanel = ({ trainerId, canEdit = false }) => {
               <div className="row g-3">
                 <div className="col-sm-6">
                   <label className="text-muted small">Email</label>
-                  <p className="mb-0">{trainer.email || '-'}</p>
+                  <p className="mb-0">{display(trainer.email || '-')}</p>
                 </div>
                 <div className="col-sm-6">
                   <label className="text-muted small">Phone</label>
-                  <p className="mb-0">{trainer.phone || '-'}</p>
+                  <p className="mb-0">{display(trainer.phone || '-')}</p>
                 </div>
                 <div className="col-sm-6">
                   <label className="text-muted small">CAMU ERP ID</label>
-                  <p className="mb-0">{trainer.camuErpId || '-'}</p>
+                  <p className="mb-0">{display(trainer.camuErpId || '-')}</p>
                 </div>
                 {showCamuPassword && (
                   <div className="col-sm-6">
                     <label className="text-muted small">CAMU Password</label>
-                    <p className="mb-0">{trainer.camuPassword || '-'}</p>
+                    <p className="mb-0">{display(trainer.camuPassword || '-')}</p>
                   </div>
                 )}
                 <div className="col-sm-6">
                   <label className="text-muted small">Department</label>
-                  <p className="mb-0">{trainer.department?.name || '-'}</p>
+                  <p className="mb-0">{display(trainer.department?.name || '-')}</p>
                 </div>
                 <div className="col-sm-6">
                   <label className="text-muted small">Joining Date</label>
-                  <p className="mb-0">{formatDate(trainer.joiningDate)}</p>
+                  <p className="mb-0">{display(formatDate(trainer.joiningDate))}</p>
                 </div>
               </div>
             </div>
@@ -160,20 +162,20 @@ const TrainerDetailsPanel = ({ trainerId, canEdit = false }) => {
               <div className="row g-3">
                 <div className="col-sm-4">
                   <label className="text-muted small">Pending Balance</label>
-                  <p className="mb-0 fw-semibold">{compOffSummary?.pendingBalance ?? 0}</p>
+                  <p className="mb-0 fw-semibold">{display(compOffSummary?.pendingBalance ?? 0)}</p>
                 </div>
                 <div className="col-sm-4">
                   <label className="text-muted small">Pending Records</label>
-                  <p className="mb-0">{compOffSummary?.pendingRecords ?? 0}</p>
+                  <p className="mb-0">{display(compOffSummary?.pendingRecords ?? 0)}</p>
                 </div>
                 <div className="col-sm-4">
                   <label className="text-muted small">Closed Records</label>
-                  <p className="mb-0">{compOffSummary?.closedRecords ?? 0}</p>
+                  <p className="mb-0">{display(compOffSummary?.closedRecords ?? 0)}</p>
                 </div>
                 {compOffSummary?.duplicateRecords > 0 && (
                   <div className="col-12">
                     <span className="badge bg-warning text-dark">
-                      {compOffSummary.duplicateRecords} duplicate comp-off row(s) flagged
+                      {display(compOffSummary.duplicateRecords)} duplicate comp-off row(s) flagged
                     </span>
                   </div>
                 )}
@@ -194,22 +196,22 @@ const TrainerDetailsPanel = ({ trainerId, canEdit = false }) => {
               <div className="row g-3">
                 <div className="col-sm-4">
                   <label className="text-muted small">Experience</label>
-                  <p className="mb-0">{trainer.experience} years</p>
+                  <p className="mb-0">{display(`${trainer.experience} years`)}</p>
                 </div>
                 <div className="col-sm-4">
                   <label className="text-muted small">Weekly Workload</label>
-                  <p className="mb-0">{trainer.weeklyWorkloadHours} hrs</p>
+                  <p className="mb-0">{display(`${trainer.weeklyWorkloadHours} hrs`)}</p>
                 </div>
                 <div className="col-sm-4">
                   <label className="text-muted small">Performance Score</label>
-                  <p className="mb-0">{trainer.performanceScore}%</p>
+                  <p className="mb-0">{display(`${trainer.performanceScore}%`)}</p>
                 </div>
                 <div className="col-12">
                   <label className="text-muted small">Skills</label>
                   <div className="d-flex flex-wrap gap-1 mt-1">
                     {trainer.skills?.length > 0
                       ? trainer.skills.map((skill) => (
-                          <span key={skill} className="badge bg-light text-dark border">{skill}</span>
+                          <span key={skill} className="badge bg-light text-dark border">{display(skill)}</span>
                         ))
                       : <span className="text-muted">No skills listed</span>}
                   </div>
@@ -220,7 +222,7 @@ const TrainerDetailsPanel = ({ trainerId, canEdit = false }) => {
                     {trainer.subjects?.length > 0
                       ? trainer.subjects.map((subject) => (
                           <span key={subject._id} className="badge bg-primary">
-                            {subject.name} ({subject.code})
+                            {display(subject.name)} ({display(subject.code)})
                           </span>
                         ))
                       : <span className="text-muted">No subjects assigned</span>}
@@ -235,7 +237,7 @@ const TrainerDetailsPanel = ({ trainerId, canEdit = false }) => {
               <div>
                 <h5 className="card-title mb-1">Schedule</h5>
                 <p className="text-muted mb-0">
-                  Weekly workload: {trainer.weeklyWorkloadHours} hrs assigned
+                  Weekly workload: {display(`${trainer.weeklyWorkloadHours} hrs`)} assigned
                 </p>
               </div>
               <Link to={`/trainers/${resolvedTrainerId}/schedule`} className="btn btn-primary btn-sm">

@@ -427,8 +427,8 @@ export const getCancellationApprovals = async (req, res) => {
     return res.status(400).json({ message: 'Invalid status filter' });
   }
 
-  // Backfill pending for legacy cancelled/postponed rows still on "none".
-  if (statusFilter === 'pending') {
+  // Demo reads never backfill production records.
+  if (statusFilter === 'pending' && !req.isDemo) {
     await TopicTrackerEntry.updateMany(
       {
         sessionStatus: { $in: ALERT_SESSION_STATUSES },

@@ -41,7 +41,7 @@ const MobileNavigation = () => {
       </nav>
       <Modal show={open} onClose={() => setOpen(false)} title="All pages" className="mobile-pages-dialog" scrollable>
         <div className="toms-modal-body mobile-pages-body">
-          <div className="mobile-pages-user"><strong>{user.name}</strong><span>{formatRole(user.role)}</span></div>
+          <div className="mobile-pages-user"><strong>{user.name}</strong><span>{formatRole(user.isDemo && !user.impersonating ? 'demo' : user.role)}</span></div>
           <nav className="mobile-pages-list" aria-label="All app pages">
             {assistant?.enabled && <button type="button" className="mobile-pages-link" aria-label="Open Sallu"
               onClick={(event) => { setOpen(false); assistant.openAssistant(event); }}>

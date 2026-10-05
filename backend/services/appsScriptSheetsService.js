@@ -78,7 +78,7 @@ export const getAppsScriptStatus = async () => {
 };
 
 export const getAppsScriptSetup = async (req) => {
-  const apiKey = await getOrCreateExportKey();
+  const apiKey = req.isDemo ? 'DEMO_LOCAL_ONLY' : await getOrCreateExportKey();
   const baseUrl = getPublicApiBaseUrl(req);
   const exportUrl = `${baseUrl}/api/sheets/timetable/export`;
 

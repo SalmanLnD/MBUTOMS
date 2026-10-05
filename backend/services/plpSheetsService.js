@@ -60,7 +60,7 @@ export const getPlpSheetStatus = async () => {
 };
 
 export const getPlpAppsScriptSetup = async (req) => {
-  const apiKey = await getOrCreatePlpExportKey();
+  const apiKey = req.isDemo ? 'DEMO_LOCAL_ONLY' : await getOrCreatePlpExportKey();
   const exportUrl = `${getPublicApiBaseUrl(req)}/api/plp/export`;
   const templatePath = path.join(__dirname, '../templates/plp-sync.gs');
   const template = fs.readFileSync(templatePath, 'utf8');

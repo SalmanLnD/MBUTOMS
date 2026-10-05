@@ -54,3 +54,4 @@
 
 @media (min-width: 992px) { .topbar-user { display: inline; max-width: 160px; } }
 @media (min-width: 768px) and (max-width: 1199.98px) { .topbar-calendars-btn span { display: none !important; } .topbar-calendars-btn { min-width: 44px; justify-content: center; } }
+.demo-workspace-banner { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: .6rem; margin-bottom: .8rem; padding: .65rem .8rem; border: 1px solid var(--line); border-radius: 12px; background: var(--primary-soft); color: var(--text-primary); font-size: .8rem; }

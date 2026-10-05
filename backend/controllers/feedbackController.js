@@ -170,13 +170,13 @@ export const getFeedbackForms = async (req, res) => {
   res.json(forms);
 };
 
-const maybeMergeDefaultFields = async (form) => {
+const maybeMergeDefaultFields = async (form, readOnly = false) => {
   if (!form) return form;
   const mergedFields = mergeDefaultFeedbackFields(form.fields);
   const fieldsChanged = JSON.stringify(mergedFields) !== JSON.stringify(form.fields);
   if (fieldsChanged) {
     form.fields = mergedFields;
-    await form.save();
+    if (!readOnly) await form.save();
   }
   return form;
 };
@@ -184,7 +184,7 @@ const maybeMergeDefaultFields = async (form) => {
 export const getCurrentMonthForm = async (req, res) => {
   const monthKey = currentMonthKey();
   let form = await FeedbackForm.findOne({ monthKey });
-  form = await maybeMergeDefaultFields(form);
+  form = await maybeMergeDefaultFields(form, req.isDemo);
 
   res.json({
     monthKey,
@@ -279,7 +279,7 @@ export const getPublicFeedbackForm = async (req, res) => {
     return res.status(404).json({ message: 'Feedback form not found or not published' });
   }
 
-  await maybeMergeDefaultFields(form);
+  await maybeMergeDefaultFields(form, Boolean(req.isDemo || req.hasDemoToken));
 
   const trainerRosterFilter = await mergeRosterFilter({ status: 'active' }, { rosterOnly: true });
   const [trainers, classGroups] = await Promise.all([

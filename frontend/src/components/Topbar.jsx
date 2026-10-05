@@ -10,6 +10,7 @@ import { CalendarIcon, MoonIcon, SunIcon } from './icons.jsx';
 import { formatRole, getErrorMessage } from '../utils/helpers.js';
 import { ROLES } from '../utils/roles.js';
 import { showError } from '../utils/toast.js';
+import { demoWorkspace } from '../services/api.js';
 
 const ACADEMIC_CALENDARS_URL = 'https://drive.google.com/drive/u/1/folders/1GvF_2ieWFGKaFfVvPTSaVG1bl87WQD3J';
 
@@ -100,6 +101,12 @@ const Topbar = ({ title }) => {
 
   return (
     <>
+      {user?.isDemo && <div className="demo-workspace-banner" role="status">
+        <span><strong>Demo workspace</strong> · Edits stay in this browser. Sallu reads live data.</span>
+        <button type="button" className="btn btn-sm btn-outline-primary" onClick={() => {
+          demoWorkspace.reset(user.demoAccountId || user._id); window.location.reload();
+        }}>Reset demo changes</button>
+      </div>}
       {user?.impersonating && (
         <div className="impersonation-banner d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
           <span className="small">
@@ -157,8 +164,8 @@ const Topbar = ({ title }) => {
                 {isDark ? <SunIcon size={16} /> : <MoonIcon size={16} />}
               </button>
 
-              <span className="topbar-user small" title={`${user.name} · ${formatRole(user.role)}`}>
-                {user.name} · {formatRole(user.role)}
+              <span className="topbar-user small" title={`${user.name} · ${formatRole(user.isDemo && !user.impersonating ? 'demo' : user.role)}`}>
+                {user.name} · {formatRole(user.isDemo && !user.impersonating ? 'demo' : user.role)}
               </span>
 
               <button type="button" className="btn btn-outline-danger btn-sm" onClick={handleLogout}>

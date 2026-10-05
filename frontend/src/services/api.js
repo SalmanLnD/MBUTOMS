@@ -1,5 +1,10 @@
 import axios from 'axios';
 import { notifySessionExpired } from '../utils/sessionManager.js';
+import { createDemoWorkspace, isDemoUser, demoNetworkActions } from '../utils/demoWorkspace.js';
+
+export const demoWorkspace = createDemoWorkspace(window.localStorage, () => window.dispatchEvent(new Event('toms-demo-change')));
+const cachedUser = () => { try { return JSON.parse(localStorage.getItem('toms_user') || 'null'); } catch { return null; } };
+const requestPath = (config) => new URL(config.url, 'https://toms.invalid').pathname.replace(/^\/api(?=\/)/, '');
 
 /** True when a request failed because its AbortSignal was aborted. */
 export const isAbortError = (error) =>
@@ -41,11 +46,29 @@ api.interceptors.request.use((config) => {
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
   }
+  const user = cachedUser(), path = requestPath(config), method = config.method?.toLowerCase() || 'get';
+  if (isDemoUser(user) && token) {
+    config.demoOwner = user.demoAccountId || user._id;
+    const localDetail = method === 'get' && demoWorkspace.localDetail(config.demoOwner, path);
+    if (localDetail || (method !== 'get' && !demoNetworkActions.has(path))) {
+      config.adapter = async (request) => ({ status: 200, statusText: 'OK', headers: {}, config: request,
+        data: localDetail || demoWorkspace.mutate(request.demoOwner, path, method, request.data) });
+    }
+  }
   return config;
 });
 
 api.interceptors.response.use(
-  (response) => response,
+  (response) => {
+    const { config } = response, user = cachedUser();
+    if (config.demoOwner && isDemoUser(user) && config.demoOwner === (user.demoAccountId || user._id)
+      && config.method === 'get' && !requestPath(config).startsWith('/auth/')) {
+      const path = requestPath(config);
+      demoWorkspace.remember(config.demoOwner, path, config.params, response.data);
+      response.data = demoWorkspace.project(config.demoOwner, path, config.params, response.data);
+    }
+    return response;
+  },
   async (error) => {
     const config = error.config;
     const status = error.response?.status;

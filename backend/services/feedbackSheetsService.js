@@ -70,7 +70,7 @@ export const getFeedbackAppsScriptStatus = async () => {
 };
 
 export const getFeedbackAppsScriptSetup = async (req) => {
-  const apiKey = await getOrCreateFeedbackExportKey();
+  const apiKey = req.isDemo ? 'DEMO_LOCAL_ONLY' : await getOrCreateFeedbackExportKey();
   const baseUrl = getPublicApiBaseUrl(req);
   const exportUrl = `${baseUrl}/api/feedback/export`;
 

@@ -38,12 +38,12 @@ const DeviceSettings = () => {
 
   useEffect(() => {
     if (!user) { promptedUser.current = null; setSetupRequired(false); setOpen(false); return; }
-    if (loading || user.appVersion !== version || user.impersonating || user.mustResetPassword || user.requiresPasswordReset
+    if (loading || user.isDemo || user.appVersion !== version || user.impersonating || user.mustResetPassword || user.requiresPasswordReset
       || promptedUser.current === user._id || hasAcknowledgedDeviceSetup(user._id)) return;
     promptedUser.current = user._id;
     if (installed && enabled) { acknowledgeDeviceSetup(user._id); return; }
     setSetupRequired(true); setOpen(true);
-  }, [loading, user?._id, user?.appVersion, user?.impersonating, user?.mustResetPassword, user?.requiresPasswordReset, installed, enabled]);
+  }, [loading, user?._id, user?.isDemo, user?.appVersion, user?.impersonating, user?.mustResetPassword, user?.requiresPasswordReset, installed, enabled]);
 
   useEffect(() => {
     const update = () => setRefresh(value => value + 1);
@@ -94,7 +94,8 @@ const DeviceSettings = () => {
   };
 
   const notificationReason = !user ? 'Sign in to enable notifications for your account.'
-    : user.impersonating ? 'Exit trainer view to change device notifications.'
+    : user.isDemo ? 'Device push subscriptions are disabled for the demo account.'
+      : user.impersonating ? 'Exit trainer view to change device notifications.'
       : supportReason || (window.Notification?.permission === 'denied'
         ? 'Notifications are blocked. Allow TOMS in your browser or device notification settings.'
         : loadError ? 'Cannot connect right now. Retry setup, or continue for this session.'
@@ -143,7 +144,7 @@ const DeviceSettings = () => {
           <p>Receive your replacements, ticket updates, observations and tracker alerts, even when TOMS is closed.</p>
           {notificationReason && <p className="device-settings-note">{notificationReason}</p>}
           <button type="button" className={`btn ${enabled ? 'btn-outline-secondary' : 'btn-primary'}`}
-            onClick={handleNotifications} disabled={busy || (!enabled && Boolean(notificationReason)) || user?.impersonating || (setupRequired && enabled)}>
+            onClick={handleNotifications} disabled={busy || (!enabled && Boolean(notificationReason)) || user?.isDemo || user?.impersonating || (setupRequired && enabled)}>
             {busy ? 'Please wait…' : enabled ? setupRequired ? 'Notifications enabled' : 'Turn off device notifications' : 'Enable notifications'}
           </button>
           {loadError && <button type="button" className="btn btn-outline-primary ms-2" onClick={() => setRetry(value => value + 1)}>Retry setup</button>}

@@ -77,7 +77,7 @@ export const getAttendanceSheetStatus = async () => {
 };
 
 export const getAttendanceAppsScriptSetup = async (req) => {
-  const apiKey = await getOrCreateAttendanceExportKey();
+  const apiKey = req.isDemo ? 'DEMO_LOCAL_ONLY' : await getOrCreateAttendanceExportKey();
   const baseUrl = getPublicApiBaseUrl(req);
   const exportUrl = `${baseUrl}/api/attendance/export`;
   const rtetExportUrl = `${baseUrl}/api/attendance/rtet-export`;

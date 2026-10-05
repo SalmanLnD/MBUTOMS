@@ -59,7 +59,7 @@ export const getTestReportSheetStatus = async () => {
 };
 
 export const getTestReportAppsScriptSetup = async (req) => {
-  const apiKey = await getOrCreateTestReportExportKey();
+  const apiKey = req.isDemo ? 'DEMO_LOCAL_ONLY' : await getOrCreateTestReportExportKey();
   const exportUrl = `${getPublicApiBaseUrl(req)}/api/student-test-reports/export`;
   const templatePath = path.join(__dirname, '../templates/student-test-reports-sync.gs');
   const template = fs.readFileSync(templatePath, 'utf8');

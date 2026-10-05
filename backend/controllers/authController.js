@@ -4,24 +4,28 @@ import { INITIAL_TRAINER_PASSWORD } from '../constants/trainerAuth.js';
 import { canImpersonate, IMPERSONATION_TARGET_ROLES, ROLES } from '../utils/roles.js';
 import { APP_VERSION, SESSION_APP_VERSION } from '../utils/sessionVersion.js';
 
-const generateToken = (user, impersonatedBy = null) => {
+const generateToken = (user, impersonatedBy = null, demoOwner = null) => {
   const payload = {
     id: user._id,
     sv: user.sessionVersion ?? 1,
     av: SESSION_APP_VERSION,
     ...(impersonatedBy ? { impersonatedBy } : {}),
+    ...(user.role === ROLES.DEMO || demoOwner ? { demo: true } : {}),
+    ...(demoOwner ? { demoOwner: String(demoOwner._id), demoSv: demoOwner.sessionVersion ?? 1 } : {}),
   };
   return jwt.sign(payload, process.env.JWT_SECRET, {
     expiresIn: process.env.JWT_EXPIRES_IN || '7d',
   });
 };
 
-const userResponse = (user, { impersonator = null } = {}) => ({
+const userResponse = (user, { impersonator = null, demoOwner = null } = {}) => ({
   appVersion: APP_VERSION,
   _id: user._id,
   name: user.name,
   email: user.email,
   role: user.role,
+  isDemo: user.role === ROLES.DEMO || Boolean(demoOwner),
+  demoAccountId: demoOwner ? String(demoOwner._id) : user.role === ROLES.DEMO ? String(user._id) : null,
   trainer: user.trainer,
   coordinatorSubjects: user.coordinatorSubjects || [],
   evaluatorSubjects: user.evaluatorSubjects || [],
@@ -37,7 +41,7 @@ const userResponse = (user, { impersonator = null } = {}) => ({
         role: impersonator.role,
       }
     : null,
-  token: generateToken(user, impersonator?._id),
+  token: generateToken(user, impersonator?._id, demoOwner),
 });
 
 export const login = async (req, res) => {
@@ -81,6 +85,8 @@ export const getMe = async (req, res) => {
   res.json({
     ...user.toObject(),
     appVersion: APP_VERSION,
+    isDemo: Boolean(req.isDemo),
+    demoAccountId: req.demoAccountId || null,
     requiresPasswordReset: Boolean(user.mustResetPassword),
     impersonating: Boolean(req.impersonator),
     impersonator: req.impersonator
@@ -184,7 +190,8 @@ export const impersonateUser = async (req, res) => {
     return res.status(400).json({ message: 'Already signed in as this user' });
   }
 
-  res.json(userResponse(targetUser, { impersonator: req.user }));
+  const demoOwner = req.isDemo ? await User.findById(req.demoAccountId).select('-password') : null;
+  res.json(userResponse(targetUser, { impersonator: demoOwner || req.user, demoOwner }));
 };
 
 export const stopImpersonation = async (req, res) => {

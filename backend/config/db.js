@@ -92,7 +92,7 @@ const runStartupTasks = async () => {
   }
 };
 
-export const connectDB = async ({ runStartup = false } = {}) => {
+export const connectDB = async ({ runStartup = false, readOnly = false } = {}) => {
   const cache = getCache();
 
   if (!process.env.MONGODB_URI) {
@@ -119,7 +119,7 @@ export const connectDB = async ({ runStartup = false } = {}) => {
     await runStartupTasks();
     cache.startupDone = true;
     cache.roleSyncDone = true;
-  } else if (!cache.roleSyncDone) {
+  } else if (!cache.roleSyncDone && !readOnly) {
     // Production/serverless: still promote coordinators/evaluators once per instance.
     cache.roleSyncDone = true;
     await runRoleSync();

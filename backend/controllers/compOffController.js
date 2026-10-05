@@ -72,7 +72,7 @@ const buildListFilter = async (req) => {
 };
 
 export const listCompOffs = async (req, res) => {
-  await ensureCompOffSeedData();
+  if (!req.isDemo) await ensureCompOffSeedData();
 
   const filter = await buildListFilter(req);
   if (filter.impossible) {
@@ -105,7 +105,7 @@ export const listCompOffs = async (req, res) => {
 };
 
 export const getCompOffSummary = async (req, res) => {
-  await ensureCompOffSeedData();
+  if (!req.isDemo) await ensureCompOffSeedData();
 
   let employeeId = req.query.employeeId?.trim() || '';
   if (isTrainerLikeRole(req.user.role)) {

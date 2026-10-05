@@ -10,6 +10,7 @@ import {
   SESSION_EXPIRED_MESSAGE,
 } from '../utils/sessionVersion.js';
 import { attachManagerEditNotifier } from '../utils/managerEditNotifications.js';
+import { DEMO_ROLE, isDemoRequestAllowed, rejectDemoWrite, maskDemoCredentials } from '../utils/demoAccess.js';
 
 export const protect = async (req, res, next) => {
   let token;
@@ -60,7 +61,23 @@ export const protect = async (req, res, next) => {
       }
     }
 
-    attachManagerEditNotifier(req, res);
+    if (decoded.demoOwner) {
+      const owner = req.impersonator;
+      if (!owner || String(owner._id) !== decoded.demoOwner || owner.role !== DEMO_ROLE
+        || !owner.isActive || (owner.sessionVersion ?? 1) !== decoded.demoSv) {
+        return res.status(401).json({ message: SESSION_EXPIRED_MESSAGE, code: SESSION_EXPIRED_CODE });
+      }
+    }
+    req.isDemo = req.user.role === DEMO_ROLE || Boolean(decoded.demoOwner);
+    if (req.isDemo) {
+      if (!isDemoRequestAllowed(req)) return rejectDemoWrite(res);
+      req.demoAccountId = decoded.demoOwner || String(req.user._id);
+      const json = res.json.bind(res);
+      res.json = (data) => json(maskDemoCredentials(JSON.parse(JSON.stringify(data))));
+      if (req.user.role === DEMO_ROLE) {
+        req.user = { ...(req.user.toObject?.() || req.user), role: 'admin', isDemo: true };
+      }
+    } else attachManagerEditNotifier(req, res);
     next();
   } catch {
     return res.status(401).json({

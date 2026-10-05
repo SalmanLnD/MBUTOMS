@@ -24,6 +24,7 @@ export const formatDateTime = (date) => {
 export const formatRole = (role) => {
   const roles = {
     [ROLES.ADMIN]: 'Admin',
+    [ROLES.DEMO]: 'Demo',
     [ROLES.MANAGER]: 'Manager',
     [ROLES.SUBJECT_COORDINATOR]: 'Subject Coordinator',
     [ROLES.CAMPUS_MANAGER]: 'Campus Manager',

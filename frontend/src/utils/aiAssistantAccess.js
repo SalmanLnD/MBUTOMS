@@ -1,5 +1,5 @@
 export const canUseAiAssistant = (user) => Boolean(user
-  && ['admin', 'subject_coordinator', 'trainer', 'evaluator', 'manager', 'campus_manager'].includes(user.role)
+  && ['admin', 'demo', 'subject_coordinator', 'trainer', 'evaluator', 'manager', 'campus_manager'].includes(user.role)
   && !user.impersonating && !user.impersonator
   && !user.mustResetPassword && !user.requiresPasswordReset);
 
