@@ -210,6 +210,36 @@ const buildClassSummaryKey = ({ subjectId, branchYearSection }) => {
   return `${subjectId || ''}::${normalizedClass}`;
 };
 
+export const collectCompletedTopicsForSessions = (sessions, entries, date) => {
+  const until = toLeaveDateKey(date);
+  return sessions.map((session) => {
+    const completionClassKey = buildClassSummaryKey(session);
+    const cohort = String(session.branchYearSection || '').match(/\bPY\s+(\d{4})/i)?.[1];
+    const topics = new Set();
+    for (const entry of entries) {
+      if (entry.sessionStatus !== 'completed' || entry.trackerStatus !== 'closed'
+        || toLeaveDateKey(entry.date) > until) continue;
+      const entryCohort = String(entry.branchYearSection || '').match(/\bPY\s+(\d{4})/i)?.[1];
+      if (cohort && entryCohort && cohort !== entryCohort) continue;
+      if (buildClassSummaryKey({ subjectId: String(entry.subject?._id || entry.subject || ''), branchYearSection: entry.branchYearSection }) !== completionClassKey) continue;
+      getEntryTopicModules({ ...entry, topicModulesCovered: entry.topicModulesCovered?.length ? entry.topicModulesCovered : undefined })
+        .forEach(topic => topics.add(topic));
+    }
+    return { ...session, completedTopics: [...topics], completionClassKey };
+  });
+};
+
+export const addCompletedTopicHistory = async (sessions, date) => {
+  if (!sessions.length) return sessions;
+  const subjects = [...new Set(sessions.map(row => row.subjectId).filter(Boolean))];
+  const { endExclusive } = getLeaveDayWindow(date);
+  const entries = await TopicTrackerEntry.find({
+    subject: { $in: subjects }, date: { $lt: endExclusive },
+    sessionStatus: 'completed', trackerStatus: 'closed',
+  }).select('subject branchYearSection date sessionStatus trackerStatus topicModulesCovered topicModuleCovered').lean();
+  return collectCompletedTopicsForSessions(sessions, entries, date);
+};
+
 const buildInterruptionKeys = (leaves = [], schedulesById = new Map(), fromKey = '', untilKey = '') => {
   const keys = new Set();
   leaves.forEach((leave) => {
@@ -618,10 +648,12 @@ export const buildTopicTrackerSessions = async ({
     ])
   );
 
-  const sessions = sessionDefaults.map((defaults) => {
+  let sessions = sessionDefaults.map((defaults) => {
     const entry = entryMap.get(defaults.scheduleId);
     return entryToSession(entry, defaults);
   });
+
+  if (!lite) sessions = await addCompletedTopicHistory(sessions, dateKey);
 
   return { date: dateKey, day: dayName, sessions };
 };

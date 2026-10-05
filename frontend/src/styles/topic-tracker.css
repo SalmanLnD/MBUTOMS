@@ -1,5 +1,22 @@
 /* Topic tracker — a spreadsheet-style workbench with clearer reading hierarchy. */
 
+.toms-styled-select__option.is-topic-completed { color: #14634f; background: #e0f5ed; box-shadow: inset 3px 0 #299b77; }
+.toms-styled-select__option.is-topic-completed:hover,
+.toms-styled-select__option.is-topic-completed.is-highlighted,
+.toms-styled-select__option.is-topic-completed.is-selected { color: #104e40; background: #c5eadc; }
+.topic-completed-badge { flex: none; font-size: .65rem; font-weight: 700; color: inherit; }
+.toms-styled-select.is-topic-completed .toms-styled-select__trigger { border-color: #299b77; color: #14634f; background-color: #e0f5ed; }
+.topic-title-guide { position: fixed; z-index: 1450; width: min(320px, calc(100vw - 16px)); padding: 8px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); color: var(--text-primary); box-shadow: var(--shadow-md); pointer-events: none; }
+.topic-title-guide__ticker { overflow: hidden; color: var(--primary); font-size: .8rem; line-height: 1.5; white-space: nowrap; }
+.topic-title-guide__ticker span { display: inline-block; width: max-content; animation: topic-title-scroll var(--topic-scroll-duration) linear infinite; }
+@keyframes topic-title-scroll { 0%,12% { transform: translateX(0); } 88%,100% { transform: translateX(min(0px, calc(var(--topic-guide-width) - 100%))); } }
+[data-theme='dark'] .toms-styled-select__option.is-topic-completed { color: #aeecd6; background: #193e37; }
+[data-theme='dark'] .toms-styled-select.is-topic-completed .toms-styled-select__trigger { color: #aeecd6; background-color: #193e37; }
+[data-theme='dark'] .toms-styled-select__option.is-topic-completed:hover,
+[data-theme='dark'] .toms-styled-select__option.is-topic-completed.is-highlighted,
+[data-theme='dark'] .toms-styled-select__option.is-topic-completed.is-selected { color: #d4f9eb; background: #235649; }
+@media (prefers-reduced-motion: reduce) { .topic-title-guide__ticker { overflow: visible; white-space: normal; overflow-wrap: anywhere; } .topic-title-guide__ticker span { width: auto; animation: none; } }
+
 .topic-tracker-sheet-wrap {
   --tracker-surface: var(--surface-elevated, #ffffff);
   --tracker-subtle: var(--surface-muted, #f5f7fb);

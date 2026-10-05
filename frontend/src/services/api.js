@@ -52,7 +52,7 @@ api.interceptors.response.use(
     const hadToken = Boolean(localStorage.getItem('toms_token'));
     const isLoginRequest = isAuthLoginRequest(config);
 
-    if (status === 401 && hadToken && !isLoginRequest) {
+    if (status === 401 && hadToken && !isLoginRequest && !config?.skipSessionExpired) {
       const data = error.response?.data;
       notifySessionExpired({
         code: data?.code || 'SESSION_EXPIRED',

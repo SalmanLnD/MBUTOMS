@@ -50,7 +50,12 @@ const NotificationBell = () => {
     if (!canViewNotifications) return undefined;
     loadNotifications();
     const intervalId = window.setInterval(loadNotifications, 45000);
-    return () => window.clearInterval(intervalId);
+    const onPush = (event) => { if (event.data?.type === 'TOMS_NOTIFICATION_RECEIVED') loadNotifications(); };
+    navigator.serviceWorker?.addEventListener('message', onPush);
+    return () => {
+      window.clearInterval(intervalId);
+      navigator.serviceWorker?.removeEventListener('message', onPush);
+    };
   }, [canViewNotifications, loadNotifications]);
 
   const updatePanelPosition = useCallback(() => {

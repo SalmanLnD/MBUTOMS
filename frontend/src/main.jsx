@@ -6,6 +6,7 @@ import 'bootstrap/dist/css/bootstrap.min.css';
 import 'react-toastify/dist/ReactToastify.css';
 import App from './App.jsx';
 import { initTheme } from './utils/themeManager.js';
+import { initializeDeviceFeatures } from './services/deviceService.js';
 import { AuthProvider } from './context/AuthContext.jsx';
 import { LoginModalProvider } from './context/LoginModalContext.jsx';
 import { ThemeProvider } from './context/ThemeContext.jsx';
@@ -18,6 +19,7 @@ import './styles/modal.css';
 import './styles/styled-select.css';
 
 initTheme();
+initializeDeviceFeatures();
 
 purgeModalOverlaysOnBoot();
 

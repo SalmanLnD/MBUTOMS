@@ -20,6 +20,7 @@ import {
   resetSessionExpiredState,
 } from '../utils/sessionManager.js';
 import { resetAllModalArtifacts } from '../utils/modalCleanup.js';
+import { disableDevicePush, syncDeviceSession } from '../services/deviceService.js';
 
 const AuthContext = createContext(null);
 
@@ -88,6 +89,10 @@ export const AuthProvider = ({ children }) => {
   }, [loadUser]);
 
   useEffect(() => {
+    if (!loading) void syncDeviceSession(user);
+  }, [loading, user]);
+
+  useEffect(() => {
     if (!user) return undefined;
 
     const validateSession = async () => {
@@ -133,7 +138,8 @@ export const AuthProvider = ({ children }) => {
     });
   }, [applySession]);
 
-  const logout = useCallback(() => {
+  const logout = useCallback(async () => {
+    await disableDevicePush();
     resetAllModalArtifacts();
     resetSessionExpiredState();
     localStorage.removeItem('toms_token');

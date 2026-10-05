@@ -210,6 +210,8 @@ const TopicTrackerSpreadsheet = ({
         durationHrs: saved.durationHrs,
         attendancePercent: saved.attendancePercent,
         trackerStatus: saved.trackerStatus,
+        completedTopics: saved.completedTopics ?? row.completedTopics,
+        completionClassKey: saved.completionClassKey ?? row.completionClassKey,
       };
       baselineRowsRef.current.set(key, serializeEditableRow(nextRow));
       setDirtyRows((current) => {
@@ -217,7 +219,9 @@ const TopicTrackerSpreadsheet = ({
         updated.delete(key);
         return updated;
       });
-      setSessions((prev) => prev.map((item, i) => (i === index ? nextRow : item)));
+      setSessions((prev) => prev.map((item, i) => (i === index ? nextRow
+        : saved.completionClassKey && item.completionClassKey === saved.completionClassKey
+          ? { ...item, completedTopics: saved.completedTopics } : item)));
       showSuccess('Slot updated successfully');
     } catch (err) {
       showError(getErrorMessage(err));
@@ -273,6 +277,7 @@ const TopicTrackerSpreadsheet = ({
       const options = row.topicOptions || [];
       const topics = getRowTopics(row);
       const selectedTopics = new Set(topics.filter(Boolean));
+      const completedTopics = new Set((row.completedTopics || []).map(topic => topic.trim().toLocaleLowerCase()));
       const topicsOptional = row.sessionStatus === 'cancelled';
       return (
         <div className="topic-tracker-topics">
@@ -284,16 +289,18 @@ const TopicTrackerSpreadsheet = ({
                   <StyledSelect
                     size="sm"
                     className="topic-tracker-cell-input topic-tracker-topic-select"
+                    topicPreview
                     value={topic}
                     onChange={(e) => updateTopic(index, topicIndex, e.target.value)}
                     disabled={isSaving}
                     aria-label={`Topic / Module Covered ${topicIndex + 1}`}
                     placeholder={topicsOptional ? 'Optional for cancelled...' : 'Select topic...'}
                     options={[
-                      ...(valueNotInList ? [{ value: topic, label: topic }] : []),
+                      ...(valueNotInList ? [{ value: topic, label: topic, completed: completedTopics.has(topic.trim().toLocaleLowerCase()) }] : []),
                       ...options.map((option) => ({
                         value: option,
                         label: option,
+                        completed: completedTopics.has(option.trim().toLocaleLowerCase()),
                         disabled: option !== topic && selectedTopics.has(option),
                       })),
                     ]}

@@ -5,6 +5,7 @@ import { useTheme } from '../context/ThemeContext.jsx';
 import { useLoginModal } from '../context/LoginModalContext.jsx';
 import StyledSelect from './StyledSelect.jsx';
 import NotificationBell from './NotificationBell.jsx';
+import DeviceSettings from './DeviceSettings.jsx';
 import { CalendarIcon, MoonIcon, SunIcon } from './icons.jsx';
 import { formatRole, getErrorMessage } from '../utils/helpers.js';
 import { ROLES } from '../utils/roles.js';
@@ -47,8 +48,8 @@ const Topbar = ({ title }) => {
     loadTargets();
   }, [loadTargets]);
 
-  const handleLogout = () => {
-    logout();
+  const handleLogout = async () => {
+    await logout();
     navigate('/timetable');
   };
 
@@ -141,6 +142,7 @@ const Topbar = ({ title }) => {
           </div>
         )}
         <div className="topbar-actions">
+          <DeviceSettings />
           {user ? (
             <>
               <NotificationBell />

@@ -20,12 +20,12 @@ const SessionExpiredModal = () => {
     });
   }, []);
 
-  const handleSignInAgain = useCallback(() => {
+  const handleSignInAgain = useCallback(async () => {
     const message = expired?.message;
     // Unmount this modal via React first; logout only resets body scroll (not portals).
     setExpired(null);
     resetSessionExpiredState();
-    logout();
+    await logout();
     navigate('/timetable', { replace: true });
     openLoginModal({
       message: message || 'Your session has expired. Please sign in again to continue with your updated access.',

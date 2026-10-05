@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { getPopoverPosition, visibleViewport } from '../utils/popoverPosition.js';
+import TopicTitleGuide from './TopicTitleGuide.jsx';
 
 const ChevronIcon = () => (
   <svg width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden="true">
@@ -46,6 +47,7 @@ const StyledSelect = ({
   required = false,
   size,
   className = '',
+  topicPreview = false,
   'aria-label': ariaLabel,
 }) => {
   const listId = useId();
@@ -54,6 +56,7 @@ const StyledSelect = ({
   const menuRef = useRef(null);
   const shouldScrollHighlightRef = useRef(false);
   const [open, setOpen] = useState(false);
+  const [preview, setPreview] = useState(null);
   const [highlightIndex, setHighlightIndex] = useState(-1);
   const [menuStyle, setMenuStyle] = useState({ top: 0, left: 0, width: 0, maxHeight: 240 });
 
@@ -75,6 +78,7 @@ const StyledSelect = ({
   const closeMenu = useCallback(() => {
     setOpen(false);
     setHighlightIndex(-1);
+    setPreview(null);
   }, []);
 
   const selectValue = useCallback((nextValue) => {
@@ -140,6 +144,13 @@ const StyledSelect = ({
     optionEl?.scrollIntoView({ block: 'nearest' });
   }, [highlightIndex, open]);
 
+  useEffect(() => {
+    if (!topicPreview || !open || highlightIndex < 0) return;
+    const option = enabledOptions[highlightIndex];
+    const anchor = menuRef.current?.querySelector(`[data-option-index="${highlightIndex}"]`);
+    if (option && anchor) setPreview({ label: String(option.label), completed: option.completed, anchor });
+  }, [topicPreview, open, highlightIndex, optionsKey]);
+
   const handleTriggerKeyDown = (event) => {
     if (disabled) return;
 
@@ -204,12 +215,17 @@ const StyledSelect = ({
           'toms-styled-select__option',
           isSelected ? 'is-selected' : '',
           isHighlighted ? 'is-highlighted' : '',
+          option.completed ? 'is-topic-completed' : '',
         ].filter(Boolean).join(' ')}
         disabled={option.disabled}
-        onMouseEnter={() => setHighlightIndex(optionIndex)}
+        onMouseEnter={event => { setHighlightIndex(optionIndex); if (topicPreview) setPreview({ label: String(option.label), completed: option.completed, anchor: event.currentTarget }); }}
+        onMouseLeave={() => { if (topicPreview) setPreview(null); }}
+        onFocus={event => { if (topicPreview) setPreview({ label: String(option.label), completed: option.completed, anchor: event.currentTarget }); }}
+        aria-describedby={topicPreview && preview?.anchor?.dataset.optionIndex === String(optionIndex) ? `${listId}-preview` : undefined}
         onClick={() => selectValue(option.value)}
       >
         <span className="toms-styled-select__option-label">{option.label}</span>
+        {option.completed && <span className="topic-completed-badge">Completed</span>}
         {isSelected && (
           <span className="toms-styled-select__option-check" aria-hidden="true">
             <CheckIcon />
@@ -267,6 +283,7 @@ const StyledSelect = ({
         size === 'sm' ? 'toms-styled-select--sm' : '',
         open ? 'is-open' : '',
         disabled ? 'is-disabled' : '',
+        topicPreview && selectedOption?.completed ? 'is-topic-completed' : '',
         className,
       ].filter(Boolean).join(' ')}
     >
@@ -289,12 +306,17 @@ const StyledSelect = ({
         aria-expanded={open}
         aria-controls={open ? listId : undefined}
         aria-label={ariaLabel}
+        aria-describedby={topicPreview && preview?.anchor === triggerRef.current ? `${listId}-preview` : undefined}
         disabled={disabled}
         onClick={() => {
           if (disabled) return;
           setOpen((prev) => !prev);
         }}
         onKeyDown={handleTriggerKeyDown}
+        onMouseEnter={event => { if (topicPreview && selectedOption) setPreview({ label: String(selectedOption.label), completed: selectedOption.completed, anchor: event.currentTarget }); }}
+        onMouseLeave={() => { if (topicPreview) setPreview(null); }}
+        onFocus={event => { if (topicPreview && selectedOption && !open) setPreview({ label: String(selectedOption.label), completed: selectedOption.completed, anchor: event.currentTarget }); }}
+        onBlur={() => { if (topicPreview && !open) setPreview(null); }}
       >
         <span className={['toms-styled-select__value', isPlaceholder ? 'is-placeholder' : ''].filter(Boolean).join(' ')}>
           {displayLabel}
@@ -304,6 +326,7 @@ const StyledSelect = ({
         </span>
       </button>
       {menu}
+      {topicPreview && preview && <TopicTitleGuide {...preview} id={`${listId}-preview`} />}
     </div>
   );
 };

@@ -18,6 +18,7 @@ import {
   buildTopicTrackerPendingBacklog,
   buildTopicTrackerExportRows,
   buildTopicTrackerClassSummary,
+  addCompletedTopicHistory,
 } from '../utils/topicTrackerSessions.js';
 import { computeHours } from '../utils/trainerClassHours.js';
 import { findTrainerByScheduleCode } from '../utils/trainerMappings.js';
@@ -360,7 +361,10 @@ export const upsertTopicTrackerEntry = async (req, res) => {
   if (!alerted) {
     await notifyAdminsOfTopicTrackerUpdate(entry, req.user);
   }
-  res.json(entry);
+  const [history] = await addCompletedTopicHistory([{
+    subjectId: String(entry.subject), branchYearSection: entry.branchYearSection,
+  }], entry.date);
+  res.json({ ...entry.toObject(), completedTopics: history.completedTopics, completionClassKey: history.completionClassKey });
 };
 
 export const updateTopicTrackerStatus = async (req, res) => {
