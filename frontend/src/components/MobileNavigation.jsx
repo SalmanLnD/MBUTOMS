@@ -45,11 +45,11 @@ const MobileNavigation = () => {
           <nav className="mobile-pages-list" aria-label="All app pages">
             {assistant?.enabled && <button type="button" className="mobile-pages-link" aria-label="Open Sallu"
               onClick={(event) => { setOpen(false); assistant.openAssistant(event); }}>
-              <SalluAvatar size={24} /><span>Sallu</span><span aria-hidden="true">›</span>
+              <SalluAvatar size={24} /><span className="mobile-pages-label">Sallu</span><span className="mobile-pages-chevron" aria-hidden="true">›</span>
             </button>}
             {visibleItems.map(({ path, label, Icon }) => (
               <NavLink key={path} to={path} onClick={() => setOpen(false)} className={({ isActive }) => `mobile-pages-link${isActive ? ' is-active' : ''}`}>
-                <Icon size={20} /><span>{label}</span><span aria-hidden="true">›</span>
+                <Icon size={20} /><span className="mobile-pages-label">{label}</span><span className="mobile-pages-chevron" aria-hidden="true">›</span>
               </NavLink>
             ))}
           </nav>

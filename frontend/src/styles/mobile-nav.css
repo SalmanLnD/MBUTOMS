@@ -10,7 +10,8 @@
   .mobile-pages-user span { color: var(--text-secondary); font-size: .8rem; }
   .mobile-pages-list { display: flex; flex-direction: column; padding: .4rem; }
   .mobile-pages-link { display: flex; align-items: center; gap: .85rem; min-height: 48px; padding: .7rem .75rem; border-radius: 4px; color: var(--text-primary); text-decoration: none; font-size: .9375rem; }
-  .mobile-pages-link span:first-of-type { flex: 1; }
-  .mobile-pages-link span:last-child { color: var(--text-muted); }
+  .mobile-pages-link > .mobile-pages-label { flex: 1; min-width: 0; }
+  .mobile-pages-link > .mobile-pages-chevron { flex: none; color: var(--text-muted); }
+  .mobile-pages-link > svg { flex-shrink: 0; }
   .mobile-pages-link:hover, .mobile-pages-link.is-active { background: var(--primary-soft); color: var(--primary-strong); }
 }
