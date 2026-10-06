@@ -28,7 +28,7 @@ const NotificationBell = () => {
   const canViewNotifications =
     user
     && !user.impersonating
-    && [ROLES.ADMIN, ROLES.TRAINER, ROLES.SUBJECT_COORDINATOR, ROLES.EVALUATOR].includes(user.role);
+    && Object.values(ROLES).includes(user.role);
 
   const loadNotifications = useCallback(async () => {
     if (!canViewNotifications) return;

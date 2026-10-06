@@ -1,0 +1,9 @@
+.feedback-announcement .toms-modal-header { background: linear-gradient(120deg, var(--primary-soft), var(--surface-soft)); }
+.feedback-announcement .btn-close:disabled { opacity: .3; cursor: wait; }
+.feedback-announcement-intro { font-size: 1rem; line-height: 1.7; }
+.feedback-announcement-list { margin: 1rem 0; padding-left: 1.5rem; }
+.feedback-announcement-list li { padding: .65rem .25rem; border-bottom: 1px solid var(--line); }
+.feedback-announcement-list li::marker { color: var(--primary); font-weight: 700; }
+.feedback-announcement-list h3 { font-size: .95rem; margin: 0 0 .4rem; color: var(--text-primary); }
+.feedback-announcement-list p { font-size: .9rem; line-height: 1.65; margin: 0; color: var(--text-secondary); }
+.feedback-announcement-thanks { padding: 1rem; margin: 1rem 0 0; border-radius: 12px; background: var(--primary-soft); line-height: 1.75; }

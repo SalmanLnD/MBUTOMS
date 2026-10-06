@@ -4,6 +4,7 @@ import Sidebar from '../components/Sidebar.jsx';
 import MobileNavigation from '../components/MobileNavigation.jsx';
 import ResetPasswordModal from '../components/ResetPasswordModal.jsx';
 import Topbar from '../components/Topbar.jsx';
+import FeedbackAnnouncement from '../components/FeedbackAnnouncement.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
 import { PageTitleProvider, usePageTitleValue } from '../context/PageTitleContext.jsx';
 import { useMediaQuery } from '../hooks/useMediaQuery.js';
@@ -86,6 +87,7 @@ const MainLayout = () => {
       <AppShell>
         <LayoutTopbar />
         <Outlet />
+        <FeedbackAnnouncement />
         {needsReset && (
           <ResetPasswordModal show onComplete={handlePasswordResetComplete} />
         )}

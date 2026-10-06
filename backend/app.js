@@ -28,6 +28,7 @@ import compOffRoutes from './routes/compOffRoutes.js';
 import aiRoutes from './routes/aiRoutes.js';
 import { APP_VERSION } from './utils/sessionVersion.js';
 import { guardDemoToken } from './utils/demoAccess.js';
+import announcementRoutes from './routes/announcementRoutes.js';
 
 dotenv.config();
 const app = express();
@@ -72,6 +73,7 @@ app.use('/api/observations', observationRoutes);
 app.use('/api/plp', plpRoutes);
 app.use('/api/webhooks', webhookRoutes);
 app.use('/api/notifications', notificationRoutes);
+app.use('/api/announcements', announcementRoutes);
 app.use('/api/tickets', ticketRoutes);
 app.use('/api/topic-tracker', topicTrackerRoutes);
 app.use('/api/student-test-reports', studentTestReportRoutes);

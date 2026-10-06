@@ -12,6 +12,7 @@ const Modal = ({
   size = '',
   scrollable = false,
   dismissible = true,
+  closeDisabled = false,
   className = '',
 }) => {
   const titleId = useId();
@@ -100,12 +101,13 @@ const Modal = ({
           {title && (
             <div className="toms-modal-header">
               <h5 className="toms-modal-title" id={titleId}>{title}</h5>
-              {dismissible && (
+              {(dismissible || closeDisabled) && (
                 <button
                   type="button"
                   className="btn-close"
                   onClick={() => onCloseRef.current?.()}
                   aria-label="Close"
+                  disabled={closeDisabled}
                 />
               )}
             </div>

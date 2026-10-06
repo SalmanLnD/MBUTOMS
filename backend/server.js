@@ -1,6 +1,7 @@
 import dotenv from 'dotenv';
 import app from './app.js';
 import connectDB from './config/db.js';
+import { startScheduledNotifications } from './services/scheduledNotifications.js';
 
 dotenv.config();
 
@@ -10,6 +11,7 @@ connectDB({ runStartup: true })
   .then(() => {
     app.listen(PORT, () => {
       console.log(`TOMS server running on port ${PORT}`);
+      startScheduledNotifications();
     });
   })
   .catch((error) => {

@@ -1,0 +1,13 @@
+# Feedback announcement and evening tracker reminder
+
+The campaign `toms-feedback-2026-10` contains Salman's edited feedback update. Each real account gets one announcement inbox notification and its normal device push if subscribed. Opening `/dashboard?announcement=toms-feedback-2026-10` reopens the full message, even after dismissal.
+
+The modal automatically opens on the next authenticated app visit unless that account has already dismissed it. It waits for other dialogs to close. The close icon, Escape and backdrop dismissal are disabled for the first five seconds. Closing writes an account-scoped `AnnouncementReceipt`; it is independent of session/browser storage. Preview/demo sessions do not dismiss a real account's announcement or receive broadcast writes.
+
+`server.js` starts the scheduler after the API begins listening. It checks every minute and sends the daily Topic Tracker reminder at or just after 18:00 Asia/Kolkata. If the service restarts later that evening, it catches up for that same IST day, without sending previous-day reminders. The existing ten-minute Render health workflow keeps the hosted service awake; reminders require the API and database to be available. A serverless deployment must use an external scheduled worker rather than relying on this process interval.
+
+Reminder eligibility comes from the existing `buildTopicTrackerSessions` daily calculation in lite mode. This respects official holidays, cancellations, subject date windows and replacements. Closed rows are excluded; a tracker that has not been created is still pending. Campus replacements receive their own reminder, while external replacements have no account recipient. Each active account with a teaching/assistant trainer reference gets one combined reminder listing its pending classes, linked to that day's first pending tracker.
+
+Announcement and daily reminder notification `_id` values are deterministic hashes of campaign/date plus recipient. MongoDB's existing unique `_id` constraint prevents duplicate inbox entries and pushes across concurrent API instances or restarts. Notification saves use the existing Web Push delivery hook. Read-only Sallu and demo protections are unchanged.
+
+Checks: `node --test tests/unit/scheduledNotifications.test.js tests/unit/demoAccess.test.js tests/unit/webPush.test.js` from backend; `npm run build` and `node scripts/check-feedback-announcement.mjs` from frontend with the standard local Playwright/Chrome environment. The browser check uses synthetic accounts and data. The live eligibility dry-run replaces notification creation and sends nothing.
