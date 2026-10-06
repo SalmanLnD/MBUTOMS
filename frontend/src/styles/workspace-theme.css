@@ -46,11 +46,45 @@
 }
 body { color: var(--text-primary); background: var(--canvas); font-family: var(--font-sans); line-height: 1.5; }
 [data-theme='dark'] .main-content {
+  isolation: isolate;
   background-color: var(--canvas);
   background-image: url('/images/cosmic-stars.svg'), radial-gradient(ellipse at 12% 8%, #244b8a45, transparent 55%), radial-gradient(ellipse at 85% 65%, #44368030, transparent 60%), linear-gradient(155deg, #08152c, #040918 70%);
   background-size: 520px 420px, cover, cover, cover;
   background-repeat: repeat, no-repeat, no-repeat, no-repeat;
   background-attachment: scroll;
+}
+[data-theme='dark'] .main-content::before,
+[data-theme='dark'] .main-content::after {
+  content: '';
+  position: fixed;
+  z-index: -1;
+  pointer-events: none;
+  top: 12vh;
+  left: 24vw;
+  width: min(90px, 16vw);
+  height: 1.5px;
+  border-radius: 50%;
+  background: linear-gradient(90deg, transparent, #c3d8ff80 65%, #fff);
+  box-shadow: 4px 0 8px #bedaff60;
+  opacity: 0;
+  animation: cosmic-shooting-star 47s linear 18s infinite;
+}
+[data-theme='dark'] .main-content::after {
+  top: 5vh;
+  left: 55vw;
+  width: min(65px, 10vw);
+  animation-duration: 79s;
+  animation-delay: 42s;
+}
+@keyframes cosmic-shooting-star {
+  0% { opacity: 0; transform: translate3d(0, 0, 0) rotate(35deg); }
+  1% { opacity: .8; }
+  4% { opacity: 0; transform: translate3d(32vw, 24vh, 0) rotate(35deg); }
+  100% { opacity: 0; transform: translate3d(32vw, 24vh, 0) rotate(35deg); }
+}
+@media (prefers-reduced-motion: reduce) {
+  [data-theme='dark'] .main-content::before,
+  [data-theme='dark'] .main-content::after { animation: none; content: none; }
 }
 a { color: var(--primary); text-underline-offset: .18em; }
 a:hover { color: var(--primary-strong); }
