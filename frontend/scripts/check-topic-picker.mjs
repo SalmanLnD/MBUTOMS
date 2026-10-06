@@ -22,11 +22,15 @@ try {
       branchYearSection: `CSE, Sem V - A${index}`, courseName: 'Test Subject', slot: `S${index}`, sessionStatus: 'completed', trackerStatus: 'pending',
       topicModulesCovered: [], topicOptions: [longTopic, shortTopic], completedTopics: index === 1 ? [longTopic] : [], completionClassKey: `class-${index}`, sessionStartTime: '09:00', sessionEndTime: '10:00' }));
     const writes = [];
+    const requestedDates = [];
     await context.route('**/api/**', async route => {
       const url = new URL(route.request().url()), path = url.pathname.replace(/^\/api/, '');
       let data;
       if (path === '/auth/me') data = trainer;
-      else if (path === '/topic-tracker/sessions') data = { day: 'Monday', sessions: rows };
+      else if (path === '/topic-tracker/sessions') {
+        requestedDates.push(url.searchParams.get('date'));
+        data = { day: 'Monday', sessions: url.searchParams.get('date') === '2026-10-07' ? [] : rows };
+      }
       else if (path === '/topic-tracker/entries') {
         const body = route.request().postDataJSON(); writes.push(body);
         data = { ...body, _id: 'saved-entry', completedTopics: [longTopic], completionClassKey: 'class-1' };
@@ -38,6 +42,8 @@ try {
     await page.goto(base + '/topic-tracker');
     if (width >= 768) await page.getByRole('button', { name: 'Toggle Sallu pet', exact: true }).click();
     await page.getByRole('button', { name: 'Open my tracker', exact: true }).click();
+    assert.equal(await page.getByRole('button', { name: "Update today's slots", exact: true }).count(), 0);
+    await page.locator('#tracker-session-date').fill('2026-10-05');
     const triggers = page.getByRole('button', { name: 'Topic / Module Covered 1', exact: true });
     await triggers.first().click();
     const completed = page.getByRole('option').filter({ hasText: longTopic });
@@ -54,6 +60,10 @@ try {
     else assert.equal(await guide.locator('.topic-title-guide__ticker span').evaluate(el => getComputedStyle(el).animationName), 'topic-title-scroll');
     await page.screenshot({ path: `.tmp/topic-picker/${width}-completed-guide.png` });
     await completed.click();
+    assert.match(await triggers.first().innerText(), /Arrays, linked lists/);
+    await page.locator('#tracker-session-date').fill('2026-10-07');
+    await page.getByRole('button', { name: 'Keep editing', exact: true }).click();
+    assert.equal(await page.locator('#tracker-session-date').inputValue(), '2026-10-05');
     assert.match(await triggers.first().innerText(), /Arrays, linked lists/);
     await triggers.nth(1).click();
     assert.doesNotMatch(await page.getByRole('option').filter({ hasText: longTopic }).getAttribute('class'), /is-topic-completed/);
@@ -75,6 +85,18 @@ try {
     assert.equal(await page.getByRole('tooltip').innerText(), shortTopic);
     await page.keyboard.press('Escape');
     assert.equal(await page.getByRole('tooltip').count(), 0);
+    await page.locator('#tracker-session-date').fill('2026-10-07');
+    await page.getByText('No scheduled sessions for this day.', { exact: true }).waitFor();
+    assert.equal(await page.locator('#topic-tracker-date').inputValue(), '2026-10-07');
+    assert.equal(requestedDates.at(-1), '2026-10-07');
+    await page.locator('#tracker-session-date').fill('2026-10-05');
+    await triggers.first().waitFor();
+    await triggers.first().click();
+    await page.getByRole('option', { name: shortTopic, exact: true }).click();
+    await page.locator('#tracker-session-date').fill('2026-10-07');
+    await page.getByRole('button', { name: 'Discard and change date', exact: true }).click();
+    await page.getByText('No scheduled sessions for this day.', { exact: true }).waitFor();
+    assert.equal(writes.length, 1, 'Changing dates must not save discarded edits');
     await page.getByRole('button', { name: 'Close', exact: true }).click();
     assert.equal(await page.getByRole('tooltip').count(), 0);
     assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth + 2), false);

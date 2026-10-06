@@ -361,15 +361,12 @@ const TopicTracker = () => {
           <div className="card-body">
             <div className="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
               <h2 className="h6 fw-semibold mb-0">My class-wise summary</h2>
-              <button type="button" className="btn btn-sm btn-primary" onClick={handleTrainerOpen}>
-                Update today&apos;s slots
-              </button>
             </div>
             <TopicTrackerClassSummaryTab
               mine
               refreshKey={summaryRefreshKey}
               showSubjectFilter={false}
-              emptyMessage={"No class coverage yet. Use Update today's slots to save closed sessions."}
+              emptyMessage="No class coverage yet. Use Open my tracker to save closed sessions."
             />
           </div>
         </div>
@@ -379,6 +376,17 @@ const TopicTracker = () => {
         <TopicTrackerSpreadsheet
           show
           date={spreadsheet.date}
+          onDateChange={(date) => {
+            setSelectedDate(date);
+            setNotificationTarget(null);
+            setSpreadsheet((current) => ({
+              ...current,
+              date,
+              title: current.title?.replace(current.date, date),
+              highlightEntryId: '',
+              highlightScheduleId: '',
+            }));
+          }}
           subjectId={spreadsheet.subjectId}
           trainerId={spreadsheet.trainerId}
           title={spreadsheet.title}

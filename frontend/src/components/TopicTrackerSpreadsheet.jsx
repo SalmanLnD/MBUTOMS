@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import Modal from './Modal.jsx';
+import ConfirmModal from './ConfirmModal.jsx';
 import StyledSelect from './StyledSelect.jsx';
 import LoadingSpinner from './LoadingSpinner.jsx';
 import {
@@ -69,6 +70,7 @@ const TopicTrackerSpreadsheet = ({
   show,
   onClose,
   date,
+  onDateChange,
   subjectId,
   trainerId,
   title,
@@ -82,6 +84,8 @@ const TopicTrackerSpreadsheet = ({
   const [loading, setLoading] = useState(true);
   const [savingKey, setSavingKey] = useState('');
   const [dirtyRows, setDirtyRows] = useState(() => new Set());
+  const [pendingDate, setPendingDate] = useState('');
+  const requestRef = useRef(0);
   const baselineRowsRef = useRef(new Map());
   const [highlightActive, setHighlightActive] = useState(
     Boolean(highlightEntryId || highlightScheduleId)
@@ -92,9 +96,11 @@ const TopicTrackerSpreadsheet = ({
 
   const fetchSessions = useCallback(async () => {
     if (!show || !date) return;
+    const request = ++requestRef.current;
     setLoading(true);
     try {
       const data = await getTopicTrackerSessions({ date, subjectId, trainerId });
+      if (request !== requestRef.current) return;
       const nextSessions = (data.sessions || []).map((row) => ({
         ...row,
         topicModulesCovered: getRowTopics(row),
@@ -106,14 +112,18 @@ const TopicTrackerSpreadsheet = ({
       setSessions(nextSessions);
       setDayLabel(data.day || '');
     } catch (err) {
-      showError(getErrorMessage(err));
+      if (request === requestRef.current) {
+        setSessions([]);
+        showError(getErrorMessage(err));
+      }
     } finally {
-      setLoading(false);
+      if (request === requestRef.current) setLoading(false);
     }
   }, [show, date, subjectId, trainerId]);
 
   useEffect(() => {
     fetchSessions();
+    return () => { requestRef.current += 1; };
   }, [fetchSessions]);
 
   useEffect(() => {
@@ -365,6 +375,7 @@ const TopicTrackerSpreadsheet = ({
   };
 
   return (
+    <>
     <Modal
       show={show}
       title={title || `Topic Tracker — ${date}${dayLabel ? ` (${dayLabel})` : ''}`}
@@ -374,6 +385,25 @@ const TopicTrackerSpreadsheet = ({
       dismissible={false}
     >
       <div className="toms-modal-body p-0">
+        {onDateChange && (
+          <div className="d-flex align-items-center gap-2 px-3 py-2 border-bottom">
+            <label htmlFor="tracker-session-date" className="small fw-semibold mb-0">Date</label>
+            <input
+              id="tracker-session-date"
+              type="date"
+              className="form-control form-control-sm"
+              style={{ width: 'auto' }}
+              value={date}
+              disabled={Boolean(savingKey)}
+              onChange={(event) => {
+                const nextDate = event.target.value;
+                if (!nextDate || nextDate === date) return;
+                if (dirtyRows.size && !loading) setPendingDate(nextDate);
+                else onDateChange(nextDate);
+              }}
+            />
+          </div>
+        )}
         {loading ? (
           <LoadingSpinner message="Loading sessions..." />
         ) : sessions.length === 0 ? (
@@ -423,6 +453,19 @@ const TopicTrackerSpreadsheet = ({
         </button>
       </div>
     </Modal>
+    <ConfirmModal
+      show={Boolean(pendingDate)}
+      title="Change tracker date?"
+      message="Your unsaved slot changes will be discarded."
+      confirmLabel="Discard and change date"
+      cancelLabel="Keep editing"
+      onClose={() => setPendingDate('')}
+      onConfirm={() => {
+        onDateChange(pendingDate);
+        setPendingDate('');
+      }}
+    />
+    </>
   );
 };
 
