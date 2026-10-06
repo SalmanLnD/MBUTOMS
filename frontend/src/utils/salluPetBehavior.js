@@ -96,3 +96,34 @@ export const playPunchSound = async ctx => {
   noise.start(now);
   noise.onended = () => { noise.disconnect(); filter.disconnect(); impact.disconnect(); };
 };
+
+// Short cartoon vocal sounds, synthesized locally with a voiced source and
+// vowel formants. No speech service or downloaded audio is needed.
+export const playEmotionSound = async (ctx, emotion) => {
+  if (ctx.state !== 'running') await ctx.resume();
+  if (ctx.state !== 'running') throw new Error('Audio is paused by the browser');
+  const laugh = emotion === 'laughing', now = ctx.currentTime;
+  const pulses = laugh ? 7 : 3;
+  for (let i = 0; i < pulses; i++) {
+    const start = now + i * (laugh ? .19 : .82), duration = laugh ? .15 : .65;
+    const voice = ctx.createOscillator(), envelope = ctx.createGain();
+    const vibrato = ctx.createOscillator(), depth = ctx.createGain();
+    voice.type = 'sawtooth';
+    voice.frequency.setValueAtTime(laugh ? 170 + i % 3 * 24 : 235, start);
+    voice.frequency.exponentialRampToValueAtTime(laugh ? 140 + i % 2 * 18 : 125, start + duration);
+    vibrato.frequency.value = laugh ? 9 : 6; depth.gain.value = laugh ? 5 : 22;
+    vibrato.connect(depth); depth.connect(voice.frequency);
+    envelope.gain.setValueAtTime(0, start);
+    envelope.gain.linearRampToValueAtTime(laugh ? .13 : .11, start + .025);
+    envelope.gain.exponentialRampToValueAtTime(.001, start + duration);
+    const filters = (laugh ? [750, 1200] : [440, 960]).map(frequency => {
+      const filter = ctx.createBiquadFilter(); filter.type = 'bandpass';
+      filter.frequency.value = frequency; filter.Q.value = 4;
+      voice.connect(filter); filter.connect(envelope); return filter;
+    });
+    envelope.connect(ctx.destination);
+    voice.start(start); vibrato.start(start);
+    voice.stop(start + duration + .02); vibrato.stop(start + duration + .02);
+    voice.onended = () => { voice.disconnect(); vibrato.disconnect(); depth.disconnect(); filters.forEach(filter => filter.disconnect()); envelope.disconnect(); };
+  }
+};

@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useMediaQuery } from '../hooks/useMediaQuery.js';
 import '../styles/sallu-pet.css';
 import { spriteFrameStyle } from '../utils/salluSpriteStyle.js';
-import { cursorPose, nextPunchReaction, punchReactions, playPunchSound, reactionDialogue, recentPunches, isStomachSwipe } from '../utils/salluPetBehavior.js';
+import { cursorPose, nextPunchReaction, punchReactions, playPunchSound, playEmotionSound, reactionDialogue, recentPunches, isStomachSwipe } from '../utils/salluPetBehavior.js';
 
 const stored = (key) => { try { return localStorage.getItem(key) === 'true'; } catch { return false; } };
 const persist = (key, value) => { try { localStorage.setItem(key, String(value)); } catch {} };
@@ -16,6 +16,7 @@ const SalluPet = ({ open, onOpen, visible, onVisibilityChange }) => {
   const [nodding, setNodding] = useState(false);
   const [muted, setMuted] = useState(() => stored('toms_sallu_pet_muted'));
   const audio = useRef(null);
+  const lastEmotionSound = useRef({});
   const [soundStatus, setSoundStatus] = useState('ready');
   const reactionBag = useRef([]);
   const lastReaction = useRef(-1);
@@ -179,13 +180,19 @@ const SalluPet = ({ open, onOpen, visible, onVisibilityChange }) => {
     document.addEventListener('click', approve, true);
     return () => document.removeEventListener('click', approve, true);
   }, [open, hidden, reducedMotion]);
-  const punchSound = async () => {
+  const reactionSound = async (emotion = 'punch') => {
     if (muted) { setSoundStatus('muted'); return; }
+    if (emotion !== 'punch') {
+      const now = Date.now(), gap = emotion === 'crying' ? 3000 : 1700;
+      if (now - (lastEmotionSound.current[emotion] ?? -Infinity) < gap) return;
+      lastEmotionSound.current[emotion] = now;
+    }
     try {
       const Audio = window.AudioContext || window.webkitAudioContext;
       if (!Audio) throw new Error('Audio unavailable');
       if (!audio.current || audio.current.state === 'closed') audio.current = new Audio();
-      await playPunchSound(audio.current);
+      if (emotion === 'punch') await playPunchSound(audio.current);
+      else await playEmotionSound(audio.current, emotion);
       setSoundStatus('playing');
     } catch { setSoundStatus('blocked'); }
   };
@@ -202,6 +209,7 @@ const SalluPet = ({ open, onOpen, visible, onVisibilityChange }) => {
     if (Date.now() - lastTickle.current < 450) return;
     lastTickle.current = Date.now(); punchHistory.current = [];
     showReaction('laughing', 'laughing', 1800);
+    void reactionSound('laughing');
   };
   const hoverTickle = event => {
     if (drag.current || event.pointerType !== 'mouse' || event.buttons) return;
@@ -213,8 +221,8 @@ const SalluPet = ({ open, onOpen, visible, onVisibilityChange }) => {
   };
   const react = () => {
     punchHistory.current = recentPunches(punchHistory.current, Date.now());
-    punchSound();
-    if (punchHistory.current.length >= 4) { showReaction('crying', 'crying', 3200); return; }
+    void reactionSound();
+    if (punchHistory.current.length >= 4) { showReaction('crying', 'crying', 3200); void reactionSound('crying'); return; }
     const next = nextPunchReaction(reactionBag.current, lastReaction.current);
     lastReaction.current = next; setReaction(next);
     showReaction('ouch', punchReactions[next], 1600);

@@ -33,18 +33,25 @@
 }
 [data-theme='dark'] {
   color-scheme: dark;
-  --canvas: #111a21; --canvas-subtle: #17232c;
-  --surface: #1b2933; --surface-raised: #21313d; --surface-soft: #18252e; --surface-strong: #101e28;
+  --canvas: #050b1b; --canvas-subtle: #0b1630;
+  --surface: #101d35; --surface-raised: #152541; --surface-soft: #0c1930; --surface-strong: #08122a;
   --ink-950: #eef3f6; --ink-800: #d4dfe5;
   --text-primary: #e2ebf0; --text-secondary: #b3c4cf; --text-muted: #9cafbb;
-  --line: #334550; --line-strong: #4c6371;
-  --primary: #91bad0; --primary-strong: #b6d6e6; --primary-soft: #263e4d;
+  --line: #293c60; --line-strong: #45608b;
+  --primary: #a4b6ff; --primary-strong: #ccd7ff; --primary-soft: #22345b;
   --teal: #87c5b7; --teal-soft: #203c37; --coral: #e6a29b; --coral-soft: #412b2b;
   --amber: #e4bd75; --amber-soft: #3b3423; --success: #92c8a4; --success-soft: #213b2b;
   --danger: #f0a0a7; --danger-soft: #412a30; --info: #98c6df; --info-soft: #253c4b;
   --focus-ring: 0 0 0 3px #91bad040; --primary-focus: #91bad040;
 }
 body { color: var(--text-primary); background: var(--canvas); font-family: var(--font-sans); line-height: 1.5; }
+[data-theme='dark'] .main-content {
+  background-color: var(--canvas);
+  background-image: url('/images/cosmic-stars.svg'), radial-gradient(ellipse at 12% 8%, #244b8a45, transparent 55%), radial-gradient(ellipse at 85% 65%, #44368030, transparent 60%), linear-gradient(155deg, #08152c, #040918 70%);
+  background-size: 520px 420px, cover, cover, cover;
+  background-repeat: repeat, no-repeat, no-repeat, no-repeat;
+  background-attachment: scroll;
+}
 a { color: var(--primary); text-underline-offset: .18em; }
 a:hover { color: var(--primary-strong); }
 :focus-visible { outline: 2px solid var(--primary); outline-offset: 3px; }

@@ -23,16 +23,23 @@ if(width>767){await page.getByRole('button',{name:'Sallu pet options'}).click();
 const seen=new Set();let lastExpression;
 for(let i=0;i<30;i++){await page.getByRole('button',{name:'Poke Sallu',exact:true}).click();const expression=await page.locator('.sallu-pet').getAttribute('data-reaction');assert.notEqual(expression,lastExpression);assert.ok(reactionDialogues[expression].includes(await page.locator('.sallu-pet__bubble').innerText()));seen.add(expression);lastExpression=expression;if(i===2)await page.screenshot({path:'.tmp/sallu-pet/'+width+'-reaction.png'});await page.clock.fastForward(2300);}assert.equal(seen.size,15);
 await page.clock.fastForward(5000);
+await page.getByRole('button',{name:'Sallu pet options'}).click();
+await page.getByRole('button',{name:'Enable reaction sound'}).click();
+await page.getByRole('button',{name:'Close',exact:true}).click();
+const beforeCryingSound=await page.evaluate(()=>window.petSoundCount);
 for(let i=0;i<4;i++)await page.getByRole('button',{name:'Poke Sallu',exact:true}).click();
 assert.equal(await page.locator('.sallu-pet').getAttribute('data-pose'),'crying');
 assert.ok(reactionDialogues.crying.includes(await page.locator('.sallu-pet__bubble').innerText()));
 assert.equal(await page.locator('.sallu-pet__tears i').count(),2);
+await page.waitForFunction(before=>window.petSoundCount>=before+10,beforeCryingSound);
 await page.screenshot({path:`.tmp/sallu-pet/${width}-crying.png`});await page.clock.fastForward(4000);
 const tickleBox=await page.locator('.sallu-pet').boundingBox(),belly=await page.locator('.sallu-pet__body').boundingBox();
 const tickleX=belly.x+belly.width*.2,tickleY=belly.y+belly.height*.3;
+const beforeLaughSound=await page.evaluate(()=>window.petSoundCount);
 if(width<768){const touch=await context.newCDPSession(page);await touch.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[{x:tickleX,y:tickleY}]});await touch.send('Input.dispatchTouchEvent',{type:'touchMove',touchPoints:[{x:tickleX+36,y:tickleY}]});await touch.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});await touch.detach();}
 else{await page.mouse.move(tickleX,tickleY);await page.mouse.down();await page.mouse.move(tickleX+36,tickleY,{steps:6});await page.mouse.up();}
 assert.equal(await page.locator('.sallu-pet').getAttribute('data-pose'),'laughing');
+await page.waitForFunction(before=>window.petSoundCount>=before+14,beforeLaughSound);
 assert.ok(reactionDialogues.laughing.includes(await page.locator('.sallu-pet__bubble').innerText()));
 assert.deepEqual(await page.locator('.sallu-pet').boundingBox(),tickleBox,'Tickling must not reposition the pet');
 await page.screenshot({path:`.tmp/sallu-pet/${width}-laughing.png`});await page.clock.fastForward(3000);
@@ -42,6 +49,16 @@ const audioEvidence=await page.evaluate(async()=>{
  let state='suspended',resumed=false;const proxy=new Proxy(offline,{get:(target,key)=>{if(key==='state')return state;if(key==='resume')return async()=>{await Promise.resolve();state='running';resumed=true;};if(key==='createOscillator')return ()=>{if(!resumed)throw new Error('Scheduled before resume');return target.createOscillator();};return typeof target[key]==='function'?target[key].bind(target):target[key];}});
  await playPunchSound(proxy);const rendered=await offline.startRendering(),data=rendered.getChannelData(0);let peak=0,energy=0;for(const value of data){peak=Math.max(peak,Math.abs(value));energy+=value*value;}return {peak,rms:Math.sqrt(energy/data.length)};
 });assert.ok(audioEvidence.peak>.3&&audioEvidence.peak<1);assert.ok(audioEvidence.rms>.1);
+const emotions=await page.evaluate(async()=>{
+ const {playEmotionSound}=await import('/src/utils/salluPetBehavior.js');const evidence=[];
+ for(const emotion of ['laughing','crying']){
+  const offline=new OfflineAudioContext(1,44100*3,44100);
+  const proxy=new Proxy(offline,{get:(target,key)=>key==='state'?'running':typeof target[key]==='function'?target[key].bind(target):target[key]});
+  await playEmotionSound(proxy,emotion);const rendered=await offline.startRendering();
+  let peak=0,energy=0;for(const sample of rendered.getChannelData(0)){peak=Math.max(peak,Math.abs(sample));energy+=sample*sample;}
+  evidence.push({emotion,peak,rms:Math.sqrt(energy/rendered.length)});
+ }return evidence;
+});for(const effect of emotions){assert.ok(effect.peak>.01&&effect.peak<1,JSON.stringify(effect));assert.ok(effect.rms>.002,JSON.stringify(effect));}
 const soundBefore=await page.evaluate(()=>window.petSoundCount);
 const session=width<768?await context.newCDPSession(page):null;
 const dragPet=async(part,dx,dy)=>{
