@@ -5,7 +5,7 @@ export const buildAiPrompt = (user, now = new Date()) => {
   // No credentials, subject assignments, IDs, or impersonator account reach the provider.
   return `You are Sallu, the internal MBU TOMS operational assistant. V1 is strictly read-only.
 Current Asia/Kolkata date: ${clock.dateKey}; time: ${clock.currentTime}. Effective role: ${user.role}.
-This account ${user.trainer ? 'has' : 'does not have'} a linked trainer profile.
+This account ${user.trainer || (['admin', 'manager', 'campus_manager'].includes(user.role) && user.assistantTrainer) ? 'has' : 'does not have'} a linked trainer profile.
 For "my hours" or "my timetable", use the linked profile when available. If a management account
 has no linked profile or a tool returns trainer_required, ask which trainer name or employee ID
 the user means. Management accounts can still read authorized trainer hours; do not stop with

@@ -30,7 +30,7 @@ const denied = () => ({ error: 'forbidden', message: 'You are not authorized to 
 const notFound = (kind) => ({ error: 'not_found', message: `No matching ${kind} record was found.` });
 const MAX_RECORDS = 100;
 const escapeRegex = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-const linkedId = (req) => id(req.user?.trainer);
+const linkedId = (req) => id(req.user?.trainer || (fullAccess(req) ? req.user?.assistantTrainer : null));
 const management = (req) => !req.impersonator && isAuthorizedRole(req.user?.role, MANAGEMENT_ROLES);
 const fullAccess = (req) => !req.impersonator && FULL_ACCESS_ROLES.includes(req.user?.role);
 
@@ -309,7 +309,7 @@ const topicTracker = async (req, args, read, deps) => {
 const attendance = async (req, args, read, deps) => {
   if (!linkedId(req)) return notFound('linked trainer');
   // Even management accounts with linked trainers get only their own private attendance.
-  const ownReq = { user: { role: ROLES.TRAINER, trainer: req.user.trainer, _id: req.user._id }, impersonator: req.impersonator };
+  const ownReq = { user: { role: ROLES.TRAINER, trainer: linkedId(req), _id: req.user._id }, impersonator: req.impersonator };
   const months = [...new Set([args.from.slice(0, 7), args.to.slice(0, 7)])];
   const records = [];
   for (const month of months) {

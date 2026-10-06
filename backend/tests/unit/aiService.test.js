@@ -96,6 +96,17 @@ test('unknown and ambiguous trainers are never guessed', async () => {
   assert.equal(ambiguous.candidates.length, 2);
 });
 
+test('admin assistant identity resolves personal hours without creating a roster-linked account', async () => {
+  const admin = { user: { role: 'admin', assistantTrainer: 'own' } };
+  const result = await executeAiTool('get_my_timetable', { date: '2026-10-01' }, admin, timetableDeps);
+  assert.equal(result.trainer.employeeId, '123456');
+  assert.equal(result.totalHours, 2.5);
+  assert.equal(admin.user.trainer, undefined);
+  assert.match(buildAiPrompt(admin.user), /has a linked trainer profile/);
+  const trainer = { user: { role: 'trainer', assistantTrainer: 'own' } };
+  assert.equal((await resolveAiTrainer(trainer, {}, timetableDeps)).error, 'not_found');
+});
+
 test('coordinator resolution enforces existing trainer scope; impersonation removes management tools', async () => {
   const coordinator = { user: { role: 'subject_coordinator', trainer: 'own' } };
   const deps = { findTrainers: async () => [{ _id: 'other', name: 'Other' }], canAccessTrainer: async () => false };
@@ -104,8 +115,9 @@ test('coordinator resolution enforces existing trainer scope; impersonation remo
   assert.equal((await executeAiTool('get_trainer_hours', { trainerName: 'Other' }, impersonated)).error, 'forbidden');
 });
 
-test('my attendance scopes even management to linked trainer and strips WhatsApp details', async () => {
-  const result = await executeAiTool('get_my_attendance', { from: '2026-10-01', to: '2026-10-01' }, { user: { _id: 'admin', role: 'admin', trainer: 'own' } }, {
+test('my attendance scopes management to its trainer or assistant identity and strips WhatsApp details', async () => {
+  for (const identity of [{ trainer: 'own' }, { assistantTrainer: 'own' }]) {
+  const result = await executeAiTool('get_my_attendance', { from: '2026-10-01', to: '2026-10-01' }, { user: { _id: 'admin', role: 'admin', ...identity } }, {
     attendanceGrid: async ({ user }) => {
       assert.equal(user.role, 'trainer'); assert.equal(user.trainer, 'own');
       return { rows: [{ trainer: { _id: 'own' }, days: { '2026-10-01': { attendanceType: 'OIF', classHandlingHours: 2 } } },
@@ -122,6 +134,7 @@ test('my attendance scopes even management to linked trainer and strips WhatsApp
   assert.ok(!JSON.stringify(result).includes('sensitive-phone'));
   assert.ok(!JSON.stringify(result).includes('private-photo'));
   assert.ok(!JSON.stringify(result).includes('private-payload'));
+  }
 });
 
 test('unknown authorized class returns no record and class counts contain no students', async () => {

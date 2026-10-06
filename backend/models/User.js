@@ -18,6 +18,8 @@ const userSchema = new mongoose.Schema(
       default: 'trainer',
     },
     trainer: { type: mongoose.Schema.Types.ObjectId, ref: 'Trainer' },
+    // Personal Sallu identity without changing roster membership or role scope.
+    assistantTrainer: { type: mongoose.Schema.Types.ObjectId, ref: 'Trainer' },
     coordinatorSubjects: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Subject' }],
     evaluatorSubjects: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Subject' }],
     sessionVersion: { type: Number, default: 1, min: 1 },
