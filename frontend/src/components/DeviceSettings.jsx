@@ -107,9 +107,13 @@ const DeviceSettings = () => {
   const pushUnavailable = Boolean((supportReason && !(ios && !standalone))
     || window.Notification?.permission === 'denied' || loadError || config?.configured === false);
   const canContinue = (installed && enabled) || pushUnavailable;
+  const skipSetup = () => {
+    if (busy || !user) return;
+    acknowledgeDeviceSetup(user._id); setSetupRequired(false); setOpen(false);
+  };
   const finishSetup = () => {
     if (!canContinue || busy) return;
-    acknowledgeDeviceSetup(user._id); setSetupRequired(false); setOpen(false);
+    skipSetup();
   };
 
   return <>
@@ -119,11 +123,13 @@ const DeviceSettings = () => {
     </button>
     <Modal show={open} onClose={() => { if (!busy && !setupRequired) setOpen(false); }}
       title={setupRequired ? `Set up TOMS v${version}` : 'TOMS on this device'} dismissible={!busy && !setupRequired} scrollable
-      footer={setupRequired && <button type="button" className="btn btn-primary" onClick={finishSetup} disabled={busy || !canContinue}>
+      footer={setupRequired && <>
+        <button type="button" className="btn btn-outline-secondary" onClick={skipSetup} disabled={busy}>Skip for now</button>
+        <button type="button" className="btn btn-primary" onClick={finishSetup} disabled={busy || !canContinue}>
         {pushUnavailable ? 'Continue without notifications' : 'Continue to TOMS'}
-      </button>}>
+      </button></>}>
       <div className="toms-modal-body device-settings" data-refresh={refresh}>
-        {setupRequired && <p className="device-setup-intro">Add TOMS to your device and enable notifications to continue. You can access all your usual pages from the installed app.</p>}
+        {setupRequired && <p className="device-setup-intro">Install TOMS and enable notifications, or skip for now and continue in your browser. You can set these up later from the top bar.</p>}
         <section className="device-settings-card" aria-labelledby="device-install-title">
           <div className="device-settings-heading"><DownloadIcon size={22} /><h3 id="device-install-title">Keep TOMS a tap away</h3></div>
           <p>Open your dashboard from a TOMS icon on your Home Screen or desktop app launcher.</p>
