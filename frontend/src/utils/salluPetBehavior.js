@@ -71,16 +71,19 @@ export const playPunchSound = async ctx => {
   // Resume must finish before scheduling; embedded browsers can suspend audio.
   if (ctx.state !== 'running') await ctx.resume();
   if (ctx.state !== 'running') throw new Error('Audio is paused by the browser');
+  const limiter = ctx.createWaveShaper();
+  limiter.curve = Float32Array.from({ length: 2048 }, (_, index) => Math.tanh((index / 2047 * 2 - 1) * 1.6) * .98);
+  limiter.connect(ctx.destination);
   const now = ctx.currentTime;
   const oscillator = ctx.createOscillator(), thump = ctx.createGain();
   oscillator.type = 'sine';
   oscillator.frequency.setValueAtTime(230, now);
   oscillator.frequency.exponentialRampToValueAtTime(75, now + .22);
-  thump.gain.setValueAtTime(.65, now);
+  thump.gain.setValueAtTime(.85, now);
   thump.gain.exponentialRampToValueAtTime(.001, now + .3);
-  oscillator.connect(thump); thump.connect(ctx.destination);
+  oscillator.connect(thump); thump.connect(limiter);
   oscillator.start(now); oscillator.stop(now + .32);
-  oscillator.onended = () => { oscillator.disconnect(); thump.disconnect(); };
+  oscillator.onended = () => { oscillator.disconnect(); thump.disconnect(); limiter.disconnect(); };
 
   // Short filtered noise adds an audible impact on small speakers.
   const buffer = ctx.createBuffer(1, Math.ceil(ctx.sampleRate * .13), ctx.sampleRate);
@@ -91,8 +94,8 @@ export const playPunchSound = async ctx => {
     samples[i] = (seed / 4294967296 * 2 - 1) * Math.exp(-i / (ctx.sampleRate * .035));
   }
   const noise = ctx.createBufferSource(), filter = ctx.createBiquadFilter(), impact = ctx.createGain();
-  noise.buffer = buffer; filter.type = 'lowpass'; filter.frequency.value = 1800; impact.gain.value = .55;
-  noise.connect(filter); filter.connect(impact); impact.connect(ctx.destination);
+  noise.buffer = buffer; filter.type = 'lowpass'; filter.frequency.value = 1800; impact.gain.value = .7;
+  noise.connect(filter); filter.connect(impact); impact.connect(limiter);
   noise.start(now);
   noise.onended = () => { noise.disconnect(); filter.disconnect(); impact.disconnect(); };
 };
@@ -114,7 +117,7 @@ export const playEmotionSound = async (ctx, emotion) => {
     vibrato.frequency.value = laugh ? 9 : 6; depth.gain.value = laugh ? 5 : 22;
     vibrato.connect(depth); depth.connect(voice.frequency);
     envelope.gain.setValueAtTime(0, start);
-    envelope.gain.linearRampToValueAtTime(laugh ? .13 : .11, start + .025);
+    envelope.gain.linearRampToValueAtTime(laugh ? .34 : .3, start + .025);
     envelope.gain.exponentialRampToValueAtTime(.001, start + duration);
     const filters = (laugh ? [750, 1200] : [440, 960]).map(frequency => {
       const filter = ctx.createBiquadFilter(); filter.type = 'bandpass';

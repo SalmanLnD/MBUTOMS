@@ -70,5 +70,22 @@ const dragPet=async(part,dx,dy)=>{
 };
 await dragPet('.sallu-pet__body',-140,-180);await dragPet('.sallu-pet__face',-120,-120);await dragPet('.sallu-pet__body',-2000,-2000);await page.screenshot({path:'.tmp/sallu-pet/'+width+'-drag.png'});
 if(width>767){await dragPet('.sallu-pet__body',650,400);const box=await page.locator('.sallu-pet').boundingBox();for(const [dx,dy]of [[-200,-200],[0,-200],[200,-200],[-300,0],[300,0],[-200,200],[0,200],[200,200]]){await page.clock.fastForward(150);await page.mouse.move(box.x+box.width/2+dx,box.y+box.height*.28+dy);assert.equal(await page.locator('.sallu-pet').getAttribute('data-pose'),cursorPose(dx,dy));}await page.screenshot({path:'.tmp/sallu-pet/gaze.png'});}
+await page.getByRole('button',{name:'Poke Sallu',exact:true}).click();
+await page.keyboard.press('ArrowLeft');await page.keyboard.press('Escape');
+assert.equal(await page.locator('.sallu-pet__body').evaluate(el=>getComputedStyle(el).outlineStyle),'none');
+assert.equal(await page.locator('.sallu-pet__body').evaluate(el=>getComputedStyle(el).backgroundColor),'rgba(0, 0, 0, 0)');
+await page.mouse.move(10,10);await page.clock.runFor(5200);
+assert.equal(await page.locator('.sallu-pet.is-working-out').count(),1);
+assert.equal(await page.locator('.sallu-pet__weights').count(),0);
+assert.equal(await page.locator('.sallu-pet__sprite').first().evaluate(el=>getComputedStyle(el).animationName),'sallu-pet-walk, sallu-pet-run-bounce');
+assert.equal(await page.locator('.sallu-pet__sweat, .sallu-pet__sweat-shirt').count(),0);
+await page.clock.runFor(6000);
+for(const phase of [0, .25, .5, .75]) {
+await page.locator('.sallu-pet__sprite').first().evaluate((el,phase)=>{for(const animation of el.getAnimations({subtree:true})){animation.pause();animation.currentTime=phase*480;}},phase);
+await page.screenshot({path:`.tmp/sallu-pet/${width}-treadmill-${phase}.png`});
+}
+await page.screenshot({path:`.tmp/sallu-pet/${width}-workout.png`});
+await page.getByRole('button',{name:'Poke Sallu',exact:true}).click();
+assert.equal(await page.locator('.sallu-pet.is-working-out').count(),0);
 assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth+2),false);assert.deepEqual(errors,[]);await context.close();
 }console.log('Desktop/mobile belly tickling, laughter, repeat-hit crying, expression dialogue, sidebar toggle, approval nod, sound/mute, chat, roaming, dragging, 15 shuffled reactions, 16 gaze angles and viewport bounds passed.');}finally{await browser.close();}
