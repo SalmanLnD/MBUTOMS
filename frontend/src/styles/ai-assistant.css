@@ -35,6 +35,8 @@
 .ai-assistant__input-row textarea { flex: 1; min-width: 0; max-height: 100px; resize: none; padding: 10px; font-size: .85rem; border: 1px solid var(--line, #d7dee7); border-radius: 6px; background: transparent; color: inherit; }
 .ai-assistant__input-row button { min-height: 44px; padding: 10px 12px; border: 0; border-radius: 5px; background: #193653; color: #fff; font-size: .8rem; }
 .ai-assistant button:disabled { opacity: .55; cursor: not-allowed; }
+.ai-assistant__input-row .ai-assistant__mic { display: grid; place-items: center; min-width: 44px; padding: 10px; }
+.ai-assistant__input-row .ai-assistant__mic[aria-pressed='true'] { background: #a52a36; }
 .ai-assistant button:focus-visible, .ai-assistant textarea:focus-visible { outline: 2px solid #4385ba; outline-offset: 2px; }
 @media (max-width: 767.98px) {
   .ai-assistant { right: 10px; left: 10px; width: auto; bottom: calc(var(--assistant-bottom, 0px) + 76px + env(safe-area-inset-bottom, 0px)); height: min(560px, calc(var(--assistant-height, 100dvh) - 100px)); }

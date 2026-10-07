@@ -25,7 +25,7 @@ export const createAiController = (service = chatWithAi, quota = aiQuota) => asy
   }
   let release;
   try {
-    release = await quota.admit(String(req.user._id));
+    release = await quota.admit(String(req.user._id), req.user.role === ROLES.ADMIN);
     const result = await service({ message: req.body.message.trim(), req });
     res.json(result);
   } catch (error) { failure(error, res); }

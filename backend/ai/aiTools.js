@@ -1,3 +1,4 @@
+import { TRAINER_ATTENDANCE_TYPES } from '../utils/trainerAttendanceTypes.js';
 import Trainer from '../models/Trainer.js';
 import Subject from '../models/Subject.js';
 import Venue from '../models/Venue.js';
@@ -10,7 +11,7 @@ import { computeClassHandlingHoursBatch } from '../utils/trainerClassHoursBatch.
 import { getLeaves } from '../controllers/leaveController.js';
 import { getSpecialClasses } from '../controllers/scheduleController.js';
 import { getClasses } from '../controllers/classController.js';
-import { getTopicTrackerSessions, getTopicTrackerClassSummary } from '../controllers/topicTrackerController.js';
+import { getTopicTrackerSessions, getTopicTrackerClassSummary, getTopicTrackerPendingBacklog } from '../controllers/topicTrackerController.js';
 import { buildTrainerAttendanceGridPayload, getTrainerPunchInLogs } from '../controllers/trainerAttendanceController.js';
 import { toAttendanceDateKey, normalizeAttendanceDate, getAttendanceCalendarDates } from '../utils/attendanceDates.js';
 import { getWeekRangeForDate } from '../utils/specialClass.js';
@@ -44,18 +45,22 @@ const definitions = [
   ['get_replacements', 'Read permitted class replacement coverage for one date; omit trainer identifiers for myself.', ['date', 'trainerName', 'employeeId']],
   ['get_special_classes', 'Read special classes overlapping a period. Requires management access.', ['from', 'to']],
   ['get_class_student_count', 'Read the active student count for a permitted class. Returns no student records.', ['department', 'section', 'semester'], ['department', 'section', 'semester']],
-  ['get_topic_tracker', 'Read authorized daily topic-tracker sessions and class summaries.', ['date', 'trainerName', 'department', 'section', 'semester', 'subjectCode']],
-  ['get_my_attendance', 'Read only my attendance and sanitized punch records over an inclusive period.', ['from', 'to']],
+  ['get_topic_tracker', 'Read authorized topic-tracker sessions over a date or inclusive range, with class coverage summaries. Includes student attendance, covered topics, observations, challenges and closure status.', ['date', 'from', 'to', 'period', 'trainerName', 'employeeId', 'department', 'section', 'semester', 'subjectCode', 'trackerStatus']],
+  ['get_topic_tracker_pending', 'Read the authorized backlog of topic-tracker entries awaiting closure, including missing entries. With no dates checks the entire tracked backlog through today. Optional from/to bounds the period.', ['from', 'to', 'subjectCode']],
+  ['get_attendance_summary', 'Read authorized trainer attendance grid records and exact counts by attendance type for a date or period. Management can query all roster trainers or one by name/employeeId. Does not expose raw messages or private punch logs. Future records are listed but excluded from totals.', ['date', 'from', 'to', 'period', 'semester', 'trainerName', 'employeeId', 'attendanceType', 'rrdOnly']],
+  ['get_my_attendance', 'Read only my attendance and sanitized punch records over an inclusive period.', ['date', 'from', 'to', 'period', 'semester']],
 ];
 
 export const getAiToolDeclarations = (req) => definitions
   .filter(([name]) => !['get_trainer_timetable', 'get_special_classes', 'get_replacements'].includes(name) || management(req))
+  .filter(([name]) => name !== 'get_topic_tracker_pending' || fullAccess(req) || isSubjectCoordinator(req.user))
+  .filter(([name]) => name !== 'get_attendance_summary' || fullAccess(req))
   .map(([name, description, fields, required = []]) => ({
     name, description,
     parameters: { type: 'OBJECT', properties: Object.fromEntries(fields.map((field) => [field, {
-      type: 'STRING', description: field === 'period' ? 'today, this_week or last_week (Monday-Sunday IST). Do not combine with date/from/to.'
+      type: 'STRING', description: field === 'period' ? 'today, this_week, last_week (Monday-Sunday IST), or month_to_date (first day of current month through today). Do not combine with date/from/to.'
         : ['date', 'from', 'to'].includes(field) ? 'IST calendar date YYYY-MM-DD. Use date for one day OR from/to for an inclusive range, not both.' : field,
-      ...(field === 'period' ? { enum: ['today', 'this_week', 'last_week'] } : {}),
+      ...(field === 'period' ? { enum: ['today', 'this_week', 'last_week', 'month_to_date'] } : {}),
     }])), required },
   }));
 
@@ -80,12 +85,16 @@ export const validateToolArguments = (name, args = {}, now = new Date()) => {
   }
   if (cleaned.time && !/^([01]\d|2[0-3]):[0-5]\d$/.test(cleaned.time)) throw new Error('Invalid time');
   if (cleaned.semester && !/^(I|II|III|IV|V|VI|VII|VIII)$/.test(cleaned.semester)) throw new Error('Invalid semester');
+  if (cleaned.rrdOnly && !['true', 'false'].includes(cleaned.rrdOnly)) throw new Error('Invalid RRD filter');
+  if (cleaned.trackerStatus && !['pending', 'closed'].includes(cleaned.trackerStatus)) throw new Error('Invalid tracker status');
+  if (cleaned.attendanceType && !Object.values(TRAINER_ATTENDANCE_TYPES).includes(cleaned.attendanceType)) throw new Error('Invalid attendance type');
   if (cleaned.status && !['pending', 'approved', 'rejected', 'cancelled'].includes(cleaned.status)) throw new Error('Invalid status');
   const today = getIstNowParts(now).dateKey;
-  const hoursTool = ['get_my_timetable', 'get_trainer_timetable', 'get_trainer_hours'].includes(name);
+  const hoursTool = ['get_my_timetable', 'get_trainer_timetable', 'get_trainer_hours', 'get_my_attendance', 'get_topic_tracker', 'get_attendance_summary'].includes(name);
   if (cleaned.period) {
-    if (!['today', 'this_week', 'last_week'].includes(cleaned.period) || cleaned.date || cleaned.from || cleaned.to) throw new Error('Use one period or date range');
+    if (!['today', 'this_week', 'last_week', 'month_to_date'].includes(cleaned.period) || cleaned.date || cleaned.from || cleaned.to) throw new Error('Use one period or date range');
     if (cleaned.period === 'today') cleaned.date = today;
+    else if (cleaned.period === 'month_to_date') { cleaned.from = `${today.slice(0, 7)}-01`; cleaned.to = today; }
     else {
       const anchor = normalizeAttendanceDate(today);
       if (cleaned.period === 'last_week') anchor.setUTCDate(anchor.getUTCDate() - 7);
@@ -96,7 +105,9 @@ export const validateToolArguments = (name, args = {}, now = new Date()) => {
   }
   if (hoursTool && cleaned.date && (cleaned.from || cleaned.to)) throw new Error('Use date or range, not both');
   if (fields.includes('date') && (!hoursTool || (!cleaned.from && !cleaned.to))) cleaned.date ||= today;
-  if (fields.includes('from') && (!hoursTool || cleaned.from || cleaned.to)) {
+  if (['get_my_attendance', 'get_attendance_summary'].includes(name) && cleaned.date) { cleaned.from = cleaned.date; cleaned.to = cleaned.date; }
+  if (['get_my_attendance', 'get_attendance_summary'].includes(name) && !cleaned.from && !cleaned.to) { cleaned.from = today; cleaned.to = today; }
+  if (fields.includes('from') && (name !== 'get_topic_tracker_pending' || cleaned.from || cleaned.to) && (!hoursTool || cleaned.from || cleaned.to)) {
     cleaned.from ||= cleaned.to || today;
     cleaned.to ||= cleaned.from;
     const days = (new Date(cleaned.to) - new Date(cleaned.from)) / 86400000;
@@ -275,13 +286,18 @@ const classCount = async (req, args, read) => {
 const topicTracker = async (req, args, read, deps) => {
   if (!fullAccess(req) && !linkedId(req) && !isSubjectCoordinator(req.user)) return denied();
   let trainerId;
-  if (args.trainerName) {
+  if (args.trainerName || args.employeeId) {
     const trainer = await resolveAiTrainer(req, args, deps);
     if (trainer.error) return trainer;
     trainerId = id(trainer);
   } else if (!management(req)) trainerId = linkedId(req);
-  const payload = await read(getTopicTrackerSessions, req, { date: args.date, trainerId });
-  if (payload.error) return payload;
+  const sessionDates = args.from ? getAttendanceCalendarDates(normalizeAttendanceDate(args.from), normalizeAttendanceDate(args.to)).map(toAttendanceDateKey) : [args.date];
+  const collected = [];
+  for (const date of sessionDates) {
+    const payload = await read(getTopicTrackerSessions, req, { date, trainerId });
+    if (payload.error) return payload;
+    collected.push(...payload.sessions.map(session => ({ ...session, date })));
+  }
   // Resolve class filters against the same class-access controller, without exposing students.
   let allowedLabels;
   if (args.department || args.section || args.semester) {
@@ -291,13 +307,14 @@ const topicTracker = async (req, args, read, deps) => {
     if (!matching.length) return notFound('authorized class');
     allowedLabels = matching.map((c) => `${c.department}, ${c.py ? `PY ${c.py} ` : ''}Sem ${c.currentSemester} - ${c.section}`);
   }
-  const sessions = payload.sessions.filter((s) => (!args.subjectCode || s.subjectCode === args.subjectCode) && (!allowedLabels || allowedLabels.includes(s.branchYearSection)));
+  const sessions = collected.filter((s) => (!args.trackerStatus || s.trackerStatus === args.trackerStatus) && (!args.subjectCode || s.subjectCode === args.subjectCode) && (!allowedLabels || allowedLabels.includes(s.branchYearSection)));
   const summary = await read(getTopicTrackerClassSummary, req, {});
-  return { date: args.date, sessions: sessions.slice(0, MAX_RECORDS).map((s) => ({
-    trainer: s.trainerName, originalTrainer: s.originalTrainerName, replacementTrainer: s.replacementTrainerName,
+  return { date: args.date, from: sessionDates[0], to: sessionDates.at(-1), totalSessions: sessions.length,
+    closedSessions: sessions.filter(s => s.trackerStatus === 'closed').length, pendingSessions: sessions.filter(s => s.trackerStatus !== 'closed').length, sessions: sessions.slice(0, MAX_RECORDS).map((s) => ({
+    date: s.date, trainer: s.trainerName, originalTrainer: s.originalTrainerName, replacementTrainer: s.replacementTrainerName,
     class: s.branchYearSection, subject: s.courseName, subjectCode: s.subjectCode, venue: s.roomNo,
     startTime: s.sessionStartTime, endTime: s.sessionEndTime, durationHours: s.durationHrs,
-    sessionStatus: s.sessionStatus, trackerStatus: s.trackerStatus, topicsCovered: s.topicModulesCovered,
+    sessionStatus: s.sessionStatus, trackerStatus: s.trackerStatus, topicsCovered: s.topicModulesCovered, allottedStudents: s.allottedStudents, presentStudents: s.noPresent, attendancePercent: s.attendancePercent, observations: s.keyObservationsFeedback, challenges: s.challengesFaced, closedAt: s.closedAt,
   })), summary: summary.error ? { error: summary.error } : summary.subjects.filter((s) => !args.subjectCode || s.subjectCode === args.subjectCode)
     .slice(0, 20).map((s) => ({ subject: s.subjectName, subjectCode: s.subjectCode,
       classes: s.classes.filter((c) => (!trainerId || c.trainerId === trainerId) && (!allowedLabels || allowedLabels.includes(c.branchYearSection))).slice(0, 30)
@@ -306,26 +323,80 @@ const topicTracker = async (req, args, read, deps) => {
   };
 };
 
+const pendingTopics = async (req, args, read) => {
+  const payload = await read(getTopicTrackerPendingBacklog, req, { from: args.from, until: args.to });
+  if (payload.error) return payload;
+  const items = (payload.items || []).filter(item => !args.subjectCode || item.subjectCode === args.subjectCode);
+  const byTrainer = new Map();
+  for (const item of items) byTrainer.set(item.trainerName, (byTrainer.get(item.trainerName) || 0) + 1);
+  return { from: payload.from, to: payload.until, totalPending: items.length,
+    byTrainer: [...byTrainer].map(([trainer, pendingEntries]) => ({ trainer, pendingEntries })),
+    entries: items.slice(0, MAX_RECORDS).map(item => ({ date: item.date, trainer: item.trainerName,
+      class: item.branchYearSection, subject: item.courseName, subjectCode: item.subjectCode,
+      startTime: item.sessionStartTime, endTime: item.sessionEndTime, trackerStatus: item.trackerStatus,
+      entryExists: Boolean(item.entryId), actionNeeded: item.entryId ? 'Review and close the pending entry' : 'Fill in and close the missing entry' })),
+    truncated: items.length > MAX_RECORDS };
+};
+
 const attendance = async (req, args, read, deps) => {
   if (!linkedId(req)) return notFound('linked trainer');
   // Even management accounts with linked trainers get only their own private attendance.
   const ownReq = { user: { role: ROLES.TRAINER, trainer: linkedId(req), _id: req.user._id }, impersonator: req.impersonator };
-  const months = [...new Set([args.from.slice(0, 7), args.to.slice(0, 7)])];
+  const months = [...new Set(getAttendanceCalendarDates(normalizeAttendanceDate(args.from), normalizeAttendanceDate(args.to))
+    .map(date => toAttendanceDateKey(date).slice(0, 7)))];
   const records = [];
   for (const month of months) {
-    const grid = await (deps.attendanceGrid || buildTrainerAttendanceGridPayload)({ month, semester: 'III', user: ownReq.user });
+    const grid = await (deps.attendanceGrid || buildTrainerAttendanceGridPayload)({ month, semester: args.semester || 'III', user: ownReq.user });
     const ownRow = grid.rows.find((row) => id(row.trainer) === linkedId(req));
     if (!ownRow) continue;
     for (const [date, cell] of Object.entries(ownRow.days)) {
       if (date < args.from || date > args.to) continue;
       records.push({ date, attendanceType: cell.attendanceType, oifNumber: cell.oifNumber, classHandlingHours: cell.classHandlingHours,
-        mockPrepHours: cell.mockPrepHours, isOnLeave: cell.isOnLeave, isFuture: cell.isFuture });
+        mockPrepHours: cell.mockPrepHours, isReplacementRequired: Boolean(cell.isReplacementRequired), isOnLeave: cell.isOnLeave, isFuture: cell.isFuture, punchInAt: cell.punchInAt, punchOutAt: cell.punchOutAt });
     }
   }
   const punches = await read(getTrainerPunchInLogs, ownReq, { from: args.from, to: args.to, page: '1', limit: '50' });
-  return { from: args.from, to: args.to, attendanceSemester: 'III', records,
+  return { from: args.from, to: args.to, attendanceSemester: args.semester || 'III', records,
     punches: punches.error ? { error: punches.error } : punches.logs.map((log) => ({ date: log.date, punchInAt: log.punchInAt, source: log.punchInSource })),
     truncated: !punches.error && punches.pagination.total > 50 };
+};
+
+const attendanceSummary = async (req, args, deps) => {
+  if (!fullAccess(req)) return denied();
+  let trainerId;
+  if (args.trainerName || args.employeeId) {
+    const trainer = await resolveAiTrainer(req, args, deps);
+    if (trainer.error) return trainer;
+    trainerId = id(trainer);
+  }
+  const months = [...new Set(getAttendanceCalendarDates(normalizeAttendanceDate(args.from), normalizeAttendanceDate(args.to))
+    .map(date => toAttendanceDateKey(date).slice(0, 7)))];
+  const records = []; const summaries = new Map(); const countsByType = {}; let replacementRequiredDays = 0;
+  for (const month of months) {
+    const grid = await (deps.attendanceGrid || buildTrainerAttendanceGridPayload)({ month, semester: args.semester || 'III', user: req.user });
+    for (const row of grid.rows) {
+      if (trainerId && id(row.trainer) !== trainerId) continue;
+      for (const [date, cell] of Object.entries(row.days)) {
+        if (date < args.from || date > args.to || (args.attendanceType && cell.attendanceType !== args.attendanceType) || (args.rrdOnly === 'true' && (!cell.isReplacementRequired || cell.isFuture))) continue;
+        const trainer = trainerInfo(row.trainer);
+        records.push({date, trainer, attendanceType: cell.attendanceType, oifNumber: cell.oifNumber,
+          isOnLeave: cell.isOnLeave, isFuture: cell.isFuture, isReplacementRequired: Boolean(cell.isReplacementRequired), classHandlingHours: cell.classHandlingHours, mockPrepHours: cell.mockPrepHours});
+        if (cell.isFuture) continue;
+        if (cell.isReplacementRequired) replacementRequiredDays++;
+        const type = cell.attendanceType || 'unrecorded';
+        countsByType[type] = (countsByType[type] || 0) + 1;
+        if (!summaries.has(id(row.trainer))) summaries.set(id(row.trainer), {trainer, countsByType: {}, replacementRequiredDays: 0});
+        const summary = summaries.get(id(row.trainer));
+        if (cell.isReplacementRequired) summary.replacementRequiredDays++;
+        summary.countsByType[type] = (summary.countsByType[type] || 0) + 1;
+      }
+    }
+  }
+  return {from: args.from, to: args.to, semester: args.semester || 'III', countsByType, replacementRequiredDays,
+    totalMatchingRecords: records.length, futureRecords: records.filter(record => record.isFuture).length,
+    trainers: [...summaries.values()].slice(0, MAX_RECORDS), records: records.slice(0, MAX_RECORDS),
+    truncated: records.length > MAX_RECORDS || summaries.size > MAX_RECORDS,
+    note: 'Counts describe attendance grid categories, not verified physical presence or absence. Future records are excluded from counts.'};
 };
 
 const trainerAvailability = async (req, args, deps) => {
@@ -370,6 +441,8 @@ export const executeAiTool = async (name, rawArgs, req, deps = {}) => {
       case 'get_special_classes': return await specialClasses(req, args, read);
       case 'get_class_student_count': return await classCount(req, args, read);
       case 'get_topic_tracker': return await topicTracker(req, args, read, deps);
+      case 'get_topic_tracker_pending': return await pendingTopics(req, args, read);
+      case 'get_attendance_summary': return await attendanceSummary(req, args, deps);
       case 'get_my_attendance': return await attendance(req, args, read, deps);
       case 'get_trainer_availability': return await trainerAvailability(req, args, deps);
       case 'get_live_venues': {

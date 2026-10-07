@@ -224,3 +224,104 @@ test('every provider round reserves quota; exhaustion stops the next call withou
   await assert.rejects(chatWithAi({ message: 'Hello', req }, { ...deps, env: { GEMINI_MODEL: 'other-paid-model' } }), AiUnavailableError);
   assert.equal(calls, 0);
 });
+
+
+test('pending topic lookup reads the full authorized backlog, distinguishes missing entries and bounds output', async () => {
+  const admin = { user: { role: 'admin', _id: 'a' } };
+  assert.deepEqual(validateToolArguments('get_topic_tracker_pending', {}, new Date('2026-10-07T10:00:00Z')), {});
+  assert.ok(!getAiToolDeclarations(req).some(tool => tool.name === 'get_topic_tracker_pending'));
+  assert.equal((await executeAiTool('get_topic_tracker_pending', {}, req)).error, 'forbidden');
+  const result = await executeAiTool('get_topic_tracker_pending', {}, admin, { read: async (controller, scopedReq, query) => {
+    assert.equal(controller.name, 'getTopicTrackerPendingBacklog');
+    assert.equal(scopedReq, admin); assert.equal(query.from, undefined); assert.equal(query.until, undefined);
+    return { from: '2026-09-01', until: '2026-10-07', items: Array.from({length: 105}, (_, i) => ({
+      date: '2026-10-01', trainerName: 'Test Trainer', branchYearSection: 'CSE A', courseName: 'Test course',
+      subjectCode: 'TEST', entryId: i ? 'entry' : null, trackerStatus: 'pending', scheduleId: 'private-id',
+    })) };
+  } });
+  assert.equal(result.totalPending, 105); assert.equal(result.entries.length, 100);
+  assert.equal(result.byTrainer[0].pendingEntries, 105); assert.equal(result.truncated, true);
+  assert.equal(result.entries[0].entryExists, false); assert.equal(result.entries[1].entryExists, true);
+  assert.equal(JSON.stringify(result).includes('private-id'), false);
+});
+
+test('attendance understands dates and weeks without changing private trainer scope', async () => {
+  const now = new Date('2026-10-07T10:00:00Z');
+  const day = validateToolArguments('get_my_attendance', {date: '2026-10-01', semester: 'V'}, now);
+  assert.equal(day.from, '2026-10-01'); assert.equal(day.to, '2026-10-01');
+  const week = validateToolArguments('get_my_attendance', {period: 'this_week'}, now);
+  assert.equal(week.from, '2026-10-05'); assert.equal(week.to, '2026-10-11');
+  const result = await executeAiTool('get_my_attendance', {date: '2026-10-01', semester: 'V'}, req, {
+    now,
+    attendanceGrid: async ({semester, user}) => {
+      assert.equal(semester, 'V'); assert.equal(user.trainer, 'own');
+      return {rows: [{trainer: {_id: 'own'}, days: {'2026-10-01': {attendanceType: 'week_off', isFuture: false}}}]};
+    },
+    read: async () => ({logs: [], pagination: {total: 0}}),
+  });
+  assert.equal(result.attendanceSemester, 'V'); assert.equal(result.records[0].attendanceType, 'week_off');
+  assert.equal(result.records.length, 1);
+});
+
+
+test('management attendance summary returns exact category totals without private payloads', async () => {
+  const admin = {user: {_id: 'a', role: 'admin'}};
+  const coordinator = {user: {_id: 'c', role: 'subject_coordinator', trainer: 'own'}};
+  for (const scoped of [req, coordinator, {...admin, impersonator: {role: 'admin'}}]) {
+    assert.equal((await executeAiTool('get_attendance_summary', {}, scoped)).error, 'forbidden');
+  }
+  const result = await executeAiTool('get_attendance_summary', {from: '2026-10-01', to: '2026-10-03'}, admin, {
+    attendanceGrid: async ({user}) => {
+      assert.equal(user, admin.user);
+      return {rows: [{trainer: {_id: 't', name: 'Test Trainer', employeeId: '123', password: 'secret'}, days: {
+        '2026-10-01': {attendanceType: 'leave', isFuture: false, rawWhatsApp: 'private'},
+        '2026-10-02': {attendanceType: 'oif', isFuture: false},
+        '2026-10-03': {attendanceType: 'oif', isFuture: true},
+      }}]};
+    },
+  });
+  assert.deepEqual(result.countsByType, {leave: 1, oif: 1});
+  assert.equal(result.futureRecords, 1); assert.equal(result.totalMatchingRecords, 3);
+  assert.equal(JSON.stringify(result).includes('secret'), false);
+  assert.equal(JSON.stringify(result).includes('private'), false);
+  assert.throws(() => validateToolArguments('get_attendance_summary', {attendanceType: 'present'}));
+});
+
+test('topic range queries preserve controller scope and return filtered status, attendance and feedback', async () => {
+  const dates = [];
+  const result = await executeAiTool('get_topic_tracker', {from: '2026-10-01', to: '2026-10-02', trackerStatus: 'closed'}, req, {
+    read: async (controller, scopedReq, query) => {
+      assert.equal(scopedReq, req);
+      if (controller.name === 'getTopicTrackerClassSummary') return {subjects: []};
+      assert.equal(controller.name, 'getTopicTrackerSessions'); assert.equal(query.trainerId, 'own');
+      dates.push(query.date);
+      return {sessions: [{trainerName: 'Own Trainer', trackerStatus: 'closed', noPresent: 20, allottedStudents: 25,
+        attendancePercent: 80, topicModulesCovered: ['Arrays'], keyObservationsFeedback: 'Needs practice', challengesFaced: 'Time'},
+        {trackerStatus: 'pending'}]};
+    },
+  });
+  assert.deepEqual(dates, ['2026-10-01', '2026-10-02']);
+  assert.equal(result.totalSessions, 2); assert.equal(result.closedSessions, 2); assert.equal(result.pendingSessions, 0);
+  assert.equal(result.sessions[0].presentStudents, 20); assert.equal(result.sessions[0].observations, 'Needs practice');
+  assert.equal(result.sessions[1].date, '2026-10-02');
+  assert.throws(() => validateToolArguments('get_topic_tracker', {trackerStatus: 'approved'}));
+});
+
+
+test('month-to-date RRD query counts authoritative flags rather than all leave days', async () => {
+  const now = new Date('2026-10-07T10:00:00Z');
+  const range = validateToolArguments('get_attendance_summary', {period: 'month_to_date', rrdOnly: 'true'}, now);
+  assert.equal(range.from, '2026-10-01'); assert.equal(range.to, '2026-10-07');
+  const result = await executeAiTool('get_attendance_summary', {period: 'month_to_date', rrdOnly: 'true'}, {user: {role: 'admin'}}, {
+    now,
+    attendanceGrid: async () => ({rows: [{trainer: {_id: 't', name: 'Test Trainer'}, days: {
+      '2026-10-01': {attendanceType: 'leave', isReplacementRequired: true},
+      '2026-10-02': {attendanceType: 'e_leave', isReplacementRequired: true},
+      '2026-10-03': {attendanceType: 'leave', isReplacementRequired: false},
+      '2026-10-08': {attendanceType: 'leave', isReplacementRequired: true, isFuture: true},
+    }}]}),
+  });
+  assert.equal(result.replacementRequiredDays, 2); assert.equal(result.trainers[0].replacementRequiredDays, 2);
+  assert.equal(result.records.length, 2);
+  assert.ok(buildAiPrompt({role: 'admin'}, now).includes('RRD means Replacement Required Days'));
+});

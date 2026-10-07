@@ -113,3 +113,25 @@ test('provider reservations enforce rolling RPM, TPM and daily totals, including
   await assert.rejects(tokenFixture.quota.reserveProviderCall(1500), (e) => e.code === 'AI_MINUTE_LIMIT');
   await assert.rejects(tokenFixture.quota.reserveProviderCall(4001), (e) => e.code === 'AI_CONTEXT_LIMIT');
 });
+
+
+test('admins bypass personal daily and minute limits but retain shared budget and concurrent limits', async () => {
+  const { quota, restart } = fixture();
+  for (let i = 0; i < 8; i++) await (await restart().admit('admin', true))();
+  const usage = await quota.usage('admin', true);
+  assert.equal(usage.used, 8);
+  assert.equal(usage.unlimitedPersonal, true);
+  assert.equal(usage.remaining, null);
+  assert.equal(usage.questionsPerDay, null);
+  assert.equal(usage.questionsPerMinute, null);
+  assert.equal((await quota.usage('regular')).questionsPerDay, 5);
+  const release = await quota.admit('admin', true);
+  await assert.rejects(restart().admit('admin', true), e => e.code === 'AI_CONCURRENT_LIMIT');
+  await release();
+  const shared = fixture({ AI_GEMINI_FREE_RPD: '5' });
+  for (let i = 0; i < 4; i++) await shared.quota.reserveProviderCall(1000);
+  await assert.rejects(shared.quota.admit('admin', true), e => e.code === 'AI_SHARED_DAILY_LIMIT');
+  await assert.rejects(shared.quota.reserveProviderCall(1000), e => e.code === 'AI_MINUTE_LIMIT');
+  shared.advance(60001);
+  await assert.rejects(shared.quota.reserveProviderCall(1000), e => e.code === 'AI_SHARED_DAILY_LIMIT');
+});

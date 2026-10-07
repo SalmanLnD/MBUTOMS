@@ -62,8 +62,8 @@ const AssistantSession = ({ children, enabled, userId, showRelease }) => {
           <h3 className="h5">Sallu is now available to everyone</h3>
           <p>Ask about TOMS data you are permitted to view. Your existing account permissions still apply.</p>
           <ul>
-            <li><strong>{usage?.questionsPerDay || 5} questions per day</strong> for each account.</li>
-            <li><strong>{usage?.questionsPerMinute || 2} questions per minute</strong>, with one question processing at a time.</li>
+            <li>{usage?.unlimitedPersonal ? <><strong>No personal question limit</strong> for admins; the shared API budget applies.</> : <><strong>{usage?.questionsPerDay || 5} questions per day</strong> for each account.</>}</li>
+            <li>{usage?.unlimitedPersonal ? <>Shared provider rate limits apply, with one question processing at a time.</> : <><strong>{usage?.questionsPerMinute || 2} questions per minute</strong>, with one question processing at a time.</>}</li>
             <li>Questions accepted for processing count toward your allowance, including failed answers and retries.</li>
             <li>A shared free API budget applies to everyone. Sallu pauses when it is exhausted.</li>
           </ul>

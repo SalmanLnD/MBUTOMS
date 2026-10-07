@@ -75,7 +75,7 @@ export const createAiQuota = ({ model = AiUsageBucket, env = process.env, clock 
     await Promise.all(keys.map((key) => model.updateOne({ _id: key, leaseId }, { $set: { leaseUntil: new Date(0) }, $unset: { leaseId: '' } })));
   };
   return {
-    async admit(userId) {
+    async admit(userId, isAdmin = false) {
       const policy = quotaPolicy(env);
       if (!policy.configured) throw setupError();
       const now = clock(); const leaseId = randomUUID(); const keys = [];
@@ -90,8 +90,8 @@ export const createAiQuota = ({ model = AiUsageBucket, env = process.env, clock 
           if (await lease(key, leaseId, now)) { keys.push(key); break; }
         }
         if (keys.length !== 2) throw limited('AI_CONCURRENT_LIMIT', new Date(now.getTime() + 60_000));
-        await rolling(`minute:user:${userId}`, QUESTIONS_PER_MINUTE, Number.MAX_SAFE_INTEGER, 0, now);
-        await daily(`day:${quotaDay(now)}:user:${userId}`, DAILY_QUESTIONS, now, 'AI_DAILY_LIMIT');
+        if (!isAdmin) await rolling(`minute:user:${userId}`, QUESTIONS_PER_MINUTE, Number.MAX_SAFE_INTEGER, 0, now);
+        await daily(`day:${quotaDay(now)}:user:${userId}`, isAdmin ? Number.MAX_SAFE_INTEGER : DAILY_QUESTIONS, now, 'AI_DAILY_LIMIT');
         return async () => release(keys, leaseId);
       } catch (error) { await release(keys, leaseId); throw error; }
     },
@@ -109,7 +109,7 @@ export const createAiQuota = ({ model = AiUsageBucket, env = process.env, clock 
       const personal = await model.findById(`day:${day}:user:${userId}`).lean();
       const used = personal?.count || 0;
       const shared = await model.findById(`day:${day}:provider`).lean();
-      return { ...policy, used, remaining: Math.max(0, DAILY_QUESTIONS - used), resetAt: nextQuotaReset(now).toISOString(),
+      return { ...policy, unlimitedPersonal: isAdmin, questionsPerDay: isAdmin ? null : DAILY_QUESTIONS, questionsPerMinute: isAdmin ? null : QUESTIONS_PER_MINUTE, used, remaining: isAdmin ? null : Math.max(0, DAILY_QUESTIONS - used), resetAt: nextQuotaReset(now).toISOString(),
         sharedExhausted: policy.configured && (shared?.count || 0) >= policy.providerCallsPerDay,
         ...(isAdmin ? { sharedUsed: shared?.count || 0, sharedRemaining: Math.max(0, policy.providerCallsPerDay - (shared?.count || 0)) } : {}) };
     },
