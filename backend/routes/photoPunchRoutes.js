@@ -14,6 +14,7 @@ import { computeClassHandlingHoursBatch } from '../utils/trainerClassHoursBatch.
 import { resolvePhotoPunchOif } from '../utils/photoPunchOif.js';
 import Subject from '../models/Subject.js';
 import { allowsLocalPunchTrial } from '../utils/photoPunchNetworkPolicy.js';
+import { canUsePhotoPunch } from '../utils/photoPunchAccess.js';
 
 const router = express.Router();
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 5 * 1024 * 1024, files: 1, fields: 2 } });
@@ -43,7 +44,7 @@ const setupIssues = (req, settings) => {
 };
 router.use(protect);
 router.use((req, res, next) => {
-  if (req.user.role !== 'admin' || req.impersonator || req.hasDemoToken) return res.status(403).json({ message: 'Photo punch-in is currently available to administrators only.' });
+  if (!canUsePhotoPunch(req.user) || req.impersonator || req.hasDemoToken) return res.status(403).json({ message: 'Photo punch-in is currently available to administrators and invited beta users only.' });
   if (!config().enabled) return res.status(503).json({ message: 'Photo punch-in is disabled by the administrator.' });
   if (req.user.mustResetPassword || req.user.requiresPasswordReset) return res.status(403).json({ message: 'Complete your password reset before punching in.' });
   next();

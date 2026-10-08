@@ -7,11 +7,11 @@ import { useAiAssistant } from '../context/AiAssistantContext.jsx';
 import SalluAvatar from './SalluAvatar.jsx';
 
 const Sidebar = ({ collapsed = false, labelsVisible = true, onToggle }) => {
-  const { hasRole } = useAuth();
+  const { user, hasRole } = useAuth();
   const assistant = useAiAssistant();
 
   const visibleItems = navItems.filter((item) =>
-    item.roles.some((role) => hasRole(role))
+    item.roles.some((role) => hasRole(role)) || item.allowedUserIds?.includes(String(user?._id || user?.id || ''))
   );
 
   return (

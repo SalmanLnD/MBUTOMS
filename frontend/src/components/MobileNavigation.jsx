@@ -15,7 +15,7 @@ const MobileNavigation = () => {
   const location = useLocation();
   const isMobile = useMediaQuery('(max-width: 767.98px)');
   const [open, setOpen] = useState(false);
-  const visibleItems = navItems.filter((item) => item.roles.some((role) => hasRole(role)));
+  const visibleItems = navItems.filter((item) => item.roles.some((role) => hasRole(role)) || item.allowedUserIds?.includes(String(user?._id || user?.id || '')));
   const shortcuts = ['/dashboard', '/timetable', '/leaves']
     .map((path) => visibleItems.find((item) => item.path === path)).filter(Boolean);
   const moreActive = !shortcuts.some(({ path }) => location.pathname.startsWith(path));

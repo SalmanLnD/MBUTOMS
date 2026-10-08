@@ -12,13 +12,14 @@ import {
   TopicTrackerIcon,
 } from '../components/icons.jsx';
 import { MANAGEMENT_ROLES, PERFORMANCE_ACCESS_ROLES, ROLES } from '../utils/roles.js';
+import { PHOTO_PUNCH_BETA_USER_IDS } from '../utils/photoPunchAccess.js';
 
 const ALL_STAFF = MANAGEMENT_ROLES;
 const TRAINER_NAV = [...ALL_STAFF, ROLES.TRAINER, ROLES.EVALUATOR];
 
 export const navItems = [
   { path: '/dashboard', label: 'Dashboard', Icon: DashboardIcon, roles: TRAINER_NAV },
-  { path: '/punch-in', label: 'Punch In', Icon: CalendarIcon, roles: [ROLES.ADMIN] },
+  { path: '/punch-in', label: 'Punch In', Icon: CalendarIcon, roles: [ROLES.ADMIN], allowedUserIds: PHOTO_PUNCH_BETA_USER_IDS },
   { path: '/trainers', label: 'Trainers', Icon: TrainerIcon, roles: TRAINER_NAV },
   { path: '/subjects', label: 'Subjects', Icon: SubjectIcon, roles: TRAINER_NAV },
   { path: '/timetable', label: 'Timetable', Icon: CalendarIcon, roles: TRAINER_NAV },

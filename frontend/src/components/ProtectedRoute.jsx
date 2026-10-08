@@ -4,7 +4,7 @@ import { useAuth } from '../context/AuthContext.jsx';
 import { useLoginModal } from '../context/LoginModalContext.jsx';
 import LoadingSpinner from './LoadingSpinner.jsx';
 
-const ProtectedRoute = ({ children, roles }) => {
+const ProtectedRoute = ({ children, roles, allowedUserIds = [] }) => {
   const { user, loading, hasRole } = useAuth();
   const { openLoginModal } = useLoginModal();
   const location = useLocation();
@@ -24,7 +24,7 @@ const ProtectedRoute = ({ children, roles }) => {
 
   if (!user) return null;
 
-  if (roles && !hasRole(...roles)) {
+  if (roles && !hasRole(...roles) && !allowedUserIds.includes(String(user._id || user.id || ''))) {
     return <Navigate to="/dashboard" replace />;
   }
 

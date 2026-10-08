@@ -10,6 +10,7 @@ import MainLayout from './layouts/MainLayout.jsx';
 import { AiAssistantProvider } from './context/AiAssistantContext.jsx';
 import OptionalAuthLayout from './layouts/OptionalAuthLayout.jsx';
 import { needsPasswordReset, MANAGEMENT_ROLES, PERFORMANCE_ACCESS_ROLES } from './utils/roles.js';
+import { PHOTO_PUNCH_BETA_USER_IDS } from './utils/photoPunchAccess.js';
 
 const Dashboard = lazy(() => import('./pages/Dashboard.jsx'));
 const PhotoPunch = lazy(() => import('./pages/PhotoPunch.jsx'));
@@ -76,7 +77,7 @@ const App = () => (
         }
       >
         <Route path="/dashboard" element={<Dashboard />} />
-        <Route path="/punch-in" element={<ProtectedRoute roles={['admin']}><PhotoPunch /></ProtectedRoute>} />
+        <Route path="/punch-in" element={<ProtectedRoute roles={['admin']} allowedUserIds={PHOTO_PUNCH_BETA_USER_IDS}><PhotoPunch /></ProtectedRoute>} />
         <Route path="/trainers" element={<Trainers />} />
         <Route path="/trainers/:id" element={<TrainerProfile />} />
         <Route path="/trainers/:id/schedule" element={<TrainerSchedule />} />
