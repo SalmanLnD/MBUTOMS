@@ -37,7 +37,7 @@ export const mergeAttendanceUiTrainerFilter = mergeUiTrainerFilter;
 
 /** Google Sheets export — keep resigned trainers indefinitely for Exit marking. */
 export const mergeAttendanceExportTrainerFilter = async (baseFilter = {}) => {
-  const hiddenTrainerIds = await getHiddenRosterTrainerIds();
+  const hiddenTrainerIds = await getHiddenRosterTrainerIds({ attendance: true });
   const exportClause = {
     $or: [
       {

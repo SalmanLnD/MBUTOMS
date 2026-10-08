@@ -154,7 +154,7 @@ export const buildTrainerAttendanceGridPayload = async ({
   }
 
   const finalTrainerFilter = await mergeAttendanceUiTrainerFilter(
-    await mergeRosterFilter(trainerFilter, { rosterOnly: true })
+    await mergeRosterFilter(trainerFilter, { rosterOnly: true, attendance: true })
   );
 
   const trainersRaw = await Trainer.find(finalTrainerFilter)
