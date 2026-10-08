@@ -68,7 +68,7 @@ export default function PhotoPunch() {
       ctx.fillText('TOMS | Campus punch-in', font, canvas.height - height + font * 1.7);
       ctx.font = `${font}px sans-serif`;
       const lines = [`${user.name}`, `Lat ${location.latitude.toFixed(6)}  Long ${location.longitude.toFixed(6)}`,
-        `${data.distance} m from campus centre | GPS accuracy +/- ${Math.round(location.accuracy)} m`, `${formatTime(data.capturedAt)} IST${data.mode === 'preview' ? ' | PROTOTYPE' : ''}`];
+        `${data.distance} m from campus centre | GPS accuracy +/- ${Math.round(location.accuracy)} m`, `${formatTime(data.capturedAt)} IST`];
       lines.forEach((line, index) => ctx.fillText(line, font, canvas.height - height + font * (3.1 + index * 1.05)));
       const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg', .85));
       if (!blob || blob.size > 5 * 1024 * 1024) throw new Error('Photo could not be prepared. Retake it.');
@@ -88,7 +88,7 @@ export default function PhotoPunch() {
     finally { if (active.current) setBusy(false); }
   };
   return <div className="photo-punch">
-    <header className="photo-punch__heading"><div><span className="photo-punch__eyebrow">TOMS ATTENDANCE</span><h1>Campus punch-in</h1><p>A fresh photo. Your location. One simple check-in.</p></div><span className="photo-punch__badge">{config?.mode === 'live' ? 'Live' : 'Prototype'}</span></header>
+    <header className="photo-punch__heading"><div><span className="photo-punch__eyebrow">TOMS ATTENDANCE</span><h1>Campus punch-in</h1><p>A fresh photo. Your location. One simple check-in.</p></div></header>
     <div className="photo-punch__grid"><section className="photo-punch__card">
       <div className="photo-punch__card-title"><h2>{photo ? 'Review your photo' : 'Take your punch-in photo'}</h2><span>1.5 km campus radius</span></div>
       <div className="photo-punch__camera">{photo ? <img src={photo.url} alt="Captured punch-in photo with location and IST timestamp" /> : camera ? <video ref={video} autoPlay muted playsInline aria-label="Live punch-in camera" /> : <div className="photo-punch__placeholder"><span aria-hidden="true">◎</span><h3>Ready when you are</h3><p>Allow camera and precise location access. Photos are captured here, not selected from your gallery.</p></div>}</div>
