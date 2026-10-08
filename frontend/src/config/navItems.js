@@ -3,6 +3,7 @@ import {
   TrainerIcon,
   SubjectIcon,
   CalendarIcon,
+  FingerprintIcon,
   VenueIcon,
   ClassesIcon,
   LeaveNavIcon,
@@ -19,7 +20,7 @@ const TRAINER_NAV = [...ALL_STAFF, ROLES.TRAINER, ROLES.EVALUATOR];
 
 export const navItems = [
   { path: '/dashboard', label: 'Dashboard', Icon: DashboardIcon, roles: TRAINER_NAV },
-  { path: '/punch-in', label: 'Punch In', Icon: CalendarIcon, roles: [ROLES.ADMIN], allowedUserIds: PHOTO_PUNCH_BETA_USER_IDS },
+  { path: '/punch-in', label: 'Punch In', Icon: FingerprintIcon, roles: [ROLES.ADMIN], allowedUserIds: PHOTO_PUNCH_BETA_USER_IDS },
   { path: '/trainers', label: 'Trainers', Icon: TrainerIcon, roles: TRAINER_NAV },
   { path: '/subjects', label: 'Subjects', Icon: SubjectIcon, roles: TRAINER_NAV },
   { path: '/timetable', label: 'Timetable', Icon: CalendarIcon, roles: TRAINER_NAV },

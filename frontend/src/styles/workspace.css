@@ -26,7 +26,8 @@
 .stat-card { border-top: 3px solid var(--stat-color,var(--primary)); background: linear-gradient(130deg,var(--surface) 45%,var(--stat-wash,var(--primary-soft))); }
 .stat-card .stat-icon { width: 42px; height: 42px; border-radius: 12px; color: var(--stat-color); background: var(--stat-wash); }
 .dashboard-attendance-chart { max-width: 380px; margin: auto; }
-.sidebar { background: linear-gradient(175deg,#253569,#172544); }
+.sidebar { background-color: #253569; background-image: linear-gradient(175deg,#253569,#172544); }
+.sidebar .text-white-50 { color: #c1ced7 !important; }
 .sidebar-link.active { background: #635bdb; box-shadow: inset 3px 0 #63e4cf; }
 .sidebar-link-label { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; overflow-wrap: normal; }
 .main-content .table:not(.timetable-grid):not(.trainer-attendance-month-table) { min-width: 760px; }

@@ -23,8 +23,8 @@
 .photo-punch__note { background: var(--surface-soft); padding: 16px; border-radius: 8px; font-size: .8rem; }
 .photo-punch__note p { margin: 8px 0 0; }
 .photo-punch__fine { font-size: .75rem; line-height: 1.6; color: var(--text-secondary); margin: 18px 0 0; }
-.photo-punch__error { background: #fff0f0; color: #9d2737; padding: 12px; margin: 14px 0; border-radius: 8px; }
-.photo-punch__success { background: #eaf7ef; color: #21583c; padding: 16px; margin-top: 16px; border-radius: 8px; }
+.photo-punch__error { background: var(--danger-soft); color: var(--danger); padding: 12px; margin: 14px 0; border-radius: 8px; }
+.photo-punch__success { background: var(--success-soft); color: var(--success); padding: 16px; margin-top: 16px; border-radius: 8px; }
 .photo-punch__success p { margin: 8px 0; } .photo-punch__success a { display: block; }
 .photo-punch__assignment { margin-top: 18px; padding: 16px; background: var(--surface-soft); border-radius: 8px; }
 .photo-punch__assignment label { display: block; font-size: .85rem; margin-bottom: 8px; }
