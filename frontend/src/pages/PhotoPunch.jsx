@@ -76,13 +76,13 @@ export default function PhotoPunch() {
     } catch (e) { if (active.current) setError(e.response?.data?.message || e.message); }
     finally { if (active.current) setBusy(false); }
   };
-  const submit = async (driveTest = false) => {
+  const submit = async () => {
     setBusy(true); setError('');
     try {
       const body = new FormData(); body.append('photo', photo.blob, 'punch.jpg'); body.append('token', session.token);
       body.append('assignment', JSON.stringify(assignment));
       const controller = new AbortController(); pending.current = controller;
-      const { data } = await api.post(driveTest === true ? '/photo-punch/test-upload' : '/photo-punch/submit', body, { signal: controller.signal, timeout: 90000, headers: { 'Content-Type': 'multipart/form-data' } });
+      const { data } = await api.post('/photo-punch/submit', body, { signal: controller.signal, timeout: 90000, headers: { 'Content-Type': 'multipart/form-data' } });
       if (active.current) setResult(data);
     } catch (e) { if (active.current) setError(e.response?.data?.message || 'Punch-in failed. Attendance was not confirmed.'); }
     finally { if (active.current) setBusy(false); }
@@ -108,16 +108,15 @@ export default function PhotoPunch() {
         {['it', 'capsule'].includes(assignment.mode) && <p>OIF: {assignment.mode === 'it' ? 'IT' : 'CA26421'} · 7 IT hours, using the current attendance rules.</p>}
       </div>}
       {result?.assignment && <p>OIF: {result.assignment.oifNumber || 'No scheduled OIF'} · Class hours: {result.assignment.classHandlingHours} · Mock / IT hours: {result.assignment.mockPrepHours}</p>}
-      {result && <div className="photo-punch__success" role="status"><strong>{result.uploaded ? 'Photo uploaded to Drive' : result.preview ? 'Preview complete' : 'You are checked in'}</strong><p>{result.message}</p><small>{result.folder}</small>{result.photoUrl && <a href={result.photoUrl} target="_blank" rel="noreferrer">View photo in Drive</a>}</div>}
+      {result && <div className="photo-punch__success" role="status"><strong>You are checked in</strong><p>{result.message}</p><small>{result.folder}</small>{result.photoUrl && <a href={result.photoUrl} target="_blank" rel="noreferrer">View photo in Drive</a>}</div>}
       <div className="photo-punch__actions">{!camera && !photo && <button className="btn btn-primary" disabled={busy || !config} onClick={start}>{busy ? 'Checking location…' : 'Enable camera & location'}</button>}
         {camera && <><button className="btn btn-primary" disabled={busy} onClick={capture}>{busy ? 'Checking…' : 'Take photo'}</button><button className="btn btn-outline-secondary" disabled={busy} onClick={() => { stop(); setCamera(false); }}>Cancel</button></>}
-        {photo && !result && <><button className="btn btn-primary" disabled={busy} onClick={submit}>{busy ? 'Verifying…' : config?.mode === 'live' ? 'Punch in' : 'Test punch-in'}</button><button className="btn btn-outline-secondary" disabled={busy} onClick={start}>Retake</button><a className="btn btn-outline-secondary" href={photo.url} download="toms-punch-preview.jpg">Download preview</a></>}
+        {photo && !result && <><button className="btn btn-primary" disabled={busy} onClick={submit}>{busy ? 'Saving punch-in…' : 'Punch in'}</button><button className="btn btn-outline-secondary" disabled={busy} onClick={start}>Retake</button><a className="btn btn-outline-secondary" href={photo.url} download="toms-punch.jpg">Download photo</a></>}
         {result && <button className="btn btn-outline-secondary" onClick={start}>Start again</button>}
       </div>
-      {photo && !result && config?.driveTestAvailable && <button className="btn btn-primary" disabled={busy} onClick={() => submit(true)}>{busy ? 'Uploading…' : 'Upload to Drive (test)'}</button>}
       {photo && !result && <p className="photo-punch__fine">Submit within 60 seconds of capture, or retake your photo for a fresh location check.</p>}
     </section><aside className="photo-punch__card photo-punch__details"><h2>Your check-in checks</h2>
-      <dl><dt>Location</dt><dd>{session ? `${session.distance} m from centre; +/- ${Math.round(session.location.accuracy)} m accuracy` : 'Fresh GPS reading required'}</dd><dt>Network</dt><dd>{session?.network === 'clear' ? 'No VPN/proxy flag reported' : 'Not verified yet'}</dd><dt>Photo storage</dt><dd>University Google Drive<br /><small>toms punch ins / date / photo.jpg</small></dd><dt>Attendance</dt><dd>{config?.mode === 'live' ? 'Recorded after Drive upload succeeds' : 'Preview only; real attendance is unchanged'}</dd></dl>
+      <dl><dt>Location</dt><dd>{session ? `${session.distance} m from centre; +/- ${Math.round(session.location.accuracy)} m accuracy` : 'Fresh GPS reading required'}</dd><dt>Network</dt><dd>{session?.network === 'clear' ? 'No VPN/proxy flag reported' : 'Not verified yet'}</dd><dt>Photo storage</dt><dd>University Google Drive<br /><small>toms punch ins / date / photo.jpg</small></dd><dt>Attendance</dt><dd>Recorded after Drive upload succeeds</dd></dl>
     </aside></div>
   </div>;
 }

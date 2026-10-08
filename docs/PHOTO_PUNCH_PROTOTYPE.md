@@ -1,11 +1,12 @@
-# TOMS photo punch-in prototype
+# TOMS photo punch-in
 
-Screen: `/punch-in`, available from Punch In after login.
+Screen: `/punch-in`, available only to administrators after login.
 
-Preview is the default. It captures a camera JPEG with coordinates, accuracy, server-issued
-capture time and an IST stamp. Photos remain in browser/server memory for this request; preview
-does not upload files or change attendance. The provisional centre (13.621069, 79.289828) comes
-from the example photo, not a surveyed university boundary. Confirm the campus centre before live use.
+Punch-in is live by default. It captures a camera JPEG with coordinates, accuracy, server-issued
+capture time and an IST stamp, uploads it to Drive, and records real attendance. There is no
+preview or upload-only endpoint. `PUNCH_ATTENDANCE_ENABLED=false` disables the feature with an
+error instead of simulating success. The administrator confirmed centre 13.621069, 79.289828;
+environment coordinates can override this default.
 
 ## University Google Drive setup
 
@@ -36,10 +37,11 @@ Loopback/private client addresses are unknown. The implementation uses Express `
 untrusted forwarded headers. Configure trusted proxy handling for the actual deployment only
 after verifying the ingress strips/replaces client-supplied forwarding headers.
 
-Only enable `PUNCH_ATTENDANCE_ENABLED=true` after the above services and a linked trainer
-account are ready. Preview sessions cannot be submitted after switching to live mode.
-Impersonated/demo accounts cannot punch in. An admin without a linked trainer can try preview,
-but cannot mark attendance for someone else through this screen.
+Configure the above services and link the administrator to their trainer record before use.
+Missing Drive credentials or network verification blocks capture; it never falls back to a test.
+Impersonated/demo accounts cannot punch in. An admin without a linked trainer cannot mark
+attendance for someone else through this screen. Set `PUNCH_ATTENDANCE_ENABLED=true` or remove
+an old `false` value on the hosted backend to enable the feature.
 
 After Drive confirms the upload, the API adds an earliest punch timestamp, Drive reference,
 GPS metadata and image hash to `TrainerDailyAttendance`. No image bytes/base64 are stored in

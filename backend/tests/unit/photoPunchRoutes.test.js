@@ -7,7 +7,7 @@ import User from '../../models/User.js';
 import TrainerDailyAttendance from '../../models/TrainerDailyAttendance.js';
 import { APP_VERSION } from '../../utils/sessionVersion.js';
 
-test('preview capture is authenticated, geofenced and never writes attendance', async t => {
+test('admin punch-in writes attendance after upload and protects disabled, duplicate and leave entries', async t => {
   const envKeys = ['JWT_SECRET', 'PUNCH_ATTENDANCE_ENABLED', 'PUNCH_CAMPUS_LATITUDE', 'PUNCH_CAMPUS_LONGITUDE', 'PUNCH_IPINFO_TOKEN', 'PUNCH_LOCAL_TRIAL_ALLOW_UNVERIFIED_NETWORK', 'NODE_ENV'];
   const old = Object.fromEntries(envKeys.map(key => [key, process.env[key]]));
   process.env.JWT_SECRET = 'photo-punch-test-secret'; process.env.PUNCH_ATTENDANCE_ENABLED = 'false';
@@ -29,15 +29,9 @@ test('preview capture is authenticated, geofenced and never writes attendance', 
     assert.equal((await fetch(`${base}${path}`, {method: path.includes('config') || path.includes('scheduled-oif') ? 'GET' : 'POST', headers})).status, 403);
   }
   role = 'admin';
-  const outside = await fetch(`${base}/capture-session`, {method: 'POST', headers, body: JSON.stringify({location: {...location, latitude: 14}})});
-  assert.equal(outside.status, 400);
-  const response = await fetch(`${base}/capture-session`, {method: 'POST', headers, body: JSON.stringify({location})});
-  assert.equal(response.status, 200); const session = await response.json(); assert.equal(session.network, 'unknown');
+  assert.equal((await fetch(`${base}/config`, {headers})).status, 503);
   const jpeg = Buffer.alloc(1100); jpeg.writeUInt16BE(0xffd8, 0); jpeg.writeUInt16BE(0xffc0, 2); jpeg.writeUInt16BE(17, 4);
   jpeg[6] = 8; jpeg.writeUInt16BE(480, 7); jpeg.writeUInt16BE(640, 9); jpeg.writeUInt16BE(0xffd9, jpeg.length - 2);
-  const form = new FormData(); form.append('token', session.token); form.append('photo', new Blob([jpeg], {type:'image/jpeg'}), 'test.jpg'); form.append('assignment', JSON.stringify({mode:'it'}));
-  const submission = await fetch(`${base}/submit`, {method:'POST', headers:{Authorization:`Bearer ${auth}`}, body:form});
-  assert.equal(submission.status, 200); assert.equal((await submission.json()).preview, true);
   const realFetch = globalThis.fetch;
   const driveKeys = ['PUNCH_GOOGLE_CLIENT_ID', 'PUNCH_GOOGLE_CLIENT_SECRET', 'PUNCH_GOOGLE_REFRESH_TOKEN'];
   const oldDrive = driveKeys.map(key => process.env[key]);
@@ -49,16 +43,14 @@ test('preview capture is authenticated, geofenced and never writes attendance', 
     if (String(url).startsWith('https://www.googleapis.com/drive/')) return Response.json({files:[{id:'mock-folder'}]});
     return realFetch(url, options);
   });
-  const uploaded = await fetch(`${base}/test-upload`, {method:'POST', headers:{Authorization:`Bearer ${auth}`}, body:form});
-  assert.equal(uploaded.status, 200);
-  assert.equal((await uploaded.json()).uploaded, true);
+  delete process.env.PUNCH_ATTENDANCE_ENABLED;
   const invalid = new FormData(); invalid.append('token', 'invalid'); invalid.append('photo', new Blob([jpeg]), 'test.jpg');
   assert.equal((await fetch(`${base}/submit`, {method:'POST', headers:{Authorization:`Bearer ${auth}`}, body:invalid})).status, 400);
-  process.env.PUNCH_ATTENDANCE_ENABLED = 'true';
   process.env.PUNCH_LOCAL_TRIAL_ALLOW_UNVERIFIED_NETWORK = 'false';
   process.env.NODE_ENV = 'development';
   assert.equal((await fetch(`${base}/capture-session`, {method:'POST',headers,body:JSON.stringify({location:{...location,timestamp:Date.now()}})})).status,503);
   process.env.PUNCH_LOCAL_TRIAL_ALLOW_UNVERIFIED_NETWORK = 'true';
+  assert.equal((await fetch(`${base}/capture-session`,{method:'POST',headers,body:JSON.stringify({location:{...location,latitude:14,timestamp:Date.now()}})})).status,400);
   const liveCapture = await fetch(`${base}/capture-session`, {method:'POST',headers,body:JSON.stringify({location:{...location,timestamp:Date.now()}})});
   assert.equal(liveCapture.status,200);
   const liveSession = await liveCapture.json();
@@ -68,7 +60,7 @@ test('preview capture is authenticated, geofenced and never writes attendance', 
   liveWriteAllowed = true;
   const liveResult = await fetch(`${base}/submit`,{method:'POST',headers:{Authorization:`Bearer ${auth}`},body:liveForm});
   assert.equal(liveResult.status,200);
-  assert.equal((await liveResult.json()).preview,false);
+  assert.equal((await liveResult.json()).message,'Punch-in recorded.');
   assert.equal(write.update.$set.oifNumber,'CA26421');
   assert.equal(write.update.$set.punchInSource,'toms_camera');
   assert.equal(write.update.$set.photoPunch.driveFileId,'mock-photo');

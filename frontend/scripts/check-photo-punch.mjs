@@ -13,12 +13,12 @@ try {
     let submissions = 0, blocked = false;
     await context.route('**/api/**', route => {
       const url = new URL(route.request().url()); const path = url.pathname.replace(/^\/api/, '');
-      if (path === '/photo-punch/config') return route.fulfill({json: {mode: 'preview', campusVerified: false, campus: {latitude: 13.621069, longitude: 79.289828}}});
+      if (path === '/photo-punch/config') return route.fulfill({json: {mode: 'live', campusVerified: false, campus: {latitude: 13.621069, longitude: 79.289828}}});
       if (path === '/photo-punch/scheduled-oif') return route.fulfill({json: {oifNumber:'CT27004',classHandlingHours:3,mockPrepHours:0}});
-      if (path === '/photo-punch/capture-session') return route.fulfill(blocked ? {status: 403, json: {message: 'VPN or proxy detected. Turn it off before taking a photo.'}} : {json: {token: 'test-token', mode: 'preview', capturedAt: new Date().toISOString(), distance: 0, network: 'unknown', location: route.request().postDataJSON().location}});
+      if (path === '/photo-punch/capture-session') return route.fulfill(blocked ? {status: 403, json: {message: 'VPN or proxy detected. Turn it off before taking a photo.'}} : {json: {token: 'test-token', mode: 'live', capturedAt: new Date().toISOString(), distance: 0, network: 'unknown', location: route.request().postDataJSON().location}});
       if (path === '/photo-punch/submit') {
         submissions++; assert.ok(route.request().postDataBuffer().includes(Buffer.from('image/jpeg')));
-        return route.fulfill({json: {preview: true, message: 'Prototype checks passed. No photo uploaded and no real attendance changed.', folder: 'toms punch ins/2026-10-07'}});
+        return route.fulfill({json: {message: 'Punch-in recorded.', folder: 'toms punch ins/2026-10-07'}});
       }
       return route.fulfill({json: path === '/ai/usage' ? {configured: false} : fixture(path, url.searchParams)});
     });
@@ -41,13 +41,13 @@ try {
     await page.getByRole('button', {name: 'Take photo', exact: true}).click();
     await page.getByRole('img', {name: 'Captured punch-in photo with location and IST timestamp'}).waitFor();
     await page.screenshot({path: `.tmp/photo-punch/${width}-review.png`});
-    await page.getByRole('button', {name: 'Test punch-in'}).click();
-    await page.getByText('Preview complete', {exact: true}).waitFor(); assert.equal(submissions, 1);
+    await page.getByRole('button', {name: 'Punch in'}).click();
+    await page.getByText('You are checked in', {exact: true}).waitFor(); assert.equal(submissions, 1);
     blocked = true; await page.getByRole('button', {name: 'Start again'}).click();
     await page.getByRole('alert').filter({hasText: 'VPN or proxy detected'}).waitFor();
     assert.equal(await page.locator('video').count(), 0);
     assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth + 2), false);
     assert.deepEqual(errors, []); await context.close();
   }
-  console.log('Desktop/mobile camera capture, JPEG stamping, preview submission and VPN-block UI passed. Services were mocked; no real Drive upload or attendance write.');
+  console.log('Desktop/mobile camera capture, JPEG stamping, punch-in submission and VPN-block UI passed. Services were mocked; no real Drive upload or attendance write.');
 } finally { await browser.close(); }

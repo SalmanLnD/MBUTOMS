@@ -28,10 +28,9 @@ const scheduledOif = async (user, capturedAt) => {
   return resolvePhotoPunchOif({}, { ...scheduled, schedules: (scheduled.schedules || []).map(s => ({ ...s, oifNumber: byId.get(String(s.subject)) })) });
 };
 const config = () => {
-  const configured = process.env.PUNCH_CAMPUS_LATITUDE !== undefined && process.env.PUNCH_CAMPUS_LONGITUDE !== undefined;
   const campus = { latitude: Number(process.env.PUNCH_CAMPUS_LATITUDE ?? 13.621069), longitude: Number(process.env.PUNCH_CAMPUS_LONGITUDE ?? 79.289828) };
-  const campusVerified = configured && Number.isFinite(campus.latitude) && Math.abs(campus.latitude) <= 90 && Number.isFinite(campus.longitude) && Math.abs(campus.longitude) <= 180;
-  return { mode: process.env.PUNCH_ATTENDANCE_ENABLED === 'true' ? 'live' : 'preview', campus, campusVerified,
+  const campusVerified = Number.isFinite(campus.latitude) && Math.abs(campus.latitude) <= 90 && Number.isFinite(campus.longitude) && Math.abs(campus.longitude) <= 180;
+  return { mode: 'live', enabled: process.env.PUNCH_ATTENDANCE_ENABLED !== 'false', campus, campusVerified,
     driveConnected: driveConfigured(), networkCheckConfigured: Boolean(process.env.PUNCH_IPINFO_TOKEN), radiusMeters: 1500 };
 };
 // IP reputation is a signal, not proof that a device has no VPN. Never trust a client-provided flag/IP.
@@ -48,10 +47,11 @@ const networkCheck = async req => {
 router.use(protect);
 router.use((req, res, next) => {
   if (req.user.role !== 'admin' || req.impersonator || req.hasDemoToken) return res.status(403).json({ message: 'Photo punch-in is currently available to administrators only.' });
+  if (!config().enabled) return res.status(503).json({ message: 'Photo punch-in is disabled by the administrator.' });
   if (req.user.mustResetPassword || req.user.requiresPasswordReset) return res.status(403).json({ message: 'Complete your password reset before punching in.' });
   next();
 });
-router.get('/config', (req, res) => res.json({ ...config(), driveTestAvailable: req.user.role === 'admin' && config().mode === 'preview' && driveConfigured() && !req.impersonator && !req.hasDemoToken, linkedTrainer: Boolean(req.user.trainer), networkDetectionLimit: 'VPN checks use IP reputation and cannot detect every VPN or spoofed GPS reading.' }));
+router.get('/config', (req, res) => res.json({ ...config(), linkedTrainer: Boolean(req.user.trainer), networkDetectionLimit: 'VPN checks use IP reputation and cannot detect every VPN or spoofed GPS reading.' }));
 router.get('/scheduled-oif', asyncHandler(async (req, res) => res.json(await scheduledOif(req.user, new Date().toISOString()))));
 router.post('/capture-session', asyncHandler(async (req, res) => {
   if (req.impersonator || req.hasDemoToken) return res.status(403).json({ message: 'Use your own account for photo punch-in.' });
@@ -67,10 +67,7 @@ router.post('/capture-session', asyncHandler(async (req, res) => {
     location: req.body.location, mode: settings.mode, capturedAt, nonce: randomUUID() }, process.env.JWT_SECRET, { expiresIn: '2m' });
   res.json({ token, capturedAt, distance, network, mode: settings.mode, location: req.body.location });
 }));
-router.post(['/submit', '/test-upload'], (req, res, next) => {
-  if (req.path === '/test-upload' && (req.user.role !== 'admin' || config().mode !== 'preview')) return res.status(403).json({ message: 'Drive upload tests are available to administrators in preview mode only.' });
-  next();
-}, upload.single('photo'), asyncHandler(async (req, res) => {
+router.post('/submit', upload.single('photo'), asyncHandler(async (req, res) => {
   if (req.impersonator || req.hasDemoToken) return res.status(403).json({ message: 'Use your own account for photo punch-in.' });
   let session;
   try {
@@ -87,11 +84,6 @@ router.post(['/submit', '/test-upload'], (req, res, next) => {
     const input = req.body.assignment ? JSON.parse(req.body.assignment) : {};
     assignment = !input.mode || input.mode === 'scheduled' ? await scheduledOif(req.user, session.capturedAt) : resolvePhotoPunchOif(input);
   } catch (error) { return res.status(400).json({ message: error.message }); }
-  if (req.path === '/test-upload') {
-    const photo = await uploadPunchPhoto({ buffer: req.file.buffer, name: `test-${req.user._id}-${session.nonce}.jpg`, day });
-    return res.json({ preview: true, uploaded: true, assignment, message: 'Photo saved to the university Drive. No attendance was marked.', folder: `toms punch ins/${day}`, photoUrl: photo.webViewLink || `https://drive.google.com/file/d/${photo.id}/view` });
-  }
-  if (settings.mode === 'preview') return res.json({ preview: true, assignment, message: 'Prototype checks passed. No photo uploaded and no real attendance changed.', folder: `toms punch ins/${day}` });
   if (!settings.campusVerified || !settings.driveConnected || (!settings.networkCheckConfigured && !allowsLocalPunchTrial(req)) || !req.user.trainer) return res.status(503).json({ message: 'Live punch-in setup is incomplete.' });
   const network = await networkCheck(req);
   if (network === 'blocked' || (network !== 'clear' && !allowsLocalPunchTrial(req))) return res.status(403).json({ message: 'Connection could not be verified. Turn off VPN and retry.' });
@@ -112,7 +104,7 @@ router.post(['/submit', '/test-upload'], (req, res, next) => {
     return res.status(error.code === 11000 ? 409 : 503).json({ message: 'Photo uploaded but attendance could not be saved. Contact an administrator before retrying.', driveFileId: photo.id });
   }
   clearAttendanceGridCache();
-  res.json({ preview: false, message: 'Punch-in recorded.', folder: `toms punch ins/${day}`, photoUrl: photo.webViewLink });
+  res.json({ assignment, message: 'Punch-in recorded.', folder: `toms punch ins/${day}`, photoUrl: photo.webViewLink || `https://drive.google.com/file/d/${photo.id}/view` });
 }));
 router.use((error, req, res, next) => {
   if (error instanceof multer.MulterError) return res.status(400).json({ message: 'Upload one JPEG camera photo under 5 MB.' });
