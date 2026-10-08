@@ -31,8 +31,7 @@ Set `PUNCH_CAMPUS_LATITUDE` and `PUNCH_CAMPUS_LONGITUDE` to the confirmed centre
 Radius is fixed at 1,500 metres. GPS accuracy must be at most 100 metres; distance plus
 reported uncertainty must fit inside the radius. Readings expire after 60 seconds.
 
-Set `PUNCH_IPINFO_TOKEN` to an IPinfo plan/token that returns `privacy.vpn`, `privacy.proxy`
-and `privacy.tor`. Missing or failed reputation checks block live capture and submission.
+Set `PUNCH_PROXYCHECK_API_KEY` to a free proxycheck.io API key. The v3 API returns `detections.anonymous`. Missing or failed reputation checks block live capture and submission.
 Loopback/private client addresses are unknown. The implementation uses Express `req.ip`, not
 untrusted forwarded headers. Configure trusted proxy handling for the actual deployment only
 after verifying the ingress strips/replaces client-supplied forwarding headers.

@@ -8,10 +8,10 @@ import TrainerDailyAttendance from '../../models/TrainerDailyAttendance.js';
 import { APP_VERSION } from '../../utils/sessionVersion.js';
 
 test('admin punch-in writes attendance after upload and protects disabled, duplicate and leave entries', async t => {
-  const envKeys = ['JWT_SECRET', 'PUNCH_ATTENDANCE_ENABLED', 'PUNCH_CAMPUS_LATITUDE', 'PUNCH_CAMPUS_LONGITUDE', 'PUNCH_IPINFO_TOKEN', 'PUNCH_LOCAL_TRIAL_ALLOW_UNVERIFIED_NETWORK', 'NODE_ENV'];
+  const envKeys = ['JWT_SECRET', 'PUNCH_ATTENDANCE_ENABLED', 'PUNCH_CAMPUS_LATITUDE', 'PUNCH_CAMPUS_LONGITUDE', 'PUNCH_PROXYCHECK_API_KEY', 'PUNCH_LOCAL_TRIAL_ALLOW_UNVERIFIED_NETWORK', 'NODE_ENV'];
   const old = Object.fromEntries(envKeys.map(key => [key, process.env[key]]));
   process.env.JWT_SECRET = 'photo-punch-test-secret'; process.env.PUNCH_ATTENDANCE_ENABLED = 'false';
-  process.env.PUNCH_CAMPUS_LATITUDE = '13.621069'; process.env.PUNCH_CAMPUS_LONGITUDE = '79.289828'; delete process.env.PUNCH_IPINFO_TOKEN;
+  process.env.PUNCH_CAMPUS_LATITUDE = '13.621069'; process.env.PUNCH_CAMPUS_LONGITUDE = '79.289828'; delete process.env.PUNCH_PROXYCHECK_API_KEY;
   t.after(() => { for (const key of envKeys) { if (old[key] === undefined) delete process.env[key]; else process.env[key] = old[key]; } });
   let role = 'trainer';
   t.mock.method(User, 'findById', () => ({select: async () => ({_id: 'test-user', role, trainer: 'test-trainer', isActive: true, sessionVersion: 1})}));

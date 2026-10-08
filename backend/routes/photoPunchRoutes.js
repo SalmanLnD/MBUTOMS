@@ -2,7 +2,7 @@ import express from 'express';
 import multer from 'multer';
 import jwt from 'jsonwebtoken';
 import { createHash, randomUUID } from 'node:crypto';
-import { isIP } from 'node:net';
+import { networkCheck } from '../services/punchNetworkCheck.js';
 import { protect } from '../middleware/auth.js';
 import { asyncHandler } from '../middleware/asyncHandler.js';
 import { validatePunchJpeg, validatePunchLocation } from '../utils/photoPunchValidation.js';
@@ -31,18 +31,15 @@ const config = () => {
   const campus = { latitude: Number(process.env.PUNCH_CAMPUS_LATITUDE ?? 13.621069), longitude: Number(process.env.PUNCH_CAMPUS_LONGITUDE ?? 79.289828) };
   const campusVerified = Number.isFinite(campus.latitude) && Math.abs(campus.latitude) <= 90 && Number.isFinite(campus.longitude) && Math.abs(campus.longitude) <= 180;
   return { mode: 'live', enabled: process.env.PUNCH_ATTENDANCE_ENABLED !== 'false', campus, campusVerified,
-    driveConnected: driveConfigured(), networkCheckConfigured: Boolean(process.env.PUNCH_IPINFO_TOKEN), radiusMeters: 1500 };
+    driveConnected: driveConfigured(), networkCheckConfigured: Boolean(process.env.PUNCH_PROXYCHECK_API_KEY), radiusMeters: 1500 };
 };
-// IP reputation is a signal, not proof that a device has no VPN. Never trust a client-provided flag/IP.
-const networkCheck = async req => {
-  const ip = req.ip?.replace(/^::ffff:/, '');
-  if (!process.env.PUNCH_IPINFO_TOKEN || !isIP(ip) || ip === '127.0.0.1' || ip === '::1' || /^(10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.)/.test(ip)) return 'unknown';
-  try {
-    const response = await fetch(`https://ipinfo.io/${encodeURIComponent(ip)}?token=${encodeURIComponent(process.env.PUNCH_IPINFO_TOKEN)}`, { signal: AbortSignal.timeout(8000) });
-    const data = await response.json();
-    if (!response.ok || !data.privacy || !['vpn', 'proxy', 'tor'].every(key => typeof data.privacy[key] === 'boolean')) return 'unknown';
-    return data.privacy.vpn || data.privacy.proxy || data.privacy.tor ? 'blocked' : 'clear';
-  } catch { return 'unknown'; }
+const setupIssues = (req, settings) => {
+  const issues = [];
+  if (!settings.campusVerified) issues.push('Campus coordinates are invalid in the backend settings.');
+  if (!settings.driveConnected) issues.push('Add PUNCH_GOOGLE_CLIENT_ID, PUNCH_GOOGLE_CLIENT_SECRET and PUNCH_GOOGLE_REFRESH_TOKEN to the backend hosting environment.');
+  if (!settings.networkCheckConfigured && !allowsLocalPunchTrial(req)) issues.push('Add PUNCH_PROXYCHECK_API_KEY to the backend hosting environment. The local trial exception does not apply to hosted traffic.');
+  if (!req.user.trainer) issues.push('Link your admin account to its trainer record.');
+  return issues;
 };
 router.use(protect);
 router.use((req, res, next) => {
@@ -56,7 +53,8 @@ router.get('/scheduled-oif', asyncHandler(async (req, res) => res.json(await sch
 router.post('/capture-session', asyncHandler(async (req, res) => {
   if (req.impersonator || req.hasDemoToken) return res.status(403).json({ message: 'Use your own account for photo punch-in.' });
   const settings = config();
-  if (settings.mode === 'live' && (!settings.campusVerified || !settings.driveConnected || (!settings.networkCheckConfigured && !allowsLocalPunchTrial(req)) || !req.user.trainer)) return res.status(503).json({ message: 'Live punch-in needs a verified campus centre, university Drive, network checks and a linked trainer.' });
+  const issues = setupIssues(req, settings);
+  if (issues.length) return res.status(503).json({ message: issues.join(' '), setupIssues: issues });
   let distance;
   try { distance = validatePunchLocation(req.body.location, settings.campus); } catch (error) { return res.status(400).json({ message: error.message }); }
   const network = await networkCheck(req);
@@ -84,7 +82,8 @@ router.post('/submit', upload.single('photo'), asyncHandler(async (req, res) => 
     const input = req.body.assignment ? JSON.parse(req.body.assignment) : {};
     assignment = !input.mode || input.mode === 'scheduled' ? await scheduledOif(req.user, session.capturedAt) : resolvePhotoPunchOif(input);
   } catch (error) { return res.status(400).json({ message: error.message }); }
-  if (!settings.campusVerified || !settings.driveConnected || (!settings.networkCheckConfigured && !allowsLocalPunchTrial(req)) || !req.user.trainer) return res.status(503).json({ message: 'Live punch-in setup is incomplete.' });
+  const issues = setupIssues(req, settings);
+  if (issues.length) return res.status(503).json({ message: issues.join(' '), setupIssues: issues });
   const network = await networkCheck(req);
   if (network === 'blocked' || (network !== 'clear' && !allowsLocalPunchTrial(req))) return res.status(403).json({ message: 'Connection could not be verified. Turn off VPN and retry.' });
   const date = normalizeAttendanceDate(day);

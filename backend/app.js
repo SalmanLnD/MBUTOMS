@@ -33,6 +33,9 @@ import announcementRoutes from './routes/announcementRoutes.js';
 
 dotenv.config();
 const app = express();
+// Render terminates HTTPS upstream. Trust only private/loopback proxy hops,
+// stopping at the nearest public address instead of trusting arbitrary client headers.
+if (process.env.RENDER === 'true') app.set('trust proxy', ['loopback', 'linklocal', 'uniquelocal']);
 
 app.use(
   cors({
