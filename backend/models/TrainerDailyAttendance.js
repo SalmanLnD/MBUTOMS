@@ -15,7 +15,8 @@ const trainerDailyAttendanceSchema = new mongoose.Schema(
       enum: Object.values(TRAINER_ATTENDANCE_TYPES),
       default: TRAINER_ATTENDANCE_TYPES.OIF,
     },
-    oifNumber: { type: String, trim: true, maxlength: 12, default: '' },
+    oifNumber: { type: String, trim: true, maxlength: 120, default: '' },
+    oifEntryMode: { type: String, enum: ['scheduled', 'other', 'it', 'capsule'] },
     mockPrepHours: { type: Number, min: 0, default: 0 },
     // Used when OIF is not a campus subject (auto timetable hours do not apply).
     classHandlingHours: { type: Number, min: 0, default: undefined },
@@ -27,10 +28,11 @@ const trainerDailyAttendanceSchema = new mongoose.Schema(
     punchInAt: { type: Date },
     punchInSource: {
       type: String,
-      enum: ['manual', 'whatsapp'],
+      enum: ['manual', 'whatsapp', 'toms_camera'],
       default: 'manual',
     },
     punchInImageUrl: { type: String, trim: true, default: '' },
+    photoPunch: { driveFileId: String, latitude: Number, longitude: Number, accuracy: Number, sha256: String },
     punchInRawPhone: { type: String, trim: true, default: '' },
     whatsappMessageIds: { type: [String], default: [] },
     markedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },

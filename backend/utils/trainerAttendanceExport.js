@@ -209,7 +209,7 @@ export const buildTrainerAttendanceExportPayload = async () => {
           if (resolved.isNonWorking) {
             mockPrepHours = 0;
             classHandlingHours = 0;
-          } else if (allowsManualClassHandlingHours(oifNumber)) {
+          } else if (log?.oifEntryMode === 'other' || allowsManualClassHandlingHours(oifNumber)) {
             mockPrepHours = Number(log?.mockPrepHours || 0);
             classHandlingHours = log?.classHandlingHours != null
               ? Number(log.classHandlingHours)
@@ -255,7 +255,7 @@ export const buildTrainerAttendanceExportPayload = async () => {
               classHandlingHours,
             });
           }
-          if (allowsManualClassHandlingHours(oifNumber)) {
+          if (log?.oifEntryMode === 'other' || allowsManualClassHandlingHours(oifNumber)) {
             mockPrepHours = Number(log?.mockPrepHours || 0);
             classHandlingHours = log?.classHandlingHours != null
               ? Number(log.classHandlingHours)

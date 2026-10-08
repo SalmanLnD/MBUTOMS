@@ -73,5 +73,5 @@ const CAMPUS_SUBJECT_OIF_KEYS = new Set(
 /** True when the OIF belongs to a known campus course (auto class hours). */
 export const isCampusSubjectOif = (oifNumber) => {
   const value = String(oifNumber || '').trim().toUpperCase();
-  return Boolean(value) && CAMPUS_SUBJECT_OIF_KEYS.has(value);
+  return Boolean(value) && value.split(',').every(code => CAMPUS_SUBJECT_OIF_KEYS.has(code.trim()));
 };

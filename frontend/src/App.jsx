@@ -12,6 +12,7 @@ import OptionalAuthLayout from './layouts/OptionalAuthLayout.jsx';
 import { needsPasswordReset, MANAGEMENT_ROLES, PERFORMANCE_ACCESS_ROLES } from './utils/roles.js';
 
 const Dashboard = lazy(() => import('./pages/Dashboard.jsx'));
+const PhotoPunch = lazy(() => import('./pages/PhotoPunch.jsx'));
 const Trainers = lazy(() => import('./pages/Trainers.jsx'));
 const TrainerProfile = lazy(() => import('./pages/TrainerProfile.jsx'));
 const Venues = lazy(() => import('./pages/Venues.jsx'));
@@ -75,6 +76,7 @@ const App = () => (
         }
       >
         <Route path="/dashboard" element={<Dashboard />} />
+        <Route path="/punch-in" element={<ProtectedRoute roles={['admin']}><PhotoPunch /></ProtectedRoute>} />
         <Route path="/trainers" element={<Trainers />} />
         <Route path="/trainers/:id" element={<TrainerProfile />} />
         <Route path="/trainers/:id/schedule" element={<TrainerSchedule />} />

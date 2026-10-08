@@ -61,7 +61,7 @@ const CAMPUS_SUBJECT_OIFS = new Set([
 export const allowsManualClassHandlingHours = (oifNumber) => {
   const value = String(oifNumber || '').trim();
   if (!value || isItOif(value)) return false;
-  return !CAMPUS_SUBJECT_OIFS.has(value.toUpperCase());
+  return !value.toUpperCase().split(',').every(code => CAMPUS_SUBJECT_OIFS.has(code.trim()));
 };
 
 const OIF_NUMBER_TOKEN = 'OIF Number';

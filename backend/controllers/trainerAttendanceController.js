@@ -308,7 +308,7 @@ export const buildTrainerAttendanceGridPayload = async ({
         const oifNumber = attendanceTypeUsesOifNumber(attendanceType)
           ? (log?.oifNumber || '')
           : '';
-        const classHoursEditable = !isNonWorking && allowsManualClassHandlingHours(oifNumber);
+        const classHoursEditable = !isNonWorking && (log?.oifEntryMode === 'other' || allowsManualClassHandlingHours(oifNumber));
         let mockPrepHours = 0;
         let classHandlingHours = 0;
         if (!isNonWorking && classHoursEditable) {
@@ -400,7 +400,7 @@ export const buildTrainerAttendanceGridPayload = async ({
       }
       const classHoursEditable = !defaultWeekOff
         && !sundayNonWorking
-        && allowsManualClassHandlingHours(oifNumber);
+        && (log?.oifEntryMode === 'other' || allowsManualClassHandlingHours(oifNumber));
 
       let mockPrepHours = 0;
       let classHandlingHours = 0;
@@ -778,7 +778,7 @@ export const getTrainerPunchInLogs = async (req, res) => {
     filter.trainer = req.query.trainer;
   }
 
-  if (req.query.source && ['whatsapp', 'manual'].includes(req.query.source)) {
+  if (req.query.source && ['whatsapp', 'manual', 'toms_camera'].includes(req.query.source)) {
     filter.punchInSource = req.query.source;
   }
 
