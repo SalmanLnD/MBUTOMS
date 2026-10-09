@@ -181,7 +181,7 @@ export const getPublicTimetable = async (req, res) => {
   const referenceDate = req.query.referenceDate || new Date();
   const semester = req.query.semester;
 
-  const rosterFilter = await mergeRosterFilter({}, { rosterOnly: true });
+  const rosterFilter = await mergeRosterFilter({}, { rosterOnly: true, timetable: true });
 
   const [{ schedulesByTrainer }, trainers, subjects] = await Promise.all([
     buildTimetableBoardForDate({ referenceDate, semester }),

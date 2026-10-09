@@ -13,4 +13,5 @@ test('admin punch-in linkage does not hide Salman attendance; other roster rules
   });
   assert.deepEqual(await getHiddenRosterTrainerIds(),['salman','manager']);
   assert.deepEqual(await getHiddenRosterTrainerIds({attendance:true}),['manager']);
+  assert.deepEqual(await getHiddenRosterTrainerIds({timetable:true}),['manager']);
 });

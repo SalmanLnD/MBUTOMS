@@ -22,10 +22,17 @@ export default function PhotoPunch() {
     active.current = true;
     const controller = new AbortController();
     api.get('/photo-punch/config', { signal: controller.signal }).then(({ data }) => setConfig(data)).catch(e => { if (!controller.signal.aborted) setError(e.response?.data?.message || 'Could not load punch-in setup.'); });
-    api.get('/photo-punch/scheduled-oif', { signal: controller.signal }).then(({ data }) => setScheduled(data)).catch(() => { if (!controller.signal.aborted) setScheduleError('Could not load your scheduled OIF. Retry by refreshing this screen.'); });
-    const onHidden = () => { if (document.hidden) { stop(); setCamera(false); } };
+    const refreshSchedule = () => {
+      api.get('/photo-punch/scheduled-oif', { signal: controller.signal }).then(({ data }) => {
+        if (!controller.signal.aborted) { setScheduled(data); setScheduleError(''); }
+      }).catch(() => { if (!controller.signal.aborted) setScheduleError('Could not load your scheduled OIF. Retry by refreshing this screen.'); });
+    };
+    refreshSchedule();
+    const onHidden = () => { if (document.hidden) { stop(); setCamera(false); } else refreshSchedule(); };
     document.addEventListener('visibilitychange', onHidden);
-    return () => { active.current = false; controller.abort(); pending.current?.abort(); stop(); document.removeEventListener('visibilitychange', onHidden); };
+    window.addEventListener('focus', refreshSchedule);
+    const refreshTimer = window.setInterval(() => { if (!document.hidden) refreshSchedule(); }, 60000);
+    return () => { active.current = false; controller.abort(); pending.current?.abort(); stop(); document.removeEventListener('visibilitychange', onHidden); window.removeEventListener('focus', refreshSchedule); window.clearInterval(refreshTimer); };
   }, []);
   useEffect(() => { if (photo) return () => URL.revokeObjectURL(photo.url); }, [photo]);
   useEffect(() => { if (camera && video.current) { video.current.srcObject = stream.current; video.current.play().catch(() => setError('Camera could not start. Retry camera access.')); } }, [camera]);

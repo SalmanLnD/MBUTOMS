@@ -12,7 +12,7 @@ export const shouldApplyRosterFilter = (query = {}, { defaultRosterOnly = false 
   return defaultRosterOnly;
 };
 
-export const getHiddenRosterTrainerIds = async ({ attendance = false } = {}) => {
+export const getHiddenRosterTrainerIds = async ({ attendance = false, timetable = false } = {}) => {
   const staffUsers = await User.find({
     role: { $in: ROSTER_HIDDEN_STAFF_ROLES },
     trainer: { $exists: true, $ne: null },
@@ -21,16 +21,16 @@ export const getHiddenRosterTrainerIds = async ({ attendance = false } = {}) => 
     .lean();
 
   const ids = staffUsers.map((user) => user.trainer.toString());
-  if (!attendance) return ids;
-  // The admin's personal trainer record still participates in attendance.
+  if (!attendance && !timetable) return ids;
+  // The admin's personal trainer record participates in attendance and teaching.
   const personalTrainer = await Trainer.findOne({ employeeId: ADMIN_TRAINER_EMPLOYEE_ID }).select('_id').lean();
   return ids.filter(id => id !== personalTrainer?._id.toString());
 };
 
-export const mergeRosterFilter = async (baseFilter = {}, { rosterOnly = true, attendance = false } = {}) => {
+export const mergeRosterFilter = async (baseFilter = {}, { rosterOnly = true, attendance = false, timetable = false } = {}) => {
   if (!rosterOnly) return excludeArchivedExternalTrainers(baseFilter);
 
-  const hiddenTrainerIds = await getHiddenRosterTrainerIds({ attendance });
+  const hiddenTrainerIds = await getHiddenRosterTrainerIds({ attendance, timetable });
   const rosterClause = {
     showInRoster: { $ne: false },
     ...(hiddenTrainerIds.length ? { _id: { $nin: hiddenTrainerIds } } : {}),

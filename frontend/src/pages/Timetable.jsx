@@ -150,7 +150,7 @@ const Timetable = () => {
       }
 
       const [trainerData, subjectData, boardData] = await Promise.all([
-        getTrainers({ limit: 200, sortBy: 'employeeId', sortOrder: 'asc', rosterOnly: true, fields: 'lite' }, { signal }),
+        getTrainers({ limit: 200, sortBy: 'employeeId', sortOrder: 'asc', rosterOnly: true, timetableOnly: true, fields: 'lite' }, { signal }),
         getSubjects({ limit: 100 }, { signal }),
         getTimetableBoard({ referenceDate }, { signal }),
       ]);

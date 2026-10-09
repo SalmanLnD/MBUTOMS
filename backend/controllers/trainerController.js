@@ -82,7 +82,7 @@ export const getTrainers = async (req, res) => {
 
   const filter = await buildTrainerQuery(req.query);
   const rosterOnly = shouldApplyRosterFilter(req.query);
-  let finalFilter = await mergeRosterFilter(filter, { rosterOnly });
+  let finalFilter = await mergeRosterFilter(filter, { rosterOnly, timetable: req.query.timetableOnly === 'true' });
   finalFilter = await mergeUiTrainerFilter(finalFilter);
 
   if (isSubjectCoordinator(req.user)) {
