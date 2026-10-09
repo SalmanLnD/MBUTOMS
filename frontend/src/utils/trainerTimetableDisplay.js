@@ -73,7 +73,7 @@ export const resolveTrainerTimetableGridOptions = ({
     visibleSchedules,
     allSubjects
   );
-  const showTimingsInCells = shouldShowTimingsInCells(
+  const showTimingsInCells = visibleSchedules.some(schedule => schedule.isSpecial) || shouldShowTimingsInCells(
     trainerSubjectsForDisplay,
     selectedSubject
   );
