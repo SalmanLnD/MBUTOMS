@@ -2,7 +2,7 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react
 import { createPortal } from 'react-dom';
 import { getPopoverPosition, visibleViewport } from '../utils/popoverPosition.js';
 import { useNavigate } from 'react-router-dom';
-import { BellIcon, CheckReadIcon } from './icons.jsx';
+import { BellIcon, CheckReadIcon, TopicTrackerIcon } from './icons.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
 import { ROLES } from '../utils/roles.js';
 import { formatDateTime, getErrorMessage } from '../utils/helpers.js';
@@ -21,6 +21,7 @@ const NotificationBell = () => {
   const [unreadCount, setUnreadCount] = useState(0);
   const [loading, setLoading] = useState(false);
   const [markingAll, setMarkingAll] = useState(false);
+  const [filter, setFilter] = useState('all');
   const [panelStyle, setPanelStyle] = useState(null);
   const rootRef = useRef(null);
   const panelRef = useRef(null);
@@ -61,7 +62,7 @@ const NotificationBell = () => {
   const updatePanelPosition = useCallback(() => {
     if (!open || !rootRef.current) return;
     setPanelStyle({
-      ...getPopoverPosition(rootRef.current.getBoundingClientRect(), visibleViewport(), { minWidth: 352, preferredHeight: 384, alignRight: true }),
+      ...getPopoverPosition(rootRef.current.getBoundingClientRect(), visibleViewport(), { minWidth: 420, preferredHeight: 560, alignRight: true }),
       position: 'fixed',
       zIndex: 1400,
     });
@@ -95,7 +96,17 @@ const NotificationBell = () => {
     };
 
     document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
+    const handleEscape = (event) => {
+      if (event.key === 'Escape') {
+        setOpen(false);
+        rootRef.current?.querySelector('button')?.focus();
+      }
+    };
+    document.addEventListener('keydown', handleEscape);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('keydown', handleEscape);
+    };
   }, [open]);
 
   const handleToggle = () => {
@@ -141,6 +152,7 @@ const NotificationBell = () => {
   };
 
   if (!canViewNotifications) return null;
+  const visibleNotifications = filter === 'unread' ? notifications.filter(item => !item.readAt) : notifications;
 
   return (
     <div className="notification-bell" ref={rootRef}>
@@ -168,31 +180,50 @@ const NotificationBell = () => {
           style={panelStyle}
         >
           <div className="notification-panel-header">
-            <h2 className="notification-panel-title">Notifications</h2>
+            <div className="notification-heading">
+              <span className="notification-heading-icon"><BellIcon size={20} /></span>
+              <div>
+                <h2 className="notification-panel-title">Notifications</h2>
+                <p className="notification-panel-subtitle">{unreadCount ? `${unreadCount} unread update${unreadCount === 1 ? '' : 's'}` : 'You’re all caught up'}</p>
+              </div>
+            </div>
+            <button type="button" className="notification-close" aria-label="Close notifications" onClick={() => { setOpen(false); rootRef.current?.querySelector('button')?.focus(); }}>×</button>
+          </div>
+          <div className="notification-toolbar">
+            <div className="notification-filters" role="group" aria-label="Filter notifications">
+              <button type="button" aria-pressed={filter === 'all'} onClick={() => setFilter('all')}>All</button>
+              <button type="button" aria-pressed={filter === 'unread'} onClick={() => setFilter('unread')}>Unread{unreadCount > 0 && <span>{unreadCount}</span>}</button>
+            </div>
             <button
               type="button"
-              className="btn btn-link btn-sm notification-mark-all"
+              className="notification-mark-all"
               onClick={handleMarkAllRead}
               disabled={!unreadCount || markingAll}
             >
-              Mark all as read
+              <CheckReadIcon size={15} /> {markingAll ? 'Marking…' : 'Mark all read'}
             </button>
           </div>
 
           <div className="notification-panel-body">
             {loading && !notifications.length ? (
               <p className="notification-empty text-muted mb-0">Loading notifications...</p>
-            ) : !notifications.length ? (
-              <p className="notification-empty text-muted mb-0">No notifications yet.</p>
+            ) : !visibleNotifications.length ? (
+              <div className="notification-empty">
+                <span className="notification-empty-icon"><CheckReadIcon size={28} /></span>
+                <strong>{filter === 'unread' ? 'All caught up' : 'A little quiet here'}</strong>
+                <p>{filter === 'unread' ? 'You have no unread updates in this list.' : 'Your reminders and latest updates will appear here.'}</p>
+              </div>
             ) : (
               <ul className="notification-list list-unstyled mb-0">
-                {notifications.map((notification) => {
+                {visibleNotifications.map((notification) => {
                   const isUnread = !notification.readAt;
+                  const isTracker = notification.resource?.includes('tracker');
                   return (
                     <li
                       key={notification._id}
                       className={`notification-item ${isUnread ? 'notification-item--unread' : ''}`}
                     >
+                      <span className={`notification-item-icon ${isTracker ? 'notification-item-icon--tracker' : ''}`} aria-hidden="true">{isTracker ? <TopicTrackerIcon size={18} /> : <BellIcon size={18} />}</span>
                       <button
                         type="button"
                         className={`notification-item-content notification-item-link ${
@@ -203,6 +234,7 @@ const NotificationBell = () => {
                         onClick={() => handleNotificationClick(notification)}
                         disabled={!notification.entityPath || notification.entityPath.startsWith('/api/')}
                       >
+                        <span className="notification-item-heading">{isTracker ? 'Topic tracker' : notification.resource || 'TOMS update'}{isUnread && <span className="notification-unread-dot" aria-label="Unread" />}</span>
                         <p className="notification-item-message mb-1">
                           {notification.message || 'Notification'}
                         </p>
