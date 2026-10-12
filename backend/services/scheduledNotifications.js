@@ -5,6 +5,7 @@ import User from '../models/User.js';
 import { getIstNowParts } from '../utils/liveTrainerVenues.js';
 import { buildTopicTrackerSessions } from '../utils/topicTrackerSessions.js';
 import { FEEDBACK_ANNOUNCEMENT } from '../utils/feedbackAnnouncement.js';
+import { getCoordinatorSubjectIds } from '../utils/subjectCoordinatorAccess.js';
 
 export const scheduledNotificationId = (key) => new mongoose.Types.ObjectId(createHash('sha256').update(key).digest('hex').slice(0, 24));
 export const createNotificationOnce = async (key, data, model = Notification) => {
@@ -47,8 +48,9 @@ export const sendTopicTrackerReminders = async (now = new Date(), deps = {}) => 
   const groups = groupPendingTrackerSessions(sessions);
   if (!groups.size) return { sent: 0, date: clock.dateKey };
   const users = await (deps.users || (() => User.find({ isActive: true, role: { $ne: 'demo' }, $or: [
+    { role: { $in: ['admin', 'subject_coordinator'] } },
     { trainer: { $in: [...groups.keys()] } }, { role: { $in: ['admin', 'manager', 'campus_manager'] }, assistantTrainer: { $in: [...groups.keys()] } },
-  ] }).select('_id trainer assistantTrainer role').lean()))();
+  ] }).select('_id trainer assistantTrainer role coordinatorSubjects').lean()))();
   let sent = 0;
   for (const user of users) {
     const trainerId = String(user.trainer || user.assistantTrainer || ''), pending = groups.get(trainerId);
@@ -59,6 +61,25 @@ export const sendTopicTrackerReminders = async (now = new Date(), deps = {}) => 
     if (await (deps.create || createNotificationOnce)(`tracker-reminder:${clock.dateKey}:${user._id}`, {
       recipient: user._id, actor: actor._id, actorName: 'TOMS', actorRole: actor.role,
       action: 'reminded', resource: 'topic tracker reminder', message, entityPath: `/topic-tracker?${params}`,
+    })) sent++;
+  }
+  for (const user of users) {
+    if (!['admin', 'subject_coordinator'].includes(user.role)) continue;
+    const subjectIds = new Set(getCoordinatorSubjectIds(user));
+    const scopedGroups = user.role === 'admin' ? groups : groupPendingTrackerSessions(
+      sessions.filter(session => subjectIds.has(String(session.subjectId || '')))
+    );
+    if (!scopedGroups.size) continue;
+    const rows = [...scopedGroups].map(([trainerId, slots]) => ({
+      name: slots[0].replacementTrainerName || slots[0].trainerName || `Trainer ${trainerId}`,
+      count: slots.length,
+    })).sort((a, b) => a.name.localeCompare(b.name));
+    const total = rows.reduce((sum, row) => sum + row.count, 0);
+    const message = `Pending topic trackers for today's classes (${clock.dateKey})${user.role === 'subject_coordinator' ? ' in your assigned subjects' : ''}: ${total} pending slot${total === 1 ? '' : 's'} across ${rows.length} trainer${rows.length === 1 ? '' : 's'}.\n${rows.map(row => `${row.name}: ${row.count} pending slot${row.count === 1 ? '' : 's'}`).join('\n')}`;
+    if (await (deps.create || createNotificationOnce)(`tracker-summary:${clock.dateKey}:${user._id}`, {
+      recipient: user._id, actor: actor._id, actorName: 'TOMS', actorRole: actor.role,
+      action: 'reminded', resource: 'pending topic tracker summary', message,
+      entityPath: `/topic-tracker?${new URLSearchParams({ date: clock.dateKey })}`,
     })) sent++;
   }
   return { sent, date: clock.dateKey };

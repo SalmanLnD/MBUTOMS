@@ -22,11 +22,42 @@ test('6 pm IST reminders include only pending teaching sessions and target campu
   assert.equal((await sendTopicTrackerReminders(new Date('2026-10-06T12:29:59Z'), deps)).sent, 0);
   assert.equal(sent.size, 0);
   const result = await sendTopicTrackerReminders(new Date('2026-10-06T12:30:00Z'), deps);
-  assert.equal(result.sent, 3);
+  assert.equal(result.sent, 4);
   assert.match(sent.get('tracker-reminder:2026-10-06:u1').message, /1 unclosed topic tracker/);
   assert.ok(sent.get('tracker-reminder:2026-10-06:u2').entityPath.includes('schedule=replacement'));
   assert.equal((await sendTopicTrackerReminders(new Date('2026-10-06T13:00:00Z'), deps)).sent, 0);
-  assert.equal((await sendTopicTrackerReminders(new Date('2026-10-07T12:30:00Z'), deps)).sent, 3);
+  assert.equal((await sendTopicTrackerReminders(new Date('2026-10-07T12:30:00Z'), deps)).sent, 4);
+});
+
+test('admin summaries count all pending slots and coordinators see only assigned subjects', async () => {
+  const sent = new Map();
+  const deps = { actor,
+    sessions: async () => ({ sessions: [
+      { ...base, trainerName: 'Alice' }, { ...base, trainerName: 'Alice' },
+      { ...base, scheduleId: 's2', trainerName: 'Alice', subjectId: 'other' },
+      { ...base, scheduleId: 's3', trainerName: 'Original', isReplacementAssignment: true, replacementTrainerId: 't2', replacementTrainerName: 'Bob' },
+      { ...base, scheduleId: 'closed', trackerStatus: 'closed' },
+      { ...base, scheduleId: 'external', isReplacementAssignment: true, replacementTrainerId: '' },
+    ] }),
+    users: async () => [
+      { _id: 'admin', role: 'admin' },
+      { _id: 'coordinator', role: 'subject_coordinator', coordinatorSubjects: [{ _id: 'subject' }] },
+      { _id: 'unassigned', role: 'subject_coordinator', coordinatorSubjects: [] },
+      { _id: 'other', role: 'subject_coordinator', coordinatorSubjects: ['unused'] },
+      { _id: 'manager', role: 'manager' },
+    ],
+    create: async (key, value) => { if (sent.has(key)) return false; sent.set(key, value); return true; },
+  };
+  const now = new Date('2026-10-06T12:30:00Z');
+  assert.equal((await sendTopicTrackerReminders(now, deps)).sent, 2);
+  const admin = sent.get('tracker-summary:2026-10-06:admin');
+  assert.match(admin.message, /3 pending slots across 2 trainers/);
+  assert.match(admin.message, /Alice: 2 pending slots\nBob: 1 pending slot/);
+  assert.equal(admin.entityPath, '/topic-tracker?date=2026-10-06');
+  const coordinator = sent.get('tracker-summary:2026-10-06:coordinator');
+  assert.match(coordinator.message, /in your assigned subjects: 2 pending slots/);
+  assert.match(coordinator.message, /Alice: 1 pending slot\nBob: 1 pending slot/);
+  assert.equal((await sendTopicTrackerReminders(now, deps)).sent, 0);
 });
 
 test('holidays, cancelled/no classes and fully closed days send nothing', async () => {
