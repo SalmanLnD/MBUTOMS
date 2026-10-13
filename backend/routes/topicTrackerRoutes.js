@@ -9,6 +9,7 @@ import {
   updateTopicTrackerStatus,
   getCancellationApprovals,
   reviewCancellationApproval,
+  approveAllCancellationApprovals,
   exportTopicTrackerForSheets,
 } from '../controllers/topicTrackerController.js';
 import {
@@ -38,6 +39,11 @@ router.get(
   '/cancellation-approvals',
   authorizeExact('admin', 'manager', 'campus_manager'),
   asyncHandler(getCancellationApprovals)
+);
+router.post(
+  '/cancellation-approvals/approve-all',
+  authorizeExact('admin', 'manager', 'campus_manager'),
+  asyncHandler(approveAllCancellationApprovals)
 );
 router.patch(
   '/entries/:id/cancellation-approval',

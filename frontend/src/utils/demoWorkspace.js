@@ -72,6 +72,26 @@ export const createDemoWorkspace = (storage, notify = () => {}) => {
       }
     }
     if (path === '/topic-tracker/sessions') result.sessions = (result.sessions || []).map(row => ({ ...row, ...state.tracker[`${row.scheduleId}|${row.date}`] }));
+    if (path === '/topic-tracker/cancellation-approvals') {
+      const patches = new Map();
+      for (const value of Object.values(state.tracker)) {
+        if (value?.entryId && value.cancellationApprovalStatus) patches.set(String(value.entryId), value.cancellationApprovalStatus);
+      }
+      let entries = (result.entries || []).map((entry) => {
+        const status = patches.get(String(entry._id));
+        return status ? { ...entry, cancellationApprovalStatus: status } : entry;
+      });
+      const status = params?.status || 'pending';
+      if (status === 'pending') {
+        entries = entries.filter((entry) => {
+          const approval = entry.cancellationApprovalStatus || 'pending';
+          return approval === 'pending' || approval === 'none';
+        });
+      } else if (status === 'approved' || status === 'rejected') {
+        entries = entries.filter((entry) => entry.cancellationApprovalStatus === status);
+      }
+      result = { ...result, entries };
+    }
     if (path === '/student-test-reports/grid') for (const row of result.students || []) {
       const key = `${params.month}|${params.subject}|${row._id}`;
       if (state.marks[key]) {
@@ -125,6 +145,29 @@ export const createDemoWorkspace = (storage, notify = () => {}) => {
       const cycleKey = body.cycleKey || body.cycle || body.month;
       state.plp[`${cycleKey}|${route.id}`] = body;
       result = { ...result, ...body, cycleKey, trainerId: route.id, isManualFinal: !body.clear, cleared: Boolean(body.clear), row: { trainerId: route.id, manualFinal: body.clear ? null : Number(body.finalRating), finalPlpRating: body.clear ? 0 : Number(body.finalRating), isManualFinal: !body.clear } };
+    } else if (path === '/topic-tracker/cancellation-approvals/approve-all') {
+      let approved = 0;
+      const seen = new Set();
+      for (const [key, data] of snapshots) {
+        if (!key.startsWith(`${owner}|/topic-tracker/cancellation-approvals|`)) continue;
+        for (const entry of data.entries || []) {
+          const approval = entry.cancellationApprovalStatus || 'pending';
+          if (approval !== 'pending' && approval !== 'none') continue;
+          const entryId = String(entry._id);
+          if (seen.has(entryId)) continue;
+          seen.add(entryId);
+          let found = false;
+          for (const [trackerKey, value] of Object.entries(state.tracker)) {
+            if (String(value.entryId) === entryId) {
+              state.tracker[trackerKey] = { ...value, cancellationApprovalStatus: 'approved' };
+              found = true;
+            }
+          }
+          if (!found) state.tracker[`approval|${entryId}`] = { entryId, cancellationApprovalStatus: 'approved' };
+          approved += 1;
+        }
+      }
+      result = { ...result, approved };
     } else if (path.startsWith('/topic-tracker/entries/')) {
       const entryId = path.split('/')[3], live = known(owner, entryId);
       if (live.scheduleId && live.date) state.tracker[`${live.scheduleId}|${live.date}`] ||= live;

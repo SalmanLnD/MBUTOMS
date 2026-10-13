@@ -11,7 +11,7 @@ import { TOPIC_TRACKER_STATUSES, SESSION_STATUS_VALUES, ALERT_SESSION_STATUSES }
 import ClassCancellation from '../models/ClassCancellation.js';
 import { clearAttendanceGridCache } from '../utils/attendanceGridCache.js';
 import { getCanceledScheduleIdsForDate } from '../utils/classCancellations.js';
-import { normalizeAttendanceDate } from '../utils/attendanceTracking.js';
+import { normalizeAttendanceDate, toAttendanceDateKey } from '../utils/attendanceTracking.js';
 import {
   buildTopicTrackerSessions,
   buildTopicTrackerOverview,
@@ -512,6 +512,101 @@ export const reviewCancellationApproval = async (req, res) => {
   await entry.save();
 
   res.json(entry);
+};
+
+const pendingCancellationFilter = () => ({
+  sessionStatus: { $in: ALERT_SESSION_STATUSES },
+  $or: [
+    { cancellationApprovalStatus: 'pending' },
+    { cancellationApprovalStatus: 'none' },
+    { cancellationApprovalStatus: { $exists: false } },
+    { cancellationApprovalStatus: null },
+  ],
+});
+
+/**
+ * Approve every cancelled/postponed session still waiting for review.
+ * One class-cancellation record is created per day for the slots that
+ * are not already cancelled.
+ */
+export const approveAllCancellationApprovals = async (req, res) => {
+  if (!isAuthorizedRole(req.user.role, FULL_ACCESS_ROLES)) {
+    return res.status(403).json({ message: 'Not authorized' });
+  }
+
+  const entries = await TopicTrackerEntry.find(pendingCancellationFilter());
+  const groups = new Map();
+  let skipped = 0;
+
+  for (const entry of entries) {
+    if (!entry.schedule) {
+      skipped += 1;
+      continue;
+    }
+    const cancelDate = normalizeAttendanceDate(entry.date);
+    const dateKey = toAttendanceDateKey(cancelDate);
+    if (!groups.has(dateKey)) groups.set(dateKey, { date: cancelDate, entries: [] });
+    groups.get(dateKey).entries.push(entry);
+  }
+
+  const now = new Date();
+  const ops = [];
+  let createdCancellations = 0;
+
+  for (const group of groups.values()) {
+    const canceledIds = await getCanceledScheduleIdsForDate(group.date);
+    const newScheduleIds = [];
+    for (const entry of group.entries) {
+      const scheduleId = entry.schedule.toString();
+      if (!canceledIds.has(scheduleId) && !newScheduleIds.includes(scheduleId)) {
+        newScheduleIds.push(scheduleId);
+      }
+    }
+
+    let cancellationId = null;
+    if (newScheduleIds.length) {
+      const cancellation = await ClassCancellation.create({
+        date: group.date,
+        scope: 'classes',
+        schedules: newScheduleIds,
+        school: null,
+        reason: 'Topic tracker cancellations approved',
+        createdBy: req.user._id,
+      });
+      cancellationId = cancellation._id;
+      createdCancellations += 1;
+    }
+
+    for (const entry of group.entries) {
+      const scheduleId = entry.schedule.toString();
+      const update = {
+        cancellationApprovalStatus: 'approved',
+        cancellationApprovedBy: req.user._id,
+        cancellationApprovedAt: now,
+      };
+      if (cancellationId && newScheduleIds.includes(scheduleId)) {
+        update.classCancellation = cancellationId;
+      }
+      ops.push({
+        updateOne: {
+          filter: {
+            _id: entry._id,
+            cancellationApprovalStatus: { $ne: 'approved' },
+          },
+          update: { $set: update },
+        },
+      });
+    }
+  }
+
+  let approved = 0;
+  if (ops.length) {
+    const write = await TopicTrackerEntry.bulkWrite(ops, { ordered: false });
+    approved = write.modifiedCount ?? write.nModified ?? 0;
+  }
+  if (createdCancellations) clearAttendanceGridCache();
+
+  res.json({ approved, skipped });
 };
 
 export const exportTopicTrackerForSheets = async (req, res) => {

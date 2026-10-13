@@ -49,6 +49,11 @@ export const reviewCancellationApproval = async (entryId, status) => {
   return data;
 };
 
+export const approveAllCancellationApprovals = async () => {
+  const { data } = await api.post('/topic-tracker/cancellation-approvals/approve-all');
+  return data;
+};
+
 export const getTopicTrackerSheetStatus = async () => {
   const { data } = await api.get('/topic-tracker/sheets/status');
   return data;

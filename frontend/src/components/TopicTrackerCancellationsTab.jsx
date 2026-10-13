@@ -4,7 +4,9 @@ import LoadingSpinner from './LoadingSpinner.jsx';
 import {
   getCancellationApprovals,
   reviewCancellationApproval,
+  approveAllCancellationApprovals,
 } from '../services/topicTrackerService.js';
+import { CheckReadIcon } from './icons.jsx';
 import { getErrorMessage, formatDate } from '../utils/helpers.js';
 import { showError, showSuccess } from '../utils/toast.js';
 import {
@@ -53,16 +55,31 @@ const TopicTrackerCancellationsTab = ({ highlightEntryId, onHighlightComplete })
     return undefined;
   }, [highlightEntryId, loading, entries, onHighlightComplete]);
 
+  const pendingCount = entries.filter((entry) => {
+    const approval = entry.cancellationApprovalStatus || 'pending';
+    return approval === 'pending' || approval === 'none';
+  }).length;
+
   const handleConfirm = async () => {
     if (!pendingAction || submitting) return;
     setSubmitting(true);
     try {
-      await reviewCancellationApproval(pendingAction.entry._id, pendingAction.status);
-      showSuccess(
-        pendingAction.status === 'approved'
-          ? 'Approved. Class hours removed from trainer attendance for that day.'
-          : 'Rejected. Trainer hours are unchanged.'
-      );
+      if (pendingAction.mode === 'all') {
+        const data = await approveAllCancellationApprovals();
+        const approved = Number(data.approved || 0);
+        showSuccess(
+          approved
+            ? `Approved ${approved} cancellation${approved === 1 ? '' : 's'}. Class hours were removed from trainer attendance for those days.`
+            : 'No cancellations were waiting for approval.'
+        );
+      } else {
+        await reviewCancellationApproval(pendingAction.entry._id, pendingAction.status);
+        showSuccess(
+          pendingAction.status === 'approved'
+            ? 'Approved. Class hours removed from trainer attendance for that day.'
+            : 'Rejected. Trainer hours are unchanged.'
+        );
+      }
       setPendingAction(null);
       await loadEntries();
     } catch (err) {
@@ -81,7 +98,19 @@ const TopicTrackerCancellationsTab = ({ highlightEntryId, onHighlightComplete })
             Approve to deduct those slot hours from the trainer&apos;s attendance for that day.
           </p>
         </div>
-        <div style={{ minWidth: '10rem' }}>
+        <div className="d-flex flex-wrap align-items-end gap-2">
+          {statusFilter === 'pending' && pendingCount > 0 && (
+            <button
+              type="button"
+              className="btn btn-success btn-sm d-inline-flex align-items-center gap-1"
+              onClick={() => setPendingAction({ mode: 'all' })}
+              disabled={submitting}
+            >
+              <CheckReadIcon size={16} />
+              Approve all
+            </button>
+          )}
+          <div style={{ minWidth: '10rem' }}>
           <label className="form-label mb-1" htmlFor="cancel-approval-filter">Show</label>
           <StyledSelect
             id="cancel-approval-filter"
@@ -96,6 +125,7 @@ const TopicTrackerCancellationsTab = ({ highlightEntryId, onHighlightComplete })
               { value: 'all', label: 'All' },
             ]}
           />
+          </div>
         </div>
       </div>
 
@@ -163,14 +193,14 @@ const TopicTrackerCancellationsTab = ({ highlightEntryId, onHighlightComplete })
                             <button
                               type="button"
                               className="btn btn-outline-success"
-                              onClick={() => setPendingAction({ entry, status: 'approved' })}
+                              onClick={() => setPendingAction({ mode: 'one', entry, status: 'approved' })}
                             >
                               Approve
                             </button>
                             <button
                               type="button"
                               className="btn btn-outline-danger"
-                              onClick={() => setPendingAction({ entry, status: 'rejected' })}
+                              onClick={() => setPendingAction({ mode: 'one', entry, status: 'rejected' })}
                             >
                               Reject
                             </button>
@@ -191,18 +221,28 @@ const TopicTrackerCancellationsTab = ({ highlightEntryId, onHighlightComplete })
       {pendingAction && (
         <ConfirmModal
           show
-          title={pendingAction.status === 'approved' ? 'Approve cancellation' : 'Reject cancellation'}
+          title={pendingAction.mode === 'all'
+            ? 'Approve all cancellations'
+            : pendingAction.status === 'approved' ? 'Approve cancellation' : 'Reject cancellation'}
           message={
-            pendingAction.status === 'approved'
-              ? `Approve ${pendingAction.entry.sessionStatus} for ${
-                pendingAction.entry.trainerName || 'this trainer'
-              } on ${formatDate(pendingAction.entry.date)}? This removes ${
-                Number(pendingAction.entry.durationHrs || 0).toFixed(2)
-              } hour(s) from their attendance for that day.`
-              : `Reject this ${pendingAction.entry.sessionStatus} report? Trainer attendance hours will stay unchanged.`
+            pendingAction.mode === 'all'
+              ? `Approve all ${pendingCount} pending cancellation${pendingCount === 1 ? '' : 's'}? This removes their slot hours from trainer attendance for those days.${
+                entries.length >= 200
+                  ? ' Any older pending cancellations beyond this list are included too.'
+                  : ''
+              }`
+              : pendingAction.status === 'approved'
+                ? `Approve ${pendingAction.entry.sessionStatus} for ${
+                  pendingAction.entry.trainerName || 'this trainer'
+                } on ${formatDate(pendingAction.entry.date)}? This removes ${
+                  Number(pendingAction.entry.durationHrs || 0).toFixed(2)
+                } hour(s) from their attendance for that day.`
+                : `Reject this ${pendingAction.entry.sessionStatus} report? Trainer attendance hours will stay unchanged.`
           }
-          confirmLabel={pendingAction.status === 'approved' ? 'Approve & deduct hours' : 'Reject'}
-          confirmVariant={pendingAction.status === 'approved' ? 'success' : 'danger'}
+          confirmLabel={pendingAction.mode === 'all'
+            ? 'Approve all'
+            : pendingAction.status === 'approved' ? 'Approve & deduct hours' : 'Reject'}
+          confirmVariant={pendingAction.mode === 'all' || pendingAction.status === 'approved' ? 'success' : 'danger'}
           onConfirm={handleConfirm}
           onClose={() => {
             if (!submitting) setPendingAction(null);
