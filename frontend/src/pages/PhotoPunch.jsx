@@ -11,6 +11,7 @@ const gps = () => new Promise((resolve, reject) => {
   { enableHighAccuracy: true, maximumAge: 0, timeout: 20000 });
 });
 const formatTime = value => new Date(value).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', dateStyle: 'medium', timeStyle: 'medium' });
+const radiusLabel = (mode) => (mode === 'scheduled' ? '500 m campus radius' : mode === 'other' ? 'Location range not restricted' : '1.5 km campus radius');
 export default function PhotoPunch() {
   const { user } = useAuth();
   const [config, setConfig] = useState(null), [session, setSession] = useState(null), [photo, setPhoto] = useState(null);
@@ -44,7 +45,7 @@ export default function PhotoPunch() {
       if (!window.isSecureContext || !navigator.mediaDevices?.getUserMedia) throw new Error('Camera access needs HTTPS or localhost and a supported browser.');
       const location = await gps();
       if (!active.current) return;
-      const { data } = await api.post('/photo-punch/capture-session', { location }, { signal: controller.signal });
+      const { data } = await api.post('/photo-punch/capture-session', { location, mode: assignment.mode }, { signal: controller.signal });
       if (!active.current) return;
       const media = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: 'environment' }, width: { ideal: 1280 }, height: { ideal: 960 } }, audio: false });
       if (!active.current) { media.getTracks().forEach(track => track.stop()); return; }
@@ -59,7 +60,7 @@ export default function PhotoPunch() {
       // Recheck location immediately before exposure. Server signs fresh coordinates and time.
       const location = await gps();
       const controller = new AbortController(); pending.current = controller;
-      const { data } = await api.post('/photo-punch/capture-session', { location }, { signal: controller.signal });
+      const { data } = await api.post('/photo-punch/capture-session', { location, mode: assignment.mode }, { signal: controller.signal });
       if (!active.current || !video.current || !stream.current) return;
       setSession(data);
       const canvas = document.createElement('canvas');
@@ -98,14 +99,22 @@ export default function PhotoPunch() {
   return <div className="photo-punch">
     <header className="photo-punch__heading"><div><span className="photo-punch__eyebrow">TOMS ATTENDANCE</span><h1>Campus punch-in</h1><p>A fresh photo. Your location. One simple check-in.</p></div></header>
     <div className="photo-punch__grid"><section className="photo-punch__card">
-      <div className="photo-punch__card-title"><h2>{photo ? 'Review your photo' : 'Take your punch-in photo'}</h2><span>1.5 km campus radius</span></div>
+      <div className="photo-punch__card-title"><h2>{photo ? 'Review your photo' : 'Take your punch-in photo'}</h2><span>{radiusLabel(assignment.mode)}</span></div>
       <div className="photo-punch__camera">{photo ? <img src={photo.url} alt="Captured punch-in photo with location and IST timestamp" /> : camera ? <video ref={video} autoPlay muted playsInline aria-label="Live punch-in camera" /> : <div className="photo-punch__placeholder"><span aria-hidden="true"><FingerprintIcon size={28} /></span><h3>Ready when you are</h3><p>Allow camera and precise location access. Photos are captured here, not selected from your gallery.</p></div>}</div>
       {error && <p className="photo-punch__error" role="alert">{error}</p>}
       {!result && <div className="photo-punch__assignment">
         <label htmlFor="punch-oif-mode">OIF type</label>
-        <select id="punch-oif-mode" className="form-select" value={assignment.mode} disabled={busy} onChange={e => setAssignment(previous => ({ ...previous, mode: e.target.value }))}>
+        <select id="punch-oif-mode" className="form-select" value={assignment.mode} disabled={busy} onChange={e => {
+          const mode = e.target.value;
+          setAssignment(previous => ({ ...previous, mode }));
+          if (mode !== assignment.mode && (session || photo || camera)) {
+            stop(); setCamera(false); setSession(null); setPhoto(null);
+            setError('OIF type changed. Check your location again for this option.');
+          }
+        }}>
           <option value="scheduled">Scheduled OIF</option><option value="other">Other OIF</option><option value="it">IT</option><option value="capsule">MBU capsule</option>
         </select>
+        <p>{radiusLabel(assignment.mode)}</p>
         {assignment.mode === 'scheduled' && <p>{scheduleError || (scheduled ? `${scheduled.oifNumber || 'No scheduled OIF found'} · ${scheduled.classHandlingHours} class hours. Fetched automatically from your timetable.` : 'Loading timetable…')}</p>}
         {assignment.mode === 'other' && <div className="photo-punch__manual-fields">
           <label>OIF number<input className="form-control" maxLength={12} value={assignment.oifNumber} disabled={busy} onChange={e => setAssignment(p => ({ ...p, oifNumber: e.target.value }))} /></label>

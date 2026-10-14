@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { distanceMeters, validatePunchLocation, validatePunchJpeg } from '../../utils/photoPunchValidation.js';
+import { distanceMeters, punchRadiusMeters, validatePunchLocation, validatePunchJpeg } from '../../utils/photoPunchValidation.js';
 const campus = { latitude: 13.621069, longitude: 79.289828 };
 const now = Date.now();
 const location = { ...campus, accuracy: 10, timestamp: now };
@@ -14,6 +14,20 @@ test('geofence checks distance, uncertainty, freshness and malformed GPS', () =>
   assert.throws(() => validatePunchLocation({...location, latitude: '13'}, campus, now), /Invalid/);
   assert.throws(() => validatePunchLocation({...location, longitude: 181}, campus, now), /Invalid/);
   assert.throws(() => validatePunchLocation({...location, accuracy: -1}, campus, now), /accuracy/);
+  const offset = {...location, latitude: campus.latitude + 0.006};
+  const midRange = distanceMeters(campus, offset);
+  assert.ok(midRange + offset.accuracy > 500 && midRange + offset.accuracy < 1500);
+  assert.throws(() => validatePunchLocation(offset, campus, now, punchRadiusMeters('scheduled')), /500 m/);
+  assert.equal(typeof validatePunchLocation(offset, campus, now, punchRadiusMeters('it')), 'number');
+  assert.equal(typeof validatePunchLocation(offset, campus, now, punchRadiusMeters('capsule')), 'number');
+  const away = {...location, latitude: campus.latitude + 0.05};
+  assert.ok(distanceMeters(campus, away) > 1500);
+  assert.equal(typeof validatePunchLocation(away, campus, now, punchRadiusMeters('other')), 'number');
+  assert.throws(() => validatePunchLocation({...away, accuracy: 101}, campus, now, null), /accuracy/);
+  assert.deepEqual(
+    ['scheduled', 'it', 'capsule', 'other'].map(punchRadiusMeters),
+    [500, 1500, 1500, null],
+  );
 });
 test('JPEG checks reject bad framing, truncated segments and undersized photos', () => {
   assert.throws(() => validatePunchJpeg(Buffer.from('not a photo')), /JPEG/);

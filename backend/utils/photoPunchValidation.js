@@ -1,16 +1,34 @@
+/** null means the option has no campus distance limit. */
+export const PUNCH_RADIUS_BY_MODE = { scheduled: 500, it: 1500, capsule: 1500, other: null };
+
+export const punchRadiusMeters = (mode) => {
+  if (!Object.prototype.hasOwnProperty.call(PUNCH_RADIUS_BY_MODE, mode)) throw new Error('Select a valid OIF option.');
+  return PUNCH_RADIUS_BY_MODE[mode];
+};
+
+const formatPunchRadius = (meters) => {
+  if (meters >= 1000) {
+    const km = meters / 1000;
+    return `${Number.isInteger(km) ? km : Math.round(km * 10) / 10} km`;
+  }
+  return `${meters} m`;
+};
+
 export const distanceMeters = (a, b) => {
   const rad = value => value * Math.PI / 180;
   const dLat = rad(b.latitude - a.latitude), dLon = rad(b.longitude - a.longitude);
   const h = Math.sin(dLat / 2) ** 2 + Math.cos(rad(a.latitude)) * Math.cos(rad(b.latitude)) * Math.sin(dLon / 2) ** 2;
   return 6371000 * 2 * Math.atan2(Math.sqrt(h), Math.sqrt(1 - h));
 };
-export const validatePunchLocation = (location, campus, now = Date.now()) => {
+export const validatePunchLocation = (location, campus, now = Date.now(), radiusMeters = 1500) => {
   if (!location || ![location.latitude, location.longitude, location.accuracy, location.timestamp].every(Number.isFinite)
     || Math.abs(location.latitude) > 90 || Math.abs(location.longitude) > 180) throw new Error('Invalid GPS reading.');
   if (location.timestamp > now + 10000 || now - location.timestamp > 60000) throw new Error('Location expired. Refresh GPS and retake the photo.');
   if (location.accuracy < 0 || location.accuracy > 100) throw new Error('GPS accuracy must be within 100 metres. Move outdoors and retry.');
   const distance = distanceMeters(location, campus);
-  if (distance + location.accuracy > 1500) throw new Error('You must be clearly within 1.5 km of campus. Move closer or improve GPS accuracy.');
+  if (radiusMeters != null && distance + location.accuracy > radiusMeters) {
+    throw new Error(`You must be clearly within ${formatPunchRadius(radiusMeters)} of campus. Move closer or improve GPS accuracy.`);
+  }
   return Math.round(distance);
 };
 // Bound size and check JPEG framing/dimensions before forwarding transient bytes to Drive.
