@@ -176,7 +176,7 @@ const LateMisconductTab = () => {
   return (
     <>
       <p className="text-muted small mb-3">
-        WhatsApp and TOMS punches after 8:40 AM are listed here. Use the photo and campus distance to decide.
+        WhatsApp and TOMS punches after 8:40 AM from 14 Oct 2026 onward are listed here. Use the photo and campus distance to decide.
         The first late mark for a trainer in a month is a warning. Each later mark adds 1 compliance point on Performance.
       </p>
       <div className="row g-2 mb-3 align-items-end">
@@ -186,7 +186,7 @@ const LateMisconductTab = () => {
             id="late-month"
             value={monthKey}
             aria-label="Month"
-            options={buildMonthOptions()}
+            options={buildMonthOptions().filter((option) => option.value >= '2026-10')}
             onChange={(event) => {
               setMonthKey(event.target.value);
               resetPage();

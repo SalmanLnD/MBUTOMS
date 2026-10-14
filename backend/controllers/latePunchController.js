@@ -5,7 +5,9 @@ import LatePunchReview from '../models/LatePunchReview.js';
 import { downloadPunchPhoto } from '../services/punchPhotoDrive.js';
 import { normalizeAttendanceDate, toAttendanceDateKey } from '../utils/attendanceTracking.js';
 import {
+  LATE_MISCONDUCT_START,
   LATE_PUNCH_SOURCES,
+  isLateMisconductDate,
   isLatePunch,
   lateMarkOutcome,
   punchDistanceFromCampus,
@@ -32,11 +34,21 @@ export const listLatePunches = async (req, res) => {
   const page = Math.max(1, parseInt(req.query.page, 10) || 1);
   const limit = Math.min(50, Math.max(1, parseInt(req.query.limit, 10) || 20));
   const { start, end } = monthBounds(monthKey);
+  const effectiveStart = normalizeAttendanceDate(LATE_MISCONDUCT_START);
+  const rangeStart = start > effectiveStart ? start : effectiveStart;
+
+  if (end < effectiveStart) {
+    return res.json({
+      month: monthKey,
+      items: [],
+      pagination: { page, limit, total: 0, pages: 1 },
+    });
+  }
 
   const filter = {
     punchInSource: { $in: LATE_PUNCH_SOURCES },
     punchInAt: { $ne: null },
-    date: { $gte: start, $lte: end },
+    date: { $gte: rangeStart, $lte: end },
   };
 
   const search = String(req.query.search || '').trim();
@@ -55,7 +67,7 @@ export const listLatePunches = async (req, res) => {
     .sort({ punchInAt: -1 })
     .lean();
 
-  const late = records.filter((record) => isLatePunch(record.punchInAt));
+  const late = records.filter((record) => isLatePunch(record.punchInAt) && isLateMisconductDate(record.date));
   const reviews = await LatePunchReview.find({
     attendance: { $in: late.map((record) => record._id) },
   }).lean();
@@ -72,6 +84,7 @@ export const listLatePunches = async (req, res) => {
   const marked = await LatePunchReview.find({
     trainer: { $in: trainerIds },
     monthKey,
+    dateKey: { $gte: LATE_MISCONDUCT_START },
     decision: { $in: ['warning', 'misconduct'] },
   }).select('trainer').lean();
   const marksByTrainer = new Map();
@@ -124,7 +137,7 @@ export const listLatePunches = async (req, res) => {
 export const reviewLatePunch = async (req, res) => {
   const action = req.body?.action === 'dismiss' ? 'dismiss' : 'mark';
   const record = await TrainerDailyAttendance.findById(req.params.id);
-  if (!record || !LATE_PUNCH_SOURCES.includes(record.punchInSource) || !isLatePunch(record.punchInAt)) {
+  if (!record || !LATE_PUNCH_SOURCES.includes(record.punchInSource) || !isLatePunch(record.punchInAt) || !isLateMisconductDate(record.date)) {
     return res.status(404).json({ message: 'Late punch not found' });
   }
 
@@ -142,6 +155,7 @@ export const reviewLatePunch = async (req, res) => {
     const priorMarks = await LatePunchReview.countDocuments({
       trainer: record.trainer,
       monthKey,
+      dateKey: { $gte: LATE_MISCONDUCT_START },
       decision: { $in: ['warning', 'misconduct'] },
     });
     decision = lateMarkOutcome(priorMarks);
@@ -194,7 +208,7 @@ export const getLatePunchPhoto = async (req, res) => {
   const record = await TrainerDailyAttendance.findById(req.params.id)
     .select('punchInAt punchInSource photoPunch punchInImageUrl')
     .lean();
-  if (!record || !LATE_PUNCH_SOURCES.includes(record.punchInSource) || !isLatePunch(record.punchInAt)) {
+  if (!record || !LATE_PUNCH_SOURCES.includes(record.punchInSource) || !isLatePunch(record.punchInAt) || !isLateMisconductDate(record.date)) {
     return res.status(404).json({ message: 'Late punch photo not found' });
   }
 

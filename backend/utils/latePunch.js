@@ -1,6 +1,9 @@
+import { toAttendanceDateKey } from './attendanceTracking.js';
+
 const IST_OFFSET_MS = (5 * 60 + 30) * 60 * 1000;
 export const LATE_PUNCH_CUTOFF_SECONDS = 8 * 3600 + 40 * 60;
 export const LATE_PUNCH_SOURCES = ['whatsapp', 'toms_camera'];
+export const LATE_MISCONDUCT_START = '2026-10-14';
 
 export const campusLocation = (env = process.env) => ({
   latitude: Number(env.PUNCH_CAMPUS_LATITUDE) || 13.621069,
@@ -20,6 +23,14 @@ export const istClockSeconds = (value) => {
 export const isLatePunch = (value) => {
   const seconds = istClockSeconds(value);
   return seconds != null && seconds > LATE_PUNCH_CUTOFF_SECONDS;
+};
+
+/** Late misconduct starts on 14 Oct 2026. Earlier attendance days are left out. */
+export const isLateMisconductDate = (value) => {
+  const key = typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value)
+    ? value
+    : toAttendanceDateKey(value);
+  return Boolean(key) && key >= LATE_MISCONDUCT_START;
 };
 
 export const haversineMeters = (lat1, lng1, lat2, lng2) => {
