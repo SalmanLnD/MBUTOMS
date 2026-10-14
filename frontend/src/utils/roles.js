@@ -58,6 +58,19 @@ export const matchesRole = (userRole, allowedRoles = []) => {
   return allowedRoles.some((allowed) => roleMatches(userRole, allowed));
 };
 
+/** Logged-in routes with no role list stay open. Exact lists do not use role aliases. */
+export const isProtectedRouteAllowed = ({
+  roles,
+  exact = false,
+  role,
+  userId,
+  allowedUserIds = [],
+} = {}) => {
+  if (!Array.isArray(roles) || roles.length === 0) return true;
+  const roleAllowed = exact ? roles.includes(role) : matchesRole(role, roles);
+  return roleAllowed || allowedUserIds.includes(String(userId || ''));
+};
+
 export const isTrainerLikeRole = (userRole) => TRAINER_LIKE_ROLES.includes(userRole);
 
 /** Only admins may create leave requests on behalf of other trainers. */

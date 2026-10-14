@@ -3,9 +3,10 @@ import { Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.jsx';
 import { useLoginModal } from '../context/LoginModalContext.jsx';
 import LoadingSpinner from './LoadingSpinner.jsx';
+import { isProtectedRouteAllowed } from '../utils/roles.js';
 
 const ProtectedRoute = ({ children, roles, allowedUserIds = [], exact = false }) => {
-  const { user, loading, hasRole } = useAuth();
+  const { user, loading } = useAuth();
   const { openLoginModal } = useLoginModal();
   const location = useLocation();
   const navigate = useNavigate();
@@ -24,8 +25,13 @@ const ProtectedRoute = ({ children, roles, allowedUserIds = [], exact = false })
 
   if (!user) return null;
 
-  const roleAllowed = exact ? roles.includes(user.role) : hasRole(...roles);
-  if (roles && !roleAllowed && !allowedUserIds.includes(String(user._id || user.id || ''))) {
+  if (!isProtectedRouteAllowed({
+    roles,
+    exact,
+    role: user.role,
+    userId: user._id || user.id,
+    allowedUserIds,
+  })) {
     return <Navigate to="/dashboard" replace />;
   }
 
