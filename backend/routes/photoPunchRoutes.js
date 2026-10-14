@@ -15,6 +15,7 @@ import { resolvePhotoPunchOif } from '../utils/photoPunchOif.js';
 import Subject from '../models/Subject.js';
 import { allowsLocalPunchTrial } from '../utils/photoPunchNetworkPolicy.js';
 import { canUsePhotoPunch } from '../utils/photoPunchAccess.js';
+import { enqueueAdminPunchShare } from '../utils/adminPunchShare.js';
 
 const router = express.Router();
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 5 * 1024 * 1024, files: 1, fields: 2 } });
@@ -44,7 +45,7 @@ const setupIssues = (req, settings) => {
 };
 router.use(protect);
 router.use((req, res, next) => {
-  if (!canUsePhotoPunch(req.user) || req.impersonator || req.hasDemoToken) return res.status(403).json({ message: 'Photo punch-in is currently available to administrators and invited beta users only.' });
+  if (!canUsePhotoPunch(req.user) || req.impersonator || req.hasDemoToken) return res.status(403).json({ message: 'Photo punch-in is available to trainers and administrators.' });
   if (!config().enabled) return res.status(503).json({ message: 'Photo punch-in is disabled by the administrator.' });
   if (req.user.mustResetPassword || req.user.requiresPasswordReset) return res.status(403).json({ message: 'Complete your password reset before punching in.' });
   next();
@@ -104,7 +105,28 @@ router.post('/submit', upload.single('photo'), asyncHandler(async (req, res) => 
     return res.status(error.code === 11000 ? 409 : 503).json({ message: 'Photo uploaded but attendance could not be saved. Contact an administrator before retrying.', driveFileId: photo.id });
   }
   clearAttendanceGridCache();
-  res.json({ assignment, message: 'Punch-in recorded.', folder: `toms punch ins/${day}`, photoUrl: photo.webViewLink || `https://drive.google.com/file/d/${photo.id}/view` });
+  let whatsappShare = 'skipped';
+  if (req.user.role === 'admin') {
+    try {
+      const share = await enqueueAdminPunchShare({
+        role: req.user.role,
+        name: req.user.name,
+        oifNumber: assignment.oifNumber,
+        capturedAt: session.capturedAt,
+        driveFileId: photo.id,
+      });
+      whatsappShare = share ? 'queued' : 'skipped';
+    } catch (error) {
+      console.warn('[photo-punch] could not queue WhatsApp share:', error.message);
+    }
+  }
+  res.json({
+    assignment,
+    message: 'Punch-in recorded.',
+    whatsappShare,
+    folder: `toms punch ins/${day}`,
+    photoUrl: photo.webViewLink || `https://drive.google.com/file/d/${photo.id}/view`,
+  });
 }));
 router.use((error, req, res, next) => {
   if (error instanceof multer.MulterError) return res.status(400).json({ message: 'Upload one JPEG camera photo under 5 MB.' });

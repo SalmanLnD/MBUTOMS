@@ -11,7 +11,8 @@ const Sidebar = ({ collapsed = false, labelsVisible = true, onToggle }) => {
   const assistant = useAiAssistant();
 
   const visibleItems = navItems.filter((item) =>
-    item.roles.some((role) => hasRole(role)) || item.allowedUserIds?.includes(String(user?._id || user?.id || ''))
+    (item.exact ? item.roles.includes(user?.role) : item.roles.some((role) => hasRole(role)))
+    || item.allowedUserIds?.includes(String(user?._id || user?.id || ''))
   );
 
   return (

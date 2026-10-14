@@ -13,7 +13,7 @@ test('admin punch-in writes attendance after upload and protects disabled, dupli
   process.env.JWT_SECRET = 'photo-punch-test-secret'; process.env.PUNCH_ATTENDANCE_ENABLED = 'false';
   process.env.PUNCH_CAMPUS_LATITUDE = '13.621069'; process.env.PUNCH_CAMPUS_LONGITUDE = '79.289828'; delete process.env.PUNCH_PROXYCHECK_API_KEY;
   t.after(() => { for (const key of envKeys) { if (old[key] === undefined) delete process.env[key]; else process.env[key] = old[key]; } });
-  let role = 'trainer';
+  let role = 'manager';
   t.mock.method(User, 'findById', () => ({select: async () => ({_id: 'test-user', role, trainer: 'test-trainer', isActive: true, sessionVersion: 1})}));
   let liveWriteAllowed = false, write;
   t.mock.method(TrainerDailyAttendance, 'findOneAndUpdate', async (filter, update) => { assert.equal(liveWriteAllowed, true, 'Preview must never write attendance'); write = {filter, update}; return {}; });

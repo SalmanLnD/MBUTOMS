@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import api from '../services/api.js';
+import { FingerprintIcon } from '../components/icons.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
 import '../styles/photo-punch.css';
 
@@ -98,7 +99,7 @@ export default function PhotoPunch() {
     <header className="photo-punch__heading"><div><span className="photo-punch__eyebrow">TOMS ATTENDANCE</span><h1>Campus punch-in</h1><p>A fresh photo. Your location. One simple check-in.</p></div></header>
     <div className="photo-punch__grid"><section className="photo-punch__card">
       <div className="photo-punch__card-title"><h2>{photo ? 'Review your photo' : 'Take your punch-in photo'}</h2><span>1.5 km campus radius</span></div>
-      <div className="photo-punch__camera">{photo ? <img src={photo.url} alt="Captured punch-in photo with location and IST timestamp" /> : camera ? <video ref={video} autoPlay muted playsInline aria-label="Live punch-in camera" /> : <div className="photo-punch__placeholder"><span aria-hidden="true">◎</span><h3>Ready when you are</h3><p>Allow camera and precise location access. Photos are captured here, not selected from your gallery.</p></div>}</div>
+      <div className="photo-punch__camera">{photo ? <img src={photo.url} alt="Captured punch-in photo with location and IST timestamp" /> : camera ? <video ref={video} autoPlay muted playsInline aria-label="Live punch-in camera" /> : <div className="photo-punch__placeholder"><span aria-hidden="true"><FingerprintIcon size={28} /></span><h3>Ready when you are</h3><p>Allow camera and precise location access. Photos are captured here, not selected from your gallery.</p></div>}</div>
       {error && <p className="photo-punch__error" role="alert">{error}</p>}
       {!result && <div className="photo-punch__assignment">
         <label htmlFor="punch-oif-mode">OIF type</label>
@@ -115,6 +116,7 @@ export default function PhotoPunch() {
         {['it', 'capsule'].includes(assignment.mode) && <p>OIF: {assignment.mode === 'it' ? 'IT' : 'CA26421'} · 7 IT hours, using the current attendance rules.</p>}
       </div>}
       {result?.assignment && <p>OIF: {result.assignment.oifNumber || 'No scheduled OIF'} · Class hours: {result.assignment.classHandlingHours} · Mock / IT hours: {result.assignment.mockPrepHours}</p>}
+      {result?.whatsappShare === 'queued' && <p>Your photo will also be posted to the training managers WhatsApp group.</p>}
       {result && <div className="photo-punch__success" role="status"><strong>You are checked in</strong><p>{result.message}</p><small>{result.folder}</small>{result.photoUrl && <a href={result.photoUrl} target="_blank" rel="noreferrer">View photo in Drive</a>}</div>}
       <div className="photo-punch__actions">{!camera && !photo && <button className="btn btn-primary" disabled={busy || !config} onClick={start}>{busy ? 'Checking location…' : 'Enable camera & location'}</button>}
         {camera && <><button className="btn btn-primary" disabled={busy} onClick={capture}>{busy ? 'Checking…' : 'Take photo'}</button><button className="btn btn-outline-secondary" disabled={busy} onClick={() => { stop(); setCamera(false); }}>Cancel</button></>}

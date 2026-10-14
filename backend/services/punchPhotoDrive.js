@@ -1,14 +1,30 @@
 import { randomUUID } from 'node:crypto';
 
 export const driveConfigured = (env = process.env) => Boolean(env.PUNCH_GOOGLE_CLIENT_ID && env.PUNCH_GOOGLE_CLIENT_SECRET && env.PUNCH_GOOGLE_REFRESH_TOKEN);
-export const uploadPunchPhoto = async ({ buffer, name, day }, env = process.env) => {
-  if (!driveConfigured(env)) throw new Error('University Google Drive is not connected.');
+
+const driveAccessToken = async (env) => {
   const tokenResponse = await fetch('https://oauth2.googleapis.com/token', { method: 'POST', signal: AbortSignal.timeout(15000),
     body: new URLSearchParams({ client_id: env.PUNCH_GOOGLE_CLIENT_ID, client_secret: env.PUNCH_GOOGLE_CLIENT_SECRET,
       refresh_token: env.PUNCH_GOOGLE_REFRESH_TOKEN, grant_type: 'refresh_token' }) });
   const token = await tokenResponse.json();
   if (!tokenResponse.ok || !token.access_token) throw new Error('University Google Drive authorization failed.');
-  const headers = { Authorization: `Bearer ${token.access_token}` };
+  return token.access_token;
+};
+
+export const downloadPunchPhoto = async (fileId, env = process.env) => {
+  if (!driveConfigured(env)) throw new Error('University Google Drive is not connected.');
+  if (!/^[\w-]{8,}$/.test(String(fileId || ''))) throw new Error('Invalid punch photo id.');
+  const result = await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`, {
+    headers: { Authorization: `Bearer ${await driveAccessToken(env)}` },
+    signal: AbortSignal.timeout(30000),
+  });
+  if (!result.ok) throw new Error('Unable to download the punch photo.');
+  return Buffer.from(await result.arrayBuffer());
+};
+
+export const uploadPunchPhoto = async ({ buffer, name, day }, env = process.env) => {
+  if (!driveConfigured(env)) throw new Error('University Google Drive is not connected.');
+  const headers = { Authorization: `Bearer ${await driveAccessToken(env)}` };
   const folder = async (label, parent) => {
     const q = `trashed = false and mimeType = 'application/vnd.google-apps.folder' and name = '${label}'${parent ? ` and '${parent}' in parents` : " and 'root' in parents"}`;
     const result = await fetch(`https://www.googleapis.com/drive/v3/files?${new URLSearchParams({ q, fields: 'files(id)', pageSize: '1' })}`, { headers, signal: AbortSignal.timeout(15000) });

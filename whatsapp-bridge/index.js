@@ -6,7 +6,7 @@ import { resolvePhoneInPage } from './phoneResolution.js';
 import { scrapeGroupMessagesInPage } from './groupHistory.js';
 import { createReconnectTimer } from './reconnectTimer.js';
 
-const { Client, LocalAuth } = pkg;
+const { Client, LocalAuth, MessageMedia } = pkg;
 
 const {
   WEBHOOK_URL,
@@ -33,6 +33,8 @@ const {
   WEBHOOK_TIMEOUT_MS = '60000',
   CONTROL_PORT = '8787',
   BRIDGE_CONTROL_SECRET = '',
+  MANAGERS_GROUP_ID = '',
+  MANAGERS_GROUP_NAME = 'FACE Prep | Attendance tracking | Training Managers',
 } = process.env;
 
 const LIST_GROUPS = process.argv.includes('--list-groups');
@@ -105,6 +107,24 @@ const syncCompleteUrl = (() => {
   }
 })();
 
+const shareClaimUrl = (() => {
+  if (!WEBHOOK_URL) return '';
+  try {
+    return new URL('/api/webhooks/whatsapp-punch-share/claim', WEBHOOK_URL).toString();
+  } catch {
+    return '';
+  }
+})();
+
+const shareCompleteUrl = (() => {
+  if (!WEBHOOK_URL) return '';
+  try {
+    return new URL('/api/webhooks/whatsapp-punch-share/complete', WEBHOOK_URL).toString();
+  } catch {
+    return '';
+  }
+})();
+
 const isPermanentWebhookError = (error) => {
   const status = error.response?.status;
   const message = String(error.response?.data?.message || '');
@@ -165,6 +185,63 @@ const pollQueuedSyncJobs = async () => {
     log(`Completed queued sync job ${job._id}: ${result?.ok ? 'ok' : result?.reason || 'failed'}`);
   } catch (error) {
     log(`Queued sync poll failed: ${error.response?.data?.message || error.message}`);
+  }
+};
+
+let cachedManagersGroupId = String(MANAGERS_GROUP_ID || '').trim();
+let shareInFlight = false;
+
+const resolveManagersGroupId = async () => {
+  if (cachedManagersGroupId) return cachedManagersGroupId;
+  if (!client) throw new Error('WhatsApp client is not ready');
+  const chats = await client.getChats();
+  const wanted = String(MANAGERS_GROUP_NAME || '').trim().toLowerCase();
+  const match = chats.find((chat) => chat.isGroup && String(chat.name || '').trim().toLowerCase() === wanted);
+  if (!match?.id?._serialized) {
+    throw new Error(`Managers group not found: ${MANAGERS_GROUP_NAME}`);
+  }
+  cachedManagersGroupId = match.id._serialized;
+  log(`Managers attendance group linked: ${cachedManagersGroupId}`);
+  return cachedManagersGroupId;
+};
+
+const pollPunchShares = async () => {
+  if (!shareClaimUrl || !shareCompleteUrl || !WEBHOOK_SECRET || !bridgeReady || !client || shareInFlight) return;
+  shareInFlight = true;
+  let jobId = '';
+  try {
+    const { data } = await axios.get(shareClaimUrl, {
+      headers: { 'x-webhook-secret': WEBHOOK_SECRET },
+      timeout: 30000,
+    });
+    const job = data?.job;
+    if (!job?._id) return;
+    jobId = String(job._id);
+    const photoUrl = new URL(`/api/webhooks/whatsapp-punch-share/${jobId}/photo`, WEBHOOK_URL).toString();
+    const photo = await axios.get(photoUrl, {
+      headers: { 'x-webhook-secret': WEBHOOK_SECRET },
+      responseType: 'arraybuffer',
+      timeout: 60000,
+    });
+    const media = new MessageMedia('image/jpeg', Buffer.from(photo.data).toString('base64'), 'punch.jpg');
+    const groupId = await resolveManagersGroupId();
+    await client.sendMessage(groupId, media, { caption: String(job.caption || 'Admin punch-in') });
+    await axios.post(shareCompleteUrl, { jobId, ok: true }, {
+      headers: { 'x-webhook-secret': WEBHOOK_SECRET },
+      timeout: 30000,
+    });
+    log(`Posted admin punch photo to managers group (${jobId})`);
+  } catch (error) {
+    const detail = error.response?.data?.message || error.message;
+    log(`Punch share failed: ${detail}`);
+    if (jobId) {
+      await axios.post(shareCompleteUrl, { jobId, ok: false, error: detail }, {
+        headers: { 'x-webhook-secret': WEBHOOK_SECRET },
+        timeout: 30000,
+      }).catch((completeError) => log(`Punch share complete failed: ${completeError.message}`));
+    }
+  } finally {
+    shareInFlight = false;
   }
 };
 
@@ -553,6 +630,7 @@ const startWatchdog = () => {
   if (syncClaimUrl && !ONE_SHOT_MODE) {
     syncJobPollTimer = setInterval(() => {
       pollQueuedSyncJobs().catch((error) => log('Queued sync poll error:', error.message));
+      pollPunchShares().catch((error) => log('Punch share poll error:', error.message));
     }, 20000);
   }
 };
@@ -1081,6 +1159,7 @@ const wireClient = (activeClient) => {
     await patchWhatsAppStoreApis();
     startPunchPoller();
     await catchUpRecentGroupMessages();
+    pollPunchShares().catch((error) => log('Punch share poll error:', error.message));
   };
   activateBridgeFn = activateBridge;
 

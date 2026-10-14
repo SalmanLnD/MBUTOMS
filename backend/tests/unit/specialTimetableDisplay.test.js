@@ -2,8 +2,6 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { resolveTrainerTimetableGridOptions } from '../../../frontend/src/utils/trainerTimetableDisplay.js';
 import { buildTimetableGrid } from '../../../frontend/src/utils/timetableGrid.js';
-import { PHOTO_PUNCH_BETA_USER_IDS as frontendBeta } from '../../../frontend/src/utils/photoPunchAccess.js';
-import { PHOTO_PUNCH_BETA_USER_IDS as backendBeta } from '../../utils/photoPunchAccess.js';
 
 test('custom special classes keep actual times in cells and omit header times', () => {
   const schedules = [
@@ -19,6 +17,3 @@ test('custom special classes keep actual times in cells and omit header times', 
   assert.equal(grid.cells['Friday|S3'].endTime, '17:00');
 });
 
-test('frontend and API share the same punch-in beta access list', () => {
-  assert.deepEqual(frontendBeta, backendBeta);
-});
