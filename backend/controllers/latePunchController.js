@@ -12,6 +12,7 @@ import {
   lateMarkOutcome,
   punchDistanceFromCampus,
 } from '../utils/latePunch.js';
+import { notifyTrainerOfLateMark } from '../utils/latePunchNotifications.js';
 
 const monthBounds = (monthKey) => {
   const [year, month] = monthKey.split('-').map(Number);
@@ -23,6 +24,18 @@ const monthBounds = (monthKey) => {
 };
 
 const currentMonthKey = () => toAttendanceDateKey(new Date()).slice(0, 7);
+
+export const countPendingLatePunches = async () => {
+  const effectiveStart = normalizeAttendanceDate(LATE_MISCONDUCT_START);
+  const reviewedIds = await LatePunchReview.find().distinct('attendance');
+  const records = await TrainerDailyAttendance.find({
+    punchInSource: { $in: LATE_PUNCH_SOURCES },
+    date: { $gte: effectiveStart },
+    punchInAt: { $ne: null },
+    ...(reviewedIds.length ? { _id: { $nin: reviewedIds } } : {}),
+  }).select('punchInAt date').lean();
+  return records.filter((record) => isLatePunch(record.punchInAt) && isLateMisconductDate(record.date)).length;
+};
 
 export const listLatePunches = async (req, res) => {
   const monthKey = /^\d{4}-\d{2}$/.test(String(req.query.month || ''))
@@ -188,6 +201,21 @@ export const reviewLatePunch = async (req, res) => {
       return res.status(409).json({ message: 'This punch has already been reviewed' });
     }
     throw error;
+  }
+
+  if (decision === 'warning' || decision === 'misconduct') {
+    try {
+      await notifyTrainerOfLateMark({
+        trainerId: record.trainer,
+        decision,
+        dateKey,
+        actor: req.user,
+      });
+    } catch (error) {
+      if (process.env.NODE_ENV !== 'test') {
+        console.error('[late-punch] trainer notification failed', error?.message);
+      }
+    }
   }
 
   const message = decision === 'warning'

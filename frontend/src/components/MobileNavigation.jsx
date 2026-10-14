@@ -3,6 +3,16 @@ import { NavLink, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.jsx';
 import { useMediaQuery } from '../hooks/useMediaQuery.js';
 import { navItems } from '../config/navItems.js';
+import ActionCount from './ActionCount.jsx';
+import { useActionCounts } from '../context/ActionCountsContext.jsx';
+
+const ACTION_COUNT_BY_PATH = {
+  '/tickets': 'tickets',
+  '/trainers': 'latePunches',
+  '/topic-tracker': 'cancellations',
+  '/leaves': 'leaves',
+  '/replacements': 'replacements',
+};
 import { formatRole } from '../utils/helpers.js';
 import Modal from './Modal.jsx';
 import '../styles/mobile-nav.css';
@@ -11,6 +21,7 @@ import SalluAvatar from './SalluAvatar.jsx';
 
 const MobileNavigation = () => {
   const { user, hasRole } = useAuth();
+  const { counts } = useActionCounts();
   const assistant = useAiAssistant();
   const location = useLocation();
   const isMobile = useMediaQuery('(max-width: 767.98px)');
@@ -26,11 +37,15 @@ const MobileNavigation = () => {
   return (
     <>
       <nav className="mobile-navigation" aria-label="Mobile navigation">
-        {shortcuts.map(({ path, label, Icon }) => (
-          <NavLink key={path} to={path} className={({ isActive }) => `mobile-navigation__link${isActive ? ' is-active' : ''}`}>
-            <Icon size={21} /><span>{label}</span>
-          </NavLink>
-        ))}
+        {shortcuts.map(({ path, label, Icon }) => {
+          const pending = counts[ACTION_COUNT_BY_PATH[path]] || 0;
+          return (
+            <NavLink key={path} to={path} aria-label={pending > 0 ? `${label}, ${pending} pending` : label} className={({ isActive }) => `mobile-navigation__link${isActive ? ' is-active' : ''}`}>
+              <Icon size={21} /><span>{label}</span>
+              <ActionCount count={pending} />
+            </NavLink>
+          );
+        })}
         <button type="button" className={`mobile-navigation__link${moreActive || open ? ' is-active' : ''}`}
           onClick={() => setOpen(true)} aria-label="Open all pages" aria-haspopup="dialog" aria-expanded={open}>
           <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
@@ -47,11 +62,16 @@ const MobileNavigation = () => {
               onClick={(event) => { setOpen(false); assistant.openAssistant(event); }}>
               <SalluAvatar size={24} /><span className="mobile-pages-label">Sallu</span><span className="mobile-pages-chevron" aria-hidden="true">›</span>
             </button>}
-            {visibleItems.map(({ path, label, Icon }) => (
-              <NavLink key={path} to={path} onClick={() => setOpen(false)} className={({ isActive }) => `mobile-pages-link${isActive ? ' is-active' : ''}`}>
-                <Icon size={20} /><span className="mobile-pages-label">{label}</span><span className="mobile-pages-chevron" aria-hidden="true">›</span>
-              </NavLink>
-            ))}
+            {visibleItems.map(({ path, label, Icon }) => {
+              const pending = counts[ACTION_COUNT_BY_PATH[path]] || 0;
+              return (
+                <NavLink key={path} to={path} aria-label={pending > 0 ? `${label}, ${pending} pending` : label} onClick={() => setOpen(false)} className={({ isActive }) => `mobile-pages-link${isActive ? ' is-active' : ''}`}>
+                  <Icon size={20} /><span className="mobile-pages-label">{label}</span>
+                  <ActionCount count={pending} />
+                  <span className="mobile-pages-chevron" aria-hidden="true">›</span>
+                </NavLink>
+              );
+            })}
           </nav>
         </div>
       </Modal>

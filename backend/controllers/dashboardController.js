@@ -64,71 +64,35 @@ const getTopTrainersByFeedback = async () => {
   ]);
 };
 
-export const getDashboardStats = async (req, res) => {
-  const today = new Date();
+export const countPendingReplacements = async (reference = new Date()) => {
+  const today = new Date(reference);
   today.setHours(0, 0, 0, 0);
-  const tomorrow = new Date(today);
-  tomorrow.setDate(tomorrow.getDate() + 1);
-  const todayName = WEEKDAYS[today.getDay()];
+  const windowEnd = new Date(today.getTime() + 30 * 24 * 60 * 60 * 1000);
+  const replacementLeaves = await Leave.find({
+    status: 'approved',
+    endDate: { $gte: today },
+    startDate: { $lte: windowEnd },
+    affectedSchedules: { $exists: true, $not: { $size: 0 } },
+  })
+    .select('startDate endDate affectedSchedules replacements')
+    .populate('affectedSchedules', 'day')
+    .lean();
+  if (!replacementLeaves.length) return 0;
 
-  const [
-    totalTrainers,
-    totalStudents,
-    activeVenues,
-    todaysLeaves,
-    replacementLeaves,
-    attendanceAgg,
-    topTrainersByFeedback,
-    activeToday,
-  ] = await Promise.all([
-    Trainer.countDocuments(excludeArchivedExternalTrainers()),
-    Student.countDocuments({ status: 'active' }),
-    Venue.countDocuments({ isActive: true }),
-    Leave.countDocuments({
-      status: 'approved',
-      startDate: { $lte: tomorrow },
-      endDate: { $gte: today },
-    }),
-    Leave.find({
-      status: 'approved',
-      endDate: { $gte: today },
-      // Bound the window so open-ended future leaves don't blow up the
-      // cancellation-map range scan.
-      startDate: { $lte: new Date(today.getTime() + 30 * 24 * 60 * 60 * 1000) },
-      affectedSchedules: { $exists: true, $not: { $size: 0 } },
-    })
-      .select('startDate endDate affectedSchedules replacements')
-      .populate('affectedSchedules', 'day')
-      .lean(),
-    Attendance.aggregate([
-      { $match: { date: { $gte: today, $lt: tomorrow } } },
-      { $group: { _id: '$status', count: { $sum: 1 } } },
-    ]),
-    getTopTrainersByFeedback(),
-    getActiveSchedulesForDay(todayName, today),
-  ]);
-
-  const todaysClasses = activeToday.count;
-
-  const cancellationWindowEnd = new Date(today.getTime() + 30 * 24 * 60 * 60 * 1000);
   const leaveRangeStart = replacementLeaves.reduce(
     (earliest, leave) => (leave.startDate < earliest ? leave.startDate : earliest),
-    replacementLeaves[0]?.startDate
+    replacementLeaves[0].startDate
   );
   const leaveRangeEnd = replacementLeaves.reduce(
     (latest, leave) => (leave.endDate > latest ? leave.endDate : latest),
-    replacementLeaves[0]?.endDate
+    replacementLeaves[0].endDate
   );
-  const exclusions = replacementLeaves.length
-    ? await getLeaveClassExclusionsForRange(
-      leaveRangeStart,
-      // Clamp so a months-long leave doesn't scan cancellations far into the future.
-      leaveRangeEnd > cancellationWindowEnd ? cancellationWindowEnd : leaveRangeEnd
-    )
-    : { cancellationMap: new Map(), holidayDateKeys: new Set() };
-  const { cancellationMap, holidayDateKeys } = exclusions;
+  const { cancellationMap, holidayDateKeys } = await getLeaveClassExclusionsForRange(
+    leaveRangeStart,
+    leaveRangeEnd > windowEnd ? windowEnd : leaveRangeEnd
+  );
 
-  const pendingReplacements = replacementLeaves.reduce((count, leave) => {
+  return replacementLeaves.reduce((count, leave) => {
     const assignedScheduleIds = new Set(
       (leave.replacements || [])
         .map((entry) => entry.schedule?.toString())
@@ -145,6 +109,43 @@ export const getDashboardStats = async (req, res) => {
     );
     return count + unassigned.length;
   }, 0);
+};
+
+export const getDashboardStats = async (req, res) => {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const tomorrow = new Date(today);
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  const todayName = WEEKDAYS[today.getDay()];
+
+  const [
+    totalTrainers,
+    totalStudents,
+    activeVenues,
+    todaysLeaves,
+    pendingReplacements,
+    attendanceAgg,
+    topTrainersByFeedback,
+    activeToday,
+  ] = await Promise.all([
+    Trainer.countDocuments(excludeArchivedExternalTrainers()),
+    Student.countDocuments({ status: 'active' }),
+    Venue.countDocuments({ isActive: true }),
+    Leave.countDocuments({
+      status: 'approved',
+      startDate: { $lte: tomorrow },
+      endDate: { $gte: today },
+    }),
+    countPendingReplacements(today),
+    Attendance.aggregate([
+      { $match: { date: { $gte: today, $lt: tomorrow } } },
+      { $group: { _id: '$status', count: { $sum: 1 } } },
+    ]),
+    getTopTrainersByFeedback(),
+    getActiveSchedulesForDay(todayName, today),
+  ]);
+
+  const todaysClasses = activeToday.count;
 
   const attendanceSummary = { present: 0, absent: 0, late: 0, leave: 0, od: 0, holiday: 0 };
   attendanceAgg.forEach((s) => {

@@ -14,6 +14,8 @@ import { getTopicTrackerStatusBadgeClass } from '../utils/topicTrackerConstants.
 import { ROLES } from '../utils/roles.js';
 import { SheetIcon, ExternalLinkIcon } from '../components/icons.jsx';
 import '../styles/topic-tracker.css';
+import ActionCount from '../components/ActionCount.jsx';
+import { useActionCounts } from '../context/ActionCountsContext.jsx';
 
 const getNotificationTarget = (search) => {
   const params = new URLSearchParams(search);
@@ -36,6 +38,7 @@ const getNotificationTarget = (search) => {
 
 const TopicTracker = () => {
   const { hasRole, user } = useAuth();
+  const { counts } = useActionCounts();
   const location = useLocation();
   const navigate = useNavigate();
   const isTrainer = hasRole(ROLES.TRAINER) || hasRole(ROLES.EVALUATOR);
@@ -187,6 +190,7 @@ const TopicTracker = () => {
                 onClick={() => setActiveTab('cancellations')}
               >
                 Cancelled sessions
+                <ActionCount count={counts.cancellations} />
               </button>
             </li>
           )}

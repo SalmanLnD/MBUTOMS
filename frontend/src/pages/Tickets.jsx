@@ -19,6 +19,7 @@ import {
   getTicketStatusBadgeClass,
 } from '../utils/ticketConstants.js';
 import { ROLES } from '../utils/roles.js';
+import { refreshActionCounts } from '../context/ActionCountsContext.jsx';
 
 const truncateText = (text, max = 80) => {
   if (!text) return '-';
@@ -147,6 +148,7 @@ const Tickets = () => {
       await updateTicketStatus(pendingUpdate._id, updateForm);
       showSuccess('Ticket status updated');
       setPendingUpdate(null);
+      refreshActionCounts();
       fetchTickets();
     } catch (err) {
       showError(getErrorMessage(err));

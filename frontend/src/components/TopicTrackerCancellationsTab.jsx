@@ -9,6 +9,7 @@ import {
 import { CheckReadIcon } from './icons.jsx';
 import { getErrorMessage, formatDate } from '../utils/helpers.js';
 import { showError, showSuccess } from '../utils/toast.js';
+import { refreshActionCounts } from '../context/ActionCountsContext.jsx';
 import {
   SESSION_STATUS_LABELS,
   getSessionStatusBadgeClass,
@@ -81,6 +82,7 @@ const TopicTrackerCancellationsTab = ({ highlightEntryId, onHighlightComplete })
         );
       }
       setPendingAction(null);
+      refreshActionCounts();
       await loadEntries();
     } catch (err) {
       showError(getErrorMessage(err));

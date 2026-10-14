@@ -20,6 +20,7 @@ import {
   canCreateLeaveForOthers,
   isTrainerLikeRole,
 } from '../utils/roles.js';
+import { refreshActionCounts } from '../context/ActionCountsContext.jsx';
 
 const Leaves = () => {
   const { user } = useAuth();
@@ -142,6 +143,7 @@ const Leaves = () => {
     try {
       await updateLeave(id, { status });
       showSuccess(`Leave ${status}`);
+      refreshActionCounts();
       fetchLeaves();
     } catch (err) {
       showError(getErrorMessage(err));
@@ -157,6 +159,7 @@ const Leaves = () => {
     try {
       await deleteLeave(pendingCancel._id);
       showSuccess('Leave cancelled');
+      refreshActionCounts();
       setPendingCancel(null);
       fetchLeaves();
     } catch (err) {

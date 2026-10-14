@@ -7,6 +7,7 @@ import Topbar from '../components/Topbar.jsx';
 import FeedbackAnnouncement from '../components/FeedbackAnnouncement.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
 import { PageTitleProvider, usePageTitleValue } from '../context/PageTitleContext.jsx';
+import { ActionCountsProvider } from '../context/ActionCountsContext.jsx';
 import { useMediaQuery } from '../hooks/useMediaQuery.js';
 import { resetAllModalArtifacts } from '../utils/modalCleanup.js';
 import '../styles/layout.css';
@@ -84,6 +85,7 @@ const MainLayout = () => {
 
   return (
     <PageTitleProvider>
+      <ActionCountsProvider>
       <AppShell>
         <LayoutTopbar />
         <Outlet />
@@ -92,6 +94,7 @@ const MainLayout = () => {
           <ResetPasswordModal show onComplete={handlePasswordResetComplete} />
         )}
       </AppShell>
+      </ActionCountsProvider>
     </PageTitleProvider>
   );
 };

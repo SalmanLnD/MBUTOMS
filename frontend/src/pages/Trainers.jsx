@@ -21,9 +21,12 @@ import { getErrorMessage } from '../utils/helpers.js';
 import { ROLES } from '../utils/roles.js';
 import { usePageTitle } from '../context/PageTitleContext.jsx';
 import { isAbortError } from '../services/api.js';
+import ActionCount from '../components/ActionCount.jsx';
+import { useActionCounts } from '../context/ActionCountsContext.jsx';
 
 const Trainers = () => {
   const { user, hasFullAccess } = useAuth();
+  const { counts } = useActionCounts();
   const canManage = hasFullAccess();
   const isTrainerUser = user?.role === ROLES.TRAINER || user?.role === ROLES.EVALUATOR;
   const isSubjectCoordinator = user?.role === ROLES.SUBJECT_COORDINATOR;
@@ -213,6 +216,7 @@ const Trainers = () => {
               onClick={() => setTab('late')}
             >
               Late misconduct
+              <ActionCount count={counts.latePunches} />
             </button>
           </li>
         )}

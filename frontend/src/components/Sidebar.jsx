@@ -2,12 +2,23 @@ import { NavLink } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.jsx';
 import { ChevronLeftIcon } from './icons.jsx';
 import { navItems } from '../config/navItems.js';
+import ActionCount from './ActionCount.jsx';
+import { useActionCounts } from '../context/ActionCountsContext.jsx';
+
+const ACTION_COUNT_BY_PATH = {
+  '/tickets': 'tickets',
+  '/trainers': 'latePunches',
+  '/topic-tracker': 'cancellations',
+  '/leaves': 'leaves',
+  '/replacements': 'replacements',
+};
 import '../styles/sidebar.css';
 import { useAiAssistant } from '../context/AiAssistantContext.jsx';
 import SalluAvatar from './SalluAvatar.jsx';
 
 const Sidebar = ({ collapsed = false, labelsVisible = true, onToggle }) => {
   const { user, hasRole } = useAuth();
+  const { counts } = useActionCounts();
   const assistant = useAiAssistant();
 
   const visibleItems = navItems.filter((item) =>
@@ -36,20 +47,25 @@ const Sidebar = ({ collapsed = false, labelsVisible = true, onToggle }) => {
           onClick={assistant.togglePet} aria-label="Toggle Sallu pet" aria-pressed={assistant.petVisible}>
           <span className="nav-icon" aria-hidden="true"><SalluAvatar size={24} /></span><span className="sidebar-link-label">Sallu</span>
         </button>}
-        {visibleItems.map(({ path, label, Icon }) => (
-          <NavLink
-            key={path}
-            to={path}
-            title={collapsed ? label : undefined}
-            aria-label={label}
-            className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`}
-          >
-            <span className="nav-icon">
-              <Icon size={18} />
-            </span>
-            <span className="sidebar-link-label">{label}</span>
-          </NavLink>
-        ))}
+        {visibleItems.map(({ path, label, Icon }) => {
+          const pending = counts[ACTION_COUNT_BY_PATH[path]] || 0;
+          const accessibleName = pending > 0 ? `${label}, ${pending} pending` : label;
+          return (
+            <NavLink
+              key={path}
+              to={path}
+              title={collapsed ? accessibleName : undefined}
+              aria-label={accessibleName}
+              className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`}
+            >
+              <span className="nav-icon">
+                <Icon size={18} />
+              </span>
+              <span className="sidebar-link-label">{label}</span>
+              <ActionCount count={pending} />
+            </NavLink>
+          );
+        })}
       </nav>
 
       <div className="sidebar-footer">

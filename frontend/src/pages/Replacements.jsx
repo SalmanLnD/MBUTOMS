@@ -20,6 +20,7 @@ import {
   assignBulkReplacement,
 } from '../services/replacementService.js';
 import { getTrainers } from '../services/trainerService.js';
+import { refreshActionCounts } from '../context/ActionCountsContext.jsx';
 
 const REPLACEMENT_STATUS = {
   current: { label: 'Current', className: 'bg-success' },
@@ -181,6 +182,7 @@ const Replacements = () => {
       } else {
         showSuccess('Bulk replacement saved');
       }
+      refreshActionCounts();
       setShowBulkModal(false);
       fetchReplacements();
     } catch (err) {
@@ -230,6 +232,7 @@ const Replacements = () => {
         replacementTrainerId: trainerId,
       });
       showSuccess(changingReplacement ? 'Replacement trainer updated' : 'Replacement trainer assigned');
+      refreshActionCounts();
       closeSuggestionsModal();
       fetchReplacements();
     } catch (err) {
@@ -250,6 +253,7 @@ const Replacements = () => {
         externalTrainerName: name,
       });
       showSuccess(changingReplacement ? 'Replacement updated to external trainer' : 'External trainer assigned');
+      refreshActionCounts();
       closeSuggestionsModal();
       fetchReplacements();
     } catch (err) {
@@ -264,6 +268,7 @@ const Replacements = () => {
     try {
       await cancelReplacement(pendingCancel.leaveId, pendingCancel.scheduleId);
       showSuccess('Replacement cancelled. Original trainer will handle this class.');
+      refreshActionCounts();
       setPendingCancel(null);
       fetchReplacements();
     } catch (err) {

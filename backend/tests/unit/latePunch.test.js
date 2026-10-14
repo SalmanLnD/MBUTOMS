@@ -6,6 +6,7 @@ import {
   lateMarkOutcome,
   punchDistanceFromCampus,
 } from '../../utils/latePunch.js';
+import { buildLateMarkMessage } from '../../utils/latePunchNotifications.js';
 
 test('punches after 8:40 India time are late and 8:40:00 is on time', () => {
   assert.equal(isLatePunch('2026-10-14T03:10:00.000Z'), false);
@@ -19,6 +20,13 @@ test('late misconduct starts on 14 Oct 2026', () => {
   assert.equal(isLateMisconductDate('2026-10-14'), true);
   assert.equal(isLateMisconductDate('2026-10-15'), true);
   assert.equal(isLateMisconductDate(new Date('2026-10-13T18:30:00.000Z')), true);
+});
+
+test('warning and compliance marks tell the trainer what happened', () => {
+  assert.match(buildLateMarkMessage({ decision: 'warning', dateKey: '2026-10-14' }), /warning/);
+  assert.match(buildLateMarkMessage({ decision: 'warning', dateKey: '2026-10-14' }), /14 Oct 2026/);
+  assert.match(buildLateMarkMessage({ decision: 'misconduct', dateKey: '2026-10-14' }), /1 compliance point/);
+  assert.equal(buildLateMarkMessage({ decision: 'dismissed', dateKey: '2026-10-14' }), '');
 });
 
 test('the first late mark in a month is a warning and later marks are misconduct', () => {

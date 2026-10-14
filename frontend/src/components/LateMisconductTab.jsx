@@ -10,6 +10,7 @@ import { usePagination } from '../hooks/usePagination.js';
 import { fetchLatePunchPhoto, getLatePunches, reviewLatePunch } from '../services/attendanceService.js';
 import { getErrorMessage } from '../utils/helpers.js';
 import { buildMonthOptions, formatMonthKey, getCurrentMonthParts } from '../utils/monthDates.js';
+import { refreshActionCounts } from '../context/ActionCountsContext.jsx';
 
 const formatPunchTime = (value) => {
   if (!value) return '-';
@@ -135,6 +136,7 @@ const LateMisconductTab = () => {
       const result = await reviewLatePunch(pendingAction.item._id, pendingAction.action);
       showSuccess(result.message || 'Review saved');
       setPendingAction(null);
+      refreshActionCounts();
       loadItems();
     } catch (err) {
       showError(getErrorMessage(err));
