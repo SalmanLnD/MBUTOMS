@@ -112,3 +112,18 @@ export const getWhatsappPunchSyncStatus = async () => {
   const { data } = await api.get('/attendance/whatsapp-sync/status');
   return data;
 };
+
+export const getLatePunches = async (params = {}) => {
+  const { data } = await api.get('/attendance/late-punches', { params });
+  return data;
+};
+
+export const reviewLatePunch = async (id, action) => {
+  const { data } = await api.post(`/attendance/late-punches/${id}/review`, { action });
+  return data;
+};
+
+export const fetchLatePunchPhoto = async (id) => {
+  const { data } = await api.get(`/attendance/late-punches/${id}/photo`, { responseType: 'blob' });
+  return data;
+};

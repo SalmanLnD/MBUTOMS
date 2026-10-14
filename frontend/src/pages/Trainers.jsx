@@ -6,6 +6,7 @@ import { showError, showSuccess } from '../utils/toast.js';
 import TrainerFormModal from '../components/TrainerFormModal.jsx';
 import TrainerAttendanceTab from '../components/TrainerAttendanceTab.jsx';
 import TrainerPunchInLogsTab from '../components/TrainerPunchInLogsTab.jsx';
+import LateMisconductTab from '../components/LateMisconductTab.jsx';
 import CompOffsTab from '../components/CompOffsTab.jsx';
 import ConfirmModal from '../components/ConfirmModal.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
@@ -31,7 +32,9 @@ const Trainers = () => {
   const tabParam = searchParams.get('tab');
   const validTabs = isTrainerUser
     ? ['details', 'comp-offs', 'attendance', 'logs']
-    : ['directory', 'comp-offs', 'attendance', 'logs'];
+    : canManage
+      ? ['directory', 'comp-offs', 'attendance', 'logs', 'late']
+      : ['directory', 'comp-offs', 'attendance', 'logs'];
   const defaultTab = isTrainerUser ? 'details' : 'directory';
   const activeTab = validTabs.includes(tabParam) ? tabParam : defaultTab;
   const {
@@ -202,6 +205,17 @@ const Trainers = () => {
             Logs
           </button>
         </li>
+        {canManage && (
+          <li className="nav-item">
+            <button
+              type="button"
+              className={`nav-link ${activeTab === 'late' ? 'active' : ''}`}
+              onClick={() => setTab('late')}
+            >
+              Late misconduct
+            </button>
+          </li>
+        )}
       </ul>
 
       {activeTab === 'attendance' ? (
@@ -220,6 +234,12 @@ const Trainers = () => {
         <div className="card table-card">
           <div className="card-body">
             <TrainerPunchInLogsTab />
+          </div>
+        </div>
+      ) : activeTab === 'late' ? (
+        <div className="card table-card">
+          <div className="card-body">
+            <LateMisconductTab />
           </div>
         </div>
       ) : activeTab === 'details' ? (

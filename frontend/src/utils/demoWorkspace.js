@@ -181,6 +181,26 @@ export const createDemoWorkspace = (storage, notify = () => {}) => {
     } else if (path === '/notifications/read-all' || path.endsWith('/read')) {
       if (route.id && route.id !== 'read-all') state.records[route.id] = { ...known(owner, route.id), isRead: true };
       else state.responses['/notifications'] = { notifications: [], unreadCount: 0 };
+    } else if (/^\/attendance\/late-punches\/[^/]+\/review$/.test(path)) {
+      const id = path.split('/')[3];
+      const existing = known(owner, id);
+      const prior = Number(existing.priorMarksThisMonth) || 0;
+      const decision = body.action === 'dismiss' ? 'dismissed' : (prior > 0 ? 'misconduct' : 'warning');
+      state.records[id] = {
+        ...existing,
+        _id: id,
+        review: { decision, reviewedAt: new Date().toISOString(), complianceAdded: decision === 'misconduct' },
+      };
+      result = {
+        decision,
+        complianceAdded: decision === 'misconduct',
+        message: decision === 'warning'
+          ? 'Recorded as a warning. The first late mark this month does not add a compliance point.'
+          : decision === 'misconduct'
+            ? 'Late misconduct recorded. 1 compliance point was added for this trainer.'
+            : 'Punch left as on time. No warning or compliance was added.',
+        localOnly: true,
+      };
     } else if (path === '/attendance/whatsapp-sync') {
       result = { ...result, message: 'Demo sync simulated locally. No WhatsApp job was sent.', job: { _id: makeId(), status: 'completed', result: { localOnly: true } } };
       state.responses['/attendance/whatsapp-sync/status'] = result;

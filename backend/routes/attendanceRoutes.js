@@ -11,6 +11,11 @@ import {
   getTrainerPunchInLogs,
   deleteTrainerPunchInLog,
 } from '../controllers/trainerAttendanceController.js';
+import {
+  getLatePunchPhoto,
+  listLatePunches,
+  reviewLatePunch,
+} from '../controllers/latePunchController.js';
 import { protect, authorize, authorizeExact } from '../middleware/auth.js';
 import { FULL_ACCESS_ROLES } from '../utils/roles.js';
 import {
@@ -61,6 +66,21 @@ router.use(protect);
 router.get('/summary', asyncHandler(getAttendanceSummary));
 router.get('/trainer-grid', asyncHandler(getTrainerAttendanceGrid));
 router.get('/trainer-punch-logs', asyncHandler(getTrainerPunchInLogs));
+router.get(
+  '/late-punches',
+  authorizeExact(...FULL_ACCESS_ROLES),
+  asyncHandler(listLatePunches)
+);
+router.get(
+  '/late-punches/:id/photo',
+  authorizeExact(...FULL_ACCESS_ROLES),
+  asyncHandler(getLatePunchPhoto)
+);
+router.post(
+  '/late-punches/:id/review',
+  authorizeExact(...FULL_ACCESS_ROLES),
+  asyncHandler(reviewLatePunch)
+);
 router.post(
   '/whatsapp-sync',
   authorizeExact(...FULL_ACCESS_ROLES),
