@@ -4,13 +4,13 @@ import { version } from '../../package.json';
 
 const PREFERENCE_KEY = 'toms_push_device';
 const INSTALLED_KEY = 'toms_installed_on_device';
-const setupSessionKey = (userId) => `toms_device_setup_session:${userId}:${version}`;
+const setupKey = (userId) => `toms_device_setup:${userId}:${version}`;
 export const hasAcknowledgedDeviceSetup = (userId) => {
-  try { return sessionStorage.getItem(setupSessionKey(userId)) === 'done'; }
+  try { return localStorage.getItem(setupKey(userId)) === 'done'; }
   catch { return false; }
 };
 export const acknowledgeDeviceSetup = (userId) => {
-  try { sessionStorage.setItem(setupSessionKey(userId), 'done'); } catch { /* Current modal still closes when storage is unavailable. */ }
+  try { localStorage.setItem(setupKey(userId), 'done'); } catch { /* Current modal still closes when storage is unavailable. */ }
 };
 export const hasInstalledToms = () => {
   try { return localStorage.getItem(INSTALLED_KEY) === 'true'; } catch { return false; }
@@ -109,10 +109,6 @@ export const disableDevicePush = async () => {
       data: { endpoint: subscription.endpoint }, timeout: 3000, skipRetry: true, skipSessionExpired: true,
     }).catch(() => {});
   } catch { /* Unsupported browsers have nothing to revoke. */ }
-};
-
-export const endDeviceSetupSession = (userId) => {
-  try { sessionStorage.removeItem(setupSessionKey(userId)); } catch { /* No stored prompt to clear. */ }
 };
 
 export const syncDeviceSession = async (user) => {
