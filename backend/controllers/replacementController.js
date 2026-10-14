@@ -627,6 +627,7 @@ export const assignBulkReplacement = async (req, res) => {
 export const getAllReplacements = async (req, res) => {
   const today = normalizeDate(new Date());
   const leaves = await Leave.find({
+    status: { $ne: 'cancelled' },
     affectedSchedules: { $exists: true, $not: { $size: 0 } },
   })
     .populate('trainer', 'name employeeId')
@@ -839,6 +840,7 @@ export const getAllReplacements = async (req, res) => {
 
   const registerFilter = String(req.query.registerFilter || 'all').trim().toLowerCase();
   const filtered = replacements.filter((row) => {
+    if (row.timelineStatus === 'cancelled' || row.leave?.status === 'cancelled') return false;
     if (registerFilter === 'pending') return !row.replacement && row.canAssign;
     if (registerFilter === 'closed') return Boolean(row.replacement) || !row.canAssign;
     return true;

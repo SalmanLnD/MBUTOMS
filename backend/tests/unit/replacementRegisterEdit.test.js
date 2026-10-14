@@ -47,6 +47,20 @@ test('approved previous-date replacements can still be assigned, edited, or dele
         endTime: '12:30',
       }],
     },
+    {
+      _id: 'cancelled-leave',
+      trainer: { _id: 'trainer', name: 'On Leave' },
+      status: 'cancelled',
+      startDate: new Date('2026-10-16'),
+      endDate: new Date('2026-10-16'),
+      replacements: [],
+      affectedSchedules: [{
+        _id: 'slot-cancelled',
+        day: 'Friday',
+        startTime: '15:45',
+        endTime: '16:45',
+      }],
+    },
   ];
 
   t.mock.method(Leave, 'find', () => query(leaves));
@@ -68,4 +82,6 @@ test('approved previous-date replacements can still be assigned, edited, or dele
   assert.equal(open.timelineStatus, 'previous');
   assert.equal(open.canAssign, true);
   assert.equal(open.canChange, false);
+  assert.equal(result.replacements.some((row) => row.leave._id === 'cancelled-leave'), false);
+  assert.equal(result.pagination.total, 2);
 });
