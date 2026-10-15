@@ -310,12 +310,11 @@ const TrainerAttendanceTab = () => {
         });
       } else {
         showError(getErrorMessage(err));
-        fetchGrid({ forceRefresh: true });
       }
     } finally {
       setSavingKey('');
     }
-  }, [canEditFutureLeave, fetchGrid]);
+  }, [canEditFutureLeave]);
 
   const pollWhatsappSyncJob = useCallback(async (jobId) => {
     const started = Date.now();
