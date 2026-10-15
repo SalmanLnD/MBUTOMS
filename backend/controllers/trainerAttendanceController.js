@@ -601,6 +601,7 @@ export const upsertTrainerDailyAttendance = async (req, res) => {
   }
 
   const trimmedOif = oifNumber?.trim() || '';
+  // One cell can hold several OIF codes, for example CT27006/CA26907.
   if (trimmedOif.length > OIF_NUMBER_MAX_LENGTH) {
     return res.status(400).json({ message: `OIF number must be ${OIF_NUMBER_MAX_LENGTH} characters or fewer` });
   }
