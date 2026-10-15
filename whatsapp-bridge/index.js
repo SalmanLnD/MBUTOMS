@@ -132,7 +132,7 @@ const isPermanentWebhookError = (error) => {
   // transient (clock/timestamp drift, partial payloads during reconnects).
   if (
     status === 400
-    && /oifNumber is required|OIF number must be 12 characters|phone is required|no trainer found/i.test(message)
+    && /oifNumber is required|OIF number must be \d+ characters|phone is required|no trainer found/i.test(message)
   ) {
     return true;
   }

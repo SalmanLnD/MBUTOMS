@@ -12,6 +12,7 @@ test('manual OIF requires explicit valid hours; IT and capsule use attendance co
   assert.equal(resolvePhotoPunchOif({mode:'it'}).oifNumber, 'IT');
   assert.equal(resolvePhotoPunchOif({mode:'capsule'}).oifNumber, 'CA26421');
   assert.deepEqual(resolvePhotoPunchOif({mode:'other',oifNumber:'XX123',classHandlingHours:2,mockPrepHours:3}), {oifEntryMode:'other',oifNumber:'XX123',classHandlingHours:2,mockPrepHours:3});
+  assert.equal(resolvePhotoPunchOif({mode:'other',oifNumber:'ct27008/ca26421',classHandlingHours:2,mockPrepHours:0}).oifNumber, 'CT27008/CA26421');
   assert.throws(() => resolvePhotoPunchOif({mode:'other',oifNumber:'XX123'}));
   assert.throws(() => resolvePhotoPunchOif({mode:'other',oifNumber:'XX123',classHandlingHours:20,mockPrepHours:8}));
   assert.throws(() => resolvePhotoPunchOif({mode:'unknown'}));

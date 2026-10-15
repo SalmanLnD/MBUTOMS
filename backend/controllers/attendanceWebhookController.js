@@ -11,8 +11,10 @@ import {
   applyItOifAttendanceRules,
   isItOif,
   IT_MOCK_PREP_HOURS,
+  OIF_NUMBER_MAX_LENGTH,
 } from '../utils/attendanceOifRules.js';
 import { TRAINER_ATTENDANCE_TYPES } from '../utils/trainerAttendanceTypes.js';
+import { isTimingSafeSecretMatch } from '../utils/webhookAuth.js';
 import OfficialHoliday from '../models/OfficialHoliday.js';
 
 const findTrainerByPhone = async (phone) => {
@@ -78,7 +80,7 @@ export const recordWhatsappPunchIn = async (req, res) => {
   if (!secret) {
     return res.status(503).json({ message: 'Punch-in webhook is not configured' });
   }
-  if (req.headers['x-webhook-secret'] !== secret) {
+  if (!isTimingSafeSecretMatch(req.headers['x-webhook-secret'], secret)) {
     return res.status(401).json({ message: 'Invalid webhook secret' });
   }
 
@@ -92,8 +94,8 @@ export const recordWhatsappPunchIn = async (req, res) => {
   }
 
   const trimmedOif = String(oifNumber).trim();
-  if (trimmedOif.length > 12) {
-    return res.status(400).json({ message: 'OIF number must be 12 characters or fewer' });
+  if (trimmedOif.length > OIF_NUMBER_MAX_LENGTH) {
+    return res.status(400).json({ message: `OIF number must be ${OIF_NUMBER_MAX_LENGTH} characters or fewer` });
   }
 
   const messageId = whatsappMessageId ? String(whatsappMessageId).trim() : '';

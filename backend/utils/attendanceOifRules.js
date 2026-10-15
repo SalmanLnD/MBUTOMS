@@ -1,9 +1,12 @@
-import { isCampusSubjectOif } from './subjectOifCatalog.js';
+import { isCampusSubjectOif, splitAttendanceOifNumbers } from './subjectOifCatalog.js';
 import { ADMIN_TRAINER_EMPLOYEE_ID } from './trainerMappings.js';
 
 export const IT_OIF_CODE = 'IT';
 export const CA26421_OIF_CODE = 'CA26421';
 export const IT_MOCK_PREP_HOURS = 7;
+export const OIF_NUMBER_MAX_LENGTH = 120;
+
+const isItToken = (token) => token === IT_OIF_CODE || token === CA26421_OIF_CODE || token.startsWith(IT_OIF_CODE);
 
 /** Trainers who default to an OIF on working days with no timetable classes. */
 export const DEFAULT_NO_CLASS_OIF_BY_EMPLOYEE_ID = {
@@ -24,7 +27,8 @@ export const countsAsOifDay = (oifNumber) => {
 export const allowsManualClassHandlingHours = (oifNumber) => {
   const value = String(oifNumber || '').trim();
   if (!value || isItOif(value)) return false;
-  return !isCampusSubjectOif(value);
+  const tokens = splitAttendanceOifNumbers(value);
+  return !tokens.every((token) => isCampusSubjectOif(token) || isItToken(token));
 };
 
 export const resolveMockPrepHoursForOif = (oifNumber, mockPrepHours) =>

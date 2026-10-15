@@ -81,7 +81,7 @@ img, svg { max-width: 100%; }
 
 .trainer-attendance-month-table { width: max-content; min-width: 100%; table-layout: fixed; }
 .trainer-attendance-month-table col.trainer-attendance-sticky-col { width: 180px; }
-.trainer-attendance-month-table col.trainer-attendance-oif-col { width: 84px; }
+.trainer-attendance-month-table col.trainer-attendance-oif-col { width: 180px; }
 .trainer-attendance-month-table col.trainer-attendance-mock-col { width: 58px; }
 .trainer-attendance-month-table col.trainer-attendance-class-col { width: 62px; }
 .trainer-attendance-month-table col.trainer-attendance-food-col { width: 82px; }
@@ -92,7 +92,7 @@ img, svg { max-width: 100%; }
 .trainer-attendance-month-table .trainer-attendance-day-header { text-align: center; color: #fff; background: var(--surface-strong); }
 .trainer-attendance-month-table .trainer-attendance-subheader { text-align: center; color: var(--text-secondary); background: var(--surface-soft); }
 .trainer-attendance-grid td { min-width: 0; }
-.trainer-attendance-grid .trainer-attendance-oif-cell { width: 84px; }
+.trainer-attendance-grid .trainer-attendance-oif-cell { width: 180px; }
 .trainer-attendance-grid .trainer-attendance-mock-cell { width: 58px; }
 .trainer-attendance-grid .trainer-attendance-class-cell { width: 62px; }
 .trainer-attendance-grid .trainer-attendance-food-cell { width: 82px; }

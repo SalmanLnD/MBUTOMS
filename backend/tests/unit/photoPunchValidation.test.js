@@ -16,8 +16,8 @@ test('geofence checks distance, uncertainty, freshness and malformed GPS', () =>
   assert.throws(() => validatePunchLocation({...location, accuracy: -1}, campus, now), /accuracy/);
   const offset = {...location, latitude: campus.latitude + 0.006};
   const midRange = distanceMeters(campus, offset);
-  assert.ok(midRange + offset.accuracy > 500 && midRange + offset.accuracy < 1500);
-  assert.throws(() => validatePunchLocation(offset, campus, now, punchRadiusMeters('scheduled')), /500 m/);
+  assert.ok(midRange + offset.accuracy > 300 && midRange + offset.accuracy < 1500);
+  assert.throws(() => validatePunchLocation(offset, campus, now, punchRadiusMeters('scheduled')), /300 m/);
   assert.equal(typeof validatePunchLocation(offset, campus, now, punchRadiusMeters('it')), 'number');
   assert.equal(typeof validatePunchLocation(offset, campus, now, punchRadiusMeters('capsule')), 'number');
   const away = {...location, latitude: campus.latitude + 0.05};
@@ -26,7 +26,7 @@ test('geofence checks distance, uncertainty, freshness and malformed GPS', () =>
   assert.throws(() => validatePunchLocation({...away, accuracy: 101}, campus, now, null), /accuracy/);
   assert.deepEqual(
     ['scheduled', 'it', 'capsule', 'other'].map(punchRadiusMeters),
-    [500, 1500, 1500, null],
+    [300, 1500, 1500, null],
   );
 });
 test('JPEG checks reject bad framing, truncated segments and undersized photos', () => {

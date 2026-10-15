@@ -70,8 +70,24 @@ const CAMPUS_SUBJECT_OIF_KEYS = new Set(
   ]).map((value) => String(value).trim().toUpperCase()).filter(Boolean)
 );
 
+/**
+ * Split a stored OIF into codes. Comma-separated lists stay as before.
+ * A slash separates multiple codes (CT27008/CA26421) without breaking aliases such as PR/IDSA.
+ */
+export const splitAttendanceOifNumbers = (oifNumber) => {
+  const value = String(oifNumber || '').trim().toUpperCase();
+  if (!value) return [];
+  return value.split(',').flatMap((part) => {
+    const code = part.trim();
+    if (!code) return [];
+    if (CAMPUS_SUBJECT_OIF_KEYS.has(code) || code.startsWith('IT') || code === 'CA26421') return [code];
+    const slashParts = code.split('/').map((item) => item.trim()).filter(Boolean);
+    return slashParts.length > 1 ? slashParts : [code];
+  });
+};
+
 /** True when the OIF belongs to a known campus course (auto class hours). */
 export const isCampusSubjectOif = (oifNumber) => {
-  const value = String(oifNumber || '').trim().toUpperCase();
-  return Boolean(value) && value.split(',').every(code => CAMPUS_SUBJECT_OIF_KEYS.has(code.trim()));
+  const tokens = splitAttendanceOifNumbers(oifNumber);
+  return tokens.length > 0 && tokens.every((code) => CAMPUS_SUBJECT_OIF_KEYS.has(code));
 };

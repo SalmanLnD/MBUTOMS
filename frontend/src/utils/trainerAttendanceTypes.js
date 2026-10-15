@@ -37,6 +37,8 @@ export const attendanceTypeUsesOifNumber = (attendanceType) => [
 export const isLeaveAttendanceType = (attendanceType) =>
   LEAVE_TYPE_OPTIONS.some((option) => option.value === attendanceType);
 
+export const OIF_NUMBER_MAX_LENGTH = 120;
+
 export const isItOif = (oifNumber) => {
   const value = String(oifNumber || '').trim().toUpperCase();
   return value.startsWith('IT');
@@ -57,11 +59,24 @@ const CAMPUS_SUBJECT_OIFS = new Set([
   'CT27009', 'QAVA', 'PR/QAVA', '22LG101702',
 ]);
 
+const splitAttendanceOifNumbers = (oifNumber) => {
+  const value = String(oifNumber || '').trim().toUpperCase();
+  if (!value) return [];
+  return value.split(',').flatMap((part) => {
+    const code = part.trim();
+    if (!code) return [];
+    if (CAMPUS_SUBJECT_OIFS.has(code) || code.startsWith('IT') || code === 'CA26421') return [code];
+    const slashParts = code.split('/').map((item) => item.trim()).filter(Boolean);
+    return slashParts.length > 1 ? slashParts : [code];
+  });
+};
+
 /** Non-campus OIFs open the class-hours column for manual entry. */
 export const allowsManualClassHandlingHours = (oifNumber) => {
   const value = String(oifNumber || '').trim();
   if (!value || isItOif(value)) return false;
-  return !value.toUpperCase().split(',').every(code => CAMPUS_SUBJECT_OIFS.has(code.trim()));
+  const tokens = splitAttendanceOifNumbers(value);
+  return !tokens.every((token) => token.startsWith('IT') || token === 'CA26421' || CAMPUS_SUBJECT_OIFS.has(token));
 };
 
 const OIF_NUMBER_TOKEN = 'OIF Number';

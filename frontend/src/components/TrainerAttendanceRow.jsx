@@ -4,6 +4,7 @@ import {
   formatTrainerAttendanceOifDisplay,
   isLeaveAttendanceType,
   LEAVE_TYPE_OPTIONS,
+  OIF_NUMBER_MAX_LENGTH,
   TRAINER_ATTENDANCE_TYPES,
 } from '../utils/trainerAttendanceTypes.js';
 import { FOOD_ALLOWANCE_OPTIONS } from '../utils/foodAllowanceTypes.js';
@@ -178,7 +179,7 @@ const TrainerAttendanceRow = memo(({
                       type="text"
                       className="form-control form-control-sm trainer-attendance-oif-input"
                       value={cell.oifNumber || ''}
-                      maxLength={12}
+                      maxLength={OIF_NUMBER_MAX_LENGTH}
                       disabled={!canEditCell || isSaving}
                       onChange={(e) => onUpdateCell(
                         row.trainer._id,
@@ -213,12 +214,12 @@ const TrainerAttendanceRow = memo(({
                 type="text"
                 className="form-control form-control-sm trainer-attendance-oif-input"
                 value={cell.oifNumber}
-                maxLength={12}
+                maxLength={OIF_NUMBER_MAX_LENGTH}
                 disabled={!editable || isSaving}
                 onChange={(e) => onUpdateCell(row.trainer._id, date.key, 'oifNumber', e.target.value)}
                 onBlur={() => editable && onSave(row.trainer._id, date.key)}
                 placeholder="—"
-                title="Up to 12 characters"
+                title="Separate multiple OIF numbers with /"
               />
             )}
           </td>

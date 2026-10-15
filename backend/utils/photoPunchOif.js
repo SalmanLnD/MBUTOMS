@@ -11,7 +11,7 @@ export const resolvePhotoPunchOif = (input = {}, scheduled = {}) => {
   if (mode === 'it' || mode === 'capsule') return { oifEntryMode: mode, oifNumber: mode === 'it' ? 'IT' : 'CA26421', classHandlingHours: 0, mockPrepHours: 7 };
   const oifNumber = String(input.oifNumber || '').trim().toUpperCase();
   if (oifNumber === 'IT' || oifNumber === 'CA26421') throw new Error('Select IT or MBU capsule from the OIF type dropdown.');
-  if (!/^[A-Z0-9][A-Z0-9 -]{0,11}$/.test(oifNumber)) throw new Error('Enter an OIF number (up to 12 letters, numbers, spaces or hyphens).');
+  if (!/^[A-Z0-9][A-Z0-9 /-]{0,119}$/.test(oifNumber)) throw new Error('Enter an OIF number. Separate multiple OIFs with / (up to 120 characters).');
   const hours = key => {
     if (input[key] === '' || input[key] === undefined || input[key] === null) throw new Error('Enter class hours and mock or IT hours; use 0 when not applicable.');
     const value = Number(input[key]);

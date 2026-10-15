@@ -44,7 +44,7 @@
 .trainer-attendance-month-table thead { position: sticky; top: 0; z-index: 6; }
 .trainer-attendance-month-table thead tr:first-child th { height: 42px; }
 .trainer-attendance-month-table thead tr:nth-child(2) th { height: 36px; }
-.trainer-attendance-month-table col.trainer-attendance-oif-col, .trainer-attendance-grid .trainer-attendance-oif-cell { width: 148px; }
+.trainer-attendance-month-table col.trainer-attendance-oif-col, .trainer-attendance-grid .trainer-attendance-oif-cell { width: 180px; }
 .trainer-attendance-month-table col.trainer-attendance-mock-col, .trainer-attendance-grid .trainer-attendance-mock-cell { width: 76px; }
 .trainer-attendance-month-table col.trainer-attendance-class-col, .trainer-attendance-grid .trainer-attendance-class-cell { width: 76px; }
 .trainer-attendance-month-table col.trainer-attendance-food-col, .trainer-attendance-grid .trainer-attendance-food-cell { width: 124px; }

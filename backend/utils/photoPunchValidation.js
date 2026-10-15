@@ -1,5 +1,5 @@
 /** null means the option has no campus distance limit. */
-export const PUNCH_RADIUS_BY_MODE = { scheduled: 500, it: 1500, capsule: 1500, other: null };
+export const PUNCH_RADIUS_BY_MODE = { scheduled: 300, it: 1500, capsule: 1500, other: null };
 
 export const punchRadiusMeters = (mode) => {
   if (!Object.prototype.hasOwnProperty.call(PUNCH_RADIUS_BY_MODE, mode)) throw new Error('Select a valid OIF option.');

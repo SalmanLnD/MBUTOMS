@@ -11,7 +11,7 @@ const gps = () => new Promise((resolve, reject) => {
   { enableHighAccuracy: true, maximumAge: 0, timeout: 20000 });
 });
 const formatTime = value => new Date(value).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', dateStyle: 'medium', timeStyle: 'medium' });
-const radiusLabel = (mode) => (mode === 'scheduled' ? '500 m campus radius' : mode === 'other' ? 'Location range not restricted' : '1.5 km campus radius');
+const radiusLabel = (mode) => (mode === 'scheduled' ? '300 m campus radius' : mode === 'other' ? 'Location range not restricted' : '1.5 km campus radius');
 export default function PhotoPunch() {
   const { user } = useAuth();
   const [config, setConfig] = useState(null), [session, setSession] = useState(null), [photo, setPhoto] = useState(null);
@@ -117,7 +117,7 @@ export default function PhotoPunch() {
         <p>{radiusLabel(assignment.mode)}</p>
         {assignment.mode === 'scheduled' && <p>{scheduleError || (scheduled ? `${scheduled.oifNumber || 'No scheduled OIF found'} · ${scheduled.classHandlingHours} class hours. Fetched automatically from your timetable.` : 'Loading timetable…')}</p>}
         {assignment.mode === 'other' && <div className="photo-punch__manual-fields">
-          <label>OIF number<input className="form-control" maxLength={12} value={assignment.oifNumber} disabled={busy} onChange={e => setAssignment(p => ({ ...p, oifNumber: e.target.value }))} /></label>
+          <label>OIF number<input className="form-control" maxLength={120} value={assignment.oifNumber} disabled={busy} onChange={e => setAssignment(p => ({ ...p, oifNumber: e.target.value }))} placeholder="CT27008/CA26421" /></label>
           <label>Class hours<input className="form-control" type="number" min="0" max="24" step="0.5" value={assignment.classHandlingHours} disabled={busy} onChange={e => setAssignment(p => ({ ...p, classHandlingHours: e.target.value }))} /></label>
           <label>Mock or IT hours<input className="form-control" type="number" min="0" max="24" step="0.5" value={assignment.mockPrepHours} disabled={busy} onChange={e => setAssignment(p => ({ ...p, mockPrepHours: e.target.value }))} /></label>
           <small>Enter 0 for hours that do not apply.</small>

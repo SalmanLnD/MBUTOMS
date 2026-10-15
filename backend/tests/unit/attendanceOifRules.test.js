@@ -37,6 +37,11 @@ test('only non-campus OIFs allow manual class handling hours', () => {
   assert.equal(allowsManualClassHandlingHours('CT27004'), false);
   assert.equal(allowsManualClassHandlingHours('idsa'), false);
   assert.equal(allowsManualClassHandlingHours('EXT-99'), true);
+  assert.equal(allowsManualClassHandlingHours('CT27008/CA26421'), false);
+  assert.equal(allowsManualClassHandlingHours('ct27008/ct27004'), false);
+  assert.equal(allowsManualClassHandlingHours('CT27008/EXT-99'), true);
+  assert.equal(allowsManualClassHandlingHours('PR/IDSA'), false);
+  assert.equal(countsAsOifDay('CT27008/CA26421'), true);
 });
 
 test('Salman defaults to CA26421 only on no-class days without a saved OIF', () => {

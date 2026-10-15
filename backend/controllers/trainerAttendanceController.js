@@ -25,6 +25,7 @@ import {
 import {
   applyItOifAttendanceRules,
   allowsManualClassHandlingHours,
+  OIF_NUMBER_MAX_LENGTH,
   countsAsOifDay,
   isItOif,
   resolveDefaultNoClassOif,
@@ -70,6 +71,7 @@ import {
   isDateInsideReplacementWindow,
   loadBulkReplacementAttendanceWindows,
 } from '../utils/bulkReplacementAttendance.js';
+import { escapeRegex } from '../utils/regex.js';
 
 const buildLogMap = (logs) => {
   const map = new Map();
@@ -599,8 +601,8 @@ export const upsertTrainerDailyAttendance = async (req, res) => {
   }
 
   const trimmedOif = oifNumber?.trim() || '';
-  if (trimmedOif.length > 12) {
-    return res.status(400).json({ message: 'OIF number must be 12 characters or fewer' });
+  if (trimmedOif.length > OIF_NUMBER_MAX_LENGTH) {
+    return res.status(400).json({ message: `OIF number must be ${OIF_NUMBER_MAX_LENGTH} characters or fewer` });
   }
 
   const isSunday = isAttendanceSundayDate(day);
@@ -795,10 +797,11 @@ export const getTrainerPunchInLogs = async (req, res) => {
   if (req.query.search && !isTrainerLikeRole(req.user.role)) {
     const search = String(req.query.search).trim();
     if (search) {
+      const escaped = escapeRegex(search);
       const matchingTrainers = await Trainer.find({
         $or: [
-          { name: { $regex: search, $options: 'i' } },
-          { employeeId: { $regex: search, $options: 'i' } },
+          { name: { $regex: escaped, $options: 'i' } },
+          { employeeId: { $regex: escaped, $options: 'i' } },
         ],
       })
         .select('_id')
