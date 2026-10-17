@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useLocation } from 'react-router-dom';
 import FeedbackSection from '../components/FeedbackSection.jsx';
 import ObservationsTab from '../components/ObservationsTab.jsx';
 import PlpTab from '../components/PlpTab.jsx';
@@ -8,6 +9,7 @@ import { FULL_ACCESS_ROLES, ROLES } from '../utils/roles.js';
 
 const Performance = () => {
   const { user } = useAuth();
+  const location = useLocation();
   // Exact role check — subject_coordinator must NOT inherit campus_manager here.
   const canManagePlp = FULL_ACCESS_ROLES.includes(user?.role);
   const canSeeFeedback = canManagePlp || user?.role === ROLES.SUBJECT_COORDINATOR;
@@ -24,6 +26,11 @@ const Performance = () => {
   }, [canSeeFeedback, canManagePlp]);
 
   const [activeTab, setActiveTab] = useState(tabs[0]?.id || 'observations');
+
+  useEffect(() => {
+    const requested = new URLSearchParams(location.search).get('tab');
+    if (tabs.some(tab => tab.id === requested)) setActiveTab(requested);
+  }, [location.search, tabs]);
 
   useEffect(() => {
     if (!tabs.some((tab) => tab.id === activeTab)) {

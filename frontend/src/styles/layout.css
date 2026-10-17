@@ -68,6 +68,9 @@
 .notification-mark-read { display: inline-grid; place-items: center; flex-shrink: 0; width: 32px; height: 32px; padding: 0; color: var(--text-muted); background: transparent; border: 1px solid transparent; border-radius: 9px; }
 .notification-mark-read:hover { color: var(--teal); background: var(--teal-soft); border-color: var(--teal); }
 @keyframes targetFlash { 20%,70% { background: var(--amber-soft); box-shadow: inset 4px 0 var(--amber); } }
+.observation-notification-target > td { background: var(--amber-soft) !important; box-shadow: none !important; }
+.observation-notification-target > td:first-child { box-shadow: inset 4px 0 var(--amber) !important; }
+.observation-notification-target { scroll-margin-top: 100px; outline: 2px solid var(--amber); outline-offset: -2px; }
 .notification-target-highlight, .notification-target-highlight > * { animation: targetFlash 2.4s ease; }
 
 @media (min-width: 768px) {

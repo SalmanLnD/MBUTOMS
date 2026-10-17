@@ -69,7 +69,8 @@ const extractDetail = (body) => {
 const shouldNotifyForRequest = (req) => {
   if (!req.user || req.impersonator) return false;
   if (!MUTATING_METHODS.has(req.method)) return false;
-  if (!MANAGER_EDIT_ROLES.has(req.user.role)) return false;
+  if (!MANAGER_EDIT_ROLES.has(req.user.role)
+    && !(req.user.role === ROLES.EVALUATOR && extractResourceKey(req.originalUrl) === 'observations')) return false;
   if (SKIP_PATH_PREFIXES.some((prefix) => req.originalUrl.startsWith(prefix))) return false;
   return true;
 };
@@ -103,11 +104,12 @@ export const createManagerEditNotifications = async (req, responseBody) => {
   if (!recipients.length) return;
 
   const resourceKey = extractResourceKey(req.originalUrl || req.url || '');
-  const resource = RESOURCE_LABELS[resourceKey] || 'record';
-  const action = ACTION_LABELS[req.method] || 'changed';
+  const observation = resourceKey === 'observations' ? buildObservationEditNotification(req, responseBody) : null;
+  const resource = observation?.resource || RESOURCE_LABELS[resourceKey] || 'record';
+  const action = observation?.action || ACTION_LABELS[req.method] || 'changed';
   const detail = extractDetail(responseBody);
   const detailSuffix = detail ? `: ${detail}` : '';
-  const message = `${req.user.name} ${action} a ${resource}${detailSuffix}`;
+  const message = observation?.message || `${req.user.name} ${action} a ${resource}${detailSuffix}`;
 
   await Notification.insertMany(
     recipients.map((recipient) => ({
@@ -118,9 +120,25 @@ export const createManagerEditNotifications = async (req, responseBody) => {
       action,
       resource,
       message,
-      entityPath: getEntityPath(resourceKey, responseBody),
+      entityPath: observation?.entityPath || getEntityPath(resourceKey, responseBody),
     }))
   );
+};
+
+export const buildObservationEditNotification = (req, responseBody) => {
+  const type = String(req.body?.type || '').trim().toLowerCase();
+  const monthKey = String(req.body?.monthKey || '').trim();
+  const trainerId = responseBody?.trainerId;
+  if (!['demo', 'class'].includes(type) || !/^\d{4}-(0[1-9]|1[0-2])$/.test(monthKey || '') || !trainerId) return null;
+  const resource = `${type === 'class' ? 'class' : 'demo'} observation`;
+  const action = responseBody.updatedAt === null ? 'cleared' : 'updated';
+  const trainer = [responseBody.name, responseBody.employeeId].filter(Boolean).join(' · ');
+  const detail = responseBody.classDetail || [responseBody.observationDate, responseBody.observationTime].filter(Boolean).join(' ');
+  return {
+    resource, action,
+    message: `${req.user.name} ${action} ${resource} for ${trainer || trainerId} (${monthKey})${detail ? ` · ${detail}` : ''}`,
+    entityPath: `/performance?${new URLSearchParams({ tab: 'observations', type, month: monthKey, trainer: String(trainerId) })}`,
+  };
 };
 
 export const attachManagerEditNotifier = (req, res) => {

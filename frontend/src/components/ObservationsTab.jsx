@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useLocation } from 'react-router-dom';
 import LoadingSpinner from './LoadingSpinner.jsx';
 import StyledSelect from './StyledSelect.jsx';
 import { getObservations, upsertObservation } from '../services/observationService.js';
@@ -31,6 +32,15 @@ const emptyDraft = (row) => ({
 });
 
 const ObservationsTab = () => {
+  const location = useLocation();
+  const targetRowRef = useRef(null);
+  const loadIdRef = useRef(0);
+  const target = useMemo(() => {
+    const params = new URLSearchParams(location.search);
+    const type = params.get('type'), month = params.get('month'), trainer = params.get('trainer');
+    return params.get('tab') === 'observations' && ['demo', 'class'].includes(type)
+      && /^\d{4}-(0[1-9]|1[0-2])$/.test(month || '') && trainer ? { type, month, trainer } : null;
+  }, [location.search]);
   const [observationType, setObservationType] = useState('demo');
   const [monthParts, setMonthParts] = useState(() => clampMonthParts(getCurrentMonthParts()));
   const [rows, setRows] = useState([]);
@@ -44,26 +54,44 @@ const ObservationsTab = () => {
   const isClass = observationType === 'class';
   const isDemo = observationType === 'demo';
 
+  useEffect(() => {
+    if (!target) return;
+    setObservationType(target.type);
+    const [year, month] = target.month.split('-').map(Number);
+    setMonthParts({ year, month });
+  }, [target]);
+
+  const targetActive = target?.type === observationType && target?.month === monthKey;
+  useEffect(() => {
+    if (loading || !targetActive || !targetRowRef.current) return;
+    targetRowRef.current.scrollIntoView({ block: 'center', inline: 'start', behavior: 'auto' });
+    targetRowRef.current.focus({ preventScroll: true });
+  }, [loading, rows, target, targetActive]);
+
   const loadObservations = useCallback(async () => {
+    const loadId = ++loadIdRef.current;
     setLoading(true);
     setLoadError('');
     try {
       const data = await getObservations({ month: monthKey, type: observationType });
+      if (loadId !== loadIdRef.current) return;
       const trainers = data.trainers || [];
       setRows(trainers);
       setDrafts(Object.fromEntries(
         trainers.map((row) => [row.trainerId, emptyDraft(row)])
       ));
     } catch (err) {
+      if (loadId !== loadIdRef.current) return;
       showError(getErrorMessage(err));
       setLoadError(getErrorMessage(err));
     } finally {
-      setLoading(false);
+      if (loadId === loadIdRef.current) setLoading(false);
     }
   }, [monthKey, observationType]);
 
   useEffect(() => {
     loadObservations();
+    return () => { loadIdRef.current++; };
   }, [loadObservations]);
 
   const updateDraft = (trainerId, field, value) => {
@@ -210,6 +238,14 @@ const ObservationsTab = () => {
         </div>
       </div>
 
+      {targetActive && !loading && (
+        <p className="small text-muted" role="status">
+          {rows.some(row => String(row.trainerId) === target.trainer)
+            ? `Opened the ${isClass ? 'class' : 'demo'} observation from your notification. The trainer’s row is highlighted below.`
+            : 'This trainer’s observation is no longer available in this view.'}
+        </p>
+      )}
+
       {loading ? (
         <LoadingSpinner />
       ) : (
@@ -244,7 +280,11 @@ const ObservationsTab = () => {
                     || String(draft.observationDate || '') !== String(row.observationDate || '')
                     || String(draft.observationTime || '') !== String(row.observationTime || '');
                   return (
-                    <tr key={row.trainerId}>
+                    <tr key={row.trainerId}
+                      ref={targetActive && String(row.trainerId) === target.trainer ? targetRowRef : null}
+                      className={targetActive && String(row.trainerId) === target.trainer ? 'observation-notification-target' : undefined}
+                      tabIndex={targetActive && String(row.trainerId) === target.trainer ? -1 : undefined}
+                    >
                       <td className="fw-medium">{row.name}</td>
                       <td>{row.employeeId}</td>
                       {isClass && (
