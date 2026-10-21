@@ -315,8 +315,8 @@ const Trainers = () => {
                         <th aria-sort={sortBy === 'name' ? (sortOrder === 'asc' ? 'ascending' : 'descending') : 'none'}>
                           <button type="button" className="table-sort" onClick={() => handleSort('name')}>Name{sortIcon('name')}</button>
                         </th>
-                        <th>Subjects</th>
-                        <th>Status</th>
+                        <th className="d-none d-md-table-cell">Subjects</th>
+                        <th className="d-none d-md-table-cell">Status</th>
                         <th>Actions</th>
                       </tr>
                     </thead>
@@ -336,12 +336,12 @@ const Trainers = () => {
                                 {trainer.name}
                               </Link>
                             </td>
-                            <td data-label="Subjects">
+                            <td data-label="Subjects" className="d-none d-md-table-cell">
                               {trainer.subjects?.length > 0
                                 ? trainer.subjects.map((s) => s.code).join(', ')
                                 : '-'}
                             </td>
-                            <td data-label="Status"><span className={`badge ${trainer.status === 'active' ? 'bg-success-subtle text-success' : 'bg-secondary-subtle text-secondary'}`}>{trainer.status === 'active' ? 'Active' : 'Archived'}</span></td>
+                            <td data-label="Status" className="d-none d-md-table-cell"><span className={`badge ${trainer.status === 'active' ? 'bg-success-subtle text-success' : 'bg-secondary-subtle text-secondary'}`}>{trainer.status === 'active' ? 'Active' : 'Archived'}</span></td>
                             <td>
                               <div className="btn-group btn-group-sm action-btn-group">
                                 <ActionIconButton
