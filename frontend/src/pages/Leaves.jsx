@@ -42,6 +42,7 @@ const Leaves = () => {
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState('');
   const [showForm, setShowForm] = useState(false);
+  const [requestType, setRequestType] = useState('leave');
   const [trainers, setTrainers] = useState([]);
   const [form, setForm] = useState({
     trainer: '',
@@ -80,7 +81,8 @@ const Leaves = () => {
       .catch(() => setTrainers([]));
   }, [showForm, canApplyForOthers]);
 
-  const openLeaveForm = () => {
+  const openLeaveForm = (type = 'leave') => {
+    setRequestType(type);
     setForm({
       trainer: '',
       startDate: toInputDate(new Date()),
@@ -128,10 +130,11 @@ const Leaves = () => {
         startDate: form.startDate,
         endDate: form.endDate,
         reason: form.reason,
+        requestType,
       };
       if (canApplyForOthers) payload.trainer = form.trainer;
       await createLeave(payload);
-      showSuccess('Leave application submitted');
+      showSuccess(requestType === 'break' ? 'Break application submitted' : 'Leave application submitted');
       closeLeaveForm();
       fetchLeaves();
     } catch (err) {
@@ -216,7 +219,8 @@ const Leaves = () => {
             { value: 'cancelled', label: 'Cancelled' },
           ]}
         />
-        <button type="button" className="btn btn-primary" onClick={openLeaveForm}>Apply Leave</button>
+        <button type="button" className="btn btn-primary" onClick={() => openLeaveForm('leave')}>Apply Leave</button>
+        <button type="button" className="btn btn-outline-primary" onClick={() => openLeaveForm('break')}>Apply break</button>
       </div>
 
       {loading ? <LoadingSpinner /> : (
@@ -242,7 +246,7 @@ const Leaves = () => {
                     <td className="fw-medium">{leave.trainer?.name}</td>
                     <td>{formatDate(leave.startDate)}</td>
                     <td>{formatDate(leave.endDate)}</td>
-                    <td>{leave.reason}</td>
+                    <td>{leave.requestType === 'break' && <span className="badge bg-info-subtle text-info me-2">Break</span>}{leave.reason}</td>
                     <td>{leave.affectedClassCount ?? leave.affectedSchedules?.length ?? 0}</td>
                     <td><span className={`badge bg-${getLeaveStatusBadgeClass(leave.status)}`}>{formatStatus(leave.status)}</span></td>
                     <td>
@@ -290,9 +294,10 @@ const Leaves = () => {
       )}
 
       {showForm && (
-        <Modal show title="Apply for Leave" onClose={closeLeaveForm}>
+        <Modal show title={requestType === 'break' ? 'Apply for Break' : 'Apply for Leave'} onClose={closeLeaveForm}>
           <form onSubmit={handleSubmit}>
             <div className="toms-modal-body">
+              {requestType === 'break' && <p className="text-muted small">Once approved, these dates will be marked as Break in trainer attendance.</p>}
               {canApplyForOthers && (
                 <div className="mb-3">
                   <label className="form-label">Trainer</label>

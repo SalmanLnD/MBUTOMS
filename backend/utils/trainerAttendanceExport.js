@@ -116,7 +116,7 @@ export const buildTrainerAttendanceExportPayload = async () => {
       status: 'approved',
       ...getLeaveOverlapFilter(TRAINER_ATTENDANCE_TRACKING_START, rangeEnd),
     })
-      .select('trainer startDate endDate reason scope affectedSchedules')
+      .select('trainer startDate endDate reason requestType scope affectedSchedules')
       .lean(),
     Schedule.find({ trainerCode: { $in: allScheduleCodes } })
       .select(`_id trainerCode day ${SPECIAL_CLASS_FIELDS}`)
@@ -147,6 +147,7 @@ export const buildTrainerAttendanceExportPayload = async () => {
   );
 
   const fullDayLeaveKeys = new Set();
+  const breakDateKeys = new Set();
   approvedLeaves.forEach((leave) => {
     const trainerId = leave.trainer.toString();
     const dayScheduleIds = getLeaveWeekdayScheduleIds(
@@ -157,6 +158,7 @@ export const buildTrainerAttendanceExportPayload = async () => {
     dates.forEach((date) => {
       if (isDateWithinLeave(date, leave)) {
         fullDayLeaveKeys.add(`${trainerId}|${toAttendanceDateKey(date)}`);
+        if (leave.requestType === 'break') breakDateKeys.add(`${trainerId}|${toAttendanceDateKey(date)}`);
       }
     });
   });
@@ -203,7 +205,7 @@ export const buildTrainerAttendanceExportPayload = async () => {
           oifNumber = '';
           mockPrepHours = 0;
           classHandlingHours = 0;
-        } else if (holidayMap.has(dateKey) && !(onLeave && isSunday)) {
+        } else if (holidayMap.has(dateKey) && !breakDateKeys.has(key) && !(onLeave && isSunday)) {
           const resolved = resolveOfficialHolidayAttendance(log);
           attendanceType = resolved.attendanceType;
           oifNumber = attendanceTypeUsesOifNumber(attendanceType)
@@ -229,7 +231,8 @@ export const buildTrainerAttendanceExportPayload = async () => {
         } else if (onLeave) {
           const weekday = new Date(`${dateKey}T12:00:00Z`).toLocaleDateString('en-US', { timeZone: 'UTC', weekday: 'long' });
           const replacementRequired = hasUncancelledClassOnDate(schedulesByTrainer.get(trainerId) || [], dateKey, weekday, cancellationMap);
-          attendanceType = resolveApprovedLeaveAttendanceType(isSunday, log?.attendanceType, replacementRequired);
+          attendanceType = breakDateKeys.has(key) ? TRAINER_ATTENDANCE_TYPES.BREAK
+            : resolveApprovedLeaveAttendanceType(isSunday, log?.attendanceType, replacementRequired);
           oifNumber = attendanceTypeUsesOifNumber(attendanceType)
             ? (log?.oifNumber || '')
             : '';

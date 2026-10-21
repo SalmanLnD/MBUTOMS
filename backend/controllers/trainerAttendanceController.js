@@ -196,7 +196,7 @@ export const buildTrainerAttendanceGridPayload = async ({
         status: 'approved',
         ...getLeaveOverlapFilter(rangeStart, rangeEnd),
       })
-        .select('trainer startDate endDate reason scope affectedSchedules')
+        .select('trainer startDate endDate reason requestType scope affectedSchedules')
         .lean()
       : [],
     allScheduleCodes.length
@@ -226,6 +226,7 @@ export const buildTrainerAttendanceGridPayload = async ({
 
   const logMap = buildLogMap(logs);
   const fullDayLeaveKeys = new Set();
+  const breakDateKeys = new Set();
 
   approvedLeaves.forEach((leave) => {
     const trainerId = leave.trainer.toString();
@@ -238,6 +239,7 @@ export const buildTrainerAttendanceGridPayload = async ({
     dates.forEach((date) => {
       if (isDateWithinLeave(date, leave)) {
         fullDayLeaveKeys.add(`${trainerId}|${toAttendanceDateKey(date)}`);
+        if (leave.requestType === 'break') breakDateKeys.add(`${trainerId}|${toAttendanceDateKey(date)}`);
       }
     });
   });
@@ -304,7 +306,7 @@ export const buildTrainerAttendanceGridPayload = async ({
         return;
       }
       const isHoliday = holidayMap.has(dateKey);
-      if (isHoliday && !(isOnLeave && isAttendanceSundayDate(date))) {
+      if (isHoliday && !breakDateKeys.has(cacheKey) && !(isOnLeave && isAttendanceSundayDate(date))) {
         const resolved = resolveOfficialHolidayAttendance(log);
         const attendanceType = resolved.attendanceType;
         const isNonWorking = resolved.isNonWorking;
@@ -350,7 +352,8 @@ export const buildTrainerAttendanceGridPayload = async ({
       }
       if (isOnLeave) {
         const replacementRequired = hasUncancelledClassOnDate(trainerSchedules, dateKey, getAttendanceWeekdayName(date), cancellationMap);
-        const attendanceType = resolveApprovedLeaveAttendanceType(isAttendanceSundayDate(date), log?.attendanceType, replacementRequired);
+        const attendanceType = breakDateKeys.has(cacheKey) ? TRAINER_ATTENDANCE_TYPES.BREAK
+          : resolveApprovedLeaveAttendanceType(isAttendanceSundayDate(date), log?.attendanceType, replacementRequired);
         const leaveOifNumber = attendanceTypeUsesOifNumber(attendanceType)
           ? (log?.oifNumber || '')
           : '';
@@ -551,10 +554,11 @@ export const upsertTrainerDailyAttendance = async (req, res) => {
     status: 'approved',
     ...getLeaveOverlapFilter(day),
   })
-    .select('startDate endDate reason scope affectedSchedules')
+    .select('startDate endDate reason requestType scope affectedSchedules')
     .lean();
 
   let isOnFullDayLeave = false;
+  let isOnBreak = false;
   if (approvedLeaves.length) {
     const trainerDoc = trainerRecord;
     const trainerSchedules = trainerDoc
@@ -570,6 +574,8 @@ export const upsertTrainerDailyAttendance = async (req, res) => {
       const dayScheduleIds = getLeaveWeekdayScheduleIds(leave, trainerSchedules);
       return isFullDayLeave(leave, { dayScheduleIds });
     });
+    isOnBreak = approvedLeaves.some(leave => leave.requestType === 'break' && isDateWithinLeave(day, leave)
+      && isFullDayLeave(leave, { dayScheduleIds: getLeaveWeekdayScheduleIds(leave, trainerSchedules) }));
   }
 
   if (day > today && !canEditFutureLeaveAttendance({
@@ -606,7 +612,10 @@ export const upsertTrainerDailyAttendance = async (req, res) => {
   let resolvedAttendanceType;
   let isNonWorkingDay = false;
 
-  if (isOfficialHoliday && !(isOnFullDayLeave && isSunday)) {
+  if (isOnBreak) {
+    resolvedAttendanceType = TRAINER_ATTENDANCE_TYPES.BREAK;
+    isNonWorkingDay = true;
+  } else if (isOfficialHoliday && !(isOnFullDayLeave && isSunday)) {
     if (!requestedType || requestedType === TRAINER_ATTENDANCE_TYPES.HOLIDAY) {
       resolvedAttendanceType = TRAINER_ATTENDANCE_TYPES.HOLIDAY;
       isNonWorkingDay = true;
@@ -746,7 +755,7 @@ export const upsertTrainerDailyAttendance = async (req, res) => {
     mockPrepHours: resolved.mockPrepHours,
     classHandlingHours: resolved.classHandlingHours,
     classHoursEditable,
-    isOnLeave: isOnFullDayLeave && !isOfficialHoliday,
+    isOnLeave: isOnBreak || (isOnFullDayLeave && !isOfficialHoliday),
     isOfficialHoliday,
     isHolidayOff: isOfficialHoliday && isNonWorkingDay,
     isSundayWeekOff: isSunday && isNonWorkingDay && !isOnFullDayLeave && !isOfficialHoliday,

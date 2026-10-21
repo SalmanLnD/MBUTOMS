@@ -146,6 +146,8 @@ export const getLeaveById = async (req, res) => {
 };
 
 export const createLeave = async (req, res) => {
+  const requestType = req.body.requestType || 'leave';
+  if (!['leave', 'break'].includes(requestType)) return res.status(400).json({ message: 'Request type must be leave or break' });
   let trainerId;
   if (isTrainerLikeRole(req.user.role)) {
     trainerId = req.user.trainer;
@@ -187,6 +189,7 @@ export const createLeave = async (req, res) => {
     startDate,
     endDate,
     reason: req.body.reason,
+    requestType,
     scope: LEAVE_SCOPES.FULL_DAY,
     affectedSchedules: affectedIds,
     replacementNeeded: effectiveSchedules.length > 0,
@@ -466,6 +469,7 @@ export const partialCancelLeave = async (req, res) => {
       startDate: normalizeDate(range.startDate),
       endDate: normalizeDate(range.endDate),
       reason: leave.reason,
+      requestType: leave.requestType || 'leave',
       scope: leave.scope || LEAVE_SCOPES.FULL_DAY,
       status: 'approved',
       affectedSchedules: affectedIds,

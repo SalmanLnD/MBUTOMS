@@ -39,6 +39,7 @@ const monthBoundsForDateKeys = (dateKeys = []) => {
 };
 
 export const applyDefaultExcessRrdAttendance = async ({ leave, markedBy } = {}) => {
+  if (leave?.requestType === 'break') return { eLeaveKeys: [] };
   if (!leave?._id || !leave.trainer) return { eLeaveKeys: [] };
 
   const trainer = await Trainer.findById(leave.trainer)

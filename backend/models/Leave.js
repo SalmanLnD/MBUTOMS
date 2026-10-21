@@ -11,6 +11,7 @@ const leaveSchema = new mongoose.Schema(
     startDate: { type: Date, required: true },
     endDate: { type: Date, required: true },
     reason: { type: String, required: true, trim: true },
+    requestType: { type: String, enum: ['leave', 'break'], default: 'leave' },
     scope: {
       type: String,
       enum: Object.values(LEAVE_SCOPES),
