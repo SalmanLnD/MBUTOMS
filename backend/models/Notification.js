@@ -19,6 +19,7 @@ const notificationSchema = new mongoose.Schema(
     action: { type: String, required: true, trim: true },
     resource: { type: String, required: true, trim: true },
     message: { type: String, required: true, trim: true },
+    pushMessage: { type: String, trim: true },
     entityPath: { type: String, trim: true, default: '' },
     readAt: { type: Date, default: null },
   },

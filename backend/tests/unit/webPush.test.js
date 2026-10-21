@@ -43,7 +43,7 @@ test('push is recipient-specific, ignores inactive/stale sessions, prunes expire
   ];
   const sent = [], deleted = [];
   await deliverWebPush([
-    { _id: 'alert-1', recipient: 'user-1', message: 'Replacement assigned', entityPath: '/topic-tracker?date=2026-10-05' },
+    { _id: 'alert-1', recipient: 'user-1', message: 'Replacement assigned. Password: synthetic-secret', pushMessage: 'Replacement assigned', entityPath: '/topic-tracker?date=2026-10-05' },
     { _id: 'alert-2', recipient: 'user-2', message: 'Ticket closed', entityPath: '//evil.test' },
     { _id: 'alert-3', recipient: 'inactive', message: 'Should not send' },
   ], { config, subscriptions: { find: () => query(devices), deleteOne: async filter => deleted.push(filter) },
@@ -54,6 +54,8 @@ test('push is recipient-specific, ignores inactive/stale sessions, prunes expire
     },
   });
   assert.equal(sent.length, 3);
+  assert.equal(sent[0].payload.body, 'Replacement assigned');
+  assert.ok(sent.every(item => !JSON.stringify(item.payload).includes('synthetic-secret')));
   assert.equal(sent.filter(item => item.payload.recipient === 'user-1').length, 2);
   assert.equal(sent.find(item => item.payload.recipient === 'user-2').payload.url, '/dashboard');
   assert.deepEqual(deleted, [{ _id: 'device-2', recipient: 'user-1' }]);

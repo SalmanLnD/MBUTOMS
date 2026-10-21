@@ -234,7 +234,7 @@ export const reviewLatePunch = async (req, res) => {
 
 export const getLatePunchPhoto = async (req, res) => {
   const record = await TrainerDailyAttendance.findById(req.params.id)
-    .select('punchInAt punchInSource photoPunch punchInImageUrl')
+    .select('date punchInAt punchInSource photoPunch punchInImageUrl')
     .lean();
   if (!record || !LATE_PUNCH_SOURCES.includes(record.punchInSource) || !isLatePunch(record.punchInAt) || !isLateMisconductDate(record.date)) {
     return res.status(404).json({ message: 'Late punch photo not found' });

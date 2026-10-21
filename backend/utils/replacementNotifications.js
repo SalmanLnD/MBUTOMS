@@ -1,5 +1,6 @@
 import Notification from '../models/Notification.js';
 import User from '../models/User.js';
+import Trainer from '../models/Trainer.js';
 import { getLeaveDateKeysForWeekday, toLeaveDateKey } from './leaveDateRange.js';
 
 const formatDateLabel = (dateInput) => {
@@ -55,6 +56,7 @@ const getTrainerUsers = async (trainerIds) => {
   const users = await User.find({
     trainer: { $in: ids },
     isActive: true,
+    role: { $ne: 'demo' },
   }).select('_id trainer').lean();
 
   const byTrainer = new Map();
@@ -229,12 +231,17 @@ export const notifyReplacementAssignment = async ({
   });
 
   if (!isExternal && replacementId) {
+    const credentials = await Trainer.findById(originalTrainer._id).select('camuErpId camuPassword').lean();
+    const camuDetail = credentials?.camuErpId && credentials?.camuPassword
+      ? `\nCAMU ERP student attendance — ${originalTrainer.name}\nLogin ID: ${credentials.camuErpId}\nPassword: ${credentials.camuPassword}`
+      : '\nCAMU ERP credentials are not available. Contact an administrator before marking student attendance.';
     for (const user of usersByTrainer.get(replacementId) || []) {
       notifications.push({
         ...base,
         recipient: user._id,
         action: 'assigned',
-        message: messages.replacement,
+        message: messages.replacement + camuDetail,
+        pushMessage: messages.replacement,
         entityPath: `${commonPath}&trainer=${replacementId}`,
       });
     }

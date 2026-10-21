@@ -67,7 +67,7 @@ export const deliverWebPush = async (notifications, dependencies = {}) => {
     await Promise.all(jobs.slice(offset, offset + 8).map(async ({ item, device }) => {
       try {
         await send({ endpoint: device.endpoint, keys: device.keys }, JSON.stringify({
-          title: 'TOMS', body: String(item.message || 'You have a new notification').slice(0, 400),
+          title: 'TOMS', body: String(item.pushMessage || item.message || 'You have a new notification').slice(0, 400),
           recipient: String(item.recipient), id: String(item._id), url: safeNotificationPath(item.entityPath),
         }), { vapidDetails: config, TTL: 3600, timeout: 5000, urgency: 'normal' });
       } catch (error) {

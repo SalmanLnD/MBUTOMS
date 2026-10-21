@@ -44,6 +44,8 @@ const LatePunchPhoto = ({ item, onOpen }) => {
   const [failed, setFailed] = useState(false);
 
   useEffect(() => {
+    setFailed(false);
+    setSrc(item.photoMode === 'url' ? item.photoUrl : '');
     if (item.photoMode !== 'drive') return undefined;
     let active = true;
     let objectUrl = '';
@@ -60,17 +62,17 @@ const LatePunchPhoto = ({ item, onOpen }) => {
       active = false;
       if (objectUrl) URL.revokeObjectURL(objectUrl);
     };
-  }, [item._id, item.photoMode]);
+  }, [item._id, item.photoMode, item.photoUrl]);
 
   if (!item.hasPhoto || failed) {
-    return <div className="late-punch-photo late-punch-photo--empty">No photo saved</div>;
+    return <div className="late-punch-photo late-punch-photo--empty">{item.hasPhoto ? 'Photo unavailable. Please retry.' : 'No photo saved'}</div>;
   }
   if (!src) {
     return <div className="late-punch-photo late-punch-photo--empty">Loading photo</div>;
   }
   return (
     <button type="button" className="late-punch-photo-button" aria-label="View punch photo" onClick={() => onOpen(src)}>
-      <img src={src} alt="" className="late-punch-photo" />
+      <img src={src} alt="Punch-in photo" className="late-punch-photo" onError={() => setFailed(true)} />
     </button>
   );
 };
