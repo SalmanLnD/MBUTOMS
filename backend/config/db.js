@@ -15,6 +15,7 @@ import { syncQavaTrainerLinks } from '../utils/syncQavaTrainerLinks.js';
 import { migrateClassesFromSchedules } from '../utils/migrateClassesFromSchedules.js';
 import { repairClassIndexesAndPy } from '../utils/repairClassIndexesAndPy.js';
 import { ensureOfficialHolidays } from '../utils/officialHolidays.js';
+import { migrateSubjectEndDates } from '../utils/migrateSubjectEndDates.js';
 
 const getCache = () => {
   if (!globalThis._mongooseCache) {
@@ -25,6 +26,7 @@ const getCache = () => {
 
 /** Lightweight role sync for serverless (Vercel skips full startup). */
 const runRoleSync = async () => {
+  await migrateSubjectEndDates();
   const coordinatorSync = await syncSubjectCoordinators();
   const evaluatorSync = await syncEvaluators();
   const qavaLinkSync = await syncQavaTrainerLinks();
@@ -41,6 +43,7 @@ const runRoleSync = async () => {
 
 const runEssentialStartup = async () => {
   const counts = await ensureReferenceData();
+  await migrateSubjectEndDates();
   const subjectTopicsMigration = await migrateSubjectTopicsFromCatalog();
   const coordinatorSync = await syncSubjectCoordinators();
   const evaluatorSync = await syncEvaluators();

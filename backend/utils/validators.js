@@ -52,6 +52,8 @@ export const subjectValidation = [
   body('oifNumber').trim().notEmpty().withMessage('OIF number is required'),
   body('dealNumber').trim().notEmpty().withMessage('Deal number is required'),
   body('startDate').notEmpty().withMessage('Start date is required'),
+  body('endDate').optional().isISO8601().withMessage('Valid end date is required')
+    .custom((value, { req }) => new Date(value) >= new Date(req.body.startDate)).withMessage('End date must be on or after start date'),
   body('academicYear').optional({ values: 'falsy' }).trim().notEmpty().withMessage('Academic year is required'),
   body('hours').optional().isInt({ min: 0 }).withMessage('Hours must be a positive number'),
 ];

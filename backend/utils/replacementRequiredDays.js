@@ -113,7 +113,7 @@ export const getReplacementRequiredDaysByTrainer = async ({
         .lean()
       : [],
     loadOfficialHolidayMap(rangeStart, endDate),
-    getCancellationMapForRange(rangeStart, endDate),
+    getCancellationMapForRange(rangeStart, endDate, { includeSubjectDates: true }),
   ]);
 
   const schedulesByCode = new Map();
@@ -205,7 +205,7 @@ export const getTrainerRrdDateKeys = async ({
       ? Schedule.find({ trainerCode: { $in: codes } }).select(`_id trainerCode day ${SPECIAL_CLASS_FIELDS}`).lean()
       : [],
     loadOfficialHolidayMap(rangeStart, endDate),
-    getCancellationMapForRange(rangeStart, endDate),
+    getCancellationMapForRange(rangeStart, endDate, { includeSubjectDates: true }),
   ]);
 
   const fromKey = toAttendanceDateKey(rangeStart);

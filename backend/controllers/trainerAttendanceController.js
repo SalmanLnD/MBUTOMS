@@ -50,6 +50,7 @@ import {
   canEditFutureLeaveAttendance,
   formatTrainerAttendanceOifDisplay,
   isLeaveAttendanceType,
+  resolveApprovedLeaveAttendanceType,
   TRAINER_ATTENDANCE_TYPES,
 } from '../utils/trainerAttendanceTypes.js';
 import { isValidFoodAllowance } from '../utils/foodAllowanceTypes.js';
@@ -204,7 +205,7 @@ export const buildTrainerAttendanceGridPayload = async ({
         .lean()
       : [],
     loadOfficialHolidayMap(rangeStart, rangeEnd),
-    getCancellationMapForRange(rangeStart, rangeEnd),
+    getCancellationMapForRange(rangeStart, rangeEnd, { includeSubjectDates: true }),
   ]);
 
   const schedulesByCode = new Map();
@@ -303,7 +304,7 @@ export const buildTrainerAttendanceGridPayload = async ({
         return;
       }
       const isHoliday = holidayMap.has(dateKey);
-      if (isHoliday) {
+      if (isHoliday && !(isOnLeave && isAttendanceSundayDate(date))) {
         const resolved = resolveOfficialHolidayAttendance(log);
         const attendanceType = resolved.attendanceType;
         const isNonWorking = resolved.isNonWorking;
@@ -348,13 +349,11 @@ export const buildTrainerAttendanceGridPayload = async ({
         return;
       }
       if (isOnLeave) {
-        const attendanceType = isLeaveAttendanceType(log?.attendanceType)
-          ? log.attendanceType
-          : TRAINER_ATTENDANCE_TYPES.LEAVE;
+        const replacementRequired = hasUncancelledClassOnDate(trainerSchedules, dateKey, getAttendanceWeekdayName(date), cancellationMap);
+        const attendanceType = resolveApprovedLeaveAttendanceType(isAttendanceSundayDate(date), log?.attendanceType, replacementRequired);
         const leaveOifNumber = attendanceTypeUsesOifNumber(attendanceType)
           ? (log?.oifNumber || '')
           : '';
-        const weekdayName = getAttendanceWeekdayName(date);
         days[dateKey] = {
           id: log?._id || null,
           attendanceType,
@@ -368,12 +367,7 @@ export const buildTrainerAttendanceGridPayload = async ({
           isSundayWeekOff: false,
           classHoursEditable: false,
           // RRD only when that leave day still has uncancelled classes.
-          isReplacementRequired: hasUncancelledClassOnDate(
-            trainerSchedules,
-            dateKey,
-            weekdayName,
-            cancellationMap
-          ),
+          isReplacementRequired: replacementRequired,
           isFuture: date > today,
         };
         return;
@@ -612,7 +606,7 @@ export const upsertTrainerDailyAttendance = async (req, res) => {
   let resolvedAttendanceType;
   let isNonWorkingDay = false;
 
-  if (isOfficialHoliday) {
+  if (isOfficialHoliday && !(isOnFullDayLeave && isSunday)) {
     if (!requestedType || requestedType === TRAINER_ATTENDANCE_TYPES.HOLIDAY) {
       resolvedAttendanceType = TRAINER_ATTENDANCE_TYPES.HOLIDAY;
       isNonWorkingDay = true;
@@ -626,10 +620,10 @@ export const upsertTrainerDailyAttendance = async (req, res) => {
       return res.status(400).json({ message: 'Select a valid holiday attendance type.' });
     }
   } else if (isOnFullDayLeave) {
-    resolvedAttendanceType = requestedType || TRAINER_ATTENDANCE_TYPES.LEAVE;
-    if (!isLeaveAttendanceType(resolvedAttendanceType)) {
+    if (!isLeaveAttendanceType(requestedType || TRAINER_ATTENDANCE_TYPES.LEAVE)) {
       return res.status(400).json({ message: 'Select a valid leave type.' });
     }
+    resolvedAttendanceType = resolveApprovedLeaveAttendanceType(isSunday, requestedType);
     isNonWorkingDay = true;
   } else if (isSunday) {
     if (!requestedType || requestedType === TRAINER_ATTENDANCE_TYPES.WEEK_OFF) {

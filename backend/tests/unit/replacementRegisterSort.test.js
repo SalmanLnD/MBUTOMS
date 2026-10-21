@@ -4,6 +4,8 @@ import { getAllReplacements } from '../../controllers/replacementController.js';
 import Leave from '../../models/Leave.js';
 import ClassCancellation from '../../models/ClassCancellation.js';
 import OfficialHoliday from '../../models/OfficialHoliday.js';
+import Schedule from '../../models/Schedule.js';
+import Subject from '../../models/Subject.js';
 
 test('date sorting uses occurrence/bulk dates across all pages, in both directions', async (t) => {
   const query = (rows) => ({
@@ -27,6 +29,8 @@ test('date sorting uses occurrence/bulk dates across all pages, in both directio
   t.mock.method(Leave, 'find', () => query(leaves));
   t.mock.method(ClassCancellation, 'find', () => query([]));
   t.mock.method(OfficialHoliday, 'find', () => query([]));
+  t.mock.method(Schedule, 'find', () => query([]));
+  t.mock.method(Subject, 'find', () => query([]));
   for (const [sortOrder, expected] of [['asc', ['earlier', 'bulk', 'later']], ['desc', ['later', 'bulk', 'earlier']]]) {
     for (let page = 1; page <= 3; page += 1) {
       let result;

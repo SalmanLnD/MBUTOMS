@@ -35,7 +35,7 @@ function fixtures(t, { schedules = [schedule()], leaves = [], cancellations = []
     trainers.filter((trainer) => !filter._id || filter._id.$in.includes(trainer._id))
   ));
   t.mock.method(Schedule, 'find', (filter) => query(schedules.filter((row) =>
-    filter._id ? filter._id.$in.includes(row._id) : filter.trainerCode.$in.includes(row.trainerCode)
+    filter._id ? filter._id.$in.includes(row._id) : !filter.trainerCode || filter.trainerCode.$in.includes(row.trainerCode)
   )));
   t.mock.method(Leave, 'find', (filter) => query(leaves.filter((leave) =>
     leave.status === 'approved' && (filter.trainer

@@ -2,46 +2,12 @@ import Subject from '../models/Subject.js';
 import { normalizeAttendanceDate as normalizeDate } from './attendanceTracking.js';
 import { createAsyncReportCache } from './asyncReportCache.js';
 import { invalidateDerivedData } from './dataRevision.js';
+import { resolveSubjectEndDate } from './subjectTrainingDates.js';
+export { resolveSubjectEndDate } from './subjectTrainingDates.js';
 
 /** Fallback when a schedule slot is not linked to a subject record. */
 export const DEFAULT_SUBJECT_START_DATE = new Date(Date.UTC(2026, 6, 13));
-export const DEFAULT_SUBJECT_END_DATE = new Date(Date.UTC(2026, 10, 10));
-
-const SOLAS_END_DATE = new Date(Date.UTC(2026, 10, 10));
-const SCHOOL_END_DATE = new Date(Date.UTC(2026, 10, 6));
-
-const normalizeString = (value) => String(value || '').trim();
-
-export const resolveSubjectEndDate = (subject = {}) => {
-  const code = normalizeString(subject.code).toUpperCase();
-  const name = normalizeString(subject.name).toUpperCase();
-
-  if (subject.endDate) {
-    return normalizeDate(subject.endDate);
-  }
-
-  if (
-    code === '22CA102006'
-    || code === 'PSTJ'
-    || /PSTJ|DSAP|QAVA/.test(name)
-    || /22CA102006|22LG101702/.test(code)
-  ) {
-    return new Date(SOLAS_END_DATE);
-  }
-
-  if (
-    code === '22LG101703'
-    || code === 'LRRE'
-    || code === 'PSTP'
-    || code === 'IDSA'
-    || /PSTP|IDSA|LRRE/.test(name)
-    || /22CS102033|22LG101703/.test(code)
-  ) {
-    return new Date(SCHOOL_END_DATE);
-  }
-
-  return null;
-};
+export const DEFAULT_SUBJECT_END_DATE = new Date(Date.UTC(2026, 10, 6));
 
 const readSubjectMap = createAsyncReportCache({ ttlMs: 60_000, maxEntries: 1 });
 export const buildSubjectStartDateMap = () => readSubjectMap('subjects', async () => {
@@ -72,7 +38,7 @@ export const getScheduleSubjectRange = (schedule, map) => {
   const meta = map.byId.get(id) || map.byCode.get(code);
   return {
     startDate: meta?.startDate || DEFAULT_SUBJECT_START_DATE,
-    endDate: meta?.endDate || DEFAULT_SUBJECT_END_DATE,
+    endDate: meta?.endDate || resolveSubjectEndDate({ code, name: schedule.subject?.name, endDate: schedule.subject?.endDate }),
   };
 };
 

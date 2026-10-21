@@ -38,6 +38,12 @@ export const attendanceTypeUsesOifNumber = (attendanceType) => [
 export const isLeaveAttendanceType = (attendanceType) =>
   LEAVE_ATTENDANCE_TYPES.includes(attendanceType);
 
+// Approved Sunday leave is leave on a weekly off, independent of stored defaults.
+export const resolveApprovedLeaveAttendanceType = (isSunday, storedType, replacementRequired = true) => isSunday
+  ? TRAINER_ATTENDANCE_TYPES.LWO
+  : storedType === TRAINER_ATTENDANCE_TYPES.E_LEAVE && !replacementRequired ? TRAINER_ATTENDANCE_TYPES.LEAVE
+  : isLeaveAttendanceType(storedType) ? storedType : TRAINER_ATTENDANCE_TYPES.LEAVE;
+
 export const canEditFutureLeaveAttendance = ({ role, isOnFullDayLeave }) =>
   role === 'admin' && Boolean(isOnFullDayLeave);
 

@@ -21,11 +21,13 @@ import { resolveTrainerScheduleCodes } from './trainerMappings.js';
 import { getLeaveOverlapFilter, isDateWithinLeave } from './leaveDateRange.js';
 import { getLeaveWeekdayScheduleIds, isFullDayLeave } from './leaveScope.js';
 import { SPECIAL_CLASS_FIELDS } from './specialClass.js';
+import { getCancellationMapForRange, hasUncancelledClassOnDate } from './leaveAffectedClasses.js';
 import { applyItOifAttendanceRules, allowsManualClassHandlingHours, resolveDefaultNoClassOif } from './attendanceOifRules.js';
 import {
   attendanceTypeUsesOifNumber,
   formatTrainerAttendanceOifDisplay,
   isLeaveAttendanceType,
+  resolveApprovedLeaveAttendanceType,
   TRAINER_ATTENDANCE_TYPES,
 } from './trainerAttendanceTypes.js';
 import { formatFoodAllowance } from './foodAllowanceTypes.js';
@@ -103,7 +105,7 @@ export const buildTrainerAttendanceExportPayload = async () => {
   );
   const allScheduleCodes = [...new Set([...codesByTrainer.values()].flat())];
 
-  const [logs, classHours, approvedLeaves, schedules, holidayMap] = await Promise.all([
+  const [logs, classHours, approvedLeaves, schedules, holidayMap, cancellationMap] = await Promise.all([
     TrainerDailyAttendance.find({
       trainer: { $in: trainerIds },
       date: { $gte: TRAINER_ATTENDANCE_TRACKING_START, $lte: rangeEnd },
@@ -120,6 +122,7 @@ export const buildTrainerAttendanceExportPayload = async () => {
       .select(`_id trainerCode day ${SPECIAL_CLASS_FIELDS}`)
       .lean(),
     loadOfficialHolidayMap(TRAINER_ATTENDANCE_TRACKING_START, rangeEnd),
+    getCancellationMapForRange(TRAINER_ATTENDANCE_TRACKING_START, rangeEnd, { includeSubjectDates: true }),
   ]);
 
   const logsByTrainerDate = new Map(
@@ -200,7 +203,7 @@ export const buildTrainerAttendanceExportPayload = async () => {
           oifNumber = '';
           mockPrepHours = 0;
           classHandlingHours = 0;
-        } else if (holidayMap.has(dateKey)) {
+        } else if (holidayMap.has(dateKey) && !(onLeave && isSunday)) {
           const resolved = resolveOfficialHolidayAttendance(log);
           attendanceType = resolved.attendanceType;
           oifNumber = attendanceTypeUsesOifNumber(attendanceType)
@@ -224,9 +227,9 @@ export const buildTrainerAttendanceExportPayload = async () => {
             classHandlingHours = applied.classHandlingHours;
           }
         } else if (onLeave) {
-          attendanceType = isLeaveAttendanceType(log?.attendanceType)
-            ? log.attendanceType
-            : TRAINER_ATTENDANCE_TYPES.LEAVE;
+          const weekday = new Date(`${dateKey}T12:00:00Z`).toLocaleDateString('en-US', { timeZone: 'UTC', weekday: 'long' });
+          const replacementRequired = hasUncancelledClassOnDate(schedulesByTrainer.get(trainerId) || [], dateKey, weekday, cancellationMap);
+          attendanceType = resolveApprovedLeaveAttendanceType(isSunday, log?.attendanceType, replacementRequired);
           oifNumber = attendanceTypeUsesOifNumber(attendanceType)
             ? (log?.oifNumber || '')
             : '';

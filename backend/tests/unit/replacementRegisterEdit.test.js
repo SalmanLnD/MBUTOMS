@@ -5,6 +5,8 @@ import Leave from '../../models/Leave.js';
 import Trainer from '../../models/Trainer.js';
 import ClassCancellation from '../../models/ClassCancellation.js';
 import OfficialHoliday from '../../models/OfficialHoliday.js';
+import Schedule from '../../models/Schedule.js';
+import Subject from '../../models/Subject.js';
 
 const query = (rows) => ({
   populate() { return this; },
@@ -67,6 +69,8 @@ test('approved previous-date replacements can still be assigned, edited, or dele
   t.mock.method(Trainer, 'find', () => query([]));
   t.mock.method(ClassCancellation, 'find', () => query([]));
   t.mock.method(OfficialHoliday, 'find', () => query([]));
+  t.mock.method(Schedule, 'find', () => query([]));
+  t.mock.method(Subject, 'find', () => query([]));
 
   let result;
   await getAllReplacements({ query: { limit: 10 } }, {

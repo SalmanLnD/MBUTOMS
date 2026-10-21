@@ -19,6 +19,7 @@ import {
 } from './leaveDateRange.js';
 import { getCancellationMapForRange } from './leaveAffectedClasses.js';
 import { loadOfficialHolidayMap } from './officialHolidays.js';
+import { resolveSubjectEndDate } from './subjectTrainingDates.js';
 
 const SCHEDULE_FIELDS = `day startTime endTime trainerCode semester subject subjectCode ${SPECIAL_CLASS_FIELDS}`;
 const EXPLANATION_FIELDS = 'department section slot venue specialReason includeInRtet';
@@ -44,7 +45,7 @@ const resolveEndDate = (schedule, subjectStartMap) => {
   if (subjectCode && subjectStartMap.byCode.has(subjectCode)) {
     return subjectStartMap.byCode.get(subjectCode).endDate || null;
   }
-  return null;
+  return resolveSubjectEndDate({ code: schedule.subjectCode || schedule.subject?.code, name: schedule.subject?.name, endDate: schedule.subject?.endDate });
 };
 
 const isActiveOnDate = (schedule, referenceDate, subjectStartMap) => {

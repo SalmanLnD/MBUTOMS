@@ -1,5 +1,6 @@
 import mongoose from 'mongoose';
 import { DEFAULT_SLOT_TIMINGS } from '../utils/timetableSlots.js';
+import { defaultSubjectEndDate } from '../utils/subjectTrainingDates.js';
 
 const periodTimingSchema = new mongoose.Schema(
   {
@@ -44,6 +45,8 @@ const subjectSchema = new mongoose.Schema(
     oifNumber: { type: String, required: true, trim: true },
     dealNumber: { type: String, required: true, trim: true },
     startDate: { type: Date, required: true },
+    endDate: { type: Date, required: true, default: function () { return defaultSubjectEndDate(this); },
+      validate: { validator: function (value) { return !this.startDate || value >= this.startDate; }, message: 'End date must be on or after start date' } },
     academicYear: { type: String, trim: true, default: '2026-27' },
     syllabusUrl: { type: String, trim: true, default: '' },
     choUrl: { type: String, trim: true, default: '' },

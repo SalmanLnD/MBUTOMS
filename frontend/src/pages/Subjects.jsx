@@ -318,6 +318,7 @@ const Subjects = () => {
                     <tr>
                       <th>Code</th>
                       <th>Name</th>
+                      <th>End date</th>
                       {!isTrainerUser && (
                         <>
                           <th>School</th>
@@ -333,7 +334,7 @@ const Subjects = () => {
                     {subjects.length === 0 ? (
                       <tr>
                         <td
-                          colSpan={isTrainerUser ? (canManage ? 3 : 2) : (canManage ? 7 : 6)}
+                          colSpan={isTrainerUser ? (canManage ? 4 : 3) : (canManage ? 8 : 7)}
                           className="text-center text-muted py-4"
                         >
                           No subjects found
@@ -361,6 +362,7 @@ const Subjects = () => {
                           >
                             <td><code>{subject.code}</code></td>
                             <td className="fw-medium">{subject.name}</td>
+                            <td className="text-nowrap">{subject.endDate ? new Date(subject.endDate).toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata', day: '2-digit', month: 'short', year: 'numeric' }) : '—'}</td>
                             {!isTrainerUser && (
                               <>
                                 <td>{formatSchools(subject)}</td>
@@ -428,6 +430,10 @@ const Subjects = () => {
               <div className="col-sm-4">
                 <label className="text-muted small">Academic Year</label>
                 <p className="mb-0">{selectedSubject.academicYear || '2026-27'}</p>
+              </div>
+              <div className="col-sm-4">
+                <label className="text-muted small">Last training day</label>
+                <p className="mb-0">{selectedSubject.endDate ? new Date(selectedSubject.endDate).toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata', day: '2-digit', month: 'short', year: 'numeric' }) : '—'}</p>
               </div>
               {showFullSubjectDetails && (
                 <>

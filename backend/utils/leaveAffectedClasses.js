@@ -6,6 +6,10 @@ import {
   toLeaveDateKey,
 } from './leaveDateRange.js';
 import { isSpecialScheduleActiveOnDate } from './specialClass.js';
+import Schedule from '../models/Schedule.js';
+import { buildSubjectStartDateMap, isScheduleWithinSubjectDates } from './subjectStartDate.js';
+import { getAttendanceCalendarDates } from './attendanceDates.js';
+import { SPECIAL_CLASS_FIELDS } from './specialClass.js';
 
 const getScheduleId = (schedule) =>
   schedule?._id?.toString?.() || schedule?.toString?.() || '';
@@ -38,17 +42,36 @@ export const buildCanceledScheduleIdsByDate = (cancellations = []) => {
   return result;
 };
 
-export const getCancellationMapForRange = async (startDate, endDate) => {
-  const cancellations = await ClassCancellation.find({
+export const getCancellationMapForRange = async (startDate, endDate, { includeSubjectDates = false } = {}) => {
+  const [cancellations, schedules, subjectDates] = await Promise.all([ClassCancellation.find({
     date: {
       $gte: normalizeAttendanceDate(startDate),
       $lte: normalizeAttendanceDate(endDate),
     },
   })
     .select('date schedules')
-    .lean();
+    .lean(),
+    includeSubjectDates ? Schedule.find({}).select(`_id subject subjectCode ${SPECIAL_CLASS_FIELDS}`).lean() : [],
+    includeSubjectDates ? buildSubjectStartDateMap() : null,
+  ]);
 
-  return buildCanceledScheduleIdsByDate(cancellations);
+  if (!includeSubjectDates) return buildCanceledScheduleIdsByDate(cancellations);
+  return addSubjectDateExclusions(buildCanceledScheduleIdsByDate(cancellations), schedules,
+    getAttendanceCalendarDates(startDate, endDate), subjectDates);
+};
+
+// The shared exclusion map also suppresses timetable slots outside training dates.
+// Nothing is persisted as a cancellation; all leave, RRD and export callers agree.
+export const addSubjectDateExclusions = (map, schedules, dates, subjectDates) => {
+  for (const date of dates) {
+    const key = toLeaveDateKey(date);
+    for (const schedule of schedules) {
+      if (isScheduleWithinSubjectDates(schedule, date, subjectDates)) continue;
+      if (!map.has(key)) map.set(key, new Set());
+      map.get(key).add(getScheduleId(schedule));
+    }
+  }
+  return map;
 };
 
 /**
@@ -59,7 +82,7 @@ export const getLeaveClassExclusionsForRange = async (startDate, endDate) => {
   const start = normalizeAttendanceDate(startDate);
   const end = normalizeAttendanceDate(endDate);
   const [cancellationMap, holidayMap] = await Promise.all([
-    getCancellationMapForRange(start, end),
+    getCancellationMapForRange(start, end, { includeSubjectDates: true }),
     loadOfficialHolidayMap(start, end),
   ]);
 
@@ -76,6 +99,7 @@ export const hasUncancelledClassOnDate = (
   canceledScheduleIdsByDate = new Map()
 ) =>
   schedules.some((schedule) => {
+    if (new Date(`${dateKey}T12:00:00Z`).getUTCDay() === 0) return false;
     if (schedule.day !== weekdayName) return false;
     if (!isSpecialScheduleActiveOnDate(schedule, dateKey)) return false;
     const scheduleId = getScheduleId(schedule);
@@ -91,6 +115,7 @@ export const getUncancelledScheduleDateKeys = (
   const holidays = toHolidayDateKeySet(holidayDateKeys);
   const scheduleId = getScheduleId(schedule);
   return getLeaveDateKeysForWeekday(leave, schedule?.day).filter((dateKey) => {
+    if (new Date(`${dateKey}T12:00:00Z`).getUTCDay() === 0) return false;
     if (holidays.has(dateKey)) return false;
     if (!isSpecialScheduleActiveOnDate(schedule, dateKey)) return false;
     return !canceledScheduleIdsByDate.get(dateKey)?.has(scheduleId);

@@ -10,6 +10,8 @@ import { buildTrainerAvailabilityForRange } from '../utils/trainerAvailability.j
 import { clearAttendanceGridCache } from '../utils/attendanceGridCache.js';
 import { clearAttendanceExportCache } from '../services/attendanceSheetsService.js';
 import { notifyReplacementAssignment, notifyReplacementCancellation } from '../utils/replacementNotifications.js';
+import { filterSchedulesActiveOnDate } from '../utils/activeSchedulesForDate.js';
+import { isScheduleActiveOnDate } from '../utils/subjectStartDate.js';
 import { LEAVE_SCOPES } from '../utils/leaveScope.js';
 import {
   getEffectiveAffectedSchedules,
@@ -1206,9 +1208,10 @@ export const getTrainerSlotsForReplacement = async (req, res) => {
     loadOfficialHolidayMap(slotDate, slotDate),
   ]);
   const isOfficialHoliday = holidayMap.has(toAttendanceDateKey(slotDate));
-  const schedules = isOfficialHoliday
+  const activeClasses = await filterSchedulesActiveOnDate(scheduledClasses, slotDate);
+  const schedules = isOfficialHoliday || dayName === 'Sunday'
     ? []
-    : scheduledClasses.filter(
+    : activeClasses.filter(
       (schedule) => !canceledScheduleIds.has(schedule._id.toString())
     );
 
@@ -1252,6 +1255,9 @@ export const createSlotReplacementRequest = async (req, res) => {
   const dayName = WEEKDAYS[slotDate.getDay()];
   if (schedule.day !== dayName) {
     return res.status(400).json({ message: 'Selected slot does not occur on the chosen date' });
+  }
+  if (dayName === 'Sunday' || !await isScheduleActiveOnDate(schedule, slotDate)) {
+    return res.status(400).json({ message: 'No replacement is needed outside the subject training dates or on Sunday.' });
   }
   const canceledScheduleIds = await getCanceledScheduleIdsForDate(slotDate);
   if (canceledScheduleIds.has(schedule._id.toString())) {
