@@ -22,10 +22,11 @@ test('directory migration preserves existing visible trainers and archives only 
  t.mock.method(Trainer,'find',()=>query([{_id:'current-1'},{_id:'current-2'}]));
  t.mock.method(Trainer,'updateMany',async(filter,update)=>writes.push({filter,update}));
  await migrateTrainerDirectoryStatus();
- assert.equal(writes.length,2);
- assert.deepEqual(writes[0].filter._id,{$in:['current-1','current-2']});
- assert.equal(writes[0].update.$set.status,'active');
- assert.equal(writes[1].update.$set.status,'archived');
- assert.ok(writes.every(write=>write.filter.directoryStatusInitializedAt.$exists===false));
- pending=false;await migrateTrainerDirectoryStatus();assert.equal(writes.length,2);
+ assert.equal(writes.length,3);
+ assert.equal(writes[0].update.$set.employmentStatus,'active');
+ assert.deepEqual(writes[1].filter._id,{$in:['current-1','current-2']});
+ assert.equal(writes[1].update.$set.status,'active');
+ assert.equal(writes[2].update.$set.status,'archived');
+ assert.ok(writes.slice(1).every(write=>write.filter.directoryStatusInitializedAt.$exists===false));
+ pending=false;await migrateTrainerDirectoryStatus();assert.equal(writes.length,4);
 });

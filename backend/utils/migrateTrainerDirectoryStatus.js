@@ -4,6 +4,9 @@ import { mergeUiTrainerFilter } from './trainerEmployment.js';
 
 // Initialize existing records once. Later archive/unarchive choices are preserved.
 export const migrateTrainerDirectoryStatus = async () => {
+  await Trainer.updateMany({ status: 'active', directoryReactivatedAt: { $ne: null }, employmentStatus: { $in: ['resigned', 'relocated'] } }, {
+    $set: { employmentStatus: 'active', resignationDate: null, includeInAttendanceUntilMonth: '', showInRoster: true },
+  });
   const missing = { directoryStatusInitializedAt: { $exists: false } };
   if (!await Trainer.exists(missing)) return;
   const visibleFilter = await mergeUiTrainerFilter(await mergeRosterFilter({}, { rosterOnly: false }));

@@ -31,12 +31,12 @@ test('RTET is written and flushed even when attendance API returns 502', () => {
   const { context, calls } = harness();
   context.fetchTomsJson = url => {
     calls.push(['fetch', url]);
-    if (url === '__EXPORT_URL__') throw new Error('HTTP 502');
+    if (url.startsWith('__EXPORT_URL__')) throw new Error('HTTP 502');
     return { dateLabels: ['11 Sept 2026'], subjects: [{ name: 'Subject A', hours: [2] }] };
   };
   assert.throws(() => context.syncTrainerAttendance(), /Attendance: HTTP 502/);
   const write = calls.findIndex(c => c[0] === 'setValues');
-  const attendance = calls.findIndex(c => c[0] === 'fetch' && c[1] === '__EXPORT_URL__');
+  const attendance = calls.findIndex(c => c[0] === 'fetch' && c[1].startsWith('__EXPORT_URL__'));
   assert.ok(write >= 0 && write < attendance);
   assert.ok(calls.slice(write, attendance).some(c => c[0] === 'flush'));
   assert.equal(calls[write][1][1][2], 2);

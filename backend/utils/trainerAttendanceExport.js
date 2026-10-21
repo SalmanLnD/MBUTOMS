@@ -83,7 +83,7 @@ export const buildTrainerAttendanceExportPayload = async () => {
   const trainerRowsRaw = await Trainer.find(
     await mergeAttendanceExportTrainerFilter({})
   )
-    .select('name employeeId scheduleTrainerCodes employmentStatus resignationDate joiningDate createdAsBulkReplacement replacementAttendanceFrom replacementAttendanceTo')
+    .select('name employeeId status directoryReactivatedAt scheduleTrainerCodes employmentStatus resignationDate joiningDate createdAsBulkReplacement replacementAttendanceFrom replacementAttendanceTo')
     .sort({ name: 1 })
     .lean();
   const replacementWindows = await loadBulkReplacementAttendanceWindows();
@@ -288,6 +288,9 @@ export const buildTrainerAttendanceExportPayload = async () => {
     });
 
   return {
+    syncVersion: 2,
+    inactiveEmployeeIds: (await Trainer.find({ status: { $ne: 'active' } }).select('employeeId').lean()).map(trainer => String(trainer.employeeId)),
+    authoritativeDates: logs.map(log => ({ employeeId: trainerRows.find(trainer => String(trainer._id) === String(log.trainer))?.employeeId, date: toAttendanceDateKey(log.date) })).filter(row => row.employeeId),
     sheetName: 'Trainer Attendance from July 13',
     dateGroupSize: DAILY_FIELDS.length,
     frozenRows: 2,

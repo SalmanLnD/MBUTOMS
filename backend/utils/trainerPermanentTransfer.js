@@ -111,7 +111,7 @@ export async function transferTrainerRole({
       employmentStatus: mode === 'relocation' ? 'relocated' : 'resigned',
       resignationDate: exitDate,
       includeInAttendanceUntilMonth: resignationMonthKeyFromDate(exitDate),
-      status: 'unavailable',
+      status: 'archived',
       showInRoster: false,
     });
   } else {

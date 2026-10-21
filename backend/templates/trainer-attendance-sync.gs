@@ -95,13 +95,20 @@ function syncRTETOnly() {
 }
 
 function syncAttendanceSheet() {
-  var payload = fetchTomsJson(EXPORT_URL);
+  var payload = fetchTomsJson(EXPORT_URL + (EXPORT_URL.indexOf('?') === -1 ? '?' : '&') + 'syncVersion=2');
   var rows = payload.rows || [];
+  if (payload.syncVersion !== 2 || rows.length < 2) throw new Error('Attendance payload is incomplete; existing rows were preserved.');
   var spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
   var sheetName = payload.sheetName || DEFAULT_SHEET_NAME;
   var sheet = spreadsheet.getSheetByName(sheetName);
   if (!sheet) {
     sheet = spreadsheet.insertSheet(sheetName);
+  }
+  var restored = [];
+  if (payload.syncVersion >= 2 && rows.length >= 2) {
+    var migration = prepareAttendanceMoves(spreadsheet, sheet, payload);
+    rows = migration.rows;
+    restored = migration.restored;
   }
 
   if (!rows.length) {
@@ -152,7 +159,104 @@ function syncAttendanceSheet() {
       sheet.setColumnWidths(3, maxColumns - 2, 90);
     }
   }
+  // Delete restored Exit snapshots only after the active sheet write succeeded.
+  if (restored.length) {
+    SpreadsheetApp.flush();
+    var exit = spreadsheet.getSheetByName('Exit');
+    restored.sort(function(a, b) { return b - a; }).forEach(function(row) { exit.deleteRows(row - 2, 3); });
+  }
+}
 
+function attendanceDateKey(value) {
+  if (value instanceof Date) return Utilities.formatDate(value, 'Asia/Kolkata', 'yyyy-MM-dd');
+  var text = String(value || '').trim();
+  if (/^\d{4}-\d{2}-\d{2}$/.test(text)) return text;
+  var parts = text.match(/^(\d{1,2})\s+([A-Za-z]{3})\s+(\d{4})$/);
+  if (parts) {
+    var month = ['jan','feb','mar','apr','may','jun','jul','aug','sep','oct','nov','dec'].indexOf(parts[2].toLowerCase()) + 1;
+    if (month) return parts[3] + '-' + ('0' + month).slice(-2) + '-' + ('0' + parts[1]).slice(-2);
+  }
+  var date = new Date(text);
+  return isNaN(date.getTime()) ? '' : Utilities.formatDate(date, 'Asia/Kolkata', 'yyyy-MM-dd');
+}
+
+function mergeAttendanceHistory(rows, snapshots, authoritative, today) {
+  var merged = rows.map(function(row) { return row.slice(); });
+  var targets = {};
+  merged.slice(2).forEach(function(row) { targets[String(row[1])] = row; });
+  var columns = {};
+  var currentDate = '';
+  for (var c = 2; c < merged[0].length; c++) {
+    currentDate = attendanceDateKey(merged[0][c]) || currentDate;
+    columns[currentDate + '|' + merged[1][c]] = c;
+  }
+  var saved = {};
+  (authoritative || []).forEach(function(row) { saved[row.employeeId + '|' + row.date] = true; });
+  snapshots.forEach(function(snapshot) {
+    var id = String(snapshot.row[1]);
+    var target = targets[id];
+    if (!target) return;
+    var date = '';
+    for (var c = 2; c < snapshot.row.length; c++) {
+      date = attendanceDateKey(snapshot.headers[0][c]) || date;
+      if (!date || !snapshot.headers[1][c]) continue;
+      var token = date + '|' + snapshot.headers[1][c];
+      var column = columns[token];
+      if (column === undefined) {
+        column = merged[0].length;
+        columns[token] = column;
+        merged[0].push(date);
+        merged[1].push(snapshot.headers[1][c]);
+      }
+      if (date < today && !saved[id + '|' + date]) target[column] = snapshot.row[c];
+    }
+  });
+  return merged;
+}
+
+function prepareAttendanceMoves(spreadsheet, sheet, payload) {
+  var active = {};
+  payload.rows.slice(2).forEach(function(row) { active[String(row[1])] = true; });
+  var inactive = {};
+  (payload.inactiveEmployeeIds || []).forEach(function(id) { inactive[String(id)] = true; });
+  var snapshots = [], restoredSnapshots = [], restored = [], archived = {};
+  var exit = spreadsheet.getSheetByName('Exit');
+  if (!exit) exit = spreadsheet.insertSheet('Exit');
+  var exitLast = exit.getLastRow();
+  if (exitLast) {
+    var notes = exit.getRange(1, 1, exitLast, 1).getNotes();
+    notes.forEach(function(note, index) {
+      var prefix = 'TOMS_ATTENDANCE_ARCHIVE:';
+      if (String(note[0]).indexOf(prefix) !== 0) return;
+      var id = String(note[0]).slice(prefix.length);
+      archived[id] = true;
+      if (!active[id] || index < 2) return;
+      var block = exit.getRange(index - 1, 1, 3, exit.getLastColumn()).getValues();
+      restoredSnapshots.push({ headers: block.slice(0, 2), row: block[2] });
+      restored.push(index + 1);
+    });
+  }
+  var last = sheet.getLastRow();
+  var width = sheet.getLastColumn();
+  if (last >= 3 && width >= 2) {
+    var values = sheet.getRange(1, 1, last, width).getValues();
+    values.slice(2).forEach(function(row, index) {
+      var id = String(row[1]);
+      if (active[id]) snapshots.push({ headers: values.slice(0, 2), row: row });
+      else if (/^\d+$/.test(id) && !archived[id]) {
+        var destination = exit.getLastRow() + 2;
+        if (exit.getMaxColumns() < width) exit.insertColumnsAfter(exit.getMaxColumns(), width - exit.getMaxColumns());
+        if (exit.getMaxRows() < destination + 2) exit.insertRowsAfter(exit.getMaxRows(), destination + 2 - exit.getMaxRows());
+        sheet.getRange(1, 1, 2, width).copyTo(exit.getRange(destination, 1, 2, width));
+        sheet.getRange(index + 3, 1, 1, width).copyTo(exit.getRange(destination + 2, 1, 1, width));
+        exit.getRange(destination + 2, 1).setNote('TOMS_ATTENDANCE_ARCHIVE:' + id);
+        archived[id] = true;
+      }
+    });
+  }
+  SpreadsheetApp.flush();
+  return { rows: mergeAttendanceHistory(payload.rows, snapshots.concat(restoredSnapshots), payload.authoritativeDates,
+    Utilities.formatDate(new Date(), 'Asia/Kolkata', 'yyyy-MM-dd')), restored: restored };
 }
 
 /**

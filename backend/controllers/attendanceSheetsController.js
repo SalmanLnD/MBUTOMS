@@ -9,6 +9,9 @@ import {
 import { buildRtetDebugForSubjectDate } from '../utils/rtetExport.js';
 
 export const exportTrainerAttendanceForSheets = async (req, res) => {
+  if (req.query?.syncVersion !== '2') return res.status(409).json({
+    message: 'Update the attendance Apps Script from TOMS Sheet setup before syncing. Version 2 preserves Exit history and restores reactivated trainers.',
+  });
   res.json(await exportTrainerAttendance());
 };
 

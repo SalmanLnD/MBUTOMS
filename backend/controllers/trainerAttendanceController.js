@@ -32,7 +32,7 @@ import {
   resolveMockPrepHoursForOif,
 } from '../utils/attendanceOifRules.js';
 import { mergeRosterFilter } from '../utils/rosterFilter.js';
-import { mergeAttendanceUiTrainerFilter, shouldAutoMarkTrainerExit, isBeforeTrainerJoiningDate } from '../utils/trainerEmployment.js';
+import { buildActiveAttendanceFilter, shouldAutoMarkTrainerExit, isBeforeTrainerJoiningDate } from '../utils/trainerEmployment.js';
 import { getLeaveOverlapFilter, isDateWithinLeave } from '../utils/leaveDateRange.js';
 import {
   getCancellationMapForRange,
@@ -156,12 +156,10 @@ export const buildTrainerAttendanceGridPayload = async ({
     trainerFilter._id = user.trainer || { $in: [] };
   }
 
-  const finalTrainerFilter = await mergeAttendanceUiTrainerFilter(
-    await mergeRosterFilter(trainerFilter, { rosterOnly: true, attendance: true })
-  );
+  const finalTrainerFilter = await buildActiveAttendanceFilter(trainerFilter);
 
   const trainersRaw = await Trainer.find(finalTrainerFilter)
-    .select('name employeeId scheduleTrainerCodes employmentStatus resignationDate includeInAttendanceUntilMonth joiningDate createdAsBulkReplacement replacementAttendanceFrom replacementAttendanceTo')
+    .select('name employeeId status directoryReactivatedAt scheduleTrainerCodes employmentStatus resignationDate includeInAttendanceUntilMonth joiningDate createdAsBulkReplacement replacementAttendanceFrom replacementAttendanceTo')
     .sort({ name: 1 })
     .lean();
 

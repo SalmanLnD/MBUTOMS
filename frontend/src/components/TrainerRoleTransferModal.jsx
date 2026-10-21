@@ -49,15 +49,15 @@ const TrainerRoleTransferModal = ({ trainer, mode, onClose, onComplete }) => {
     return () => { cancelled = true; };
   }, [trainer._id]);
 
-  const title = isResignation ? 'Trainer Resignation / Exit' : isRelocation ? 'Trainer Relocation' : 'Permanent Replacement';
-  const submitLabel = isResignation ? 'Confirm Resignation' : isRelocation ? 'Confirm Relocation' : 'Confirm Transfer';
+  const title = isResignation ? 'Trainer Resignation / Exit' : isRelocation ? 'Internal transfer' : 'Permanent Replacement';
+  const submitLabel = isResignation ? 'Confirm Resignation' : isRelocation ? 'Confirm Internal Transfer' : 'Confirm Transfer';
 
   const helperText = useMemo(() => {
     if (isResignation) {
       return 'Permanent replacement is required only when the trainer still has timetable classes. If no classes remain, the exit can proceed without a replacement trainer.';
     }
     if (isRelocation) {
-      return 'Permanent replacement is optional when the trainer has no assigned classes. If classes remain, a replacement trainer is required before relocation is saved.';
+      return 'Internal transfer archives the trainer and moves attendance to Exit on the next sheet sync. If classes remain, a permanent replacement trainer is required.';
     }
     return 'Only trainers with no timetable slots are listed. The current trainer stays active in the system with no slots after transfer. Schedules, subjects, and CAMU credentials move to the replacement from the selected date.';
   }, [isResignation, isRelocation]);

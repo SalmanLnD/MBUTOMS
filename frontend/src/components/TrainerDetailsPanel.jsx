@@ -73,7 +73,7 @@ const TrainerDetailsPanel = ({ trainerId, canEdit = false }) => {
 
   return (
     <>
-      {canEdit && trainer.employmentStatus !== 'resigned' && (
+      {canEdit && !['resigned', 'relocated'].includes(trainer.employmentStatus) && (
         <div className="mb-3 d-flex flex-wrap justify-content-end gap-2">
           <button type="button" className="btn btn-outline-secondary btn-sm" onClick={() => setShowEditModal(true)}>
             Edit Profile
@@ -84,12 +84,13 @@ const TrainerDetailsPanel = ({ trainerId, canEdit = false }) => {
           <button type="button" className="btn btn-outline-danger btn-sm" onClick={() => setTransferMode('resign')}>
             Resignation / Exit
           </button>
+          <button type="button" className="btn btn-outline-warning btn-sm" onClick={() => setTransferMode('relocate')}>Internal transfer</button>
         </div>
       )}
 
-      {trainer.employmentStatus === 'resigned' && (
+      {['resigned', 'relocated'].includes(trainer.employmentStatus) && (
         <div className="alert alert-warning mb-3">
-          Resigned
+          {trainer.employmentStatus === 'relocated' ? 'Internally transferred' : 'Resigned'}
           {trainer.resignationDate ? ` — last working day ${display(formatDate(trainer.resignationDate))}` : ''}
           {trainer.successorTrainer?.name
             ? `. Replaced by ${display(trainer.successorTrainer.name)} (${display(trainer.successorTrainer.employeeId)}).`
@@ -97,7 +98,7 @@ const TrainerDetailsPanel = ({ trainerId, canEdit = false }) => {
         </div>
       )}
 
-      {canEdit && trainer.employmentStatus === 'resigned' && (
+      {canEdit && ['resigned', 'relocated'].includes(trainer.employmentStatus) && (
         <div className="mb-3 d-flex justify-content-end">
           <button type="button" className="btn btn-outline-secondary btn-sm" onClick={() => setShowEditModal(true)}>
             Edit Profile

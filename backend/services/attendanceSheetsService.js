@@ -100,7 +100,9 @@ export const getAttendanceAppsScriptSetup = async (req) => {
       'Paste the Google Sheet URL below and click Save link.',
     ],
     note:
-      'The sheet refreshes every 15 minutes with attendance through today only, so the export '
+      'Attendance sync version 2 is required: replace the existing Apps Script with the script below once. '
+      + 'It moves inactive trainers to Exit, freezes their rows, and restores their history when reactivated. '
+      + 'Older scripts are blocked from clearing attendance. The sheet refreshes every 15 minutes with attendance through today only, so the export '
       + 'does not block the live TOMS app. Google Apps Script cannot call localhost; use the '
       + 'deployed API URL or a tunnel for local testing.',
   };

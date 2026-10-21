@@ -67,8 +67,8 @@ const finalizeExitTransfer = async ({
   if (!sourceTrainer) {
     return res.status(404).json({ message: 'Trainer not found' });
   }
-  if (sourceTrainer.employmentStatus === 'resigned') {
-    return res.status(409).json({ message: 'This trainer has already resigned' });
+  if (['resigned', 'relocated'].includes(sourceTrainer.employmentStatus)) {
+    return res.status(409).json({ message: 'This trainer has already exited or transferred' });
   }
 
   const hasAssignedClasses = await trainerHasOwnedSlots(sourceTrainer);
@@ -95,7 +95,7 @@ const finalizeExitTransfer = async ({
           includeInAttendanceUntilMonth: exitDate
             ? `${exitDate.getUTCFullYear()}-${String(exitDate.getUTCMonth() + 1).padStart(2, '0')}`
             : '',
-          status: 'unavailable',
+          status: 'archived',
           showInRoster: false,
           successorTrainer: null,
           roleTransferEffectiveDate: exitDate,

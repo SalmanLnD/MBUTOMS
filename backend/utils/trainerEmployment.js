@@ -32,25 +32,20 @@ export const mergeUiTrainerFilter = async (baseFilter = {}, referenceDate = new 
   return { $and: [baseFilter, employmentClause] };
 };
 
-/** Attendance grid UI — same visibility as directory lists. */
-export const mergeAttendanceUiTrainerFilter = mergeUiTrainerFilter;
+/** Attendance grid lists only active trainers. */
+export const mergeAttendanceUiTrainerFilter = async (baseFilter = {}) => ({ $and: [baseFilter, { status: 'active' }] });
 
-/** Google Sheets export — keep resigned trainers indefinitely for Exit marking. */
+export const buildActiveAttendanceFilter = async (baseFilter = {}) => {
+  const hidden = await getHiddenRosterTrainerIds({ attendance: true });
+  return { $and: [baseFilter, { status: 'active' }, { $or: [
+    { directoryReactivatedAt: { $ne: null } },
+    { showInRoster: { $ne: false }, ...(hidden.length ? { _id: { $nin: hidden } } : {}) },
+  ] }] };
+};
+
+/** Only active rows are refreshed; the sheet sync freezes inactive rows in Exit. */
 export const mergeAttendanceExportTrainerFilter = async (baseFilter = {}) => {
-  const hiddenTrainerIds = await getHiddenRosterTrainerIds({ attendance: true });
-  const exportClause = {
-    $or: [
-      {
-        showInRoster: { $ne: false },
-        employmentStatus: { $nin: ['resigned', 'relocated'] },
-        ...(hiddenTrainerIds.length ? { _id: { $nin: hiddenTrainerIds } } : {}),
-      },
-      { employmentStatus: { $in: ['resigned', 'relocated'] } },
-    ],
-  };
-
-  if (!Object.keys(baseFilter).length) return exportClause;
-  return { $and: [baseFilter, exportClause] };
+  return buildActiveAttendanceFilter(baseFilter);
 };
 
 export const shouldAutoMarkTrainerRelocated = (trainer, date) => {

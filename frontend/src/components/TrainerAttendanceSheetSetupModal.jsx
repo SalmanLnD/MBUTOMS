@@ -81,8 +81,8 @@ const TrainerAttendanceSheetSetupModal = ({
           ) : setup && (
             <>
               <p className="text-muted small">
-                One continuous attendance sheet refreshes every five minutes and automatically
-                adds later months.
+                Only active trainers are refreshed. Inactive trainers move to Exit with their history;
+                reactivated trainers return to attendance. Install the updated script once to enable this flow.
               </p>
               <ol className="small mb-3">
                 {setup.steps.map((step) => (

@@ -244,9 +244,12 @@ export const updateTrainer = async (req, res) => {
   }
 
   const previousSubjects = [...(trainer.subjects || [])];
-  if (trainer.status === 'archived' && payload.status === 'active') {
+  if (payload.status === 'active' && (trainer.status !== 'active' || ['resigned', 'relocated'].includes(trainer.employmentStatus))) {
     payload.directoryReactivatedAt = new Date();
     payload.showInRoster = true;
+    payload.employmentStatus = 'active';
+    payload.resignationDate = null;
+    payload.includeInAttendanceUntilMonth = '';
   }
   const previousEmployeeId = trainer.employeeId;
 

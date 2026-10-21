@@ -95,6 +95,7 @@ export const loadBulkReplacementAttendanceWindows = async () => {
 };
 
 export const isBulkReplacementOnlyTrainer = (trainer, windows) => {
+  if (trainer?.directoryReactivatedAt && trainer.status === 'active') return false;
   if (!trainer) return false;
   if (trainer.createdAsBulkReplacement) return true;
   return windows?.has(trainer._id?.toString?.() || trainer.toString());
