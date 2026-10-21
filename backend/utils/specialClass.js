@@ -10,6 +10,26 @@ export const SPECIAL_CLASS_FIELDS = 'isSpecial specialType specialStartDate spec
 
 const WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
+// A recurring group completes only when its final scheduled weekday/time ends,
+// rather than moving each elapsed occurrence into the completed list.
+export const specialClassCompletionTime = (group) => {
+  const end = group.endDate || group.startDate;
+  if (!end || !group.startDate || !group.endTime) return null;
+  const cursor = new Date(`${end}T12:00:00Z`);
+  if (Number.isNaN(cursor.getTime())) return null;
+  for (let i = 0; i < 7; i++) {
+    const key = cursor.toISOString().slice(0, 10);
+    if (key < group.startDate) break;
+    if (group.specialType !== SPECIAL_CLASS_TYPES.RECURRING || group.days?.includes(WEEKDAYS[cursor.getUTCDay()])) {
+      const time = group.endTime.length === 5 ? `${group.endTime}:00` : group.endTime;
+      const completedAt = new Date(`${key}T${time}+05:30`);
+      return Number.isNaN(completedAt.getTime()) ? null : completedAt;
+    }
+    cursor.setUTCDate(cursor.getUTCDate() - 1);
+  }
+  return null;
+};
+
 export const isSpecialSchedule = (schedule) => Boolean(schedule?.isSpecial);
 
 /** Missing or true keeps current RTET behaviour; false is complementary-only. */

@@ -18,6 +18,7 @@ import {
   getWeekdayForDateKey,
   getWeekdaysBetween,
   isSpecialScheduleInRange,
+  specialClassCompletionTime,
 } from '../utils/specialClass.js';
 import { mergeRosterFilter } from '../utils/rosterFilter.js';
 import { buildLiveTrainerVenues, parseIstClockTime } from '../utils/liveTrainerVenues.js';
@@ -541,7 +542,6 @@ export const getSpecialClasses = async (req, res) => {
   const schedules = await Schedule.find(filter)
     .select('trainerCode day startTime endTime department section semester subject subjectCode slot venue specialType specialStartDate specialEndDate specialGroupId specialReason includeInRtet')
     .sort({ specialStartDate: 1, startTime: 1 })
-    .limit(500)
     .lean();
 
   const trainerCodes = [...new Set(schedules.map((schedule) => schedule.trainerCode))];
@@ -607,7 +607,18 @@ export const getSpecialClasses = async (req, res) => {
     group.scheduleIds.push(schedule._id);
   });
 
-  res.json({ specialClasses: [...groups.values()] });
+  const now = new Date();
+  let specialClasses = [...groups.values()].map(group => {
+    const completedAt = specialClassCompletionTime(group);
+    return { ...group, completedAt, completed: Boolean(completedAt && completedAt <= now) };
+  });
+  if (req.query.status === 'completed') {
+    specialClasses = specialClasses.filter(group => group.completed)
+      .sort((a, b) => b.completedAt - a.completedAt);
+  } else if (req.query.status === 'upcoming') {
+    specialClasses = specialClasses.filter(group => !group.completed);
+  }
+  res.json({ specialClasses });
 };
 
 export const deleteSpecialClass = async (req, res) => {

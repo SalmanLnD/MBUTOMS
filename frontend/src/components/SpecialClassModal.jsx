@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Modal from './Modal.jsx';
 import ConfirmModal from './ConfirmModal.jsx';
 import ActionIconButton from './ActionIconButton.jsx';
@@ -82,7 +82,8 @@ const buildInitialForm = (initialDate) => ({
 
 const SpecialClassModal = ({ trainers = [], initialDate, initialTab = 'add', onClose, onChanged }) => {
   const today = toInputDate(new Date());
-  const [activeTab, setActiveTab] = useState(initialTab === 'list' ? 'list' : 'add');
+  const [activeTab, setActiveTab] = useState(['list', 'completed'].includes(initialTab) ? initialTab : 'add');
+  const listRequestRef = useRef(0);
   const [form, setForm] = useState(() => buildInitialForm(initialDate || today));
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
@@ -170,19 +171,25 @@ const SpecialClassModal = ({ trainers = [], initialDate, initialTab = 'add', onC
   );
 
   const loadSpecialClasses = useCallback(async () => {
+    const requestId = ++listRequestRef.current;
     setListLoading(true);
+    setSpecialClasses([]);
     try {
-      const data = await getSpecialClasses({ from: today });
+      const data = await getSpecialClasses({ status: activeTab === 'completed' ? 'completed' : 'upcoming' });
+      if (requestId !== listRequestRef.current) return;
       setSpecialClasses(data.specialClasses || []);
     } catch (err) {
+      if (requestId !== listRequestRef.current) return;
       setError(getErrorMessage(err));
     } finally {
-      setListLoading(false);
+      if (requestId === listRequestRef.current) setListLoading(false);
     }
-  }, [today]);
+  }, [activeTab]);
 
   useEffect(() => {
-    if (activeTab === 'list') loadSpecialClasses();
+    if (activeTab !== 'list' && activeTab !== 'completed') return undefined;
+    loadSpecialClasses();
+    return () => { listRequestRef.current++; };
   }, [activeTab, loadSpecialClasses]);
 
   const availableRecurringDays = useMemo(
@@ -388,6 +395,7 @@ const SpecialClassModal = ({ trainers = [], initialDate, initialTab = 'add', onC
             {[
               { id: 'add', label: editingGroupId ? 'Edit special class' : 'Add special class' },
               { id: 'list', label: 'Upcoming special classes' },
+              { id: 'completed', label: 'Completed classes' },
             ].map((tab) => (
               <li className="nav-item" key={tab.id} role="presentation">
                 <button
@@ -637,11 +645,14 @@ const SpecialClassModal = ({ trainers = [], initialDate, initialTab = 'add', onC
             </form>
           )}
 
-          {activeTab === 'list' && (
+          {activeTab !== 'add' && <p className="text-muted small">{activeTab === 'completed'
+            ? 'Completed one-time classes and finished recurring series. Each recurring series appears once, after its final class ends.'
+            : 'Upcoming one-time classes and recurring series that are still running.'}</p>}
+          {(activeTab === 'list' || activeTab === 'completed') && (
             listLoading ? (
               <div className="text-muted py-3">Loading special classes...</div>
             ) : specialClasses.length === 0 ? (
-              <div className="text-muted py-3">No upcoming special classes.</div>
+              <div className="text-muted py-3">{activeTab === 'completed' ? 'No completed special classes.' : 'No upcoming special classes.'}</div>
             ) : (
               <div className="table-responsive">
                 <table className="table table-sm align-middle mb-0">
