@@ -16,6 +16,7 @@ import { migrateClassesFromSchedules } from '../utils/migrateClassesFromSchedule
 import { repairClassIndexesAndPy } from '../utils/repairClassIndexesAndPy.js';
 import { ensureOfficialHolidays } from '../utils/officialHolidays.js';
 import { migrateSubjectEndDates } from '../utils/migrateSubjectEndDates.js';
+import { migrateTrainerDirectoryStatus } from '../utils/migrateTrainerDirectoryStatus.js';
 
 const getCache = () => {
   if (!globalThis._mongooseCache) {
@@ -26,6 +27,7 @@ const getCache = () => {
 
 /** Lightweight role sync for serverless (Vercel skips full startup). */
 const runRoleSync = async () => {
+  await migrateTrainerDirectoryStatus();
   await migrateSubjectEndDates();
   const coordinatorSync = await syncSubjectCoordinators();
   const evaluatorSync = await syncEvaluators();
@@ -42,6 +44,7 @@ const runRoleSync = async () => {
 };
 
 const runEssentialStartup = async () => {
+  await migrateTrainerDirectoryStatus();
   const counts = await ensureReferenceData();
   await migrateSubjectEndDates();
   const subjectTopicsMigration = await migrateSubjectTopicsFromCatalog();

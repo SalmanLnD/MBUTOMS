@@ -203,8 +203,8 @@ const TrainerDetailsPanel = ({ trainerId, canEdit = false }) => {
                   <p className="mb-0">{display(`${trainer.weeklyWorkloadHours} hrs`)}</p>
                 </div>
                 <div className="col-sm-4">
-                  <label className="text-muted small">Performance Score</label>
-                  <p className="mb-0">{display(`${trainer.performanceScore}%`)}</p>
+                  <label className="text-muted small">Status</label>
+                  <p className="mb-0">{trainer.status === 'active' ? 'Active' : 'Archived'}</p>
                 </div>
                 <div className="col-12">
                   <label className="text-muted small">Skills</label>

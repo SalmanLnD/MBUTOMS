@@ -31,7 +31,6 @@ const emptyForm = {
   joiningDate: toInputDate(new Date()),
   status: 'active',
   weeklyWorkloadHours: 0,
-  performanceScore: 0,
 };
 
 const TrainerFormModal = ({ trainer, onClose }) => {
@@ -72,7 +71,6 @@ const TrainerFormModal = ({ trainer, onClose }) => {
           : '',
         status: trainer.status || 'active',
         weeklyWorkloadHours: trainer.weeklyWorkloadHours || 0,
-        performanceScore: trainer.performanceScore || 0,
       });
     }
   }, [trainer]);
@@ -99,7 +97,6 @@ const TrainerFormModal = ({ trainer, onClose }) => {
       skills: form.skills.split(',').map((s) => s.trim()).filter(Boolean),
       experience: Number(form.experience),
       weeklyWorkloadHours: Number(form.weeklyWorkloadHours),
-      performanceScore: Number(form.performanceScore),
       department: form.department || undefined,
       subjects: form.subjects.map(toSubjectId).filter(Boolean),
     };
@@ -171,14 +168,15 @@ const TrainerFormModal = ({ trainer, onClose }) => {
                   />
                 </div>
                 <div className="col-md-6">
-                  <label className="form-label">Availability</label>
+                  <label className="form-label">Status</label>
                   <StyledSelect
                     name="status"
+                    aria-label="Trainer status"
                     value={form.status}
                     onChange={handleChange}
                     options={[
-                      { value: 'active', label: 'Available' },
-                      { value: 'unavailable', label: 'Unavailable' },
+                      { value: 'active', label: 'Active' },
+                      { value: 'archived', label: 'Archived' },
                     ]}
                   />
                 </div>
@@ -193,10 +191,6 @@ const TrainerFormModal = ({ trainer, onClose }) => {
                 <div className="col-md-6">
                   <label className="form-label">Weekly Workload (hrs)</label>
                   <input type="number" name="weeklyWorkloadHours" className="form-control" min="0" value={form.weeklyWorkloadHours} onChange={handleChange} />
-                </div>
-                <div className="col-md-6">
-                  <label className="form-label">Performance Score</label>
-                  <input type="number" name="performanceScore" className="form-control" min="0" max="100" value={form.performanceScore} onChange={handleChange} />
                 </div>
                 <div className="col-12">
                   <label className="form-label">Skills (comma-separated)</label>

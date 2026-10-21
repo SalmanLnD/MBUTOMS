@@ -32,8 +32,8 @@ export const trainerValidation = [
   body('experience').optional().isInt({ min: 0 }).withMessage('Experience must be a positive number'),
   body('status')
     .optional()
-    .isIn(['active', 'unavailable'])
-    .withMessage('Invalid availability status'),
+    .isIn(['active', 'unavailable', 'archived'])
+    .withMessage('Invalid trainer status'),
 ];
 
 export const venueValidation = [

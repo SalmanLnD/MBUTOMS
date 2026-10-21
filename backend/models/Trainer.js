@@ -22,11 +22,13 @@ const trainerSchema = new mongoose.Schema(
     joiningDate: { type: Date, default: Date.now },
     status: {
       type: String,
-      enum: ['active', 'unavailable'],
+      enum: ['active', 'unavailable', 'archived'],
       default: 'active',
     },
     weeklyWorkloadHours: { type: Number, default: 0 },
     performanceScore: { type: Number, default: 0, min: 0, max: 100 },
+    directoryStatusInitializedAt: { type: Date, default: Date.now },
+    directoryReactivatedAt: { type: Date, default: null },
     scheduleTrainerCodes: [{ type: String, trim: true }],
     showInRoster: { type: Boolean, default: true },
     employmentStatus: {

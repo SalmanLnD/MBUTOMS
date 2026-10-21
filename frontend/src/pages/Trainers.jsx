@@ -16,6 +16,7 @@ import { getTrainers, deleteTrainer, resetTrainerPassword } from '../services/tr
 import { EditIcon, EyeIcon, KeyIcon, TrashIcon } from '../components/icons.jsx';
 import ActionIconButton from '../components/ActionIconButton.jsx';
 import CollapsibleFilters from '../components/CollapsibleFilters.jsx';
+import StyledSelect from '../components/StyledSelect.jsx';
 import TrainerDetailsPanel from '../components/TrainerDetailsPanel.jsx';
 import { getErrorMessage } from '../utils/helpers.js';
 import { ROLES } from '../utils/roles.js';
@@ -54,6 +55,7 @@ const Trainers = () => {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [subjectSearch, setSubjectSearch] = useState('');
+  const [statusFilter, setStatusFilter] = useState('active');
   const [sortBy, setSortBy] = useState('employeeId');
   const [sortOrder, setSortOrder] = useState('asc');
   const [showModal, setShowModal] = useState(false);
@@ -72,6 +74,8 @@ const Trainers = () => {
         limit: pageSize,
         search: debouncedSearch,
         subject: debouncedSubjectSearch,
+        directory: 'true',
+        status: statusFilter,
         sortBy,
         sortOrder,
       }, { signal });
@@ -90,7 +94,7 @@ const Trainers = () => {
     const controller = new AbortController();
     fetchTrainers(controller.signal);
     return () => controller.abort();
-  }, [activeTab, page, pageSize, debouncedSearch, debouncedSubjectSearch, sortBy, sortOrder]);
+  }, [activeTab, page, pageSize, debouncedSearch, debouncedSubjectSearch, sortBy, sortOrder, statusFilter]);
 
   const handleSort = (field) => {
     if (sortBy === field) {
@@ -281,9 +285,21 @@ const Trainers = () => {
                   aria-label="Filter trainers by subject"
                 />
               </div>
+              <div className="col-md-4">
+                <StyledSelect value={statusFilter} onChange={event => { setStatusFilter(event.target.value); resetPage(); }}
+                  aria-label="Filter trainers by status" options={[
+                    { value: 'active', label: 'Active' }, { value: 'archived', label: 'Archived' }, { value: 'all', label: 'All statuses' },
+                  ]} />
+              </div>
 
             </div>
             </CollapsibleFilters>
+
+            <p className="text-muted small mb-3">
+              {statusFilter === 'active' ? 'Showing active trainers. Use Trainer filters to view archived trainers.'
+                : statusFilter === 'archived' ? 'Showing archived trainers. Edit a trainer and set Status to Active to restore them.'
+                  : 'Showing all trainers, including archived records.'}
+            </p>
 
             {loading ? (
               <LoadingSpinner />
@@ -300,13 +316,14 @@ const Trainers = () => {
                           <button type="button" className="table-sort" onClick={() => handleSort('name')}>Name{sortIcon('name')}</button>
                         </th>
                         <th>Subjects</th>
+                        <th>Status</th>
                         <th>Actions</th>
                       </tr>
                     </thead>
                     <tbody>
                       {trainers.length === 0 ? (
                         <tr>
-                          <td colSpan="4" className="text-center text-muted py-4">
+                          <td colSpan="5" className="text-center text-muted py-4">
                             No trainers found
                           </td>
                         </tr>
@@ -324,6 +341,7 @@ const Trainers = () => {
                                 ? trainer.subjects.map((s) => s.code).join(', ')
                                 : '-'}
                             </td>
+                            <td data-label="Status"><span className={`badge ${trainer.status === 'active' ? 'bg-success-subtle text-success' : 'bg-secondary-subtle text-secondary'}`}>{trainer.status === 'active' ? 'Active' : 'Archived'}</span></td>
                             <td>
                               <div className="btn-group btn-group-sm action-btn-group">
                                 <ActionIconButton

@@ -59,7 +59,7 @@ const buildTrainerQuery = async (query) => {
     }
   }
 
-  if (query.status?.trim()) {
+  if (query.status?.trim() && query.status !== 'all') {
     clauses.push({ status: query.status.trim() });
   }
 
@@ -81,9 +81,17 @@ export const getTrainers = async (req, res) => {
   const skip = (page - 1) * limit;
 
   const filter = await buildTrainerQuery(req.query);
+  const directory = req.query.directory === 'true';
   const rosterOnly = shouldApplyRosterFilter(req.query);
-  let finalFilter = await mergeRosterFilter(filter, { rosterOnly, timetable: req.query.timetableOnly === 'true' });
-  finalFilter = await mergeUiTrainerFilter(finalFilter);
+  let finalFilter;
+  if (directory) {
+    finalFilter = req.query.status ? filter : { $and: [filter, { status: 'active' }] };
+  } else {
+    const legacyFilter = await mergeUiTrainerFilter(await mergeRosterFilter(filter, { rosterOnly, timetable: req.query.timetableOnly === 'true' }));
+    finalFilter = { $and: [{ status: { $ne: 'archived' } }, { $or: [legacyFilter,
+      { $and: [filter, { status: 'active', directoryReactivatedAt: { $ne: null } }] },
+    ] }] };
+  }
 
   if (isSubjectCoordinator(req.user)) {
     const coordinatorSubjectIds = getCoordinatorSubjectIds(req.user);
@@ -236,6 +244,10 @@ export const updateTrainer = async (req, res) => {
   }
 
   const previousSubjects = [...(trainer.subjects || [])];
+  if (trainer.status === 'archived' && payload.status === 'active') {
+    payload.directoryReactivatedAt = new Date();
+    payload.showInRoster = true;
+  }
   const previousEmployeeId = trainer.employeeId;
 
   const updateDoc = { $set: { ...payload } };
