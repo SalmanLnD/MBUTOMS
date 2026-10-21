@@ -32,6 +32,7 @@ import { ROLES } from '../utils/roles.js';
 import TrainerAttendanceSheetSetupModal from './TrainerAttendanceSheetSetupModal.jsx';
 import { CalendarIcon, ExternalLinkIcon, SheetIcon } from './icons.jsx';
 import OfficialHolidayModal from './OfficialHolidayModal.jsx';
+import { lockBodyScroll, unlockBodyScroll } from '../utils/modalManager.js';
 
 const TrainerAttendanceTab = () => {
   const { user, hasFullAccess } = useAuth();
@@ -51,6 +52,39 @@ const TrainerAttendanceTab = () => {
   const [showSheetSetup, setShowSheetSetup] = useState(false);
   const [whatsappSyncing, setWhatsappSyncing] = useState(false);
   const [showHolidays, setShowHolidays] = useState(false);
+  const [fullscreen, setFullscreen] = useState(false);
+  const panelRef = useRef(null);
+  const fullscreenButtonRef = useRef(null);
+
+  useEffect(() => {
+    if (!fullscreen) return undefined;
+    lockBodyScroll();
+    const siblings = [];
+    let node = panelRef.current;
+    while (node && node !== document.body) {
+      for (const sibling of node.parentElement?.children || []) {
+        if (sibling !== node) { siblings.push([sibling, sibling.inert]); sibling.inert = true; }
+      }
+      node = node.parentElement;
+    }
+    const onKeyDown = event => {
+      if (document.querySelector('.toms-modal-dialog, .toms-styled-select__menu, .toms-styled-multi-select__menu')) return;
+      if (event.key === 'Escape') { event.preventDefault(); setFullscreen(false); }
+      if (event.key === 'Tab') {
+        const controls = [...panelRef.current.querySelectorAll('button:not(:disabled), input:not(:disabled), a[href], select:not(:disabled), [tabindex="0"]')].filter(el => el.getClientRects().length);
+        const first = controls[0], last = controls.at(-1);
+        if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last?.focus(); }
+        else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus(); }
+      }
+    };
+    document.addEventListener('keydown', onKeyDown);
+    return () => {
+      document.removeEventListener('keydown', onKeyDown);
+      siblings.forEach(([element, inert]) => { element.inert = inert; });
+      unlockBodyScroll();
+      fullscreenButtonRef.current?.focus({ preventScroll: true });
+    };
+  }, [fullscreen]);
   const scrollContainerRef = useRef(null);
   const gridDataRef = useRef(null);
   const monthCacheRef = useRef(new Map());
@@ -366,9 +400,15 @@ const TrainerAttendanceTab = () => {
   const monthLabel = grid?.monthLabel || formatMonthLabel(monthParts.year, monthParts.month);
 
   return (
-    <>
+    <section ref={panelRef} className={`trainer-attendance-panel${fullscreen ? ' trainer-attendance-panel--fullscreen' : ''}`} aria-label="Monthly trainer attendance">
       <div className="trainer-attendance-toolbar mb-2">
         <h5 className="mb-0">Monthly Trainer Attendance</h5>
+        <button ref={fullscreenButtonRef} type="button" className="btn btn-outline-primary btn-sm"
+          aria-pressed={fullscreen} onClick={() => setFullscreen(value => !value)} title={fullscreen ? 'Exit full screen (Esc)' : 'Expand attendance to full screen'}>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
+            <path d={fullscreen ? 'M4 9h5V4M20 9h-5V4M4 15h5v5M20 15h-5v5' : 'M9 4H4v5M15 4h5v5M4 15v5h5M20 15v5h-5'} />
+          </svg> {fullscreen ? 'Exit full screen' : 'Full screen'}
+        </button>
 
         <div className="trainer-attendance-month-controls">
           <button
@@ -634,7 +674,7 @@ const TrainerAttendanceTab = () => {
           onChanged={() => fetchGrid({ forceRefresh: true })}
         />
       )}
-    </>
+    </section>
   );
 };
 
