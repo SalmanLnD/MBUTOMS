@@ -45,6 +45,7 @@ const Replacements = () => {
   const [loading, setLoading] = useState(true);
   const [selectedSchedule, setSelectedSchedule] = useState(null);
   const [selectedLeaveId, setSelectedLeaveId] = useState('');
+  const [selectedDate, setSelectedDate] = useState('');
   const [changingReplacement, setChangingReplacement] = useState(false);
   const [suggestions, setSuggestions] = useState([]);
   const [otherSuggestions, setOtherSuggestions] = useState([]);
@@ -195,6 +196,7 @@ const Replacements = () => {
   const closeSuggestionsModal = () => {
     setSelectedSchedule(null);
     setSelectedLeaveId('');
+    setSelectedDate('');
     setChangingReplacement(false);
     setSuggestions([]);
     setOtherSuggestions([]);
@@ -204,9 +206,10 @@ const Replacements = () => {
     setAssigningExternal(false);
   };
 
-  const handleViewSuggestions = async (leaveId, schedule, replacement = null) => {
+  const handleViewSuggestions = async (leaveId, schedule, replacement = null, date) => {
     setSelectedSchedule(schedule);
     setSelectedLeaveId(leaveId);
+    setSelectedDate(date || '');
     setChangingReplacement(Boolean(replacement));
     setExternalTrainerName(replacement?.isExternal ? (replacement.name || '') : '');
     setLoadingSuggestions(true);
@@ -215,7 +218,7 @@ const Replacements = () => {
     setSuggestionSubject(null);
     setSuggestionFilter('');
     try {
-      const data = await getReplacementSuggestions(schedule._id, leaveId);
+      const data = await getReplacementSuggestions(schedule._id, leaveId, date);
       setSuggestions(data.suggestions || []);
       setOtherSuggestions(data.otherSuggestions || []);
       setSuggestionSubject(data.subject || null);
@@ -229,6 +232,7 @@ const Replacements = () => {
   const handleAssign = async (trainerId) => {
     try {
       await assignReplacement(selectedLeaveId, selectedSchedule._id, {
+        date: selectedDate,
         replacementTrainerId: trainerId,
       });
       showSuccess(changingReplacement ? 'Replacement trainer updated' : 'Replacement trainer assigned');
@@ -249,6 +253,7 @@ const Replacements = () => {
     setAssigningExternal(true);
     try {
       await assignReplacement(selectedLeaveId, selectedSchedule._id, {
+        date: selectedDate,
         isExternal: true,
         externalTrainerName: name,
       });
@@ -266,7 +271,7 @@ const Replacements = () => {
   const handleConfirmCancel = async () => {
     if (!pendingCancel) return;
     try {
-      await cancelReplacement(pendingCancel.leaveId, pendingCancel.scheduleId);
+      await cancelReplacement(pendingCancel.leaveId, pendingCancel.scheduleId, pendingCancel.date);
       showSuccess('Replacement cancelled. Original trainer will handle this class.');
       refreshActionCounts();
       setPendingCancel(null);
@@ -442,11 +447,12 @@ const Replacements = () => {
                     canAssign,
                     canChange,
                     affectedDates,
+                    replacementDate,
                     isBulkMerged,
                     bulkRangeStart,
                     bulkRangeEnd,
                   }) => (
-                    <tr key={`${leave._id}-${schedule._id}`}>
+                    <tr key={`${leave._id}-${schedule._id}-${replacementDate}`}>
                       <td>{leave.trainer?.name}</td>
                       <td>{formatReplacementDate(leave, schedule, affectedDates, bulkRangeStart, bulkRangeEnd, isBulkMerged)}</td>
                       <td>{isBulkMerged ? 'All' : formatTimeRange(schedule.startTime, schedule.endTime)}</td>
@@ -480,7 +486,7 @@ const Replacements = () => {
                                   icon={EditIcon}
                                   title="Change replacement"
                                   aria-label={`Change replacement for ${schedule.department} ${schedule.section}`}
-                                  onClick={() => handleViewSuggestions(leave._id, schedule, replacement)}
+                                  onClick={() => handleViewSuggestions(leave._id, schedule, replacement, replacementDate)}
                                 />
                                 <ActionIconButton
                                   variant="delete"
@@ -489,6 +495,7 @@ const Replacements = () => {
                                   aria-label={`Cancel replacement for ${schedule.department} ${schedule.section}`}
                                   onClick={() => setPendingCancel({
                                     leaveId: leave._id,
+                                    date: replacementDate,
                                     scheduleId: schedule._id,
                                     originalTrainerName: leave.trainer?.name,
                                     replacementName: replacement.name,
@@ -503,7 +510,7 @@ const Replacements = () => {
                             <button
                               type="button"
                               className="btn btn-sm btn-primary"
-                              onClick={() => handleViewSuggestions(leave._id, schedule)}
+                              onClick={() => handleViewSuggestions(leave._id, schedule, null, replacementDate)}
                             >
                               Find Replacements
                             </button>
@@ -514,6 +521,7 @@ const Replacements = () => {
                               aria-label={`Cancel replacement for ${schedule.department} ${schedule.section}`}
                               onClick={() => setPendingCancel({
                                 leaveId: leave._id,
+                                date: replacementDate,
                                 scheduleId: schedule._id,
                                 originalTrainerName: leave.trainer?.name,
                                 replacementName: null,
@@ -716,8 +724,8 @@ const Replacements = () => {
           title="Cancel Replacement"
           message={
             pendingCancel.replacementName
-              ? `Cancel replacement by "${pendingCancel.replacementName}" for ${pendingCancel.classLabel}? ${pendingCancel.originalTrainerName || 'The original trainer'} will handle this class as originally allocated.`
-              : `Cancel replacement requirement for ${pendingCancel.classLabel}? ${pendingCancel.originalTrainerName || 'The original trainer'} will handle this class as originally allocated.`
+              ? `Cancel replacement by "${pendingCancel.replacementName}" for ${pendingCancel.classLabel}${pendingCancel.date ? ` on ${formatDate(pendingCancel.date)}` : ''}? ${pendingCancel.originalTrainerName || 'The original trainer'} will handle this class as originally allocated.`
+              : `Cancel replacement requirement for ${pendingCancel.classLabel}${pendingCancel.date ? ` on ${formatDate(pendingCancel.date)}` : ''}? ${pendingCancel.originalTrainerName || 'The original trainer'} will handle this class as originally allocated.`
           }
           confirmLabel="Cancel replacement"
           confirmVariant="danger"
@@ -735,7 +743,7 @@ const Replacements = () => {
         >
           <div className="toms-modal-body">
             <p className="text-muted">
-              {selectedSchedule.department} {selectedSchedule.section} on {selectedSchedule.day} at {formatTimeRange(selectedSchedule.startTime, selectedSchedule.endTime)}
+              {selectedSchedule.department} {selectedSchedule.section} on {selectedDate ? formatDate(selectedDate) : selectedSchedule.day} at {formatTimeRange(selectedSchedule.startTime, selectedSchedule.endTime)}
             </p>
             {loadingSuggestions ? <LoadingSpinner message="Finding replacements..." /> : (
               <div className="table-responsive">

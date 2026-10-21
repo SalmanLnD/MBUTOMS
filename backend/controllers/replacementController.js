@@ -30,6 +30,7 @@ import { SPECIAL_CLASS_FIELDS } from '../utils/specialClass.js';
 import { syncTrainerUser } from '../utils/trainerUserSync.js';
 import { INITIAL_TRAINER_PASSWORD } from '../constants/trainerAuth.js';
 import mongoose from 'mongoose';
+import { scopeReplacementOccurrence, saveReplacementOccurrence } from '../utils/replacementOccurrence.js';
 
 const timeToMinutes = (time) => {
   const [h, m] = time.split(':').map(Number);
@@ -255,6 +256,11 @@ export const getReplacementSuggestions = async (req, res) => {
   const leave = await Leave.findOne(leaveFilter);
   if (!leave) {
     return res.status(400).json({ message: 'No approved leave found for this schedule' });
+  }
+  try {
+    scopeReplacementOccurrence(leave, req.query.date, schedule);
+  } catch (error) {
+    return res.status(400).json({ message: error.message });
   }
   const { cancellationMap, holidayDateKeys } = await getLeaveClassExclusionsForRange(
     leave.startDate,
@@ -791,26 +797,32 @@ export const getAllReplacements = async (req, res) => {
       if (!affectedDates.length) continue;
       const replacement = resolveReplacementTrainer(leave, schedule, trainersById);
       const isEditable = leave.status === 'approved';
-      replacements.push({
-        leave: {
-          _id: leave._id,
-          trainer: leave.trainer,
-          startDate: leave.startDate,
-          endDate: leave.endDate,
-          reason: leave.reason,
-          status: leave.status,
-          replacementNeeded: leave.replacementNeeded,
-        },
-        schedule,
-        replacement,
-        timelineStatus,
-        canAssign: isEditable && !replacement,
-        canChange: isEditable && Boolean(replacement),
-        replacementDate: affectedDates[0],
-        affectedDates,
-        isSlotReplacement:
-          normalizeDate(leave.startDate).getTime() === normalizeDate(leave.endDate).getTime(),
-      });
+      for (const occurrenceDate of affectedDates) {
+        const occurrenceStatus = leave.status === 'approved'
+          ? (occurrenceDate < toAttendanceDateKey(today) ? 'previous'
+            : occurrenceDate === toAttendanceDateKey(today) ? 'current' : 'upcoming')
+          : timelineStatus;
+        replacements.push({
+          leave: {
+            _id: leave._id,
+            trainer: leave.trainer,
+            startDate: leave.startDate,
+            endDate: leave.endDate,
+            reason: leave.reason,
+            status: leave.status,
+            replacementNeeded: leave.replacementNeeded,
+          },
+          schedule,
+          replacement,
+          timelineStatus: occurrenceStatus,
+          canAssign: isEditable && !replacement,
+          canChange: isEditable && Boolean(replacement),
+          replacementDate: occurrenceDate,
+          affectedDates: [occurrenceDate],
+          isSlotReplacement:
+            normalizeDate(leave.startDate).getTime() === normalizeDate(leave.endDate).getTime(),
+        });
+      }
     }
   }
 
@@ -904,6 +916,12 @@ export const assignReplacement = async (req, res) => {
   const leave = await Leave.findOne(leaveFilter).populate('trainer', 'name employeeId');
   if (!leave) {
     return res.status(400).json({ message: 'No approved leave found for this schedule' });
+  }
+  let retainedRanges;
+  try {
+    retainedRanges = scopeReplacementOccurrence(leave, req.body.date, schedule);
+  } catch (error) {
+    return res.status(400).json({ message: error.message });
   }
   const { cancellationMap, holidayDateKeys } = await getLeaveClassExclusionsForRange(
     leave.startDate,
@@ -1021,7 +1039,7 @@ export const assignReplacement = async (req, res) => {
     leave.markModified('bulkReplacement');
   }
   leave.markModified('replacements');
-  await leave.save();
+  await saveReplacementOccurrence(Leave, leave, retainedRanges);
   clearAttendanceGridCache();
 
   const resolvedReplacement = useExternal
@@ -1086,6 +1104,14 @@ export const cancelReplacement = async (req, res) => {
     return res.status(404).json({ message: 'Replacement record not found' });
   }
 
+  let retainedRanges;
+  try {
+    const schedule = leave.affectedSchedules.find((item) => getScheduleId(item) === scheduleId.toString());
+    retainedRanges = scopeReplacementOccurrence(leave, req.body.date, schedule);
+  } catch (error) {
+    return res.status(400).json({ message: error.message });
+  }
+
   const scheduleIdStr = scheduleId.toString();
   const revokedReplacement = (leave.replacements || []).find(
     (entry) => getScheduleId(entry.schedule) === scheduleIdStr
@@ -1130,7 +1156,7 @@ export const cancelReplacement = async (req, res) => {
     leave.replacementNeeded = effectiveSchedules.length > 0;
   }
 
-  await leave.save();
+  await saveReplacementOccurrence(Leave, leave, retainedRanges);
   clearAttendanceGridCache();
 
   if (revokedReplacement) {

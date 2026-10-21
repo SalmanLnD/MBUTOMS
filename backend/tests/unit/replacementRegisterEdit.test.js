@@ -89,3 +89,25 @@ test('approved previous-date replacements can still be assigned, edited, or dele
   assert.equal(result.replacements.some((row) => row.leave._id === 'cancelled-leave'), false);
   assert.equal(result.pagination.total, 2);
 });
+
+test('weekly class dates have individual rows and paginate as occurrences', async (t) => {
+  t.mock.method(Leave, 'find', () => query([{
+    _id: 'weekly-leave', trainer: { name: 'Jahnavi' }, status: 'approved',
+    startDate: new Date('2026-10-21'), endDate: new Date('2026-11-04'),
+    replacements: [], affectedSchedules: [{
+      _id: 'weekly-slot', day: 'Wednesday', startTime: '13:45', endTime: '15:45',
+    }],
+  }]));
+  for (const model of [Trainer, ClassCancellation, OfficialHoliday, Schedule, Subject]) {
+    t.mock.method(model, 'find', () => query([]));
+  }
+  let result;
+  await getAllReplacements({ query: { sortBy: 'date', sortOrder: 'asc', limit: 10 } }, {
+    json(data) { result = data; },
+  });
+  assert.equal(result.pagination.total, 3);
+  assert.deepEqual(result.replacements.map((row) => row.affectedDates), [
+    ['2026-10-21'], ['2026-10-28'], ['2026-11-04'],
+  ]);
+  assert.ok(result.replacements.every((row) => row.canAssign));
+});

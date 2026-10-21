@@ -537,12 +537,8 @@ export const buildTopicTrackerSessions = async ({
     }
   }
 
-  if (trainerId) {
-    const targetId = trainerId.toString();
-    allowedTrainerIds = allowedTrainerIds
-      ? new Set([...allowedTrainerIds].filter((id) => id === targetId))
-      : new Set([targetId]);
-  }
+  // Apply the requested trainer and viewer access separately below. A replacement
+  // can open the original trainer's overview row even when their IDs differ.
 
   const sessionDefaults = [];
 

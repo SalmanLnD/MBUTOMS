@@ -5,9 +5,9 @@ export const getAllReplacements = async (params = {}) => {
   return data;
 };
 
-export const getReplacementSuggestions = async (scheduleId, leaveId) => {
+export const getReplacementSuggestions = async (scheduleId, leaveId, date) => {
   const { data } = await api.get(`/replacements/suggestions/${scheduleId}`, {
-    params: { leaveId },
+    params: { leaveId, date },
   });
   return data;
 };
@@ -23,6 +23,7 @@ export const assignReplacement = async (leaveId, scheduleId, options = {}) => {
     : {
       leaveId,
       scheduleId,
+      date: options.date,
       ...(options.isExternal
         ? {
           isExternal: true,
@@ -34,8 +35,8 @@ export const assignReplacement = async (leaveId, scheduleId, options = {}) => {
   return data;
 };
 
-export const removeReplacement = async (leaveId, scheduleId) => {
-  const { data } = await api.post('/replacements/cancel', { leaveId, scheduleId });
+export const removeReplacement = async (leaveId, scheduleId, date) => {
+  const { data } = await api.post('/replacements/cancel', { leaveId, scheduleId, date });
   return data;
 };
 
