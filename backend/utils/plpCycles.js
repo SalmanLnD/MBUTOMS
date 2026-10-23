@@ -12,6 +12,12 @@ import {
 export const PLP_CYCLE_START_DAY = 21;
 export const PLP_CYCLE_END_DAY = 20;
 
+/**
+ * September–October 2026 (cycle key 2026-10, 21 Sep–20 Oct) is the first cycle
+ * that uses the updated compliance default and feedback response adjustment.
+ */
+export const PLP_UPDATED_RULES_FROM_CYCLE = '2026-10';
+
 const TRACKING_START_KEY = toAttendanceDateKey(TRAINER_ATTENDANCE_TRACKING_START);
 
 const shiftMonthParts = (year, month, delta) => {
@@ -82,6 +88,20 @@ export const observationBelongsToCycle = (observation, cycle) => {
   if (dateKey) return dateKey >= cycle.startKey && dateKey <= cycle.endKey;
   return observation?.monthKey === cycle.cycleKey;
 };
+
+/** End-month cycle key that contains this attendance date (YYYY-MM-DD). */
+export const cycleKeyForAttendanceDate = (dateKey) => {
+  const match = String(dateKey || '').trim().match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!match) return null;
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+  const end = day > PLP_CYCLE_END_DAY ? shiftMonthParts(year, month, 1) : { year, month };
+  return formatAttendanceMonthKey(end.year, end.month);
+};
+
+export const plpCycleUsesUpdatedRules = (cycleKey) =>
+  String(cycleKey || '') >= PLP_UPDATED_RULES_FROM_CYCLE;
 
 export const resolvePlpCycleKey = (cycleParam) => {
   const raw = String(cycleParam || '').trim();

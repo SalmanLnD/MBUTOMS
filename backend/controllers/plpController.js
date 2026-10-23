@@ -11,6 +11,7 @@ import {
   buildPlpCycleOptions,
   getPlpCycleRange,
   observationBelongsToCycle,
+  plpCycleUsesUpdatedRules,
   resolvePlpCycleKey,
 } from '../utils/plpCycles.js';
 import {
@@ -20,6 +21,8 @@ import {
   PLP_WEIGHTAGE_KEYS,
   attendanceScoreFromRrd,
   complianceScoreFromCount,
+  feedbackResponseDeduction,
+  feedbackScoreForPlp,
   computeDisplayPlpFinal,
   computePlpFinalRating,
   normalizeWeightages,
@@ -129,8 +132,12 @@ const buildPlpRowsForCycle = async (cycleKey, weightages = PLP_WEIGHTAGES) => {
   ]);
 
   const feedbackMap = new Map(
-    feedbackAvgs.map((row) => [row._id.toString(), roundPlpScore(row.average)])
+    feedbackAvgs.map((row) => [row._id.toString(), {
+      average: roundPlpScore(row.average),
+      count: row.count || 0,
+    }])
   );
+  const updatedRules = plpCycleUsesUpdatedRules(cycle.cycleKey);
   // A cycle can span two month buckets, so a trainer may have more than one
   // observation of a type inside it. Average the rated ones; a comments-only
   // (unrated) row never displaces a real rating.
@@ -158,16 +165,23 @@ const buildPlpRowsForCycle = async (cycleKey, weightages = PLP_WEIGHTAGES) => {
     overrides.map((row) => [row.trainer.toString(), row.finalRating])
   );
 
-  return trainers.map((trainer) => {
+  const rows = trainers.map((trainer) => {
     const id = trainer._id.toString();
     const rrdDays = rrdByTrainer.get(id) || 0;
     const complianceCount = complianceMap.get(id) || 0;
+    const feedbackStats = feedbackMap.get(id);
+    const feedbackDeduction = feedbackStats && updatedRules
+      ? feedbackResponseDeduction(feedbackStats.count)
+      : 0;
+    const feedbackRating = feedbackStats
+      ? feedbackScoreForPlp(feedbackStats.average, feedbackStats.count, cycle.cycleKey)
+      : 0;
     const scores = {
-      feedback: feedbackMap.get(id) ?? 0,
+      feedback: feedbackRating ?? 0,
       classObservation: classMap.has(id) && classMap.get(id) != null ? classMap.get(id) : 0,
       demoObservation: demoMap.has(id) && demoMap.get(id) != null ? demoMap.get(id) : 0,
       attendance: attendanceScoreFromRrd(rrdDays),
-      compliance: complianceScoreFromCount(complianceCount),
+      compliance: complianceScoreFromCount(complianceCount, cycle.cycleKey),
     };
 
     const calculatedRaw = computePlpFinalRating(scores, weightages);
@@ -180,6 +194,8 @@ const buildPlpRowsForCycle = async (cycleKey, weightages = PLP_WEIGHTAGES) => {
       employeeId: trainer.employeeId,
       name: trainer.name,
       feedbackRating: scores.feedback,
+      feedbackResponseCount: feedbackStats?.count || 0,
+      feedbackDeduction,
       classObservationRating: scores.classObservation,
       demoObservationRating: scores.demoObservation,
       attendanceScore: scores.attendance,
@@ -193,13 +209,15 @@ const buildPlpRowsForCycle = async (cycleKey, weightages = PLP_WEIGHTAGES) => {
       finalPlpRating,
     };
   });
+
+  return { rows, updatedRules };
 };
 
 export const getPlpSheet = async (req, res) => {
   const cycleKey = resolvePlpCycleKey(req.query.cycle || req.query.month);
   const weightages = await getStoredPlpWeightages();
   const cycle = getPlpCycleRange(cycleKey);
-  const rows = await buildPlpRowsForCycle(cycleKey, weightages);
+  const { rows, updatedRules } = await buildPlpRowsForCycle(cycleKey, weightages);
   const cycles = buildPlpCycleOptions();
 
   res.json({
@@ -209,6 +227,7 @@ export const getPlpSheet = async (req, res) => {
     weightages,
     weightageKeys: PLP_WEIGHTAGE_KEYS,
     headers: plpWeightageLabels(weightages),
+    updatedRules,
     rows,
   });
 };
@@ -289,6 +308,7 @@ export const buildPlpExportPayload = async () => {
     'Employee ID',
     'Trainer',
     `Feedback (${weightages.feedback}%)`,
+    'Feedback responses',
     `Class observation (${weightages.classObservation}%)`,
     `Demo observation (${weightages.demoObservation}%)`,
     `Attendance (${weightages.attendance}%)`,
@@ -303,7 +323,7 @@ export const buildPlpExportPayload = async () => {
 
   const sheets = [];
   for (const option of cycles) {
-    const cycleRows = await buildPlpRowsForCycle(option.value, weightages);
+    const { rows: cycleRows } = await buildPlpRowsForCycle(option.value, weightages);
     sheets.push({
       cycleKey: option.value,
       sheetName: option.sheetName,
@@ -317,6 +337,7 @@ export const buildPlpExportPayload = async () => {
           row.employeeId || '',
           row.name || '',
           row.feedbackRating ?? '',
+          row.feedbackResponseCount ?? 0,
           row.classObservationRating ?? '',
           row.demoObservationRating ?? '',
           row.attendanceScore ?? '',

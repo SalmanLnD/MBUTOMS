@@ -3,6 +3,8 @@ import TrainerCompliance from '../models/TrainerCompliance.js';
 import { mergeRosterFilter } from '../utils/rosterFilter.js';
 import { toAttendanceDateKey, normalizeAttendanceDate } from '../utils/attendanceTracking.js';
 import { complianceScoreFromCount } from '../utils/plpScoring.js';
+import { cycleKeyForAttendanceDate } from '../utils/plpCycles.js';
+import { escapeRegex } from '../utils/regex.js';
 
 const populateOptions = [
   { path: 'trainer', select: 'name employeeId' },
@@ -13,7 +15,7 @@ export const listCompliance = async (req, res) => {
   const monthKey = String(req.query.month || '').trim();
   const search = String(req.query.search || req.query.trainer || '').trim();
   const page = Math.max(1, parseInt(req.query.page, 10) || 1);
-  const limit = Math.min(100, Math.max(1, parseInt(req.query.limit, 10) || 20));
+  const limit = Math.min(100, Math.max(1, parseInt(req.query.limit, 10) || 25));
   const skip = (page - 1) * limit;
 
   const filter = {};
@@ -22,10 +24,11 @@ export const listCompliance = async (req, res) => {
   }
 
   if (search) {
+    const escaped = escapeRegex(search);
     const rosterFilter = await mergeRosterFilter({
       $or: [
-        { name: { $regex: search, $options: 'i' } },
-        { employeeId: { $regex: search, $options: 'i' } },
+        { name: { $regex: escaped, $options: 'i' } },
+        { employeeId: { $regex: escaped, $options: 'i' } },
       ],
     }, { rosterOnly: true });
     const trainers = await Trainer.find(rosterFilter).select('_id').lean();
@@ -103,7 +106,7 @@ export const createCompliance = async (req, res) => {
     item: populated,
     monthKey,
     complianceCount,
-    complianceScore: complianceScoreFromCount(complianceCount),
+    complianceScore: complianceScoreFromCount(complianceCount, cycleKeyForAttendanceDate(dateKey)),
   });
 };
 
@@ -123,7 +126,7 @@ export const deleteCompliance = async (req, res) => {
     monthKey,
     trainerId: trainer,
     complianceCount,
-    complianceScore: complianceScoreFromCount(complianceCount),
+    complianceScore: complianceScoreFromCount(complianceCount, cycleKeyForAttendanceDate(item.dateKey)),
   });
 };
 

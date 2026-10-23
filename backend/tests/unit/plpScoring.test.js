@@ -7,9 +7,15 @@ import {
   complianceScoreFromCount,
   computeDisplayPlpFinal,
   computePlpFinalRating,
+  feedbackResponseDeduction,
+  feedbackScoreForPlp,
   roundToHalf,
 } from '../../utils/plpScoring.js';
-import { getPlpCycleRange, observationBelongsToCycle } from '../../utils/plpCycles.js';
+import {
+  cycleKeyForAttendanceDate,
+  getPlpCycleRange,
+  observationBelongsToCycle,
+} from '../../utils/plpCycles.js';
 
 test('attendance score defaults to 4 and deducts RRD days', () => {
   assert.equal(attendanceScoreFromRrd(0), 4);
@@ -18,11 +24,39 @@ test('attendance score defaults to 4 and deducts RRD days', () => {
   assert.equal(attendanceScoreFromRrd(9), 0);
 });
 
-test('compliance score defaults to 5 and deducts per record', () => {
+test('compliance score defaults to 5 before September-October and deducts per record', () => {
   assert.equal(complianceScoreFromCount(0), 5);
+  assert.equal(complianceScoreFromCount(0, '2026-09'), 5);
   assert.equal(complianceScoreFromCount(2), 3);
   assert.equal(complianceScoreFromCount(5), 0);
   assert.equal(complianceScoreFromCount(8), 0);
+});
+
+test('compliance starts at 4 from the September-October cycle', () => {
+  assert.equal(complianceScoreFromCount(0, '2026-10'), 4);
+  assert.equal(complianceScoreFromCount(1, '2026-10'), 3);
+  assert.equal(complianceScoreFromCount(4, '2026-10'), 0);
+  assert.equal(complianceScoreFromCount(6, '2026-11'), 0);
+  assert.equal(cycleKeyForAttendanceDate('2026-09-20'), '2026-09');
+  assert.equal(cycleKeyForAttendanceDate('2026-09-21'), '2026-10');
+});
+
+test('feedback response count adjusts the PLP score from September-October', () => {
+  assert.equal(feedbackResponseDeduction(101), 0);
+  assert.equal(feedbackResponseDeduction(100), 0.25);
+  assert.equal(feedbackResponseDeduction(76), 0.25);
+  assert.equal(feedbackResponseDeduction(75), 0.5);
+  assert.equal(feedbackResponseDeduction(51), 0.5);
+  assert.equal(feedbackResponseDeduction(50), 1);
+  assert.equal(feedbackResponseDeduction(12), 1);
+
+  assert.equal(feedbackScoreForPlp(4.5, 140, '2026-10'), 4.5);
+  assert.equal(feedbackScoreForPlp(4.5, 90, '2026-10'), 4.25);
+  assert.equal(feedbackScoreForPlp(4.5, 60, '2026-10'), 4);
+  assert.equal(feedbackScoreForPlp(4.2, 40, '2026-10'), 3.2);
+  assert.equal(feedbackScoreForPlp(0.4, 10, '2026-10'), 0);
+  assert.equal(feedbackScoreForPlp(4.2, 40, '2026-09'), 4.2);
+  assert.equal(feedbackScoreForPlp(null, 10, '2026-10'), null);
 });
 
 test('final PLP rating uses weightages and treats missing components as zero', () => {
