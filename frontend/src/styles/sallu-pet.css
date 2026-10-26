@@ -32,7 +32,7 @@
 .sallu-pet.is-dragging { transition: none; }
 .sallu-pet.is-dragging .sallu-pet__hit { cursor: grabbing; }
 .sallu-pet__face { top: 5%; left: 23%; width: 58%; height: 43%; cursor: pointer; }
-.sallu-pet__body { top: 48%; left: 15%; width: 75%; height: 47%; cursor: grab; }
+.sallu-pet__body { top: 48%; left: 15%; width: 75%; height: 47%; cursor: pointer; }
 .sallu-pet__hit:focus, .sallu-pet__hit:focus-visible { outline: none; background: transparent; box-shadow: none; }
 .sallu-pet:has(.sallu-pet__hit:focus-visible)::after { content: ""; position: absolute; bottom: 0; left: 35%; width: 30%; height: 3px; border-radius: 3px; background: var(--primary); }
 .sallu-pet__settings { position: absolute; right: 0; top: 0; min-width: 28px; min-height: 28px; pointer-events: auto; background: var(--surface); color: var(--text-secondary); border: 1px solid var(--line); border-radius: 50%; font-size: 18px; opacity: 0; transition: opacity 150ms ease; }
