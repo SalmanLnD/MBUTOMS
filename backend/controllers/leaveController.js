@@ -20,6 +20,7 @@ import {
 } from '../utils/leaveAffectedClasses.js';
 import { getLeaveDateKeys, getLeaveDateKeysForWeekday, toLeaveDateKey } from '../utils/leaveDateRange.js';
 import { splitLeaveRangeForPartialCancel } from '../utils/leaveRangeSplit.js';
+import { normalizeAttendanceDate } from '../utils/attendanceTracking.js';
 import {
   applyDefaultExcessRrdAttendance,
   clearELeaveAttendanceForDateKeys,
@@ -339,8 +340,8 @@ export const partialCancelLeave = async (req, res) => {
     return res.status(400).json({ message: 'Cancelled start date and end date are required' });
   }
 
-  const cancelStart = normalizeDate(startDate);
-  const cancelEnd = normalizeDate(endDate);
+  const cancelStart = normalizeAttendanceDate(startDate);
+  const cancelEnd = normalizeAttendanceDate(endDate);
   if (cancelEnd < cancelStart) {
     return res.status(400).json({ message: 'Cancel end date must be on or after the start date' });
   }

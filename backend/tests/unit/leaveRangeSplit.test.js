@@ -4,6 +4,14 @@ import assert from 'node:assert/strict';
 import { splitLeaveRangeForPartialCancel } from '../../utils/leaveRangeSplit.js';
 import { toLeaveDateKey } from '../../utils/leaveDateRange.js';
 
+test('last IST day can be cancelled from a range stored at IST midnight', () => {
+  const result = splitLeaveRangeForPartialCancel(
+    new Date('2026-10-21T18:30:00Z'), new Date('2026-10-23T18:30:00Z'),
+    '2026-10-24', '2026-10-24');
+  assert.deepEqual(result.map((row) => [toLeaveDateKey(row.startDate), toLeaveDateKey(row.endDate)]),
+    [['2026-10-22', '2026-10-23']]);
+});
+
 test('partial cancel splits a leave range into remaining before and after segments', () => {
   const result = splitLeaveRangeForPartialCancel(
     new Date('2026-09-01T00:00:00.000Z'),

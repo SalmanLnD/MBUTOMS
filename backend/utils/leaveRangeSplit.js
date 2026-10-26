@@ -1,10 +1,13 @@
-import { normalizeDate } from './scheduleHelpers.js';
+import { normalizeAttendanceDate as normalizeDate } from './attendanceTracking.js';
 
 export const splitLeaveRangeForPartialCancel = (leaveStart, leaveEnd, cancelStart, cancelEnd) => {
   const start = normalizeDate(leaveStart);
   const end = normalizeDate(leaveEnd);
   const removeStart = normalizeDate(cancelStart);
   const removeEnd = normalizeDate(cancelEnd);
+  if ([start, end, removeStart, removeEnd].some((date) => Number.isNaN(date.getTime()))) {
+    throw new Error('Select valid leave cancellation dates');
+  }
 
   if (removeEnd < removeStart) {
     throw new Error('Cancel end date must be on or after the start date');
@@ -22,7 +25,7 @@ export const splitLeaveRangeForPartialCancel = (leaveStart, leaveEnd, cancelStar
   const remaining = [];
 
   const beforeEnd = new Date(removeStart);
-  beforeEnd.setDate(beforeEnd.getDate() - 1);
+  beforeEnd.setUTCDate(beforeEnd.getUTCDate() - 1);
   if (beforeEnd >= start) {
     remaining.push({
       startDate: new Date(start),
@@ -31,7 +34,7 @@ export const splitLeaveRangeForPartialCancel = (leaveStart, leaveEnd, cancelStar
   }
 
   const afterStart = new Date(removeEnd);
-  afterStart.setDate(afterStart.getDate() + 1);
+  afterStart.setUTCDate(afterStart.getUTCDate() + 1);
   if (afterStart <= end) {
     remaining.push({
       startDate: new Date(afterStart),
