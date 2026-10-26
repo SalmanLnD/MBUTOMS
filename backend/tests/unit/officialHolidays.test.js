@@ -12,7 +12,7 @@ test('empty holiday day resolves to official Holiday', () => {
   assert.equal(resolved.isNonWorking, true);
 });
 
-test('punched holiday day stays as worked holiday', () => {
+test('explicit OIF present survives holiday resolution', () => {
   assert.equal(isWorkedOfficialHoliday({
     punchInAt: new Date(),
     attendanceType: TRAINER_ATTENDANCE_TYPES.OIF,
@@ -24,6 +24,15 @@ test('punched holiday day stays as worked holiday', () => {
     attendanceType: TRAINER_ATTENDANCE_TYPES.OIF,
     oifNumber: 'IT',
   });
-  assert.equal(resolved.attendanceType, TRAINER_ATTENDANCE_TYPES.HOLIDAY_OIF);
+  assert.equal(resolved.attendanceType, TRAINER_ATTENDANCE_TYPES.OIF);
   assert.equal(resolved.isNonWorking, false);
+});
+
+test('present stays selected before an OIF number is entered; explicit holiday OIF remains distinct', () => {
+  assert.deepEqual(resolveOfficialHolidayAttendance({ attendanceType: 'oif', oifNumber: '' }), {
+    attendanceType: 'oif', isNonWorking: false,
+  });
+  assert.deepEqual(resolveOfficialHolidayAttendance({ attendanceType: 'holiday_oif', oifNumber: 'IT' }), {
+    attendanceType: 'holiday_oif', isNonWorking: false,
+  });
 });

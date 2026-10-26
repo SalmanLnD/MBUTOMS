@@ -621,7 +621,7 @@ export const upsertTrainerDailyAttendance = async (req, res) => {
       requestedType === TRAINER_ATTENDANCE_TYPES.OIF
       || requestedType === TRAINER_ATTENDANCE_TYPES.HOLIDAY_OIF
     ) {
-      resolvedAttendanceType = TRAINER_ATTENDANCE_TYPES.HOLIDAY_OIF;
+      resolvedAttendanceType = requestedType;
       isNonWorkingDay = false;
     } else {
       return res.status(400).json({ message: 'Select a valid holiday attendance type.' });

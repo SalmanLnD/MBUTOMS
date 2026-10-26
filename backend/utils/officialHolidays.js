@@ -64,6 +64,11 @@ export const isWorkedOfficialHoliday = (log) => {
 };
 
 export const resolveOfficialHolidayAttendance = (log) => {
+  // An explicit present selection must survive save, reload and sheet export,
+  // including Sundays that are also listed as official holidays.
+  if (log?.attendanceType === TRAINER_ATTENDANCE_TYPES.OIF) {
+    return { attendanceType: TRAINER_ATTENDANCE_TYPES.OIF, isNonWorking: false };
+  }
   if (isWorkedOfficialHoliday(log)) {
     const attendanceType = log.attendanceType === TRAINER_ATTENDANCE_TYPES.HOLIDAY_OIF
       || log.attendanceType === TRAINER_ATTENDANCE_TYPES.OIF
