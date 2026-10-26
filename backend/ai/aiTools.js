@@ -20,6 +20,9 @@ import { getLeaveOverlapFilter } from '../utils/leaveDateRange.js';
 import { getLeaveClassExclusionsForRange, getUncancelledScheduleDateKeys } from '../utils/leaveAffectedClasses.js';
 import { dedupeReplacementsBySchedule } from '../utils/leaveReplacements.js';
 import { filterSchedulesActiveOnDate } from '../utils/activeSchedulesForDate.js';
+import TrainerObservation from '../models/TrainerObservation.js';
+import { hasFullObservationAccess, hasEvaluatorObservationAccess, buildTrainerFilterForEvaluator } from '../utils/evaluatorAccess.js';
+import { cycleKeyForAttendanceDate, getPlpCycleRange } from '../utils/plpCycles.js';
 
 import { buildTrainerAvailabilityForRange, WORK_DAY_START, WORK_DAY_END } from '../utils/trainerAvailability.js';
 import { mergeRosterFilter } from '../utils/rosterFilter.js';
@@ -34,8 +37,11 @@ const escapeRegex = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 const linkedId = (req) => id(req.user?.trainer || (fullAccess(req) ? req.user?.assistantTrainer : null));
 const management = (req) => !req.impersonator && isAuthorizedRole(req.user?.role, MANAGEMENT_ROLES);
 const fullAccess = (req) => !req.impersonator && FULL_ACCESS_ROLES.includes(req.user?.role);
+const observationAccess = (req) => !req.impersonator
+  && (hasFullObservationAccess(req.user) || hasEvaluatorObservationAccess(req.user));
 
 const definitions = [
+  ['get_observations', 'Read recorded demo/class observation counts and ratings out of 5, grouped by PLP 21–20 cycle. Omit cycle for all recorded history. Counts are saved observation records, not proof of every demo conducted. This does not return overall PLP scores.', ['trainerName', 'employeeId', 'type', 'cycle']],
   ['get_my_timetable', 'Read my workload for a date or inclusive range. For this week use period=this_week; returns backend total and daily breakdown.', ['date', 'from', 'to', 'period', 'semester']],
   ['get_trainer_timetable', 'Read an authorized trainer timetable for a date or period. For this week use period=this_week. Never guess a trainer.', ['trainerName', 'employeeId', 'date', 'from', 'to', 'period', 'semester']],
   ['get_trainer_hours', 'Explain official hours for a date or inclusive range, including cancellations and holidays. For this week use period=this_week; totalHours covers the WHOLE returned period. Omit trainer identifiers for myself.', ['trainerName', 'employeeId', 'date', 'from', 'to', 'period', 'semester']],
@@ -52,6 +58,7 @@ const definitions = [
 ];
 
 export const getAiToolDeclarations = (req) => definitions
+  .filter(([name]) => name !== 'get_observations' || observationAccess(req))
   .filter(([name]) => !['get_trainer_timetable', 'get_special_classes', 'get_replacements'].includes(name) || management(req))
   .filter(([name]) => name !== 'get_topic_tracker_pending' || fullAccess(req) || isSubjectCoordinator(req.user))
   .filter(([name]) => name !== 'get_attendance_summary' || fullAccess(req))
@@ -75,6 +82,8 @@ export const validateToolArguments = (name, args = {}, now = new Date()) => {
     if (['date', 'from', 'to'].includes(key) && (!/^\d{4}-\d{2}-\d{2}$/.test(value) || !toAttendanceDateKey(value))) throw new Error('Invalid date');
   }
   if (required.some((key) => !cleaned[key])) throw new Error('Missing tool arguments');
+  if (cleaned.type && !['demo', 'class'].includes(cleaned.type)) throw new Error('Invalid observation type');
+  if (cleaned.cycle && !/^\d{4}-(0[1-9]|1[0-2])$/.test(cleaned.cycle)) throw new Error('Invalid cycle');
   if (name === 'get_trainer_availability') {
     for (const field of ['startTime', 'endTime']) {
       if (cleaned[field] && !/^([01]\d|2[0-3]):[0-5]\d$/.test(cleaned[field])) throw new Error('Invalid time');
@@ -423,6 +432,45 @@ const trainerAvailability = async (req, args, deps) => {
   return buildHourlyTrainerAvailability({ trainers: (result.trainers || []).filter((trainer) => permittedIds.has(id(trainer))) }, args, MAX_RECORDS);
 };
 
+const observations = async (req, args, deps) => {
+  if (!observationAccess(req)) return denied();
+  const scope = hasFullObservationAccess(req.user) ? null
+    : await (deps.observationTrainerFilter || buildTrainerFilterForEvaluator)(req.user);
+  const find = deps.findObservationTrainers || (async (filter) => Trainer.find(filter)
+    .select('name employeeId').limit(11).lean());
+  if (!args.trainerName && !args.employeeId) return { error: 'trainer_required', message: 'Ask for a trainer name or employee ID.' };
+  const identity = args.employeeId ? { employeeId: args.employeeId }
+    : { name: { $regex: escapeRegex(args.trainerName), $options: 'i' } };
+  const trainers = await find(scope ? { $and: [identity, scope] } : identity);
+  if (!trainers.length) return notFound('authorized trainer');
+  if (trainers.length > 1) return { error: 'ambiguous', candidates: trainers.slice(0, 10).map(trainerInfo) };
+  const trainer = trainers[0];
+  const filter = { trainer: trainer._id, ...(args.type ? { type: args.type } : {}) };
+  const load = deps.loadObservations || (async (query) => TrainerObservation.find(query)
+    .select('monthKey type rating observationDate observationTime subjectCode').lean());
+  const today = getIstNowParts(deps.now || new Date()).dateKey;
+  const records = (await load(filter)).filter((row) => !row.observationDate || row.observationDate <= today);
+  const cycles = new Map();
+  let demoCount = 0; let classCount = 0;
+  for (const row of records) {
+    const key = row.observationDate ? cycleKeyForAttendanceDate(row.observationDate) : row.monthKey;
+    if (!key || (args.cycle && key !== args.cycle)) continue;
+    if (row.type === 'demo') demoCount++;
+    else if (row.type === 'class') classCount++;
+    if (!cycles.has(key)) {
+      const range = getPlpCycleRange(key);
+      cycles.set(key, { cycle: key, from: range.startKey, to: range.endKey, observations: [] });
+    }
+    cycles.get(key).observations.push({ type: row.type, rating: row.rating ?? null,
+      date: row.observationDate || null, time: row.observationTime || null, subjectCode: row.subjectCode || '' });
+  }
+  const allCycles = [...cycles.values()].sort((a, b) => a.cycle.localeCompare(b.cycle));
+  return { trainer: trainerInfo(trainer), demoCount, classCount, ratingScale: 5,
+    countMeaning: 'Saved observation records only; not a complete count of all demos conducted.',
+    cycles: allCycles.slice(-MAX_RECORDS), truncated: allCycles.length > MAX_RECORDS,
+    totalCycles: allCycles.length };
+};
+
 export const executeAiTool = async (name, rawArgs, req, deps = {}) => {
   if (!req.user || !Object.values(ROLES).includes(req.user.role)) return denied();
   if (!getAiToolDeclarations(req).some((tool) => tool.name === name)) return denied();
@@ -433,6 +481,7 @@ export const executeAiTool = async (name, rawArgs, req, deps = {}) => {
   const read = deps.read || readController;
   try {
     switch (name) {
+      case 'get_observations': return await observations(req, args, deps);
       case 'get_my_timetable': return await timetable(req, args, deps);
       case 'get_trainer_timetable':
       case 'get_trainer_hours': return await timetable(req, args, deps);

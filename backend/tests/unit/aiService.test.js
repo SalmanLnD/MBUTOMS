@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { chatWithAi as realChatWithAi, AiUnavailableError, MAX_TOOL_ROUNDS, MAX_TOOL_CALLS } from '../../ai/aiService.js';
+import { chatWithAi as realChatWithAi, AiUnavailableError, AiProviderBusyError, MAX_TOOL_ROUNDS, MAX_TOOL_CALLS } from '../../ai/aiService.js';
 import { AiQuotaError } from '../../ai/aiQuota.js';
 import { getAiToolDeclarations, executeAiTool, resolveAiTrainer, validateToolArguments } from '../../ai/aiTools.js';
 import { buildAiPrompt } from '../../ai/aiPrompt.js';
@@ -8,6 +8,44 @@ import { buildAiPrompt } from '../../ai/aiPrompt.js';
 const req = { user: { _id: 'user', role: 'trainer', trainer: 'own', password: 'private-password', camuPassword: 'camu-secret' } };
 const response = (parts) => ({ candidates: [{ content: { role: 'model', parts } }] });
 const clientFor = (generateContent) => ({ models: { generateContent } });
+
+test('one transient overload is retried and both attempts reserve quota', async () => {
+  let attempts = 0; let reservations = 0; let waits = 0;
+  const result = await realChatWithAi({ message: 'Hello', req }, {
+    client: clientFor(async () => {
+      if (++attempts === 1) throw Object.assign(new Error('provider details'), { status: 503 });
+      return response([{ text: 'Ready' }]);
+    }),
+    env: {}, reserveProviderCall: async () => { reservations++; }, waitForRetry: async () => { waits++; },
+  });
+  assert.equal(result.message, 'Ready');
+  assert.equal(attempts, 2); assert.equal(reservations, 2); assert.equal(waits, 1);
+});
+
+test('persistent overload stops after one retry and returns a safe busy error', async () => {
+  let attempts = 0;
+  await assert.rejects(realChatWithAi({ message: 'Hello', req }, {
+    client: clientFor(async () => { attempts++; throw Object.assign(new Error('private provider details'), { status: 503 }); }),
+    env: {}, reserveProviderCall: async () => {}, waitForRetry: async () => {},
+  }), (error) => error instanceof AiProviderBusyError && error.code === 'AI_PROVIDER_BUSY'
+    && !error.message.includes('private provider'));
+  assert.equal(attempts, 2);
+});
+
+test('retry cannot exceed quota or retry non-transient provider errors', async () => {
+  let attempts = 0; let reservations = 0;
+  const quotaError = new AiQuotaError('AI_MINUTE_LIMIT', 'Wait for quota');
+  await assert.rejects(realChatWithAi({ message: 'Hello', req }, {
+    client: clientFor(async () => { attempts++; throw Object.assign(new Error('overload'), { status: 503 }); }),
+    env: {}, reserveProviderCall: async () => { if (++reservations === 2) throw quotaError; }, waitForRetry: async () => {},
+  }), (error) => error === quotaError);
+  assert.equal(attempts, 1);
+  await assert.rejects(realChatWithAi({ message: 'Hello', req }, {
+    client: clientFor(async () => { attempts++; throw Object.assign(new Error('bad key'), { status: 403 }); }),
+    env: {}, reserveProviderCall: async () => {},
+  }), AiUnavailableError);
+  assert.equal(attempts, 2);
+});
 const chatWithAi = (args, deps = {}) => realChatWithAi(args, { reserveProviderCall: async () => {}, ...deps });
 const timetableDeps = {
   findTrainers: async () => [{ _id: 'own', name: 'Own Trainer', employeeId: '123456', password: 'private-password' }],

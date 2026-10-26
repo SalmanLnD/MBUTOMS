@@ -1,4 +1,4 @@
-import { chatWithAi, AI_UNAVAILABLE_MESSAGE } from './aiService.js';
+import { chatWithAi, AI_UNAVAILABLE_MESSAGE, AiProviderBusyError } from './aiService.js';
 import { aiQuota, AiQuotaError } from './aiQuota.js';
 import { ROLES } from '../utils/roles.js';
 
@@ -11,6 +11,10 @@ const access = (req, res) => {
   return true;
 };
 const failure = (error, res) => {
+  if (error instanceof AiProviderBusyError) {
+    res.setHeader('Retry-After', '30');
+    return res.status(503).json({ message: error.message, code: error.code });
+  }
   if (error instanceof AiQuotaError) {
     res.setHeader('Retry-After', String(Math.max(1, Math.ceil((error.resetAt - Date.now()) / 1000))));
     return res.status(error.status).json({ message: error.message, code: error.code, resetAt: error.resetAt.toISOString() });

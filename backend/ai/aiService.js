@@ -1,4 +1,5 @@
 import { GoogleGenAI } from '@google/genai';
+import { setTimeout as wait } from 'node:timers/promises';
 import { buildAiPrompt } from './aiPrompt.js';
 import { executeAiTool, getAiToolDeclarations } from './aiTools.js';
 import { aiQuota, AiQuotaError } from './aiQuota.js';
@@ -9,6 +10,14 @@ export const MAX_TOOL_CALLS = 8;
 
 export class AiUnavailableError extends Error {
   constructor() { super(AI_UNAVAILABLE_MESSAGE); }
+}
+
+export class AiProviderBusyError extends AiUnavailableError {
+  constructor() {
+    super();
+    this.code = 'AI_PROVIDER_BUSY';
+    this.message = 'Gemini is experiencing high demand. Please wait about 30 seconds, then retry.';
+  }
 }
 
 const withinDeadline = (work, signal) => new Promise((resolve, reject) => {
@@ -41,12 +50,15 @@ export const chatWithAi = async ({ message, req }, deps = {}) => {
   const contents = [{ role: 'user', parts: [{ text: redactAiText(message, env) }] }];
   const signal = AbortSignal.timeout(45_000);
   let callCount = 0;
+  let overloadRetries = 0;
   try {
     for (let round = 0; round <= MAX_TOOL_ROUNDS; round += 1) {
       // UTF-8 byte count conservatively bounds text tokens, including schemas/history.
       const inputUpperBound = Buffer.byteLength(JSON.stringify({ contents, tools, system: buildAiPrompt(req.user, now) }), 'utf8') + 1024;
-      await withinDeadline(reserve(inputUpperBound), signal);
-      const response = await withinDeadline(client.models.generateContent({
+      const generate = async () => {
+        // Every attempt, including retries, consumes the configured API budget.
+        await withinDeadline(reserve(inputUpperBound), signal);
+        return withinDeadline(client.models.generateContent({
         model: env.GEMINI_MODEL?.trim() || 'gemini-3.1-flash-lite', contents,
         config: {
           systemInstruction: buildAiPrompt(req.user, now),
@@ -57,7 +69,17 @@ export const chatWithAi = async ({ message, req }, deps = {}) => {
           thinkingConfig: { includeThoughts: false },
           abortSignal: signal,
         },
-      }), signal);
+        }), signal);
+      };
+      let response;
+      try {
+        response = await generate();
+      } catch (error) {
+        if (error instanceof AiQuotaError || Number(error?.status || error?.code) !== 503 || overloadRetries >= 1 || signal.aborted) throw error;
+        overloadRetries += 1;
+        await withinDeadline((deps.waitForRetry || wait)(1000 + Math.floor(Math.random() * 500), undefined, { signal }), signal);
+        response = await generate();
+      }
       const content = response.candidates?.[0]?.content;
       if (!content?.parts?.length) throw new AiUnavailableError();
       const calls = content.parts.filter((part) => part.functionCall).map((part) => part.functionCall);
@@ -91,6 +113,7 @@ export const chatWithAi = async ({ message, req }, deps = {}) => {
     throw new AiUnavailableError();
   } catch (error) {
     if (error instanceof AiQuotaError) throw error;
+    if (Number(error?.status || error?.code) === 503) throw new AiProviderBusyError();
     if (error?.status === 429 || error?.code === 429) throw new AiQuotaError('AI_PROVIDER_LIMIT', 'Gemini’s free quota is temporarily exhausted. Please wait before trying again.');
     throw new AiUnavailableError();
   }

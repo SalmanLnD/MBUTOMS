@@ -8,8 +8,23 @@ import { createAiRouter } from '../../routes/aiRoutes.js';
 import { createAiController, createAiUsageController } from '../../ai/aiController.js';
 import { attachManagerEditNotifier } from '../../utils/managerEditNotifications.js';
 import { AiQuotaError } from '../../ai/aiQuota.js';
+import { AiProviderBusyError } from '../../ai/aiService.js';
 
 const quotaStub = { admit: async () => async () => {} };
+
+test('provider overload returns a clear safe message and retry guidance', async () => {
+  let released = false;
+  const quota = { admit: async () => async () => { released = true; } };
+  const res = { code: 200, headers: {}, status(code) { this.code = code; return this; },
+    setHeader(key, value) { this.headers[key] = value; }, json(body) { this.body = body; return this; } };
+  await createAiController(async () => { throw new AiProviderBusyError(); }, quota)(
+    { user: { _id: 'test', role: 'admin' }, body: { message: 'Hello' } }, res);
+  assert.equal(res.code, 503);
+  assert.equal(res.body.code, 'AI_PROVIDER_BUSY');
+  assert.match(res.body.message, /high demand/);
+  assert.equal(res.headers['Retry-After'], '30');
+  assert.equal(released, true);
+});
 
 test('AI endpoint uses real protect middleware for missing, invalid and valid sessions', async (t) => {
   const oldSecret = process.env.JWT_SECRET;
