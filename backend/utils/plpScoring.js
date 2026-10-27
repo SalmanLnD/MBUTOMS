@@ -42,8 +42,11 @@ export const clampPlpFinal = (value) => {
   return Math.min(PLP_FINAL_MAX, Math.max(PLP_FINAL_MIN, rounded));
 };
 
-export const attendanceScoreFromRrd = (rrdDays = 0) =>
-  Math.max(0, PLP_ATTENDANCE_DEFAULT - Math.max(0, Number(rrdDays) || 0));
+export const attendanceScoreFromRrd = (rrdDays = 0, cycleKey) => {
+  const days = Math.max(0, Number(rrdDays) || 0);
+  const deduction = plpCycleUsesUpdatedRules(cycleKey) ? Math.max(0, days - 1) : days;
+  return Math.max(0, PLP_ATTENDANCE_DEFAULT - deduction);
+};
 
 export const complianceDefaultForCycle = (cycleKey) =>
   (plpCycleUsesUpdatedRules(cycleKey) ? PLP_COMPLIANCE_DEFAULT_UPDATED : PLP_COMPLIANCE_DEFAULT);

@@ -180,7 +180,7 @@ const buildPlpRowsForCycle = async (cycleKey, weightages = PLP_WEIGHTAGES) => {
       feedback: feedbackRating ?? 0,
       classObservation: classMap.has(id) && classMap.get(id) != null ? classMap.get(id) : 0,
       demoObservation: demoMap.has(id) && demoMap.get(id) != null ? demoMap.get(id) : 0,
-      attendance: attendanceScoreFromRrd(rrdDays),
+      attendance: attendanceScoreFromRrd(rrdDays, cycle.cycleKey),
       compliance: complianceScoreFromCount(complianceCount, cycle.cycleKey),
     };
 

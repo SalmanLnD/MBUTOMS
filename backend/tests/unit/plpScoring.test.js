@@ -24,6 +24,16 @@ test('attendance score defaults to 4 and deducts RRD days', () => {
   assert.equal(attendanceScoreFromRrd(9), 0);
 });
 
+test('September-October onward allows one RRD before attendance deductions', () => {
+  for (const cycle of ['2026-10', '2026-11', '2027-01']) {
+    for (const [days, expected] of [[0, 4], [0.5, 4], [1, 4], [1.5, 3.5], [2, 3], [3, 2], [4, 1], [5, 0], [9, 0]]) {
+      assert.equal(attendanceScoreFromRrd(days, cycle), expected);
+    }
+  }
+  assert.equal(attendanceScoreFromRrd(1, '2026-09'), 3);
+  assert.equal(attendanceScoreFromRrd(2, '2026-09'), 2);
+});
+
 test('compliance score defaults to 5 before September-October and deducts per record', () => {
   assert.equal(complianceScoreFromCount(0), 5);
   assert.equal(complianceScoreFromCount(0, '2026-09'), 5);
