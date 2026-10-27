@@ -58,7 +58,10 @@ export const savePlpWeightages = async (input) => {
   return next;
 };
 
+import { compactPlpSheetRows } from '../utils/plpSheetColumns.js';
+
 const buildPlpRowsForCycle = async (cycleKey, weightages = PLP_WEIGHTAGES) => {
+  const rrdDateKeysByTrainer = new Map();
   const cycle = getPlpCycleRange(cycleKey);
   const rosterFilter = await mergeRosterFilter({
     status: 'active',
@@ -120,6 +123,7 @@ const buildPlpRowsForCycle = async (cycleKey, weightages = PLP_WEIGHTAGES) => {
       startDate: cycle.startDate,
       endDate: cycle.endDate,
       trainers,
+      dateKeysByTrainer: rrdDateKeysByTrainer,
     }),
     trainerIds.length
       ? TrainerPlpOverride.find({
@@ -200,6 +204,7 @@ const buildPlpRowsForCycle = async (cycleKey, weightages = PLP_WEIGHTAGES) => {
       demoObservationRating: scores.demoObservation,
       attendanceScore: scores.attendance,
       replacementRequiredDays: rrdDays,
+      replacementRequiredDates: rrdDateKeysByTrainer.get(id) || [],
       complianceScore: scores.compliance,
       complianceCount,
       calculatedRaw,
@@ -324,6 +329,7 @@ export const buildPlpExportPayload = async () => {
   const sheets = [];
   for (const option of cycles) {
     const { rows: cycleRows } = await buildPlpRowsForCycle(option.value, weightages);
+    const compact = option.value >= '2026-11';
     sheets.push({
       cycleKey: option.value,
       sheetName: option.sheetName,
@@ -331,7 +337,7 @@ export const buildPlpExportPayload = async () => {
       startKey: option.startKey,
       endKey: option.endKey,
       feedbackMonthKey: option.feedbackMonthKey,
-      rows: [
+      rows: compact ? compactPlpSheetRows(cycleRows, header) : [
         header,
         ...cycleRows.map((row) => [
           row.employeeId || '',

@@ -81,6 +81,7 @@ export const getReplacementRequiredDaysByTrainer = async ({
   startDate,
   endDate,
   trainers = [],
+  dateKeysByTrainer = null,
 } = {}) => {
   const counts = new Map(trainers.map((trainer) => [trainer._id.toString(), 0]));
   if (!trainers.length || !startDate || !endDate) return counts;
@@ -156,16 +157,15 @@ export const getReplacementRequiredDaysByTrainer = async ({
       const dateKey = toAttendanceDateKey(date);
       if (fullDayLeaveKeys.has(`${trainerId}|${dateKey}`)) leaveDateKeys.add(dateKey);
     });
-    counts.set(
-      trainerId,
-      collectRrdDateKeys({
+    const rrdDates = collectRrdDateKeys({
         dates,
         leaveDateKeys,
         schedules: schedulesByTrainer.get(trainerId) || [],
         holidayMap,
         cancellationMap,
-      }).length
-    );
+      });
+    counts.set(trainerId, rrdDates.length);
+    if (dateKeysByTrainer) dateKeysByTrainer.set(trainerId, rrdDates);
   });
 
   return counts;
