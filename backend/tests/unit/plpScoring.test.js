@@ -32,10 +32,10 @@ test('compliance score defaults to 5 before September-October and deducts per re
   assert.equal(complianceScoreFromCount(8), 0);
 });
 
-test('September-October compliance starts at 5; later cycles retain their default', () => {
-  assert.equal(complianceScoreFromCount(0, '2026-10'), 5);
-  assert.equal(complianceScoreFromCount(1, '2026-10'), 4);
-  assert.equal(complianceScoreFromCount(4, '2026-10'), 1);
+test('September-October compliance starts at 4; later cycles retain their default', () => {
+  assert.equal(complianceScoreFromCount(0, '2026-10'), 4);
+  assert.equal(complianceScoreFromCount(1, '2026-10'), 3);
+  assert.equal(complianceScoreFromCount(4, '2026-10'), 0);
   assert.equal(complianceScoreFromCount(0, '2026-11'), 4);
   assert.equal(complianceScoreFromCount(6, '2026-11'), 0);
   assert.equal(cycleKeyForAttendanceDate('2026-09-20'), '2026-09');

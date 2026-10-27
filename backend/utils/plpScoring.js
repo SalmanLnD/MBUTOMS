@@ -46,11 +46,10 @@ export const attendanceScoreFromRrd = (rrdDays = 0) =>
   Math.max(0, PLP_ATTENDANCE_DEFAULT - Math.max(0, Number(rrdDays) || 0));
 
 export const complianceDefaultForCycle = (cycleKey) =>
-  (cycleKey === '2026-10' ? PLP_COMPLIANCE_DEFAULT
-    : plpCycleUsesUpdatedRules(cycleKey) ? PLP_COMPLIANCE_DEFAULT_UPDATED : PLP_COMPLIANCE_DEFAULT);
+  (plpCycleUsesUpdatedRules(cycleKey) ? PLP_COMPLIANCE_DEFAULT_UPDATED : PLP_COMPLIANCE_DEFAULT);
 
 /**
- * Starts at 5 through September–October 2026, and at 4 for later cycles.
+ * Starts at 5 before September–October 2026, and at 4 from that cycle on.
  * Each compliance record removes 1. The score cannot go below 0.
  */
 export const complianceScoreFromCount = (count = 0, cycleKey) =>
