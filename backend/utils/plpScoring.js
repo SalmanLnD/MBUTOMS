@@ -46,10 +46,11 @@ export const attendanceScoreFromRrd = (rrdDays = 0) =>
   Math.max(0, PLP_ATTENDANCE_DEFAULT - Math.max(0, Number(rrdDays) || 0));
 
 export const complianceDefaultForCycle = (cycleKey) =>
-  (plpCycleUsesUpdatedRules(cycleKey) ? PLP_COMPLIANCE_DEFAULT_UPDATED : PLP_COMPLIANCE_DEFAULT);
+  (cycleKey === '2026-10' ? PLP_COMPLIANCE_DEFAULT
+    : plpCycleUsesUpdatedRules(cycleKey) ? PLP_COMPLIANCE_DEFAULT_UPDATED : PLP_COMPLIANCE_DEFAULT);
 
 /**
- * Starts at 5 before September–October 2026, and at 4 from that cycle on.
+ * Starts at 5 through September–October 2026, and at 4 for later cycles.
  * Each compliance record removes 1. The score cannot go below 0.
  */
 export const complianceScoreFromCount = (count = 0, cycleKey) =>
@@ -57,16 +58,16 @@ export const complianceScoreFromCount = (count = 0, cycleKey) =>
 
 /**
  * Response-count adjustment applied to a trainer's average feedback.
- * More than 100 responses: use the average as scored.
- * 76–100: subtract 0.25. 51–75: subtract 0.5. 50 or fewer: subtract 1.
- * Counts of 100, 75, and 50 fall in the next lower band.
+ * Below 100: subtract 0.25; below 75: 0.35; below 50: 0.50.
+ * The thresholds are strict: 100 has no deduction, 75 deducts 0.25,
+ * and 50 deducts 0.35.
  */
 export const feedbackResponseDeduction = (responseCount = 0) => {
   const count = Math.max(0, Number(responseCount) || 0);
-  if (count > 100) return 0;
-  if (count > 75) return 0.25;
-  if (count > 50) return 0.5;
-  return 1;
+  if (count >= 100) return 0;
+  if (count >= 75) return 0.25;
+  if (count >= 50) return 0.35;
+  return 0.5;
 };
 
 /** Feedback component used in the PLP average. Missing ratings stay null. */

@@ -32,10 +32,11 @@ test('compliance score defaults to 5 before September-October and deducts per re
   assert.equal(complianceScoreFromCount(8), 0);
 });
 
-test('compliance starts at 4 from the September-October cycle', () => {
-  assert.equal(complianceScoreFromCount(0, '2026-10'), 4);
-  assert.equal(complianceScoreFromCount(1, '2026-10'), 3);
-  assert.equal(complianceScoreFromCount(4, '2026-10'), 0);
+test('September-October compliance starts at 5; later cycles retain their default', () => {
+  assert.equal(complianceScoreFromCount(0, '2026-10'), 5);
+  assert.equal(complianceScoreFromCount(1, '2026-10'), 4);
+  assert.equal(complianceScoreFromCount(4, '2026-10'), 1);
+  assert.equal(complianceScoreFromCount(0, '2026-11'), 4);
   assert.equal(complianceScoreFromCount(6, '2026-11'), 0);
   assert.equal(cycleKeyForAttendanceDate('2026-09-20'), '2026-09');
   assert.equal(cycleKeyForAttendanceDate('2026-09-21'), '2026-10');
@@ -43,17 +44,20 @@ test('compliance starts at 4 from the September-October cycle', () => {
 
 test('feedback response count adjusts the PLP score from September-October', () => {
   assert.equal(feedbackResponseDeduction(101), 0);
-  assert.equal(feedbackResponseDeduction(100), 0.25);
+  assert.equal(feedbackResponseDeduction(99), 0.25);
+  assert.equal(feedbackResponseDeduction(74), 0.35);
+  assert.equal(feedbackResponseDeduction(49), 0.50);
+  assert.equal(feedbackResponseDeduction(100), 0);
   assert.equal(feedbackResponseDeduction(76), 0.25);
-  assert.equal(feedbackResponseDeduction(75), 0.5);
-  assert.equal(feedbackResponseDeduction(51), 0.5);
-  assert.equal(feedbackResponseDeduction(50), 1);
-  assert.equal(feedbackResponseDeduction(12), 1);
+  assert.equal(feedbackResponseDeduction(75), 0.25);
+  assert.equal(feedbackResponseDeduction(51), 0.35);
+  assert.equal(feedbackResponseDeduction(50), 0.35);
+  assert.equal(feedbackResponseDeduction(12), 0.5);
 
   assert.equal(feedbackScoreForPlp(4.5, 140, '2026-10'), 4.5);
   assert.equal(feedbackScoreForPlp(4.5, 90, '2026-10'), 4.25);
-  assert.equal(feedbackScoreForPlp(4.5, 60, '2026-10'), 4);
-  assert.equal(feedbackScoreForPlp(4.2, 40, '2026-10'), 3.2);
+  assert.equal(feedbackScoreForPlp(4.5, 60, '2026-10'), 4.15);
+  assert.equal(feedbackScoreForPlp(4.2, 40, '2026-10'), 3.7);
   assert.equal(feedbackScoreForPlp(0.4, 10, '2026-10'), 0);
   assert.equal(feedbackScoreForPlp(4.2, 40, '2026-09'), 4.2);
   assert.equal(feedbackScoreForPlp(null, 10, '2026-10'), null);

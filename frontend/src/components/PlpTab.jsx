@@ -28,8 +28,6 @@ const FINAL_OPTIONS = [0, 3.5, 4, 4.5];
 const PlpTab = () => {
   const [cycleKey, setCycleKey] = useState('');
   const [cycles, setCycles] = useState([]);
-  const [cycle, setCycle] = useState(null);
-  const [updatedRules, setUpdatedRules] = useState(false);
   const [rows, setRows] = useState([]);
   const [headers, setHeaders] = useState(null);
   const [weightDraft, setWeightDraft] = useState(null);
@@ -65,8 +63,6 @@ const PlpTab = () => {
       const nextCycle = data.cycleKey;
       setCycleKey(nextCycle);
       setCycles(data.cycles || []);
-      setCycle(data.cycle || null);
-      setUpdatedRules(Boolean(data.updatedRules));
       setRows(data.rows || []);
       setHeaders(data.headers || null);
       setWeightDraft(data.weightages || null);
@@ -216,24 +212,6 @@ const PlpTab = () => {
         </div>
       </div>
 
-      {cycle && (
-        <p className="text-muted small mb-3">
-          Cycle <strong>{cycle.label}</strong>. Class and demo observations, attendance RRD, and
-          compliance all count from the 21st to the 20th. Feedback alone uses calendar month{' '}
-          <strong>{cycle.feedbackMonthKey}</strong> (e.g. July feedback for the Jun–Jul cycle).
-          Missing feedback, class, or demo count as <strong>0</strong> (their weightage still
-          applies). The sheet shows the actual weighted value and the rounded final (nearest 0.5,
-          clamped 3.5–4.5). You can override the final manually — use <strong>0</strong> for
-          trainers on break or long leave.
-          {updatedRules && (
-            <>
-              {' '}From this cycle, compliance starts at <strong>4</strong> and each record removes 1.
-              Feedback uses the average when there are more than 100 responses. It is reduced by 0.25
-              for 76–100 responses, 0.5 for 51–75, and 1 for 50 or fewer.
-            </>
-          )}
-        </p>
-      )}
 
       {weightDraft && (
         <div className="border rounded p-3 mb-3 bg-light">
