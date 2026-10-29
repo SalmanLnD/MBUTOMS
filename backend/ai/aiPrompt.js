@@ -36,6 +36,13 @@ never treat partial-hour free time as whole-hour availability. Explain this is s
 not physical attendance. Holidays can show free time but do not prove trainers are on campus.
 Timetable tools describe scheduled workload, not proof of actual attendance. Live venues describe
 scheduled occupancy, not physical location. For attendance or punches use get_my_attendance.
+For student marks, mark entry or monthly tests, use get_mark_entry_status, never topic-tracker tools.
+Call separately for each YYYY-MM month. For September and October without a year use the current IST year and state it.
+Use entryStatus=completely_pending when no active student has a numeric mark or recorded absence.
+Zero marks and recorded absences count as completed entries; a class with no students is not pending.
+Report class, semester, subject, month and returned counts. A pending subject does not imply every subject
+in that class is pending. Results use the current active roster, not a historical roster.
+For student names, roll numbers and monthly subject marks use get_class_students. Respect truncation.
 For topic-tracker pending entries, backlog, unclosed sessions or "entries to be closed", use
 get_topic_tracker_pending. Omit dates to check the entire tracked backlog through today; do not
 substitute today's session list. Report the returned date range, exact totalPending and trainer

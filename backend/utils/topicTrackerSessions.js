@@ -51,6 +51,29 @@ import {
   getScheduleSubjectRange,
   isScheduleWithinSubjectDates,
 } from './subjectStartDate.js';
+import { getDataRevision } from './dataRevision.js';
+import { isScheduleOwnedOnDate } from './trainerTimetableOwnership.js';
+
+const backlogCache = new Map();
+const BACKLOG_CACHE_TTL_MS = 90_000;
+
+export const clearPendingBacklogCache = () => {
+  backlogCache.clear();
+};
+
+const getCachedBacklog = (key) => {
+  const entry = backlogCache.get(key);
+  if (!entry) return null;
+  if (entry.revision !== getDataRevision() || Date.now() - entry.cachedAt > BACKLOG_CACHE_TTL_MS) {
+    backlogCache.delete(key);
+    return null;
+  }
+  return entry.data;
+};
+
+const setCachedBacklog = (key, data) => {
+  backlogCache.set(key, { data, cachedAt: Date.now(), revision: getDataRevision() });
+};
 
 const WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
@@ -787,6 +810,12 @@ export const buildTopicTrackerPendingBacklog = async ({
   const dates = getAttendanceCalendarDates(fromDate, untilDate);
   const fromKey = toAttendanceDateKey(fromDate);
   const untilKey = toAttendanceDateKey(untilDate);
+
+  const userKey = user ? `${user.role || ''}:${user._id || ''}` : 'anon';
+  const cacheKey = `${userKey}|${fromKey}|${untilKey}`;
+  const cached = getCachedBacklog(cacheKey);
+  if (cached) return cached;
+
   const fromWindow = getLeaveDayWindow(fromKey);
   const untilWindow = getLeaveDayWindow(untilKey);
 
@@ -801,7 +830,7 @@ export const buildTopicTrackerPendingBacklog = async ({
   ] = await Promise.all([
     Schedule.find({})
       .populate('subject', 'name code')
-      .select(`day startTime endTime slot department section semester subject subjectCode trainerCode ${SPECIAL_CLASS_FIELDS}`)
+      .select(`day startTime endTime slot department section semester subject subjectCode trainerCode ownershipStartDate ${SPECIAL_CLASS_FIELDS}`)
       .lean(),
     buildTrainerLookup(),
     buildSubjectStartDateMap(),
@@ -909,6 +938,7 @@ export const buildTopicTrackerPendingBacklog = async ({
       if (seen.has(dedupeKey) || closedKeys.has(dedupeKey)) return;
       if (canceledIds.has(scheduleId)) return;
       if (!isScheduleActiveOnDateKey(schedule, dateKey, subjectStartMap)) return;
+      if (!isScheduleOwnedOnDate(schedule, dateKey)) return;
 
       const originalTrainer = trainerLookup.byCode.get(schedule.trainerCode);
       if (!originalTrainer) return;
@@ -980,12 +1010,15 @@ export const buildTopicTrackerPendingBacklog = async ({
     return String(a.courseName || '').localeCompare(String(b.courseName || ''));
   });
 
-  return {
+  const result = {
     from: fromKey,
     until: untilKey,
     totalPending: pendingItems.length,
     items: pendingItems,
   };
+
+  setCachedBacklog(cacheKey, result);
+  return result;
 };
 
 export const buildTopicTrackerExportRows = async () => {

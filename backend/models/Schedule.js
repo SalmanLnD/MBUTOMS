@@ -5,6 +5,9 @@ const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'
 const scheduleSchema = new mongoose.Schema(
   {
     trainerCode: { type: String, required: true, trim: true, index: true },
+    // Set when a permanent handover moves this slot. The successor teaches it
+    // only on and after this date; earlier occurrences stay with the previous trainer.
+    ownershipStartDate: { type: Date, default: null },
     day: { type: String, required: true, enum: DAYS },
     startTime: { type: String, required: true },
     endTime: { type: String, required: true },

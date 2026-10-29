@@ -73,7 +73,7 @@ export async function transferTrainerRole({
   if (ownedSchedules.length) {
     await Schedule.updateMany(
       { _id: { $in: ownedSchedules.map((schedule) => schedule._id) } },
-      { $set: { trainerCode: successorTrainer.employeeId } }
+      { $set: { trainerCode: successorTrainer.employeeId, ownershipStartDate: normalizedEffective } }
     );
   }
 

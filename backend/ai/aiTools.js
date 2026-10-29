@@ -1,3 +1,4 @@
+import { readMarkEntries, readClassStudents } from './aiMarkEntries.js';
 import { TRAINER_ATTENDANCE_TYPES } from '../utils/trainerAttendanceTypes.js';
 import Trainer from '../models/Trainer.js';
 import Subject from '../models/Subject.js';
@@ -18,6 +19,7 @@ import { getWeekRangeForDate } from '../utils/specialClass.js';
 import { loadOfficialHolidayMap } from '../utils/officialHolidays.js';
 import { getLeaveOverlapFilter } from '../utils/leaveDateRange.js';
 import { getLeaveClassExclusionsForRange, getUncancelledScheduleDateKeys } from '../utils/leaveAffectedClasses.js';
+import { applyOwnershipFloorsToLeaves } from '../utils/trainerTimetableOwnership.js';
 import { dedupeReplacementsBySchedule } from '../utils/leaveReplacements.js';
 import { filterSchedulesActiveOnDate } from '../utils/activeSchedulesForDate.js';
 import TrainerObservation from '../models/TrainerObservation.js';
@@ -41,6 +43,8 @@ const observationAccess = (req) => !req.impersonator
   && (hasFullObservationAccess(req.user) || hasEvaluatorObservationAccess(req.user));
 
 const definitions = [
+  ['get_mark_entry_status', 'Read monthly student mark-entry completion by authorized class and subject, including classes with NO reports. Use for pending marks, never topic tracker. Call separately per month.', ['month', 'department', 'section', 'semester', 'subjectCode', 'entryStatus'], ['month']],
+  ['get_class_students', 'Read authorized class student names, roll numbers and monthly marks for one subject. No contact details.', ['month', 'department', 'section', 'semester', 'subjectCode'], ['month', 'department', 'section', 'semester', 'subjectCode']],
   ['get_observations', 'Read recorded demo/class observation counts and ratings out of 5, grouped by PLP 21–20 cycle. Omit cycle for all recorded history. Counts are saved observation records, not proof of every demo conducted. This does not return overall PLP scores.', ['trainerName', 'employeeId', 'type', 'cycle']],
   ['get_my_timetable', 'Read my workload for a date or inclusive range. For this week use period=this_week; returns backend total and daily breakdown.', ['date', 'from', 'to', 'period', 'semester']],
   ['get_trainer_timetable', 'Read an authorized trainer timetable for a date or period. For this week use period=this_week. Never guess a trainer.', ['trainerName', 'employeeId', 'date', 'from', 'to', 'period', 'semester']],
@@ -99,6 +103,8 @@ export const validateToolArguments = (name, args = {}, now = new Date()) => {
   if (cleaned.attendanceType && !Object.values(TRAINER_ATTENDANCE_TYPES).includes(cleaned.attendanceType)) throw new Error('Invalid attendance type');
   if (cleaned.status && !['pending', 'approved', 'rejected', 'cancelled'].includes(cleaned.status)) throw new Error('Invalid status');
   const today = getIstNowParts(now).dateKey;
+  if (cleaned.month && (!/^\d{4}-(0[1-9]|1[0-2])$/.test(cleaned.month) || cleaned.month < '2026-08' || cleaned.month > today.slice(0, 7))) throw new Error('Invalid report month');
+  if (cleaned.entryStatus && !['completely_pending', 'partially_pending', 'complete', 'no_students'].includes(cleaned.entryStatus)) throw new Error('Invalid mark entry status');
   const hoursTool = ['get_my_timetable', 'get_trainer_timetable', 'get_trainer_hours', 'get_my_attendance', 'get_topic_tracker', 'get_attendance_summary'].includes(name);
   if (cleaned.period) {
     if (!['today', 'this_week', 'last_week', 'month_to_date'].includes(cleaned.period) || cleaned.date || cleaned.from || cleaned.to) throw new Error('Use one period or date range');
@@ -245,6 +251,7 @@ const replacements = async (req, args, deps) => {
     .populate('trainer', 'name employeeId').populate('replacements.replacementTrainer', 'name employeeId')
     .populate({ path: 'affectedSchedules', populate: [{ path: 'subject', select: 'name' }, { path: 'venue', select: 'name' }] })
     .limit(MAX_RECORDS + 1).lean();
+  await applyOwnershipFloorsToLeaves(docs);
   const { cancellationMap, holidayDateKeys } = await getLeaveClassExclusionsForRange(args.date, args.date);
   const rows = [];
   for (const leave of docs.slice(0, MAX_RECORDS)) {
@@ -481,6 +488,8 @@ export const executeAiTool = async (name, rawArgs, req, deps = {}) => {
   const read = deps.read || readController;
   try {
     switch (name) {
+      case 'get_mark_entry_status': return await readMarkEntries(req, args, read);
+      case 'get_class_students': return await readClassStudents(req, args, read);
       case 'get_observations': return await observations(req, args, deps);
       case 'get_my_timetable': return await timetable(req, args, deps);
       case 'get_trainer_timetable':
