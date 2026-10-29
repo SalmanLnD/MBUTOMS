@@ -29,6 +29,7 @@ const PlpTab = () => {
   const [cycleKey, setCycleKey] = useState('');
   const [cycles, setCycles] = useState([]);
   const [rows, setRows] = useState([]);
+  const [trainerFilter, setTrainerFilter] = useState('');
   const [headers, setHeaders] = useState(null);
   const [weightDraft, setWeightDraft] = useState(null);
   const [finalDrafts, setFinalDrafts] = useState({});
@@ -38,6 +39,15 @@ const PlpTab = () => {
   const [savingFinalId, setSavingFinalId] = useState('');
   const [sheetStatus, setSheetStatus] = useState(null);
   const [showSheetSetup, setShowSheetSetup] = useState(false);
+
+  const trainerOptions = useMemo(() => rows.map((row) => ({
+    value: row.trainerId,
+    label: `${row.name}${row.employeeId ? ` (${row.employeeId})` : ''}`,
+  })).sort((a, b) => a.label.localeCompare(b.label)), [rows]);
+  const visibleRows = useMemo(() => {
+    if (!trainerFilter) return [];
+    return trainerFilter === '__all__' ? rows : rows.filter((row) => row.trainerId === trainerFilter);
+  }, [rows, trainerFilter]);
 
   const weightTotal = useMemo(() => {
     if (!weightDraft) return 0;
@@ -256,6 +266,20 @@ const PlpTab = () => {
         </div>
       )}
 
+      <div className="mb-3" style={{ maxWidth: 360 }}>
+        <label className="form-label mb-1" htmlFor="plp-trainer-filter">Trainer</label>
+        <StyledSelect
+          id="plp-trainer-filter"
+          value={trainerFilter}
+          onChange={(e) => setTrainerFilter(e.target.value)}
+          placeholder="Select a trainer to view PLP"
+          options={[
+            { value: '__all__', label: 'All trainers' },
+            ...trainerOptions,
+          ]}
+        />
+      </div>
+
       {loading ? (
         <LoadingSpinner />
       ) : (
@@ -275,13 +299,15 @@ const PlpTab = () => {
               </tr>
             </thead>
             <tbody>
-              {rows.length === 0 ? (
+              {visibleRows.length === 0 ? (
                 <tr>
                   <td colSpan={9} className="text-center text-muted py-4">
-                    {loadError || 'No trainers found for this cycle.'}
+                    {loadError || (!trainerFilter
+                      ? 'Select a trainer to view their PLP.'
+                      : 'No matching trainer found for this cycle.')}
                   </td>
                 </tr>
-              ) : rows.map((row) => (
+              ) : visibleRows.map((row) => (
                 <tr key={row.trainerId}>
                   <td>{row.employeeId || '—'}</td>
                   <td>{row.name}</td>
