@@ -10,7 +10,7 @@
   .timetable-filter-panel .form-control, .timetable-filter-panel .toms-styled-select__trigger { font-size: 16px; }
 }
 .toms-collapsible-filters__toggle { min-height: 40px; margin-bottom: .45rem; }
-.toms-collapsible-filters__chevron { transition: transform var(--transition-base); }
+.toms-collapsible-filters__chevron { transition: transform var(--motion-enter); }
 .toms-collapsible-filters.is-open .toms-collapsible-filters__chevron { transform: rotate(180deg); }
 .toms-collapsible-filters__content { padding: .85rem; background: var(--surface-soft); border: 1px solid var(--line); border-radius: 6px; }
 .toms-collapsible-filters__content > .row:last-child, .toms-collapsible-filters__content > .timetable-controls:last-child { margin-bottom: 0 !important; }
@@ -28,6 +28,8 @@
 @media (max-width: 575.98px) { .toms-collapsible-filters__content { padding: .7rem; } .mark-entry-filters { grid-template-columns: 1fr; } .mark-entry-filters__actions .btn { min-height: 44px; } }
 .toms-collapsible-filters__toggle { width: auto; min-width: 130px; min-height: 34px; padding: .35rem .65rem; border-radius: 999px; }
 .toms-collapsible-filters__content { padding: .65rem; background: var(--surface); border-radius: 10px; box-shadow: var(--shadow-xs); }
+.toms-collapsible-filters__content { animation: toms-filter-enter var(--motion-enter) both; }
+@keyframes toms-filter-enter { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: translateY(0); } }
 .toms-collapsible-filters__content .row { row-gap: .5rem; }
 .toms-collapsible-filters__content .form-label { margin-bottom: .2rem; font-size: .78rem; }
 .toms-collapsible-filters__content > .row { margin-bottom: 0 !important; }

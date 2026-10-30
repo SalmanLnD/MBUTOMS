@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useId, useState } from 'react';
 import { FilterIcon, ChevronDownIcon } from './icons.jsx';
 
 const CollapsibleFilters = ({
@@ -9,6 +9,7 @@ const CollapsibleFilters = ({
   actions = null,
 }) => {
   const [open, setOpen] = useState(defaultOpen);
+  const contentId = useId();
 
   return (
     <div className={`toms-collapsible-filters ${open ? 'is-open' : ''} ${className}`.trim()}>
@@ -17,6 +18,7 @@ const CollapsibleFilters = ({
         type="button"
         className="toms-collapsible-filters__toggle btn btn-sm btn-outline-primary d-inline-flex align-items-center justify-content-between gap-2"
         aria-expanded={open}
+        aria-controls={contentId}
         onClick={() => setOpen((current) => !current)}
       >
         <span className="d-inline-flex align-items-center gap-2">
@@ -27,11 +29,11 @@ const CollapsibleFilters = ({
       </button>
       {actions && <div className="toms-collapsible-filters__actions">{actions}</div>}
       </div>
-      {open && (
-        <div className="toms-collapsible-filters__content">
+      <div id={contentId} hidden={!open}>
+        {open && <div className="toms-collapsible-filters__content">
           {children}
-        </div>
-      )}
+        </div>}
+      </div>
     </div>
   );
 };

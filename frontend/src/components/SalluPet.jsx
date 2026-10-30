@@ -13,6 +13,9 @@ const SalluPet = ({ open, onOpen, visible, onVisibilityChange }) => {
   const reducedMotion = useMediaQuery('(prefers-reduced-motion: reduce)');
   const size = mobile ? 96 : 144;
   const hidden = !visible;
+  const [offset, setOffset] = useState({ x: 0, y: 0 });
+  const offsetRef = useRef(offset);
+  const motionFrame = useRef(null);
   const [nodding, setNodding] = useState(false);
   const [muted, setMuted] = useState(() => stored('toms_sallu_pet_muted'));
   const audio = useRef(null);
@@ -26,7 +29,7 @@ const SalluPet = ({ open, onOpen, visible, onVisibilityChange }) => {
   const lastTickle = useRef(-Infinity);
   const [reactionSerial, setReactionSerial] = useState(0);
   const [reaction, setReaction] = useState(0);
-  const position = { x: Math.max(12, window.innerWidth - size - (mobile ? 12 : 24)), y: mobile ? 78 : 20 };
+  const position = { x: Math.max(12, window.innerWidth - size - (mobile ? 12 : 24)) + offset.x, y: (mobile ? 78 : 20) - offset.y };
   const [dragging, setDragging] = useState(false);
   const drag = useRef(null);
   const suppressClick = useRef(false);
@@ -60,12 +63,15 @@ const SalluPet = ({ open, onOpen, visible, onVisibilityChange }) => {
     ['/images/sallu/reactions-atlas.png', '/images/sallu/gaze-atlas.png'].forEach(src => { const image = new Image(); image.src = src; });
   }, []);
   useEffect(() => () => {
+    cancelAnimationFrame(motionFrame.current);
     clearTimeout(reactionTimer.current); clearTimeout(bubbleTimer.current);
     clearTimeout(menuCloseTimer.current);
     audio.current?.close().catch(() => {});
   }, []);
   useEffect(() => {
     if (!open && !hidden) return;
+    cancelAnimationFrame(motionFrame.current);
+    motionFrame.current = null;
     clearTimeout(reactionTimer.current); clearTimeout(bubbleTimer.current);
     reacting.current = false; punchHistory.current = []; hoverStroke.current = null; drag.current = null;
     setDragging(false); setNodding(false); setPose('front'); setBubble('');
@@ -84,13 +90,45 @@ const SalluPet = ({ open, onOpen, visible, onVisibilityChange }) => {
     window.addEventListener('pointermove', look, { passive: true });
     return () => window.removeEventListener('pointermove', look);
   }, [open, hidden, mobile, reducedMotion]);
-  const stop = () => {};
+  const stop = () => { cancelAnimationFrame(motionFrame.current); motionFrame.current = null; };
+  const setPetOffset = (next) => { offsetRef.current = next; setOffset(next); };
+  const boundedOffset = (next) => {
+    const baseX = Math.max(12, window.innerWidth - size - (mobile ? 12 : 24));
+    const baseY = window.innerHeight - size - (mobile ? 78 : 20);
+    return { x: clamp(next.x, 8 - baseX, Math.max(8, window.innerWidth - size - 8) - baseX),
+      y: clamp(next.y, 8 - baseY, Math.max(8, window.innerHeight - size - 8) - baseY) };
+  };
+  useEffect(() => {
+    const fit = () => { stop(); setPetOffset(boundedOffset(offsetRef.current)); };
+    window.addEventListener('resize', fit);
+    fit();
+    return () => window.removeEventListener('resize', fit);
+  }, [mobile, size]);
+  const settle = (velocity) => {
+    stop();
+    if (reducedMotion) return;
+    let point = offsetRef.current;
+    let v = velocity;
+    const target = boundedOffset({ x: point.x + v.x * .12, y: point.y + v.y * .12 });
+    let previous = performance.now();
+    const frame = (now) => {
+      const dt = Math.min((now - previous) / 1000, .032); previous = now;
+      v = { x: v.x + ((target.x - point.x) * 220 - v.x * 28) * dt,
+        y: v.y + ((target.y - point.y) * 220 - v.y * 28) * dt };
+      point = boundedOffset({ x: point.x + v.x * dt, y: point.y + v.y * dt });
+      if (Math.hypot(target.x - point.x, target.y - point.y) < .2 && Math.hypot(v.x, v.y) < 2) {
+        setPetOffset(target); motionFrame.current = null; return;
+      }
+      setPetOffset(point); motionFrame.current = requestAnimationFrame(frame);
+    };
+    motionFrame.current = requestAnimationFrame(frame);
+  };
   const startDrag = event => {
     if (!event.isPrimary || event.button !== 0) return;
     const rect = pet.current.getBoundingClientRect();
     stop(); suppressClick.current = false;
     hoverStroke.current = null;
-    drag.current = { id: event.pointerId, x: event.clientX, y: event.clientY, left: rect.left, bottom: window.innerHeight - rect.bottom, started: Date.now(), body: event.currentTarget.classList.contains('sallu-pet__body'), moved: false };
+    drag.current = { id: event.pointerId, x: event.clientX, y: event.clientY, left: rect.left, bottom: window.innerHeight - rect.bottom, offset: offsetRef.current, lastX: event.clientX, lastY: event.clientY, lastTime: event.timeStamp, velocity: { x: 0, y: 0 }, started: Date.now(), body: event.currentTarget.classList.contains('sallu-pet__body'), moved: false };
     event.currentTarget.setPointerCapture(event.pointerId);
   };
   const moveDrag = event => {
@@ -105,6 +143,10 @@ const SalluPet = ({ open, onOpen, visible, onVisibilityChange }) => {
     if (!current.moved && current.body && Date.now() - current.started <= 260
       && Math.abs(dx) > Math.abs(dy) * 1.6 && Math.abs(dy) <= size * .18) return;
     current.moved = true; suppressClick.current = true; setDragging(true);
+    const dt = (event.timeStamp - current.lastTime) / 1000;
+    if (dt > 0) current.velocity = { x: clamp((event.clientX - current.lastX) / dt, -1600, 1600), y: clamp((event.clientY - current.lastY) / dt, -1600, 1600) };
+    current.lastX = event.clientX; current.lastY = event.clientY; current.lastTime = event.timeStamp;
+    setPetOffset(boundedOffset({ x: current.offset.x + dx, y: current.offset.y + dy }));
     clearTimeout(reactionTimer.current); clearTimeout(bubbleTimer.current);
     reacting.current = false; setNodding(false); setPose('front'); setBubble(''); setMenu(false);
   };
@@ -117,6 +159,7 @@ const SalluPet = ({ open, onOpen, visible, onVisibilityChange }) => {
       && isStomachSwipe(event.clientX - current.x, event.clientY - current.y, Date.now() - current.started, size)) {
       suppressClick.current = true; tickle();
     } else if (!current.moved && current.swiping) suppressClick.current = true;
+    if (current.moved && event.type === 'pointerup') settle(event.timeStamp - current.lastTime < 100 ? current.velocity : { x: 0, y: 0 });
     drag.current = null; setDragging(false);
     if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId);
   };
@@ -202,7 +245,7 @@ const SalluPet = ({ open, onOpen, visible, onVisibilityChange }) => {
   if (hidden) return mobile && !open && <button className="sallu-pet-return btn btn-sm btn-outline-primary" onClick={() => onVisibilityChange(true)} aria-label="Show Sallu pet">Sallu</button>;
   return <div ref={pet} className={`sallu-pet ${workingOut ? 'is-working-out' : ''} ${pose === 'ouch' ? 'is-ouch' : ''} ${nodding ? 'is-nodding' : ''} ${dragging ? 'is-dragging' : ''}`}
     hidden={open} data-pose={pose} data-reaction={pose === 'ouch' ? punchReactions[reaction] : ['laughing', 'crying'].includes(pose) ? pose : undefined} data-sound={muted ? 'muted' : soundStatus}
-    style={{ '--pet-size': `${size}px`, right: mobile ? 12 : 24, bottom: mobile ? 78 : 20 }}
+    style={{ '--pet-size': `${size}px`, right: mobile ? 12 : 24, bottom: mobile ? 78 : 20, translate: `${offset.x}px ${offset.y}px` }}
     onPointerMoveCapture={interact}
     onPointerDownCapture={interact}
     onFocusCapture={interact}
