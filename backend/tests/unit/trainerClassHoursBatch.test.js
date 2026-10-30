@@ -7,6 +7,14 @@ import {
 import { computeHours } from '../../utils/trainerClassHours.js';
 
 describe('trainer class hours', () => {
+  it('keeps reconstructed historical slots only before the handover', () => {
+    const slot = { _id: 'historical', day: 'Thursday', startTime: '09:00', endTime: '10:00', historicalOwnershipUntil: '2026-10-21' };
+    const options = { subjectStartMap: { byId: new Map(), byCode: new Map() } };
+    assert.equal(filterOwnedSchedulesForAttendanceDate([slot], { ...options, date: '2026-10-01' }).length, 1);
+    assert.equal(filterOwnedSchedulesForAttendanceDate([slot], { ...options, date: '2026-10-21' }).length, 0);
+    assert.equal(filterOwnedSchedulesForAttendanceDate([slot], { ...options, date: '2026-10-01', replacedScheduleIds: new Set(['historical']) }).length, 0);
+    assert.equal(filterOwnedSchedulesForAttendanceDate([slot], { ...options, date: '2026-10-01', canceledScheduleIds: new Set(['historical']) }).length, 0);
+  });
   it('buildSlotIdentityKey treats identical slots as duplicates', () => {
     const slotA = {
       day: 'Monday',

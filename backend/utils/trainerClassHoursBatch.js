@@ -18,10 +18,15 @@ import {
   isDateWithinLeave,
 } from './leaveDateRange.js';
 import { getCancellationMapForRange } from './leaveAffectedClasses.js';
+import {
+  applyOwnershipFloor,
+  inheritedOwnershipFloorsByTrainer,
+  isScheduleOwnedOnDate,
+} from './trainerTimetableOwnership.js';
 import { loadOfficialHolidayMap } from './officialHolidays.js';
 import { resolveSubjectEndDate } from './subjectTrainingDates.js';
 
-const SCHEDULE_FIELDS = `day startTime endTime trainerCode semester subject subjectCode ${SPECIAL_CLASS_FIELDS}`;
+const SCHEDULE_FIELDS = `day startTime endTime trainerCode ownershipStartDate semester subject subjectCode ${SPECIAL_CLASS_FIELDS}`;
 const EXPLANATION_FIELDS = 'department section slot venue specialReason includeInRtet';
 
 const resolveStartDate = (schedule, subjectStartMap) => {
@@ -140,6 +145,8 @@ export const filterOwnedSchedulesForAttendanceDate = (
   const scheduleId = schedule._id.toString();
   return !replacedScheduleIds.has(scheduleId)
     && !canceledScheduleIds.has(scheduleId)
+    && (!schedule.historicalOwnershipUntil || toAttendanceDateKey(date) < schedule.historicalOwnershipUntil)
+    && isScheduleOwnedOnDate(schedule, toAttendanceDateKey(date))
     && isActiveOnDate(schedule, date, subjectStartMap);
 });
 
@@ -191,7 +198,46 @@ export const computeClassHandlingHoursBatch = async (
     loadOfficialHolidayMap(rangeStart, rangeEnd),
   ]);
 
+  const ownershipFloors = await inheritedOwnershipFloorsByTrainer(trainerIds);
+  ownedSchedules.forEach((schedule) => {
+    const ownerId = codeToTrainerId.get(schedule.trainerCode);
+    if (ownerId) applyOwnershipFloor([schedule], ownershipFloors.get(ownerId) || '');
+  });
+
   const schedulesByTrainerDay = indexSchedulesByTrainerDay(ownedSchedules, codeToTrainerId, includeDetails);
+
+  // Older handovers rewrote timetable ownership without retaining its history.
+  // An approved leave's affected schedule IDs provide per-slot evidence of the
+  // outgoing trainer's former timetable; only recover those before handover.
+  const outgoing = await Trainer.find({ _id: { $in: trainerIds }, successorTrainer: { $ne: null }, roleTransferEffectiveDate: { $gt: rangeStart } })
+    .select('successorTrainer roleTransferEffectiveDate').lean();
+  if (outgoing.length) {
+    const successors = await Trainer.find({ _id: { $in: outgoing.map((trainer) => trainer.successorTrainer) } })
+      .select('employeeId scheduleTrainerCodes').lean();
+    const successorCodes = new Map(successors.map((trainer) => [String(trainer._id), new Set(resolveTrainerScheduleCodes(trainer))]));
+    const historicalLeaves = await Leave.find({ trainer: { $in: outgoing.map((trainer) => trainer._id) }, status: 'approved', 'affectedSchedules.0': { $exists: true } })
+      .select('trainer affectedSchedules').lean();
+    const historicalIds = [...new Set(historicalLeaves.flatMap((leave) => (leave.affectedSchedules || []).map(String)))];
+    const historicalSlots = historicalIds.length
+      ? await Schedule.find({ _id: { $in: historicalIds }, ...(semester ? { semester } : {}) })
+        .select(`${SCHEDULE_FIELDS} ${includeDetails ? EXPLANATION_FIELDS : ''}`).lean() : [];
+    const historicalById = new Map(historicalSlots.map((slot) => [String(slot._id), slot]));
+    for (const trainer of outgoing) {
+      const trainerId = String(trainer._id);
+      const until = toAttendanceDateKey(trainer.roleTransferEffectiveDate);
+      const ids = new Set(historicalLeaves.filter((leave) => String(leave.trainer) === trainerId)
+        .flatMap((leave) => (leave.affectedSchedules || []).map(String)));
+      let byDay = schedulesByTrainerDay.get(trainerId);
+      if (!byDay) { byDay = new Map(); schedulesByTrainerDay.set(trainerId, byDay); }
+      for (const scheduleId of ids) {
+        const slot = historicalById.get(scheduleId);
+        if (!slot || !successorCodes.get(String(trainer.successorTrainer))?.has(slot.trainerCode)) continue;
+        if (!byDay.has(slot.day)) byDay.set(slot.day, []);
+        if (byDay.get(slot.day).some((existing) => String(existing._id) === scheduleId)) continue;
+        byDay.get(slot.day).push({ ...slot, ownershipStartDate: null, historicalOwnershipUntil: until });
+      }
+    }
+  }
 
   const replacementScheduleIds = [
     ...new Set(
@@ -244,7 +290,7 @@ export const computeClassHandlingHoursBatch = async (
 
         // Always exclude the original trainer's owned hours for a covered slot,
         // including external covers (who do not receive campus hours).
-        const originalTrainerId = codeToTrainerId.get(schedule.trainerCode);
+        const originalTrainerId = leave.trainer?.toString();
         if (originalTrainerId) {
           const originalKey = `${originalTrainerId}|${dateKey}`;
           let replacedIds = replacedOwnedScheduleIdsByTrainerDate.get(originalKey);
