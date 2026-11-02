@@ -44,6 +44,12 @@ function syncStudentTestReports() {
     payload.summaryRows || []
   );
 
+  if (payload.studentSummaryRows) {
+    const studentSummaryName = payload.studentSummarySheetName || 'Student Summary';
+    managedNames[studentSummaryName] = true;
+    writeSheetValues(ensureSheet(spreadsheet, studentSummaryName), payload.studentSummaryRows);
+  }
+
   (payload.monthSheets || []).forEach(function (monthSheet) {
     const sheetName = sanitizeSheetName(monthSheet.sheetName || monthSheet.month || 'Unknown');
     managedNames[sheetName] = true;
@@ -80,6 +86,7 @@ function cleanupStaleMonthSheets(spreadsheet, managedNames, summaryName) {
     const name = sheet.getName();
     if (managedNames[name]) return;
     if (name === summaryName) return;
+    if (!/^(January|February|March|April|May|June|July|August|September|October|November|December) \d{4}$/.test(name)) return;
     if (spreadsheet.getSheets().length <= 1) return;
     spreadsheet.deleteSheet(sheet);
   });

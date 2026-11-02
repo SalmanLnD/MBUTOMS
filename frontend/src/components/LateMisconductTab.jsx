@@ -10,7 +10,7 @@ import { usePagination } from '../hooks/usePagination.js';
 import { fetchLatePunchPhoto, getLatePunches, reviewLatePunch } from '../services/attendanceService.js';
 import { getErrorMessage } from '../utils/helpers.js';
 import { buildMonthOptions, formatMonthKey, getCurrentMonthParts } from '../utils/monthDates.js';
-import { refreshActionCounts } from '../context/ActionCountsContext.jsx';
+import { refreshActionCounts, useActionCounts } from '../context/ActionCountsContext.jsx';
 
 const formatPunchTime = (value) => {
   if (!value) return '-';
@@ -78,6 +78,7 @@ const LatePunchPhoto = ({ item, onOpen }) => {
 };
 
 const LateMisconductTab = () => {
+  const { counts } = useActionCounts();
   const {
     page,
     setPage,
@@ -179,10 +180,11 @@ const LateMisconductTab = () => {
 
   return (
     <>
-      <p className="text-muted small mb-3">
-        WhatsApp and TOMS punches after 8:40 AM from 14 Oct 2026 onward are listed here. Use the photo and campus distance to decide.
-        The first late mark for a trainer in a month is a warning. Each later mark adds 1 compliance point on Performance.
-      </p>
+      {counts.latePunches > 0 && (
+        <p className="text-muted small mb-3" role="status">
+          {counts.latePunches} {counts.latePunches === 1 ? 'punch needs' : 'punches need'} review across all months. Use the Month filter to check earlier pending reviews.
+        </p>
+      )}
       <div className="row g-2 mb-3 align-items-end">
         <div className="col-md-3">
           <label className="form-label" htmlFor="late-month">Month</label>
