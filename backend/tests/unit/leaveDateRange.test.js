@@ -13,6 +13,8 @@ import { getWeekdaysInLeaveRange } from '../../utils/trainerScheduleView.js';
 
 test('preserves plain calendar dates independently of server timezone', () => {
   assert.equal(toLeaveDateKey('2026-07-15'), '2026-07-15');
+  assert.equal(toLeaveDateKey(null), '');
+  assert.equal(toLeaveDateKey(undefined), '');
 });
 
 test('maps both historical IST-midnight and UTC-midnight storage to one day', () => {

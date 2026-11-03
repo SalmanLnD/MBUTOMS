@@ -16,7 +16,8 @@ const operationalDateFormatter = new Intl.DateTimeFormat('en-CA', {
  * Plain YYYY-MM-DD inputs are preserved so server timezone never shifts them.
  */
 export const toLeaveDateKey = (dateInput) => {
-  const raw = String(dateInput || '').trim();
+  if (dateInput == null || dateInput === '') return '';
+  const raw = String(dateInput).trim();
   if (DATE_KEY_PATTERN.test(raw)) return raw;
 
   const date = new Date(dateInput);

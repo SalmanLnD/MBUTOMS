@@ -12,6 +12,7 @@ import {
   approveAllCancellationApprovals,
   exportTopicTrackerForSheets,
 } from '../controllers/topicTrackerController.js';
+import { getTimetableExecutionHours } from '../controllers/timetableExecutionController.js';
 import {
   getTopicTrackerSheetStatus,
   getTopicTrackerAppsScriptSetup,
@@ -31,6 +32,11 @@ router.use(protect);
 router.get('/overview', asyncHandler(getTopicTrackerOverview));
 router.get('/pending-backlog', asyncHandler(getTopicTrackerPendingBacklog));
 router.get('/class-summary', asyncHandler(getTopicTrackerClassSummary));
+router.get(
+  '/execution-hours',
+  authorizeExact('admin', 'manager', 'campus_manager'),
+  asyncHandler(getTimetableExecutionHours)
+);
 router.get('/topics', asyncHandler(getTopicTrackerTopics));
 router.get('/sessions', asyncHandler(getTopicTrackerSessions));
 router.put('/entries', asyncHandler(upsertTopicTrackerEntry));

@@ -13,6 +13,11 @@ export const getTopicTrackerPendingBacklog = async (params = {}) => {
   return data;
 };
 
+export const getTimetableExecutionHours = async () => {
+  const { data } = await api.get('/topic-tracker/execution-hours');
+  return data;
+};
+
 export const getTopicTrackerClassSummary = async (params = {}) => {
   const { data } = await api.get('/topic-tracker/class-summary', { params });
   return data;

@@ -61,6 +61,7 @@ const topicTrackerEntrySchema = new mongoose.Schema(
 );
 
 topicTrackerEntrySchema.index({ schedule: 1, date: 1 }, { unique: true });
+topicTrackerEntrySchema.index({ date: 1, trackerStatus: 1 });
 topicTrackerEntrySchema.index({ subject: 1, date: 1, trackerStatus: 1 });
 topicTrackerEntrySchema.index({ trainer: 1, date: 1 });
 topicTrackerEntrySchema.index({ subject: 1, trackerStatus: 1, date: 1 });

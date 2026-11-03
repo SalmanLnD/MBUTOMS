@@ -10,6 +10,7 @@ import Schedule from '../models/Schedule.js';
 import { buildSubjectStartDateMap, isScheduleWithinSubjectDates } from './subjectStartDate.js';
 import { getAttendanceCalendarDates } from './attendanceDates.js';
 import { SPECIAL_CLASS_FIELDS } from './specialClass.js';
+import { isScheduleOwnedOnDate } from './trainerTimetableOwnership.js';
 
 const getScheduleId = (schedule) =>
   schedule?._id?.toString?.() || schedule?.toString?.() || '';
@@ -101,6 +102,7 @@ export const hasUncancelledClassOnDate = (
   schedules.some((schedule) => {
     if (new Date(`${dateKey}T12:00:00Z`).getUTCDay() === 0) return false;
     if (schedule.day !== weekdayName) return false;
+    if (!isScheduleOwnedOnDate(schedule, dateKey)) return false;
     if (!isSpecialScheduleActiveOnDate(schedule, dateKey)) return false;
     const scheduleId = getScheduleId(schedule);
     return Boolean(scheduleId) && !canceledScheduleIdsByDate.get(dateKey)?.has(scheduleId);
@@ -117,6 +119,7 @@ export const getUncancelledScheduleDateKeys = (
   return getLeaveDateKeysForWeekday(leave, schedule?.day).filter((dateKey) => {
     if (new Date(`${dateKey}T12:00:00Z`).getUTCDay() === 0) return false;
     if (holidays.has(dateKey)) return false;
+    if (!isScheduleOwnedOnDate(schedule, dateKey)) return false;
     if (!isSpecialScheduleActiveOnDate(schedule, dateKey)) return false;
     return !canceledScheduleIdsByDate.get(dateKey)?.has(scheduleId);
   });

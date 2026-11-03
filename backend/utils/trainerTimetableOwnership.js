@@ -1,39 +1,14 @@
-import Trainer from '../models/Trainer.js';
 import { toLeaveDateKey } from './leaveDateRange.js';
 
 const trainerIdString = (value) => value?._id?.toString?.() || value?.toString?.() || '';
 
 /**
- * A permanent handover rewrites trainerCode immediately, while the successor
- * only takes those classes from roleTransferEffectiveDate. When every inbound
- * handover shares one date, that date is the first day the successor owns the
- * timetable they hold now.
+ * A trainer-level transfer date cannot identify which individual slots moved.
+ * Only the schedule's recorded ownershipStartDate is reliable evidence.
  */
 export const inheritedOwnershipFloorsByTrainer = async (trainerIds = []) => {
   const ids = [...new Set(trainerIds.map(trainerIdString).filter(Boolean))];
-  const floors = new Map(ids.map((id) => [id, '']));
-  if (!ids.length) return floors;
-
-  const sources = await Trainer.find({
-    successorTrainer: { $in: ids },
-    roleTransferEffectiveDate: { $ne: null },
-  })
-    .select('successorTrainer roleTransferEffectiveDate')
-    .lean();
-
-  const keysBySuccessor = new Map();
-  sources.forEach((source) => {
-    const successorId = trainerIdString(source.successorTrainer);
-    const key = toLeaveDateKey(source.roleTransferEffectiveDate);
-    if (!successorId || !key) return;
-    if (!keysBySuccessor.has(successorId)) keysBySuccessor.set(successorId, new Set());
-    keysBySuccessor.get(successorId).add(key);
-  });
-
-  keysBySuccessor.forEach((keys, successorId) => {
-    if (keys.size === 1) floors.set(successorId, [...keys][0]);
-  });
-  return floors;
+  return new Map(ids.map((id) => [id, '']));
 };
 
 export const inheritedOwnershipFloorKey = async (trainerId) => {
@@ -48,11 +23,7 @@ export const isScheduleOwnedOnDate = (schedule, dateKey) => {
 };
 
 export const applyOwnershipFloor = (schedules = [], floorKey = '') => {
-  if (!floorKey) return schedules;
-  schedules.forEach((schedule) => {
-    if (!schedule || toLeaveDateKey(schedule.ownershipStartDate)) return;
-    schedule.ownershipStartDate = floorKey;
-  });
+  // A generic floor cannot prove that any particular schedule was transferred.
   return schedules;
 };
 

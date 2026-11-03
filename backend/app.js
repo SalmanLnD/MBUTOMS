@@ -29,6 +29,7 @@ import photoPunchRoutes from './routes/photoPunchRoutes.js';
 import { APP_VERSION } from './utils/sessionVersion.js';
 import { guardDemoToken } from './utils/demoAccess.js';
 import { protectCookieRequest } from './utils/sessionCookie.js';
+import { invalidateAfterWrite } from './utils/dataRevision.js';
 import announcementRoutes from './routes/announcementRoutes.js';
 
 dotenv.config();
@@ -46,6 +47,7 @@ app.use(
 app.use(express.json({ limit: '2mb' }));
 app.use(express.urlencoded({ extended: true }));
 app.use(protectCookieRequest);
+app.use(invalidateAfterWrite);
 app.use(guardDemoToken);
 
 app.get('/api/health', (req, res) => {

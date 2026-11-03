@@ -22,6 +22,10 @@ import { getLeaveOverlapFilter, isDateWithinLeave } from './leaveDateRange.js';
 import { getLeaveWeekdayScheduleIds, isFullDayLeave } from './leaveScope.js';
 import { SPECIAL_CLASS_FIELDS } from './specialClass.js';
 import { getCancellationMapForRange, hasUncancelledClassOnDate } from './leaveAffectedClasses.js';
+import {
+  applyOwnershipFloorsToTrainerSchedules,
+  inheritedOwnershipFloorsByTrainer,
+} from './trainerTimetableOwnership.js';
 import { applyItOifAttendanceRules, allowsManualClassHandlingHours, resolveDefaultNoClassOif } from './attendanceOifRules.js';
 import {
   attendanceTypeUsesOifNumber,
@@ -145,6 +149,8 @@ export const buildTrainerAttendanceExportPayload = async () => {
         .flatMap((code) => schedulesByCode.get(code) || []),
     ])
   );
+  const ownershipFloors = await inheritedOwnershipFloorsByTrainer(trainerIds);
+  applyOwnershipFloorsToTrainerSchedules(schedulesByTrainer, ownershipFloors);
 
   const fullDayLeaveKeys = new Set();
   const breakDateKeys = new Set();

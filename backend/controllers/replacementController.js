@@ -22,6 +22,11 @@ import { getCanceledScheduleIdsForDate } from '../utils/classCancellations.js';
 import { loadOfficialHolidayMap } from '../utils/officialHolidays.js';
 import { toAttendanceDateKey } from '../utils/attendanceDates.js';
 import {
+  applyOwnershipFloor,
+  applyOwnershipFloorsToLeaves,
+  inheritedOwnershipFloorKey,
+} from '../utils/trainerTimetableOwnership.js';
+import {
   loadReplacementBusySlotsByTrainer,
   trainerHasSlotConflict,
 } from '../utils/replacementSlotConflicts.js';
@@ -115,6 +120,7 @@ const gatherBulkTargets = async ({ sourceTrainerId, start, end }) => {
   if (!leaves.length) {
     return { leaves: [], targets: [], cancellationMap: new Map(), holidayDateKeys: new Set() };
   }
+  await applyOwnershipFloorsToLeaves(leaves);
 
   const { cancellationMap, holidayDateKeys } = await getLeaveClassExclusionsForRange(start, end);
   const dateInRange = (key) => {
@@ -256,6 +262,7 @@ export const getReplacementSuggestions = async (req, res) => {
   if (!leave) {
     return res.status(400).json({ message: 'No approved leave found for this schedule' });
   }
+  applyOwnershipFloor([schedule], await inheritedOwnershipFloorKey(leave.trainer));
   try {
     scopeReplacementOccurrence(leave, req.query.date, schedule);
   } catch (error) {
@@ -651,6 +658,7 @@ export const getAllReplacements = async (req, res) => {
       select: 'name employeeId',
     })
     .sort({ startDate: -1, createdAt: -1 });
+  await applyOwnershipFloorsToLeaves(leaves);
 
   // Collapse duplicate schedule assignments left by older concurrent writes.
   const dirtyLeaves = [];
@@ -917,6 +925,7 @@ export const assignReplacement = async (req, res) => {
   if (!leave) {
     return res.status(400).json({ message: 'No approved leave found for this schedule' });
   }
+  applyOwnershipFloor([schedule], await inheritedOwnershipFloorKey(leave.trainer));
   let retainedRanges;
   try {
     retainedRanges = scopeReplacementOccurrence(leave, req.body.date, schedule);

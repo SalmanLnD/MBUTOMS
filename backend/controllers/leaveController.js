@@ -19,6 +19,11 @@ import {
   getUncancelledScheduleDateKeys,
 } from '../utils/leaveAffectedClasses.js';
 import { getLeaveDateKeys, getLeaveDateKeysForWeekday, toLeaveDateKey } from '../utils/leaveDateRange.js';
+import {
+  applyOwnershipFloor,
+  applyOwnershipFloorsToLeaves,
+  inheritedOwnershipFloorKey,
+} from '../utils/trainerTimetableOwnership.js';
 import { splitLeaveRangeForPartialCancel } from '../utils/leaveRangeSplit.js';
 import { normalizeAttendanceDate } from '../utils/attendanceTracking.js';
 import {
@@ -80,6 +85,7 @@ const addEffectiveAffectedDataToLeaves = async (leaves) => {
     startDate,
     endDate
   );
+  await applyOwnershipFloorsToLeaves(leaves);
   return leaves.map((leave) => addEffectiveAffectedData(leave, cancellationMap, holidayDateKeys));
 };
 
@@ -105,7 +111,14 @@ const findAffectedSchedules = async (trainerId, startDate, endDate) => {
     trainerCode: { $in: resolveTrainerScheduleCodes(trainer) },
     day: { $in: days },
   }).sort({ day: 1, startTime: 1 });
-  return schedules.filter((schedule) => isSpecialScheduleInRange(schedule, startDate, endDate));
+  const floor = await inheritedOwnershipFloorKey(trainerId);
+  applyOwnershipFloor(schedules, floor);
+  const endKey = toLeaveDateKey(endDate);
+  return schedules.filter((schedule) => {
+    if (!isSpecialScheduleInRange(schedule, startDate, endDate)) return false;
+    const ownedFrom = toLeaveDateKey(schedule.ownershipStartDate);
+    return !ownedFrom || !endKey || ownedFrom <= endKey;
+  });
 };
 
 export const getLeaves = async (req, res) => {
@@ -143,6 +156,7 @@ export const getLeaveById = async (req, res) => {
     leave.startDate,
     leave.endDate
   );
+  await applyOwnershipFloorsToLeaves([leave]);
   res.json(addEffectiveAffectedData(leave, cancellationMap, holidayDateKeys));
 };
 
@@ -197,6 +211,7 @@ export const createLeave = async (req, res) => {
   });
 
   const populated = await Leave.findById(leave._id).populate(populateLeave);
+  await applyOwnershipFloorsToLeaves([populated]);
   res.status(201).json(addEffectiveAffectedData(populated, cancellationMap, holidayDateKeys));
 };
 
@@ -234,6 +249,7 @@ export const updateLeave = async (req, res) => {
     updated.startDate,
     updated.endDate
   );
+  await applyOwnershipFloorsToLeaves([updated]);
   res.json(addEffectiveAffectedData(updated, cancellationMap, holidayDateKeys));
 };
 
@@ -357,6 +373,7 @@ export const partialCancelLeave = async (req, res) => {
     return deleteLeave(req, res);
   }
 
+  await applyOwnershipFloorsToLeaves([leave]);
   const cancelKeyStart = toLeaveDateKey(cancelStart);
   const cancelKeyEnd = toLeaveDateKey(cancelEnd);
   const { cancellationMap, holidayDateKeys } = await getLeaveClassExclusionsForRange(
@@ -441,6 +458,7 @@ export const partialCancelLeave = async (req, res) => {
 
     const updated = await Leave.findById(leave._id).populate(populateLeave);
     const rangeExclusions = await getLeaveClassExclusionsForRange(updated.startDate, updated.endDate);
+    await applyOwnershipFloorsToLeaves([updated]);
     res.json({
       message: revokedReplacements.length
         ? 'Leave period partially cancelled and replacement assignments revoked'

@@ -16,6 +16,12 @@ import {
 } from './leaveAffectedClasses.js';
 import { loadOfficialHolidayMap } from './officialHolidays.js';
 import { resolveTrainerScheduleCodes } from './trainerMappings.js';
+import {
+  applyOwnershipFloor,
+  applyOwnershipFloorsToTrainerSchedules,
+  inheritedOwnershipFloorKey,
+  inheritedOwnershipFloorsByTrainer,
+} from './trainerTimetableOwnership.js';
 import { SPECIAL_CLASS_FIELDS } from './specialClass.js';
 
 /**
@@ -132,6 +138,8 @@ export const getReplacementRequiredDaysByTrainer = async ({
       .flatMap((code) => schedulesByCode.get(code) || []);
     schedulesByTrainer.set(trainerId, trainerSchedules);
   });
+  const ownershipFloors = await inheritedOwnershipFloorsByTrainer(trainerIds);
+  applyOwnershipFloorsToTrainerSchedules(schedulesByTrainer, ownershipFloors);
 
   const fromKey = toAttendanceDateKey(rangeStart);
   const untilKey = toAttendanceDateKey(endDate);
@@ -207,6 +215,7 @@ export const getTrainerRrdDateKeys = async ({
     loadOfficialHolidayMap(rangeStart, endDate),
     getCancellationMapForRange(rangeStart, endDate, { includeSubjectDates: true }),
   ]);
+  applyOwnershipFloor(schedules, await inheritedOwnershipFloorKey(trainer._id));
 
   const fromKey = toAttendanceDateKey(rangeStart);
   const untilKey = toAttendanceDateKey(endDate);

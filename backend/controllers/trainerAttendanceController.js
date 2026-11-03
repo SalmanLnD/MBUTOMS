@@ -46,6 +46,12 @@ import { SPECIAL_CLASS_FIELDS } from '../utils/specialClass.js';
 import Schedule from '../models/Schedule.js';
 import { resolveTrainerScheduleCodes } from '../utils/trainerMappings.js';
 import {
+  applyOwnershipFloor,
+  applyOwnershipFloorsToTrainerSchedules,
+  inheritedOwnershipFloorKey,
+  inheritedOwnershipFloorsByTrainer,
+} from '../utils/trainerTimetableOwnership.js';
+import {
   attendanceTypeUsesOifNumber,
   canEditFutureLeaveAttendance,
   formatTrainerAttendanceOifDisplay,
@@ -221,6 +227,8 @@ export const buildTrainerAttendanceGridPayload = async ({
       .flatMap((code) => schedulesByCode.get(code) || []);
     schedulesByTrainer.set(trainerId, trainerSchedules);
   });
+  const ownershipFloors = await inheritedOwnershipFloorsByTrainer(trainerIds);
+  applyOwnershipFloorsToTrainerSchedules(schedulesByTrainer, ownershipFloors);
 
   const logMap = buildLogMap(logs);
   const fullDayLeaveKeys = new Set();
@@ -566,6 +574,7 @@ export const upsertTrainerDailyAttendance = async (req, res) => {
         .select(`_id day ${SPECIAL_CLASS_FIELDS}`)
         .lean()
       : [];
+    applyOwnershipFloor(trainerSchedules, await inheritedOwnershipFloorKey(trainer));
 
     isOnFullDayLeave = approvedLeaves.some((leave) => {
       if (!isDateWithinLeave(day, leave)) return false;

@@ -1,10 +1,11 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import LoadingSpinner from '../components/LoadingSpinner.jsx';
 import TopicTrackerSpreadsheet from '../components/TopicTrackerSpreadsheet.jsx';
 import TopicTrackerSheetSetupModal from '../components/TopicTrackerSheetSetupModal.jsx';
 import TopicTrackerClassSummaryTab from '../components/TopicTrackerClassSummaryTab.jsx';
 import TopicTrackerCancellationsTab from '../components/TopicTrackerCancellationsTab.jsx';
+import TimetableExecutionTab from '../components/TimetableExecutionTab.jsx';
 import TopicTrackerPendingBacklogTab from '../components/TopicTrackerPendingBacklogTab.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
 import { getTopicTrackerOverview, getTopicTrackerSheetStatus } from '../services/topicTrackerService.js';
@@ -62,6 +63,8 @@ const TopicTracker = () => {
     () => notificationTarget?.date || toInputDate(new Date())
   );
   const [overview, setOverview] = useState(null);
+  const [overviewError, setOverviewError] = useState('');
+  const overviewRequest = useRef(0);
   const [loading, setLoading] = useState(true);
   const [sheetStatus, setSheetStatus] = useState(null);
   const [sheetModalOpen, setSheetModalOpen] = useState(false);
@@ -70,23 +73,30 @@ const TopicTracker = () => {
   const [pendingRefreshKey, setPendingRefreshKey] = useState(0);
 
   const loadOverview = useCallback(async () => {
+    const request = ++overviewRequest.current;
     if (!showOverview || activeTab !== 'day') {
       setLoading(false);
       return;
     }
     setLoading(true);
+    setOverviewError('');
     try {
       const data = await getTopicTrackerOverview(selectedDate);
+      if (request !== overviewRequest.current) return;
       setOverview(data);
     } catch (err) {
+      if (request !== overviewRequest.current) return;
+      setOverview(null);
+      setOverviewError(getErrorMessage(err));
       showError(getErrorMessage(err));
     } finally {
-      setLoading(false);
+      if (request === overviewRequest.current) setLoading(false);
     }
   }, [selectedDate, showOverview, activeTab]);
 
   useEffect(() => {
     loadOverview();
+    return () => { overviewRequest.current += 1; };
   }, [loadOverview]);
 
   useEffect(() => {
@@ -159,6 +169,7 @@ const TopicTracker = () => {
             <button
               type="button"
               className={`nav-link ${activeTab === 'day' ? 'active' : ''}`}
+              aria-pressed={activeTab === 'day'}
               onClick={() => setActiveTab('day')}
             >
               Day overview
@@ -168,6 +179,7 @@ const TopicTracker = () => {
             <button
               type="button"
               className={`nav-link ${activeTab === 'pending' ? 'active' : ''}`}
+              aria-pressed={activeTab === 'pending'}
               onClick={() => setActiveTab('pending')}
             >
               Pending backlog
@@ -177,6 +189,7 @@ const TopicTracker = () => {
             <button
               type="button"
               className={`nav-link ${activeTab === 'class' ? 'active' : ''}`}
+              aria-pressed={activeTab === 'class'}
               onClick={() => setActiveTab('class')}
             >
               Class-wise summary
@@ -186,7 +199,20 @@ const TopicTracker = () => {
             <li className="nav-item">
               <button
                 type="button"
+                className={`nav-link ${activeTab === 'hours' ? 'active' : ''}`}
+                aria-pressed={activeTab === 'hours'}
+                onClick={() => setActiveTab('hours')}
+              >
+                Hours
+              </button>
+            </li>
+          )}
+          {canManageSheets && (
+            <li className="nav-item">
+              <button
+                type="button"
                 className={`nav-link ${activeTab === 'cancellations' ? 'active' : ''}`}
+                aria-pressed={activeTab === 'cancellations'}
                 onClick={() => setActiveTab('cancellations')}
               >
                 Cancelled sessions
@@ -263,6 +289,14 @@ const TopicTracker = () => {
         </div>
       )}
 
+      {canManageSheets && activeTab === 'hours' && (
+        <div className="card table-card">
+          <div className="card-body">
+            <TimetableExecutionTab />
+          </div>
+        </div>
+      )}
+
       {canManageSheets && activeTab === 'cancellations' && (
         <div className="card table-card">
           <div className="card-body">
@@ -282,6 +316,11 @@ const TopicTracker = () => {
           <h2 className="h6 fw-semibold mb-3">Day-wise pending by subject</h2>
           {loading ? (
             <LoadingSpinner message="Loading overview..." />
+          ) : overviewError ? (
+            <div className="alert alert-danger" role="alert">
+              Could not load the overview. {overviewError}{' '}
+              <button type="button" className="btn btn-sm btn-outline-danger" onClick={loadOverview}>Retry</button>
+            </div>
           ) : !overview?.subjects?.length ? (
             <div className="alert alert-light border">No scheduled sessions for this date.</div>
           ) : (
