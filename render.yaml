@@ -16,6 +16,12 @@ services:
         source: /*
         destination: /index.html
     headers:
+      - path: /*
+        name: X-Frame-Options
+        value: DENY
+      - path: /*
+        name: Content-Security-Policy
+        value: "frame-ancestors 'none'; object-src 'none'; base-uri 'self'"
       - path: /sw.js
         name: Cache-Control
         value: no-cache

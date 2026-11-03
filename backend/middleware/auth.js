@@ -12,6 +12,11 @@ import {
 import { attachManagerEditNotifier } from '../utils/managerEditNotifications.js';
 import { DEMO_ROLE, isDemoRequestAllowed, rejectDemoWrite, maskDemoCredentials } from '../utils/demoAccess.js';
 
+export const allowPasswordResetSession = (req, res, next) => {
+  req.allowPasswordResetSession = true;
+  next();
+};
+
 export const protect = async (req, res, next) => {
   let token;
 
@@ -52,6 +57,10 @@ export const protect = async (req, res, next) => {
         message: SESSION_EXPIRED_MESSAGE,
         code: SESSION_EXPIRED_CODE,
       });
+    }
+
+    if (req.user.mustResetPassword && !req.allowPasswordResetSession) {
+      return res.status(403).json({ message: 'Change your password before continuing.', code: 'PASSWORD_RESET_REQUIRED' });
     }
 
     if (decoded.impersonatedBy) {

@@ -101,6 +101,9 @@ export const getMe = async (req, res) => {
 };
 
 export const resetPassword = async (req, res) => {
+  if (req.impersonator) {
+    return res.status(403).json({ message: 'Exit trainer view before changing a password.' });
+  }
   const { newPassword, confirmPassword } = req.body;
 
   if (!newPassword || newPassword.length < 6) {
