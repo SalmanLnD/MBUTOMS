@@ -66,7 +66,7 @@ test('demo trainer preview remains restricted and validates the owning demo sess
   const app=express(); app.all('/api/preview', protect, (req,res) => res.json({ demo: req.isDemo, role: req.user.role }));
   const server=app.listen(0,'127.0.0.1'); await new Promise(r=>server.once('listening',r));
   t.after(()=>{server.closeAllConnections();server.close()});
-  const request = async method => fetch(`http://127.0.0.1:${server.address().port}/api/preview`, { method, headers: { Authorization: `Bearer ${jwt.sign({ id:'target',sv:1,av:SESSION_APP_VERSION,demo:true,impersonatedBy:'owner',demoOwner:'owner',demoSv:1 },process.env.JWT_SECRET)}` } });
+  const request = async method => fetch(`http://127.0.0.1:${server.address().port}/api/preview`, { method, headers: { Authorization: `Bearer ${jwt.sign({ id:'target',sv:1,av:SESSION_APP_VERSION,demo:true,impersonatedBy:'owner',impersonatorSv:1,demoOwner:'owner',demoSv:1 },process.env.JWT_SECRET)}` } });
   assert.deepEqual(await (await request('GET')).json(),{demo:true,role:'trainer'});
   assert.equal((await request('PUT')).status,403); owner.sessionVersion=2;
   assert.equal((await request('GET')).status,401);

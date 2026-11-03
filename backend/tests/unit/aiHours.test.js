@@ -24,6 +24,7 @@ const query = (records) => ({
 });
 
 test('AI explanation uses the unchanged official calculation for special, cancelled and replacement classes', async (t) => {
+  t.mock.method(Trainer, 'find', () => query([]));
   const date = new Date('2026-10-01T00:00:00Z');
   const trainers = [{ _id: 'owner', employeeId: '100', name: 'Original', joiningDate: '2026-07-01' },
     { _id: 'cover', employeeId: '200', name: 'Replacement', joiningDate: '2026-07-01' }];
@@ -68,6 +69,7 @@ test('AI explanation uses the unchanged official calculation for special, cancel
 });
 
 test('explanation fields preserve attendance slot deduplication and zero-hour holiday/joining behavior', async (t) => {
+  t.mock.method(Trainer, 'find', () => query([]));
   const date = new Date('2026-10-01T00:00:00Z');
   const trainer = { _id: 'own', employeeId: '100', joiningDate: '2026-07-01' };
   const records = [{ _id: 'a', trainerCode: '100', day: 'Thursday', startTime: '09:00', endTime: '10:00', subjectCode: 'TEST', semester: 'III', department: 'CSE', section: 'A1' },
@@ -110,6 +112,7 @@ test('real class controllers enforce trainer access before exposing counts', asy
 });
 
 test('Salman current week totals 4 hours across September/October, excluding Gandhi Jayanthi', async (t) => {
+  t.mock.method(Trainer, 'find', () => query([]));
   const trainer = { _id: 'salman', name: 'Muhammed Salman S F', employeeId: '131665', joiningDate: '2026-07-01' };
   const slot = (key, day, startTime, endTime) => ({ _id: key, trainerCode: '131665', day, startTime, endTime,
     semester: 'III', department: 'MCA', section: '1', subjectCode: '25CA202009', subject: 'dsap' });

@@ -65,6 +65,9 @@ export const protect = async (req, res, next) => {
       if (!req.impersonator) {
         return res.status(401).json({ message: 'Impersonation session is invalid' });
       }
+      if (!req.impersonator.isActive || decoded.impersonatorSv !== (req.impersonator.sessionVersion ?? 1)) {
+        return res.status(401).json({ message: SESSION_EXPIRED_MESSAGE, code: SESSION_EXPIRED_CODE });
+      }
     }
 
     if (decoded.demoOwner) {

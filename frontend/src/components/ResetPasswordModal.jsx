@@ -11,8 +11,8 @@ const ResetPasswordModal = ({ show, onComplete }) => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (newPassword.length < 6) {
-      showError('Password must be at least 6 characters');
+    if (newPassword.length < 12 || newPassword.length > 72) {
+      showError('Password must be between 12 and 72 characters');
       return;
     }
     if (newPassword !== confirmPassword) {
@@ -45,7 +45,7 @@ const ResetPasswordModal = ({ show, onComplete }) => {
       <form onSubmit={handleSubmit}>
         <div className="toms-modal-body">
           <p className="text-muted mb-3">
-            You signed in with the initial OTP. Please choose a new password to continue.
+            You signed in with a one-time code. Choose a password of 12 to 72 characters to continue.
           </p>
           <div className="mb-3">
             <label htmlFor="newPassword" className="form-label">New password</label>
@@ -53,6 +53,8 @@ const ResetPasswordModal = ({ show, onComplete }) => {
               id="newPassword"
               type="password"
               className="form-control"
+              minLength={12}
+              maxLength={72}
               value={newPassword}
               onChange={(e) => setNewPassword(e.target.value)}
               required

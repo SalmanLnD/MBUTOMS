@@ -66,7 +66,7 @@ test('AI endpoint uses real protect middleware for missing, invalid and valid se
   role = 'admin';
   assert.equal((await post(token)).status, 200);
   mustResetPassword = true; assert.equal((await post(token)).status, 403); mustResetPassword = false;
-  const impersonatedToken = jwt.sign({ id: 'route-test-user', sv: 1, av: SESSION_APP_VERSION, impersonatedBy: 'admin-id' }, process.env.JWT_SECRET);
+  const impersonatedToken = jwt.sign({ id: 'route-test-user', sv: 1, av: SESSION_APP_VERSION, impersonatedBy: 'admin-id', impersonatorSv: 1 }, process.env.JWT_SECRET);
   assert.equal((await post(impersonatedToken)).status, 403);
 });
 

@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { isExternalTrainerArchived, excludeArchivedExternalTrainers } from '../../utils/externalTrainerArchive.js';
 import { isTrainerVisibleInUi, mergeAttendanceExportTrainerFilter } from '../../utils/trainerEmployment.js';
 import User from '../../models/User.js';
+import Trainer from '../../models/Trainer.js';
 
 test('external tenure includes its last day and archives at midnight IST', () => {
   const trainer = { createdAsBulkReplacement: true, replacementAttendanceTo: new Date('2026-09-12') };
@@ -22,5 +23,6 @@ test('archive query uses the IST date, preserves caller constraints and does not
     replacementAttendanceTo: { $ne: null, $lt: new Date('2026-09-13') } });
   assert.deepEqual(base, { status: 'active' });
   t.mock.method(User, 'find', () => ({ select() { return this; }, lean: async () => [] }));
+  t.mock.method(Trainer, 'findOne', () => ({ select() { return this; }, lean: async () => null }));
   assert.equal(JSON.stringify(await mergeAttendanceExportTrainerFilter()).includes('replacementAttendanceTo'), false);
 });

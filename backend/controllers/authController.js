@@ -6,12 +6,12 @@ import { setSessionCookie, clearSessionCookie } from '../utils/sessionCookie.js'
 import { canImpersonate, IMPERSONATION_TARGET_ROLES, ROLES } from '../utils/roles.js';
 import { APP_VERSION, SESSION_APP_VERSION } from '../utils/sessionVersion.js';
 
-const generateToken = (user, impersonatedBy = null, demoOwner = null) => {
+const generateToken = (user, impersonator = null, demoOwner = null) => {
   const payload = {
     id: user._id,
     sv: user.sessionVersion ?? 1,
     av: SESSION_APP_VERSION,
-    ...(impersonatedBy ? { impersonatedBy } : {}),
+    ...(impersonator ? { impersonatedBy: impersonator._id, impersonatorSv: impersonator.sessionVersion ?? 1 } : {}),
     ...(user.role === ROLES.DEMO || demoOwner ? { demo: true } : {}),
     ...(demoOwner ? { demoOwner: String(demoOwner._id), demoSv: demoOwner.sessionVersion ?? 1 } : {}),
   };
@@ -46,7 +46,7 @@ const userResponse = (user, { impersonator = null, demoOwner = null } = {}) => (
 });
 
 const sendSession = (res, user, options = {}) => {
-  setSessionCookie(res, generateToken(user, options.impersonator?._id, options.demoOwner));
+  setSessionCookie(res, generateToken(user, options.impersonator, options.demoOwner));
   res.set('Cache-Control', 'no-store');
   return res.json(userResponse(user, options));
 };
@@ -109,8 +109,8 @@ export const resetPassword = async (req, res) => {
   }
   const { newPassword, confirmPassword } = req.body;
 
-  if (!newPassword || newPassword.length < 6) {
-    return res.status(400).json({ message: 'Password must be at least 6 characters' });
+  if (typeof newPassword !== 'string' || newPassword.length < 12 || Buffer.byteLength(newPassword, 'utf8') > 72) {
+    return res.status(400).json({ message: 'Password must be between 12 and 72 characters' });
   }
   if (newPassword !== confirmPassword) {
     return res.status(400).json({ message: 'Passwords do not match' });
@@ -135,6 +135,8 @@ export const resetPassword = async (req, res) => {
 };
 
 export const logout = async (req, res) => {
+  const owner = req.impersonator || req.user;
+  await User.updateOne({ _id: owner._id }, { $inc: { sessionVersion: 1 } });
   clearSessionCookie(res);
   res.json({ message: 'Logged out successfully' });
 };
