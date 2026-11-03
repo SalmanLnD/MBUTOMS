@@ -102,12 +102,8 @@ const TrainerFormModal = ({ trainer, onClose }) => {
     };
 
     try {
-      if (isEdit) {
-        await updateTrainer(trainer._id, payload);
-      } else {
-        await createTrainer(payload);
-      }
-      onClose(true);
+      const result = isEdit ? await updateTrainer(trainer._id, payload) : await createTrainer(payload);
+      onClose(result?.initialOtp ? { initialOtp: result.initialOtp, name: form.name } : true);
     } catch (err) {
       setError(getErrorMessage(err));
     } finally {

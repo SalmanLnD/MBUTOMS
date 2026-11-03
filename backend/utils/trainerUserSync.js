@@ -1,5 +1,5 @@
 import User from '../models/User.js';
-import { INITIAL_TRAINER_PASSWORD } from '../constants/trainerAuth.js';
+import { createTrainerOtp } from './trainerOtp.js';
 import { ROLES } from './roles.js';
 
 /** Roles that log in through a linked trainer profile and can use the initial OTP. */
@@ -23,15 +23,19 @@ export const syncTrainerUser = async (trainer, { resetPassword = false } = {}) =
   }
 
   if (!user) {
+    const { otp, expiresAt } = createTrainerOtp();
     user = new User({
       name: trainer.name,
       email,
-      password: INITIAL_TRAINER_PASSWORD,
+      password: otp,
       role: ROLES.TRAINER,
       trainer: trainer._id,
       mustResetPassword: true,
+      otpExpiresAt: expiresAt,
+      otpAttempts: 0,
     });
     await user.save();
+    user.$locals.initialOtp = otp;
     return user;
   }
 
@@ -40,8 +44,12 @@ export const syncTrainerUser = async (trainer, { resetPassword = false } = {}) =
   user.trainer = trainer._id;
 
   if (resetPassword) {
-    user.password = INITIAL_TRAINER_PASSWORD;
+    const { otp, expiresAt } = createTrainerOtp();
+    user.password = otp;
     user.mustResetPassword = true;
+    user.otpExpiresAt = expiresAt;
+    user.otpAttempts = 0;
+    user.$locals.initialOtp = otp;
     user.sessionVersion = (user.sessionVersion || 1) + 1;
   }
 

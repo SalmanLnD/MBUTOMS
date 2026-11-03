@@ -25,6 +25,8 @@ const userSchema = new mongoose.Schema(
     sessionVersion: { type: Number, default: 1, min: 1 },
     isActive: { type: Boolean, default: true },
     mustResetPassword: { type: Boolean, default: false },
+    otpExpiresAt: { type: Date, default: null },
+    otpAttempts: { type: Number, default: 0 },
   },
   { timestamps: true }
 );

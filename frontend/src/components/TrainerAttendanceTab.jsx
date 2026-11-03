@@ -455,17 +455,6 @@ const TrainerAttendanceTab = () => {
           >
             Refresh
           </button>
-          {canManageAll && (
-            <button
-              type="button"
-              className="btn btn-outline-primary btn-sm"
-              disabled={loading || refreshing || whatsappSyncing}
-              onClick={handleWhatsappSync}
-              title="Re-fetch recent WhatsApp group punches into attendance"
-            >
-              {whatsappSyncing ? 'Fetching WhatsApp...' : 'Fetch WhatsApp Punches'}
-            </button>
-          )}
         </div>
       </div>
 

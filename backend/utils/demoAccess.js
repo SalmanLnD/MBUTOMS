@@ -1,4 +1,5 @@
 import jwt from 'jsonwebtoken';
+import { getSessionToken } from './sessionCookie.js';
 
 export const DEMO_ROLE = 'demo';
 export const maskDemoValue = (value) => {
@@ -29,7 +30,7 @@ export const rejectDemoWrite = (res) => res.status(403).json({
 // Also covers public/key-authenticated routes that do not run protect().
 export const guardDemoToken = (req, res, next) => {
   try {
-    const token = req.headers.authorization?.split(' ')[1];
+    const token = getSessionToken(req);
     req.hasDemoToken = Boolean(token && jwt.verify(token, process.env.JWT_SECRET).demo);
     if (req.hasDemoToken && !isDemoRequestAllowed(req)) return rejectDemoWrite(res);
   } catch { /* Protected routes perform complete authentication. */ }

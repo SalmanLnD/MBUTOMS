@@ -36,10 +36,6 @@ import {
   unlinkTrainerAttendanceSheet,
 } from '../controllers/attendanceSheetsController.js';
 import { requireAttendanceExportKey } from '../middleware/attendanceExportAuth.js';
-import {
-  requestWhatsappPunchSync,
-  getWhatsappPunchSyncStatus,
-} from '../controllers/whatsappSyncController.js';
 
 const router = express.Router();
 
@@ -80,16 +76,6 @@ router.post(
   '/late-punches/:id/review',
   authorizeExact(...FULL_ACCESS_ROLES),
   asyncHandler(reviewLatePunch)
-);
-router.post(
-  '/whatsapp-sync',
-  authorizeExact(...FULL_ACCESS_ROLES),
-  asyncHandler(requestWhatsappPunchSync)
-);
-router.get(
-  '/whatsapp-sync/status',
-  authorizeExact(...FULL_ACCESS_ROLES),
-  asyncHandler(getWhatsappPunchSyncStatus)
 );
 router.get('/holidays', asyncHandler(listOfficialHolidays));
 router.post('/holidays', authorizeExact('admin'), asyncHandler(createOfficialHoliday));

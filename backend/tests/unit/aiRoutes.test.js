@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import express from 'express';
 import jwt from 'jsonwebtoken';
 import User from '../../models/User.js';
-import { APP_VERSION } from '../../utils/sessionVersion.js';
+import { SESSION_APP_VERSION } from '../../utils/sessionVersion.js';
 import { createAiRouter } from '../../routes/aiRoutes.js';
 import { createAiController, createAiUsageController } from '../../ai/aiController.js';
 import { attachManagerEditNotifier } from '../../utils/managerEditNotifications.js';
@@ -46,7 +46,7 @@ test('AI endpoint uses real protect middleware for missing, invalid and valid se
   const post = (token, body = { message: 'My timetable' }) => fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) }, body: JSON.stringify(body) });
   assert.equal((await post()).status, 401);
   assert.equal((await post('invalid-jwt')).status, 401);
-  const token = jwt.sign({ id: 'route-test-user', sv: 1, av: APP_VERSION }, process.env.JWT_SECRET);
+  const token = jwt.sign({ id: 'route-test-user', sv: 1, av: SESSION_APP_VERSION }, process.env.JWT_SECRET);
   const previousReleaseToken = jwt.sign({ id: 'route-test-user', sv: 1, av: '2.2.0' }, process.env.JWT_SECRET);
   const oldSession = await post(previousReleaseToken);
   assert.equal(oldSession.status, 401); assert.equal((await oldSession.json()).code, 'APP_VERSION_UPDATED');
@@ -66,7 +66,7 @@ test('AI endpoint uses real protect middleware for missing, invalid and valid se
   role = 'admin';
   assert.equal((await post(token)).status, 200);
   mustResetPassword = true; assert.equal((await post(token)).status, 403); mustResetPassword = false;
-  const impersonatedToken = jwt.sign({ id: 'route-test-user', sv: 1, av: APP_VERSION, impersonatedBy: 'admin-id' }, process.env.JWT_SECRET);
+  const impersonatedToken = jwt.sign({ id: 'route-test-user', sv: 1, av: SESSION_APP_VERSION, impersonatedBy: 'admin-id' }, process.env.JWT_SECRET);
   assert.equal((await post(impersonatedToken)).status, 403);
 });
 

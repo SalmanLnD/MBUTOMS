@@ -19,7 +19,6 @@ import sheetsRoutes from './routes/sheetsRoutes.js';
 import feedbackRoutes from './routes/feedbackRoutes.js';
 import observationRoutes from './routes/observationRoutes.js';
 import plpRoutes from './routes/plpRoutes.js';
-import webhookRoutes from './routes/webhookRoutes.js';
 import notificationRoutes from './routes/notificationRoutes.js';
 import ticketRoutes from './routes/ticketRoutes.js';
 import topicTrackerRoutes from './routes/topicTrackerRoutes.js';
@@ -29,6 +28,7 @@ import aiRoutes from './routes/aiRoutes.js';
 import photoPunchRoutes from './routes/photoPunchRoutes.js';
 import { APP_VERSION } from './utils/sessionVersion.js';
 import { guardDemoToken } from './utils/demoAccess.js';
+import { protectCookieRequest } from './utils/sessionCookie.js';
 import announcementRoutes from './routes/announcementRoutes.js';
 
 dotenv.config();
@@ -45,6 +45,7 @@ app.use(
 );
 app.use(express.json({ limit: '2mb' }));
 app.use(express.urlencoded({ extended: true }));
+app.use(protectCookieRequest);
 app.use(guardDemoToken);
 
 app.get('/api/health', (req, res) => {
@@ -76,7 +77,6 @@ app.use('/api/sheets', sheetsRoutes);
 app.use('/api/feedback', feedbackRoutes);
 app.use('/api/observations', observationRoutes);
 app.use('/api/plp', plpRoutes);
-app.use('/api/webhooks', webhookRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/announcements', announcementRoutes);
 app.use('/api/tickets', ticketRoutes);

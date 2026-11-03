@@ -4,7 +4,6 @@ import Subject from '../models/Subject.js';
 import Schedule from '../models/Schedule.js';
 import { applyTrainerSubjectsChange, toIdStrings } from '../utils/syncTrainerSubjectLinks.js';
 import { syncTrainerUser, removeTrainerUser } from '../utils/trainerUserSync.js';
-import { INITIAL_TRAINER_PASSWORD } from '../constants/trainerAuth.js';
 import { mergeRosterFilter, shouldApplyRosterFilter } from '../utils/rosterFilter.js';
 import { mergeUiTrainerFilter } from '../utils/trainerEmployment.js';
 import {
@@ -215,11 +214,9 @@ export const createTrainer = async (req, res) => {
     .populate('department', 'name code')
     .populate('subjects', 'name code');
 
-  if (email) {
-    await syncTrainerUser(populated, { resetPassword: true });
-  }
-
-  res.status(201).json(populated);
+  const loginUser = email ? await syncTrainerUser(populated, { resetPassword: true }) : null;
+  res.set('Cache-Control', 'no-store');
+  res.status(201).json({ ...populated.toObject(), initialOtp: loginUser?.$locals?.initialOtp || null });
 };
 
 export const updateTrainer = async (req, res) => {
@@ -287,13 +284,15 @@ export const updateTrainer = async (req, res) => {
     .populate('department', 'name code')
     .populate('subjects', 'name code');
 
+  let loginUser;
   if (payload.email) {
-    await syncTrainerUser(refreshed);
+    loginUser = await syncTrainerUser(refreshed);
   } else if (!req.body.email?.trim()) {
     await removeTrainerUser(req.params.id);
   }
 
-  res.json(refreshed);
+  res.set('Cache-Control', 'no-store');
+  res.json({ ...refreshed.toObject(), initialOtp: loginUser?.$locals?.initialOtp || null });
 };
 
 export const deleteTrainer = async (req, res) => {
@@ -323,7 +322,8 @@ export const resetTrainerPassword = async (req, res) => {
   }
 
   res.json({
-    message: `Password reset to initial OTP (${INITIAL_TRAINER_PASSWORD}). User must set a new password on next login.`,
+    message: 'Share this one-time code privately. It expires in 24 hours.',
+    initialOtp: user.$locals.initialOtp,
     email: trainer.email.trim().toLowerCase(),
   });
 };

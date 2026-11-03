@@ -7,7 +7,7 @@ import { protect } from '../../middleware/auth.js';
 import { login } from '../../controllers/authController.js';
 import { APP_VERSION, SESSION_APP_VERSION } from '../../utils/sessionVersion.js';
 
-test('patch update retains 2.2.1 sessions and still rejects revoked, expired and incompatible sessions', async t => {
+test('security migration rejects old sessions and accepts only current valid sessions', async t => {
   const secret = process.env.JWT_SECRET;
   process.env.JWT_SECRET = 'patch-session-test-only';
   t.after(() => { secret === undefined ? delete process.env.JWT_SECRET : process.env.JWT_SECRET = secret; });
@@ -19,12 +19,13 @@ test('patch update retains 2.2.1 sessions and still rejects revoked, expired and
   await new Promise(resolve => server.once('listening', resolve));
   t.after(() => { server.closeAllConnections(); server.close(); });
   const request = (payload, options) => fetch(`http://127.0.0.1:${server.address().port}/session`, {
-    headers: { Authorization: `Bearer ${jwt.sign({ id: 'test-user', sv: 3, av: '2.2.1', ...payload }, process.env.JWT_SECRET, options)}` },
+    headers: { Authorization: `Bearer ${jwt.sign({ id: 'test-user', sv: 3, av: SESSION_APP_VERSION, ...payload }, process.env.JWT_SECRET, options)}` },
   });
   assert.equal(APP_VERSION, '2.2.2');
-  assert.equal(SESSION_APP_VERSION, '2.2.1');
-  assert.equal((await request({})).status, 200, 'Existing logged-in users must remain signed in');
-  assert.equal((await request({ av: APP_VERSION })).status, 200);
+  assert.equal(SESSION_APP_VERSION, 'security-cookie-v1');
+  assert.equal((await request({})).status, 200);
+  assert.equal((await request({ av: APP_VERSION })).status, 401);
+  assert.equal((await request({ av: '2.2.1' })).status, 401);
   const incompatible = await request({ av: '2.2.0' });
   assert.equal(incompatible.status, 401); assert.equal((await incompatible.json()).code, 'APP_VERSION_UPDATED');
   assert.equal((await request({ sv: 2 })).status, 401);
@@ -40,9 +41,10 @@ test('new logins report the patch release while issuing tokens with the stable s
     matchPassword: async password => password === 'test-password' };
   const query = { populate() { return this; }, then(resolve, reject) { return Promise.resolve(user).then(resolve, reject); } };
   t.mock.method(User, 'findOne', () => query);
-  let response;
-  await login({ body: { email: user.email, password: 'test-password' } }, { json: value => { response = value; } });
+  let response, cookieToken;
+  await login({ body: { email: user.email, password: 'test-password' } }, { cookie: (name, value) => { cookieToken = value; }, set: () => {}, json: value => { response = value; } });
   assert.equal(response.appVersion, APP_VERSION);
-  const token = jwt.verify(response.token, process.env.JWT_SECRET);
+  assert.equal(response.token, undefined);
+  const token = jwt.verify(cookieToken, process.env.JWT_SECRET);
   assert.equal(token.av, SESSION_APP_VERSION); assert.equal(token.sv, 3);
 });

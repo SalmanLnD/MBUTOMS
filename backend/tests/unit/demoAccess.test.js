@@ -2,6 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import express from 'express';
 import jwt from 'jsonwebtoken';
+import { SESSION_APP_VERSION } from '../../utils/sessionVersion.js';
 import User from '../../models/User.js';
 import AppSetting from '../../models/AppSetting.js';
 import CompOff from '../../models/CompOff.js';
@@ -40,7 +41,7 @@ test('demo has admin reads and AI tools, but all business write verbs are blocke
   const server = app.listen(0, '127.0.0.1'); await new Promise(r => server.once('listening', r));
   t.after(() => { server.closeAllConnections(); server.close(); });
   const url = `http://127.0.0.1:${server.address().port}`;
-  const token = jwt.sign({ id: account._id, sv: 1, av: '2.2.1', demo: true }, process.env.JWT_SECRET);
+  const token = jwt.sign({ id: account._id, sv: 1, av: SESSION_APP_VERSION, demo: true }, process.env.JWT_SECRET);
   const headers = { Authorization: `Bearer ${token}` };
   assert.equal((await fetch(url+'/api/read', { headers })).status, 200);
   for (const method of ['POST','PUT','PATCH','DELETE']) {
@@ -51,7 +52,7 @@ test('demo has admin reads and AI tools, but all business write verbs are blocke
   assert.equal((await fetch(url+'/api/webhooks/whatsapp-sync/claim', { headers })).status, 403);
   assert.equal((await fetch(url+'/api/ai/chat', { headers, method: 'POST' })).status, 200);
   // A forged client role or omitted demo claim cannot grant a demo account writes.
-  const oldToken = jwt.sign({ id: account._id, sv: 1, av: '2.2.1', role: 'admin' }, process.env.JWT_SECRET);
+  const oldToken = jwt.sign({ id: account._id, sv: 1, av: SESSION_APP_VERSION, role: 'admin' }, process.env.JWT_SECRET);
   assert.equal((await fetch(url+'/api/write', { headers: { Authorization: `Bearer ${oldToken}` }, method: 'PUT' })).status, 403);
   assert.equal(writes, 0);
 });
@@ -65,7 +66,7 @@ test('demo trainer preview remains restricted and validates the owning demo sess
   const app=express(); app.all('/api/preview', protect, (req,res) => res.json({ demo: req.isDemo, role: req.user.role }));
   const server=app.listen(0,'127.0.0.1'); await new Promise(r=>server.once('listening',r));
   t.after(()=>{server.closeAllConnections();server.close()});
-  const request = async method => fetch(`http://127.0.0.1:${server.address().port}/api/preview`, { method, headers: { Authorization: `Bearer ${jwt.sign({ id:'target',sv:1,av:'2.2.1',demo:true,impersonatedBy:'owner',demoOwner:'owner',demoSv:1 },process.env.JWT_SECRET)}` } });
+  const request = async method => fetch(`http://127.0.0.1:${server.address().port}/api/preview`, { method, headers: { Authorization: `Bearer ${jwt.sign({ id:'target',sv:1,av:SESSION_APP_VERSION,demo:true,impersonatedBy:'owner',demoOwner:'owner',demoSv:1 },process.env.JWT_SECRET)}` } });
   assert.deepEqual(await (await request('GET')).json(),{demo:true,role:'trainer'});
   assert.equal((await request('PUT')).status,403); owner.sessionVersion=2;
   assert.equal((await request('GET')).status,401);

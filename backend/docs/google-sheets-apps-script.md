@@ -46,7 +46,7 @@ only works if you expose that port publicly.
 
 ## How it works
 
-- TOMS exposes read-only data at `GET /api/sheets/timetable/export?key=...`
+- TOMS exposes read-only data at `GET /api/sheets/timetable/export` with the export key in the `x-sheets-key` request header. Older scripts using a URL key must be updated from the current setup template.
 - The API key is generated automatically and embedded in the Apps Script
 - Edits in TOMS appear in the sheet after the next refresh (up to 5 min)
 - The sheet is **view-only for viewers** if you share it that way in Google Sheets

@@ -5,7 +5,7 @@ import jwt from 'jsonwebtoken';
 import router from '../../routes/photoPunchRoutes.js';
 import User from '../../models/User.js';
 import TrainerDailyAttendance from '../../models/TrainerDailyAttendance.js';
-import { APP_VERSION } from '../../utils/sessionVersion.js';
+import { SESSION_APP_VERSION } from '../../utils/sessionVersion.js';
 
 test('admin punch-in writes attendance after upload and protects disabled, duplicate and leave entries', async t => {
   const envKeys = ['JWT_SECRET', 'PUNCH_ATTENDANCE_ENABLED', 'PUNCH_CAMPUS_LATITUDE', 'PUNCH_CAMPUS_LONGITUDE', 'PUNCH_PROXYCHECK_API_KEY', 'PUNCH_LOCAL_TRIAL_ALLOW_UNVERIFIED_NETWORK', 'NODE_ENV'];
@@ -21,7 +21,7 @@ test('admin punch-in writes attendance after upload and protects disabled, dupli
   const server = app.listen(0, '127.0.0.1'); await new Promise(resolve => server.once('listening', resolve));
   t.after(() => {server.closeAllConnections(); server.close();});
   const base = `http://127.0.0.1:${server.address().port}/punch`;
-  const auth = jwt.sign({id: 'test-user', sv: 1, av: APP_VERSION}, process.env.JWT_SECRET);
+  const auth = jwt.sign({id: 'test-user', sv: 1, av: SESSION_APP_VERSION}, process.env.JWT_SECRET);
   const headers = {Authorization: `Bearer ${auth}`, 'Content-Type': 'application/json'};
   const location = {latitude: 13.621069, longitude: 79.289828, accuracy: 10, timestamp: Date.now()};
   assert.equal((await fetch(`${base}/config`)).status, 401);

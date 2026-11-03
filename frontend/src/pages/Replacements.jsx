@@ -56,6 +56,7 @@ const Replacements = () => {
   const [externalTrainerName, setExternalTrainerName] = useState('');
   const [assigningExternal, setAssigningExternal] = useState(false);
   const [pendingCancel, setPendingCancel] = useState(null);
+  const [newTrainerOtp, setNewTrainerOtp] = useState(null);
   const [registerFilter, setRegisterFilter] = useState('all');
   const [dateSortOrder, setDateSortOrder] = useState(null);
   const [showBulkModal, setShowBulkModal] = useState(false);
@@ -179,7 +180,7 @@ const Replacements = () => {
       }
       const data = await assignBulkReplacement(payload);
       if (data?.createdExternalAccount && data?.defaultPassword) {
-        showSuccess(`Bulk replacement saved. External trainer account created. Default password: ${data.defaultPassword}`);
+        setNewTrainerOtp({ code: data.defaultPassword, name: data.replacementTrainer?.name || 'the trainer' });
       } else {
         showSuccess('Bulk replacement saved');
       }
@@ -838,6 +839,16 @@ const Replacements = () => {
                 </div>
               </div>
             )}
+          </div>
+        </Modal>
+      )}
+      {newTrainerOtp && (
+        <Modal show title="Trainer login code" onClose={() => setNewTrainerOtp(null)}>
+          <div className="toms-modal-body">
+            <p>Share this code privately with {newTrainerOtp.name}. It expires in 24 hours and can be used once.</p>
+            <p><strong>{newTrainerOtp.code}</strong></p>
+            <p>The trainer enters it in the password field and then chooses a password.</p>
+            <button type="button" className="btn btn-primary" onClick={() => setNewTrainerOtp(null)}>Done</button>
           </div>
         </Modal>
       )}

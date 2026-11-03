@@ -1,6 +1,8 @@
 import jwt from 'jsonwebtoken';
 import User from '../models/User.js';
 import { INITIAL_TRAINER_PASSWORD } from '../constants/trainerAuth.js';
+import { isUsableTrainerOtp } from '../utils/trainerOtp.js';
+import { setSessionCookie, clearSessionCookie } from '../utils/sessionCookie.js';
 import { canImpersonate, IMPERSONATION_TARGET_ROLES, ROLES } from '../utils/roles.js';
 import { APP_VERSION, SESSION_APP_VERSION } from '../utils/sessionVersion.js';
 
@@ -41,8 +43,13 @@ const userResponse = (user, { impersonator = null, demoOwner = null } = {}) => (
         role: impersonator.role,
       }
     : null,
-  token: generateToken(user, impersonator?._id, demoOwner),
 });
+
+const sendSession = (res, user, options = {}) => {
+  setSessionCookie(res, generateToken(user, options.impersonator?._id, options.demoOwner));
+  res.set('Cache-Control', 'no-store');
+  return res.json(userResponse(user, options));
+};
 
 export const login = async (req, res) => {
   const { email, password } = req.body;
@@ -51,7 +58,7 @@ export const login = async (req, res) => {
     .populate('trainer', 'name employeeId')
     .populate('coordinatorSubjects', 'name code')
     .populate('evaluatorSubjects', 'name code');
-  if (!user || !(await user.matchPassword(password))) {
+  if (!user) {
     return res.status(401).json({ message: 'Invalid email or password' });
   }
 
@@ -59,21 +66,17 @@ export const login = async (req, res) => {
     return res.status(403).json({ message: 'Account is deactivated' });
   }
 
-  const usedInitialPassword = await user.matchPassword(INITIAL_TRAINER_PASSWORD);
-  if (
-    (
-      user.role === ROLES.TRAINER
-      || user.role === ROLES.SUBJECT_COORDINATOR
-      || user.role === ROLES.EVALUATOR
-      || user.role === ROLES.MANAGER
-    )
-    && usedInitialPassword
-  ) {
-    user.mustResetPassword = true;
-    await user.save();
+  if (user.mustResetPassword) {
+    if (!isUsableTrainerOtp(user)) return res.status(401).json({ message: 'Invalid or expired code. Ask an administrator for a new code.' });
+    const reserved = await User.updateOne({ _id: user._id, otpExpiresAt: { $gt: new Date() }, otpAttempts: { $lt: 5 } }, { $inc: { otpAttempts: 1 } });
+    if (!reserved.modifiedCount || !(await user.matchPassword(password))) return res.status(401).json({ message: 'Invalid email or password' });
+    const consumed = await User.updateOne({ _id: user._id, otpExpiresAt: user.otpExpiresAt }, { $set: { otpExpiresAt: null } });
+    if (!consumed.modifiedCount) return res.status(401).json({ message: 'Code already used. Ask an administrator for a new code.' });
+  } else if (!(await user.matchPassword(password)) || await user.matchPassword(INITIAL_TRAINER_PASSWORD)) {
+    return res.status(401).json({ message: 'Invalid email or password' });
   }
 
-  res.json(userResponse(user));
+  return sendSession(res, user);
 };
 
 export const getMe = async (req, res) => {
@@ -123,15 +126,16 @@ export const resetPassword = async (req, res) => {
 
   user.password = newPassword;
   user.mustResetPassword = false;
+  user.sessionVersion = (user.sessionVersion || 1) + 1;
+  user.otpExpiresAt = null;
+  user.otpAttempts = 0;
   await user.save();
 
-  res.json({
-    message: 'Password updated successfully',
-    ...userResponse(user),
-  });
+  return sendSession(res, user);
 };
 
 export const logout = async (req, res) => {
+  clearSessionCookie(res);
   res.json({ message: 'Logged out successfully' });
 };
 
@@ -194,7 +198,7 @@ export const impersonateUser = async (req, res) => {
   }
 
   const demoOwner = req.isDemo ? await User.findById(req.demoAccountId).select('-password') : null;
-  res.json(userResponse(targetUser, { impersonator: demoOwner || req.user, demoOwner }));
+  return sendSession(res, targetUser, { impersonator: demoOwner || req.user, demoOwner });
 };
 
 export const stopImpersonation = async (req, res) => {
@@ -207,5 +211,5 @@ export const stopImpersonation = async (req, res) => {
     return res.status(404).json({ message: 'Original user not found' });
   }
 
-  res.json(userResponse(adminUser));
+  return sendSession(res, adminUser);
 };

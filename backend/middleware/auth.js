@@ -11,6 +11,7 @@ import {
 } from '../utils/sessionVersion.js';
 import { attachManagerEditNotifier } from '../utils/managerEditNotifications.js';
 import { DEMO_ROLE, isDemoRequestAllowed, rejectDemoWrite, maskDemoCredentials } from '../utils/demoAccess.js';
+import { getSessionToken } from '../utils/sessionCookie.js';
 
 export const allowPasswordResetSession = (req, res, next) => {
   req.allowPasswordResetSession = true;
@@ -18,11 +19,7 @@ export const allowPasswordResetSession = (req, res, next) => {
 };
 
 export const protect = async (req, res, next) => {
-  let token;
-
-  if (req.headers.authorization?.startsWith('Bearer')) {
-    token = req.headers.authorization.split(' ')[1];
-  }
+  const token = getSessionToken(req);
 
   if (!token) {
     return res.status(401).json({ message: 'Not authorized, no token' });

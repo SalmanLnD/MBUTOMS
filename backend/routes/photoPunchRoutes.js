@@ -15,7 +15,6 @@ import { resolvePhotoPunchOif } from '../utils/photoPunchOif.js';
 import Subject from '../models/Subject.js';
 import { allowsLocalPunchTrial } from '../utils/photoPunchNetworkPolicy.js';
 import { canUsePhotoPunch } from '../utils/photoPunchAccess.js';
-import { enqueueAdminPunchShare } from '../utils/adminPunchShare.js';
 import { notifyAdminOfPunch } from '../utils/punchNotifications.js';
 
 const router = express.Router();
@@ -120,25 +119,9 @@ router.post('/submit', upload.single('photo'), asyncHandler(async (req, res) => 
   } catch (error) {
     console.warn('[photo-punch] could not notify administrators:', error.message);
   }
-  let whatsappShare = 'skipped';
-  if (req.user.role === 'admin') {
-    try {
-      const share = await enqueueAdminPunchShare({
-        role: req.user.role,
-        name: req.user.name,
-        oifNumber: assignment.oifNumber,
-        capturedAt: session.capturedAt,
-        driveFileId: photo.id,
-      });
-      whatsappShare = share ? 'queued' : 'skipped';
-    } catch (error) {
-      console.warn('[photo-punch] could not queue WhatsApp share:', error.message);
-    }
-  }
   res.json({
     assignment,
     message: 'Punch-in recorded.',
-    whatsappShare,
     folder: `toms punch ins/${day}`,
     photoUrl: photo.webViewLink || `https://drive.google.com/file/d/${photo.id}/view`,
   });

@@ -5,7 +5,7 @@ import jwt from 'jsonwebtoken';
 import User from '../../models/User.js';
 import { protect, allowPasswordResetSession } from '../../middleware/auth.js';
 import { SESSION_APP_VERSION } from '../../utils/sessionVersion.js';
-import { createLoginRateLimiter } from '../../middleware/loginRateLimit.js';
+import { createLoginRateLimiter, createDistributedLoginRateLimiter } from '../../middleware/loginRateLimit.js';
 
 test('password-reset sessions cannot access normal protected routes', async t => {
   const previous = process.env.JWT_SECRET;
@@ -22,6 +22,19 @@ test('password-reset sessions cannot access normal protected routes', async t =>
   const get = path => fetch(`http://127.0.0.1:${server.address().port}${path}`, { headers: { Authorization: `Bearer ${token}` } });
   assert.equal((await get('/normal')).status, 403);
   assert.equal((await get('/reset')).status, 200);
+});
+
+test('distributed login limit shares counts through its store', async () => {
+  let count = 0;
+  const store = { findOneAndUpdate: async () => ({ count: ++count }) };
+  const a = createDistributedLoginRateLimiter({ store, max: 2, clock: () => 1000 });
+  const b = createDistributedLoginRateLimiter({ store, max: 2, clock: () => 1000 });
+  const req = { ip: '127.0.0.1' };
+  const response = () => ({ statusCode: 200, status(code) { this.statusCode = code; return this; }, set() { return this; }, json() { return this; } });
+  let passed = 0;
+  await a(req, response(), () => passed++); await b(req, response(), () => passed++);
+  const blocked = response(); await a(req, blocked, () => passed++);
+  assert.equal(passed, 2); assert.equal(blocked.statusCode, 429);
 });
 
 test('login rate limit blocks repeated requests and resets after its window', () => {

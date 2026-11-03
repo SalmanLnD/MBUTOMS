@@ -9,6 +9,7 @@ import TrainerPunchInLogsTab from '../components/TrainerPunchInLogsTab.jsx';
 import LateMisconductTab from '../components/LateMisconductTab.jsx';
 import CompOffsTab from '../components/CompOffsTab.jsx';
 import ConfirmModal from '../components/ConfirmModal.jsx';
+import Modal from '../components/Modal.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
 import { useDebounce } from '../hooks/useDebounce.js';
 import { usePagination } from '../hooks/usePagination.js';
@@ -61,6 +62,7 @@ const Trainers = () => {
   const [showModal, setShowModal] = useState(false);
   const [editingTrainer, setEditingTrainer] = useState(null);
   const [pendingReset, setPendingReset] = useState(null);
+  const [newOtp, setNewOtp] = useState(null);
   const [pendingDelete, setPendingDelete] = useState(null);
 
   const debouncedSearch = useDebounce(search);
@@ -109,7 +111,7 @@ const Trainers = () => {
     if (!pendingReset) return;
     try {
       const result = await resetTrainerPassword(pendingReset.id);
-      showSuccess(result.message || 'Trainer password reset');
+      setNewOtp({ initialOtp: result.initialOtp, name: pendingReset.name });
       setPendingReset(null);
     } catch (err) {
       showError(getErrorMessage(err));
@@ -146,7 +148,8 @@ const Trainers = () => {
     setShowModal(false);
     setEditingTrainer(null);
     if (saved) {
-      showSuccess(saved === true ? 'Trainer saved successfully' : saved);
+      if (saved.initialOtp) setNewOtp(saved);
+      else showSuccess(saved === true ? 'Trainer saved successfully' : saved);
       fetchTrainers();
     }
   };
@@ -414,12 +417,23 @@ const Trainers = () => {
         <ConfirmModal
           show
           title="Reset Trainer Password"
-          message={`Reset login password for "${pendingReset.name}"${pendingReset.email ? ` (${pendingReset.email})` : ''} to the initial OTP?`}
+          message={`Generate a new one-time login code for "${pendingReset.name}"${pendingReset.email ? ` (${pendingReset.email})` : ''}?`}
           confirmLabel="Reset password"
           confirmVariant="warning"
           onConfirm={handleConfirmReset}
           onClose={() => setPendingReset(null)}
         />
+      )}
+
+      {newOtp && (
+        <Modal show title="Trainer login code" onClose={() => setNewOtp(null)}>
+          <div className="toms-modal-body">
+            <p>Share this code privately with {newOtp.name}. It expires in 24 hours and can be used once.</p>
+            <p><strong>{newOtp.initialOtp}</strong></p>
+            <p>The trainer enters the code in the password field and then chooses a new password. If the code expires or is lost, generate a new one.</p>
+            <button type="button" className="btn btn-primary" onClick={() => setNewOtp(null)}>Done</button>
+          </div>
+        </Modal>
       )}
 
       {pendingDelete && (

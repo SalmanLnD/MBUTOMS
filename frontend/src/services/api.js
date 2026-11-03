@@ -38,16 +38,13 @@ const isAuthLoginRequest = (config) => {
 const api = axios.create({
   baseURL: import.meta.env.VITE_API_URL || '/api',
   timeout: REQUEST_TIMEOUT_MS,
-  headers: { 'Content-Type': 'application/json' },
+  withCredentials: true,
+  headers: { 'Content-Type': 'application/json', 'X-TOMS-Request': '1' },
 });
 
 api.interceptors.request.use((config) => {
-  const token = localStorage.getItem('toms_token');
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`;
-  }
   const user = cachedUser(), path = requestPath(config), method = config.method?.toLowerCase() || 'get';
-  if (isDemoUser(user) && token) {
+  if (isDemoUser(user)) {
     config.demoOwner = user.demoAccountId || user._id;
     const localDetail = method === 'get' && demoWorkspace.localDetail(config.demoOwner, path);
     if (localDetail || (method !== 'get' && !demoNetworkActions.has(path))) {
@@ -72,7 +69,7 @@ api.interceptors.response.use(
   async (error) => {
     const config = error.config;
     const status = error.response?.status;
-    const hadToken = Boolean(localStorage.getItem('toms_token'));
+    const hadToken = Boolean(cachedUser());
     const isLoginRequest = isAuthLoginRequest(config);
 
     if (status === 401 && hadToken && !isLoginRequest && !config?.skipSessionExpired) {

@@ -21,7 +21,7 @@ services:
         value: DENY
       - path: /*
         name: Content-Security-Policy
-        value: "frame-ancestors 'none'; object-src 'none'; base-uri 'self'"
+        value: "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; font-src 'self' data:; connect-src 'self' https://mbutoms-api.onrender.com; worker-src 'self' blob:; frame-ancestors 'none'; object-src 'none'; base-uri 'self'; form-action 'self'"
       - path: /sw.js
         name: Cache-Control
         value: no-cache
@@ -72,5 +72,3 @@ services:
         value: https://mbutoms.onrender.com
       - key: API_PUBLIC_URL
         value: https://mbutoms-api.onrender.com
-      - key: WHATSAPP_WEBHOOK_SECRET
-        sync: false

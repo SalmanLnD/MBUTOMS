@@ -28,7 +28,6 @@ import {
 import { dedupeReplacementsBySchedule } from '../utils/leaveReplacements.js';
 import { SPECIAL_CLASS_FIELDS } from '../utils/specialClass.js';
 import { syncTrainerUser } from '../utils/trainerUserSync.js';
-import { INITIAL_TRAINER_PASSWORD } from '../constants/trainerAuth.js';
 import mongoose from 'mongoose';
 import { scopeReplacementOccurrence, saveReplacementOccurrence } from '../utils/replacementOccurrence.js';
 
@@ -193,8 +192,8 @@ const resolveBulkReplacementTrainer = async ({
     includeInAttendanceUntilMonth: untilMonth,
   });
 
-  await syncTrainerUser(trainer, { resetPassword: true });
-  return { trainer, createdExternalAccount: true };
+  const loginUser = await syncTrainerUser(trainer, { resetPassword: true });
+  return { trainer, createdExternalAccount: true, initialOtp: loginUser?.$locals?.initialOtp };
 };
 
 const trainerCanCoverTargets = async ({
@@ -611,6 +610,7 @@ export const assignBulkReplacement = async (req, res) => {
   clearAttendanceGridCache();
   clearAttendanceExportCache();
 
+  res.set('Cache-Control', 'no-store');
   res.json({
     message: 'Bulk replacement applied successfully',
     sourceTrainer: {
@@ -626,7 +626,7 @@ export const assignBulkReplacement = async (req, res) => {
       role: 'trainer',
     },
     createdExternalAccount: resolved.createdExternalAccount,
-    defaultPassword: resolved.createdExternalAccount ? INITIAL_TRAINER_PASSWORD : null,
+    defaultPassword: resolved.initialOtp || null,
     updatedLeaveCount: updatedLeaves.length,
     updatedClassCount: targets.length,
   });

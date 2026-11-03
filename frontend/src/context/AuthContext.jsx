@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import { createContext, useContext } from 'react';
 import {
   login as loginApi,
+  logout as logoutApi,
   getMe,
   resetPassword as resetPasswordApi,
   getImpersonationTargets as getImpersonationTargetsApi,
@@ -43,8 +44,7 @@ const buildUserData = (data) => ({
   impersonator: data.impersonator || null,
 });
 
-const storeUser = (userData, token) => {
-  if (token) localStorage.setItem('toms_token', token);
+const storeUser = (userData) => {
   localStorage.setItem('toms_user', JSON.stringify(userData));
 };
 
@@ -63,20 +63,17 @@ export const AuthProvider = ({ children }) => {
   const applySession = useCallback((data) => {
     resetSessionExpiredState();
     const userData = buildUserData(data);
-    storeUser(userData, data.token);
+    storeUser(userData);
     setUser(userData);
     return userData;
   }, []);
 
   const loadUser = useCallback(async () => {
-    const token = localStorage.getItem('toms_token');
-    if (!token) {
-      setLoading(false);
-      return;
-    }
+    localStorage.removeItem('toms_token');
+    localStorage.removeItem('toms_admin_token');
     try {
       const userData = await getMe();
-      applySession({ ...userData, token });
+      applySession(userData);
     } catch {
       localStorage.removeItem('toms_token');
       localStorage.removeItem('toms_user');
@@ -143,6 +140,7 @@ export const AuthProvider = ({ children }) => {
 
   const logout = useCallback(async () => {
     await disableDevicePush();
+    try { await logoutApi(); } catch { /* Clear local state even if the session expired. */ }
     resetAllModalArtifacts();
     resetSessionExpiredState();
     localStorage.removeItem('toms_token');
@@ -176,11 +174,7 @@ export const AuthProvider = ({ children }) => {
   }, [isImpersonating, impersonatorRole, userRole]);
 
   const startImpersonation = useCallback(async (targetUserId) => {
-    const currentToken = localStorage.getItem('toms_token');
     const data = await impersonateUserApi(targetUserId);
-    if (currentToken && !localStorage.getItem('toms_admin_token')) {
-      localStorage.setItem('toms_admin_token', currentToken);
-    }
     applySession(data);
     return data;
   }, [applySession]);

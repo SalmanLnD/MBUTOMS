@@ -3,7 +3,7 @@ import { validateTopicTrackerExportKey } from '../services/topicTrackerSheetsSer
 import { exportGuard } from './exportGuard.js';
 
 export const requireTopicTrackerExportKey = asyncHandler(async (req, res, next) => {
-  const key = req.query.key || req.headers['x-sheets-key'];
+  const key = req.headers['x-sheets-key'];
   const valid = await validateTopicTrackerExportKey(key);
   if (!valid) {
     return res.status(401).json({ message: 'Invalid or missing export key' });
