@@ -13,6 +13,7 @@ import {
   punchDistanceFromCampus,
 } from '../utils/latePunch.js';
 import { notifyTrainerOfLateMark } from '../utils/latePunchNotifications.js';
+import { escapeRegex } from '../utils/regex.js';
 
 const monthBounds = (monthKey) => {
   const [year, month] = monthKey.split('-').map(Number);
@@ -66,10 +67,11 @@ export const listLatePunches = async (req, res) => {
 
   const search = String(req.query.search || '').trim();
   if (search) {
+    const escaped = escapeRegex(search);
     const matchingTrainers = await Trainer.find({
       $or: [
-        { name: { $regex: search, $options: 'i' } },
-        { employeeId: { $regex: search, $options: 'i' } },
+        { name: { $regex: escaped, $options: 'i' } },
+        { employeeId: { $regex: escaped, $options: 'i' } },
       ],
     }).select('_id').lean();
     filter.trainer = { $in: matchingTrainers.map((trainer) => trainer._id) };

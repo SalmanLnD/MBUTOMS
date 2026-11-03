@@ -1,18 +1,20 @@
-const DEFAULT_ORIGINS = ['http://localhost:5173'];
+const DEFAULT_ORIGINS = [
+  'https://mbutoms.onrender.com',
+  'https://mbutoms.vercel.app',
+  'http://localhost:5173',
+  'http://localhost:5174',
+];
 
 export const getAllowedOrigins = () =>
   (process.env.CLIENT_URL || DEFAULT_ORIGINS.join(','))
     .split(',')
-    .map((origin) => origin.trim())
+    .map((origin) => origin.trim().replace(/\/+$/, ''))
     .filter(Boolean);
 
 export const isOriginAllowed = (origin) => {
   if (!origin) return true;
   const allowed = getAllowedOrigins();
-  if (allowed.includes(origin)) return true;
-  if (/^https:\/\/[\w-]+\.vercel\.app$/.test(origin)) return true;
-  if (/^https:\/\/[\w-]+\.onrender\.com$/.test(origin)) return true;
-  return false;
+  return allowed.includes(origin);
 };
 
 export const applyCorsHeaders = (req, res) => {

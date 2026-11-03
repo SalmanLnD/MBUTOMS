@@ -8,6 +8,7 @@ import {
   buildTrainerCompOffSummary,
   ensureCompOffSeedData,
 } from '../utils/compOffService.js';
+import { escapeRegex } from '../utils/regex.js';
 
 const hasFullAccess = (role) => FULL_ACCESS_ROLES.includes(role);
 
@@ -47,11 +48,13 @@ const buildListFilter = async (req) => {
   }
 
   if (req.query.name?.trim()) {
-    filter.name = { $regex: String(req.query.name).trim(), $options: 'i' };
+    const escaped = escapeRegex(String(req.query.name).trim());
+    if (escaped) filter.name = { $regex: escaped, $options: 'i' };
   }
 
   if (req.query.base?.trim()) {
-    filter.base = { $regex: String(req.query.base).trim(), $options: 'i' };
+    const escaped = escapeRegex(String(req.query.base).trim());
+    if (escaped) filter.base = { $regex: escaped, $options: 'i' };
   }
 
   if (req.query.status && Object.values(COMP_OFF_STATUSES).includes(req.query.status)) {

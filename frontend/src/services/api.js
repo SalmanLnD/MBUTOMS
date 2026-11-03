@@ -1,6 +1,7 @@
 import axios from 'axios';
 import { notifySessionExpired } from '../utils/sessionManager.js';
 import { createDemoWorkspace, isDemoUser, demoNetworkActions } from '../utils/demoWorkspace.js';
+import { isSafeRetryMethod } from '../utils/retryPolicy.js';
 
 export const demoWorkspace = createDemoWorkspace(window.localStorage, () => window.dispatchEvent(new Event('toms-demo-change')));
 const cachedUser = () => { try { return JSON.parse(localStorage.getItem('toms_user') || 'null'); } catch { return null; } };
@@ -83,6 +84,7 @@ api.interceptors.response.use(
 
     if (
       config
+      && isSafeRetryMethod(config.method)
       && !config.skipRetry
       && !isAbortError(error)
       && error.code !== 'ECONNABORTED'

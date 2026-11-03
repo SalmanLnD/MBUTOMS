@@ -17,6 +17,7 @@ import {
   getCoordinatorSubjectIds,
   isSubjectCoordinator,
 } from '../utils/subjectCoordinatorAccess.js';
+import { escapeRegex } from '../utils/regex.js';
 
 const populateSubject = (query) =>
   query
@@ -178,8 +179,11 @@ const buildSubjectQuery = async (query) => {
   if (query.school) filter.schools = query.school;
   if (query.department) filter.departments = query.department;
   if (query.search) {
-    const searchRegex = { $regex: query.search, $options: 'i' };
-    filter.$or = [{ name: searchRegex }, { code: searchRegex }];
+    const escaped = escapeRegex(String(query.search).trim());
+    if (escaped) {
+      const searchRegex = { $regex: escaped, $options: 'i' };
+      filter.$or = [{ name: searchRegex }, { code: searchRegex }];
+    }
   }
   if (query.trainer) {
     const trainer = await Trainer.findById(query.trainer).select('subjects');

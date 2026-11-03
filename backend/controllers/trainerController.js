@@ -12,6 +12,7 @@ import {
   getCoordinatorSubjectIds,
   isSubjectCoordinator,
 } from '../utils/subjectCoordinatorAccess.js';
+import { escapeRegex } from '../utils/regex.js';
 
 const buildTrainerQuery = async (query) => {
   const clauses = [];
@@ -21,27 +22,32 @@ const buildTrainerQuery = async (query) => {
   }
 
   if (query.search?.trim()) {
-    const searchRegex = { $regex: query.search.trim(), $options: 'i' };
-    clauses.push({
-      $or: [
-        { name: searchRegex },
-        { email: searchRegex },
-        { employeeId: searchRegex },
-        { phone: searchRegex },
-      ],
-    });
+    const escaped = escapeRegex(query.search.trim());
+    if (escaped) {
+      const searchRegex = { $regex: escaped, $options: 'i' };
+      clauses.push({
+        $or: [
+          { name: searchRegex },
+          { email: searchRegex },
+          { employeeId: searchRegex },
+          { phone: searchRegex },
+        ],
+      });
+    }
   }
 
   if (query.subject?.trim()) {
-    const subjectRegex = { $regex: query.subject.trim(), $options: 'i' };
-    const matchingSubjects = await Subject.find({
-      $or: [{ name: subjectRegex }, { code: subjectRegex }],
-    }).select('_id trainerEligible');
+    const escapedSubject = escapeRegex(query.subject.trim());
+    if (escapedSubject) {
+      const subjectRegex = { $regex: escapedSubject, $options: 'i' };
+      const matchingSubjects = await Subject.find({
+        $or: [{ name: subjectRegex }, { code: subjectRegex }],
+      }).select('_id trainerEligible');
 
-    if (!matchingSubjects.length) {
-      clauses.push({ _id: { $in: [] } });
-    } else {
-      const subjectIds = matchingSubjects.map((subject) => subject._id);
+      if (!matchingSubjects.length) {
+        clauses.push({ _id: { $in: [] } });
+      } else {
+        const subjectIds = matchingSubjects.map((subject) => subject._id);
       const eligibleTrainerIds = [
         ...new Set(
           matchingSubjects.flatMap((subject) =>
@@ -56,6 +62,7 @@ const buildTrainerQuery = async (query) => {
       }
       clauses.push({ $or: subjectClauses });
     }
+  }
   }
 
   if (query.status?.trim() && query.status !== 'all') {
@@ -321,6 +328,7 @@ export const resetTrainerPassword = async (req, res) => {
     });
   }
 
+  res.set('Cache-Control', 'no-store');
   res.json({
     message: 'Share this one-time code privately. It expires in 24 hours.',
     initialOtp: user.$locals.initialOtp,

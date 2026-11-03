@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import LoadingSpinner from './LoadingSpinner.jsx';
 import { getTopicTrackerPendingBacklog } from '../services/topicTrackerService.js';
 import { getErrorMessage, formatDate } from '../utils/helpers.js';
@@ -34,25 +34,31 @@ const TopicTrackerPendingBacklogTab = ({ refreshKey = 0, onOpenTracker }) => {
   const [pageSize, setPageSize] = useState(25);
 
   const [loadError, setLoadError] = useState('');
+  const requestVersion = useRef(0);
 
   const loadBacklog = useCallback(async (selectedRange = rangeFilter) => {
+    const request = ++requestVersion.current;
     setLoading(true);
     setLoadError('');
     try {
       const params = computeDateParams(selectedRange, includeToday);
       const data = await getTopicTrackerPendingBacklog(params);
+      if (request !== requestVersion.current) return;
       setBacklog(data);
       setPage(1);
     } catch (err) {
+      if (request !== requestVersion.current) return;
+      setBacklog(null);
       showError(getErrorMessage(err));
       setLoadError(getErrorMessage(err));
     } finally {
-      setLoading(false);
+      if (request === requestVersion.current) setLoading(false);
     }
   }, [rangeFilter, includeToday]);
 
   useEffect(() => {
     loadBacklog(rangeFilter);
+    return () => { requestVersion.current += 1; };
   }, [loadBacklog, refreshKey, rangeFilter]);
 
   const items = backlog?.items || [];

@@ -18,6 +18,7 @@ import {
   mergeWithStudentAccessFilter,
 } from '../utils/trainerClassAccess.js';
 import { invalidateStudentCountCache } from './classController.js';
+import { escapeRegex } from '../utils/regex.js';
 
 const populateStudent = (query) =>
   query
@@ -44,14 +45,17 @@ const buildStudentQuery = async (query) => {
   }
 
   if (query.search) {
-    const searchRegex = { $regex: query.search, $options: 'i' };
-    filter.$or = [
-      { name: searchRegex },
-      { rollNumber: searchRegex },
-      { email: searchRegex },
-      { branch: searchRegex },
-      { sectionLabel: searchRegex },
-    ];
+    const escaped = escapeRegex(String(query.search).trim());
+    if (escaped) {
+      const searchRegex = { $regex: escaped, $options: 'i' };
+      filter.$or = [
+        { name: searchRegex },
+        { rollNumber: searchRegex },
+        { email: searchRegex },
+        { branch: searchRegex },
+        { sectionLabel: searchRegex },
+      ];
+    }
   }
   return filter;
 };

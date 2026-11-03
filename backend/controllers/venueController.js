@@ -3,18 +3,22 @@ import {
   VENUE_MAPPING_REFERENCE,
   enrichVenueRecord,
 } from '../utils/venueBuildingMappings.js';
+import { escapeRegex } from '../utils/regex.js';
 
 const buildVenueQuery = (query) => {
   const filter = {};
   if (query.type) filter.type = query.type;
   if (query.isActive !== undefined) filter.isActive = query.isActive === 'true';
   if (query.search) {
-    const searchRegex = { $regex: query.search, $options: 'i' };
-    filter.$or = [
-      { name: searchRegex },
-      { building: searchRegex },
-      { floor: searchRegex },
-    ];
+    const escaped = escapeRegex(String(query.search).trim());
+    if (escaped) {
+      const searchRegex = { $regex: escaped, $options: 'i' };
+      filter.$or = [
+        { name: searchRegex },
+        { building: searchRegex },
+        { floor: searchRegex },
+      ];
+    }
   }
   return filter;
 };
