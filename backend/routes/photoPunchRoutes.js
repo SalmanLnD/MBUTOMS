@@ -16,6 +16,7 @@ import Subject from '../models/Subject.js';
 import { allowsLocalPunchTrial } from '../utils/photoPunchNetworkPolicy.js';
 import { canUsePhotoPunch } from '../utils/photoPunchAccess.js';
 import { enqueueAdminPunchShare } from '../utils/adminPunchShare.js';
+import { notifyAdminOfPunch } from '../utils/punchNotifications.js';
 
 const router = express.Router();
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 5 * 1024 * 1024, files: 1, fields: 2 } });
@@ -114,6 +115,11 @@ router.post('/submit', upload.single('photo'), asyncHandler(async (req, res) => 
     return res.status(error.code === 11000 ? 409 : 503).json({ message: 'Photo uploaded but attendance could not be saved. Contact an administrator before retrying.', driveFileId: photo.id });
   }
   clearAttendanceGridCache();
+  try {
+    await notifyAdminOfPunch({ user: req.user, capturedAt: session.capturedAt });
+  } catch (error) {
+    console.warn('[photo-punch] could not notify administrators:', error.message);
+  }
   let whatsappShare = 'skipped';
   if (req.user.role === 'admin') {
     try {

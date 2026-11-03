@@ -37,6 +37,8 @@ const SKIP_PATH_PREFIXES = [
   '/api/notifications',
   '/api/webhooks',
   '/api/health',
+  // Photo capture is read-only; the completed punch sends its own notification.
+  '/api/photo-punch',
   // The assistant uses POST for read-only queries, not management edits.
   '/api/ai',
   // These resources create richer, record-specific notifications in their controllers.

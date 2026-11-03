@@ -7,9 +7,10 @@ import Attendance from '../models/Attendance.js';
 import FeedbackResponse from '../models/FeedbackResponse.js';
 import { getActiveSchedulesForDay } from '../utils/activeSchedulesForDate.js';
 import {
-  getEffectiveAffectedSchedules,
   getLeaveClassExclusionsForRange,
+  getUncancelledScheduleDateKeys,
 } from '../utils/leaveAffectedClasses.js';
+import { normalizeAttendanceDate, toAttendanceDateKey } from '../utils/attendanceDates.js';
 import { PERFORMANCE_EXCLUDED_EMPLOYEE_IDS } from '../utils/trainerMappings.js';
 import { mergeRosterFilter } from '../utils/rosterFilter.js';
 
@@ -65,8 +66,7 @@ const getTopTrainersByFeedback = async () => {
 };
 
 export const countPendingReplacements = async (reference = new Date()) => {
-  const today = new Date(reference);
-  today.setHours(0, 0, 0, 0);
+  const today = normalizeAttendanceDate(toAttendanceDateKey(reference));
   const windowEnd = new Date(today.getTime() + 30 * 24 * 60 * 60 * 1000);
   const replacementLeaves = await Leave.find({
     status: 'approved',
@@ -92,22 +92,19 @@ export const countPendingReplacements = async (reference = new Date()) => {
     leaveRangeEnd > windowEnd ? windowEnd : leaveRangeEnd
   );
 
+  const startKey = toAttendanceDateKey(today);
+  const endKey = toAttendanceDateKey(windowEnd);
   return replacementLeaves.reduce((count, leave) => {
     const assignedScheduleIds = new Set(
       (leave.replacements || [])
         .map((entry) => entry.schedule?.toString())
         .filter(Boolean)
     );
-    const effectiveSchedules = getEffectiveAffectedSchedules(
-      leave,
-      leave.affectedSchedules,
-      cancellationMap,
-      holidayDateKeys
-    );
-    const unassigned = effectiveSchedules.filter(
-      (schedule) => !assignedScheduleIds.has(schedule._id.toString())
-    );
-    return count + unassigned.length;
+    return count + leave.affectedSchedules.reduce((total, schedule) => {
+      if (!schedule || assignedScheduleIds.has(schedule._id.toString())) return total;
+      const dates = getUncancelledScheduleDateKeys(leave, schedule, cancellationMap, holidayDateKeys);
+      return total + dates.filter((date) => date >= startKey && date <= endKey).length;
+    }, 0);
   }, 0);
 };
 
