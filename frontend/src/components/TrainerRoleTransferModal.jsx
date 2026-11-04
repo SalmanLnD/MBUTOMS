@@ -1,3 +1,5 @@
+import AsyncButton from './AsyncButton.jsx';
+import AsyncForm from './AsyncForm.jsx';
 import { useEffect, useMemo, useState } from 'react';
 import Modal from './Modal.jsx';
 import StyledSelect from './StyledSelect.jsx';
@@ -88,7 +90,7 @@ const TrainerRoleTransferModal = ({ trainer, mode, onClose, onComplete }) => {
           ? await relocateTrainer(trainer._id, payload)
           : await permanentReplaceTrainer(trainer._id, payload);
 
-      onComplete(result);
+      await onComplete(result);
     } catch (err) {
       setError(getErrorMessage(err));
     } finally {
@@ -104,21 +106,21 @@ const TrainerRoleTransferModal = ({ trainer, mode, onClose, onComplete }) => {
       size="toms-modal-lg"
       footer={(
         <>
-          <button type="button" className="btn btn-secondary" onClick={onClose} disabled={submitting}>
+          <AsyncButton type="button" className="btn btn-secondary" onClick={onClose} disabled={submitting}>
             Cancel
-          </button>
-          <button
+          </AsyncButton>
+          <AsyncButton
             type="submit"
             form="trainer-role-transfer-form"
             className={`btn btn-${isResignation ? 'danger' : 'primary'}`}
             disabled={submitting || loadingOptions}
           >
             {submitting ? 'Processing…' : submitLabel}
-          </button>
+          </AsyncButton>
         </>
       )}
     >
-      <form id="trainer-role-transfer-form" onSubmit={handleSubmit}>
+      <AsyncForm id="trainer-role-transfer-form" onSubmit={handleSubmit}>
         <div className="toms-modal-body">
           {error && <AlertMessage type="danger" message={error} />}
 
@@ -205,7 +207,7 @@ const TrainerRoleTransferModal = ({ trainer, mode, onClose, onComplete }) => {
             </div>
           )}
         </div>
-      </form>
+      </AsyncForm>
     </Modal>
   );
 };

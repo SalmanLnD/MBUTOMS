@@ -1,3 +1,5 @@
+import AsyncButton from './AsyncButton.jsx';
+import AsyncForm from './AsyncForm.jsx';
 import { useState } from 'react';
 import Modal from './Modal.jsx';
 import { showError, showSuccess } from '../utils/toast.js';
@@ -42,7 +44,7 @@ const ResetPasswordModal = ({ show, onComplete }) => {
       dismissible={false}
       onClose={() => {}}
     >
-      <form onSubmit={handleSubmit}>
+      <AsyncForm onSubmit={handleSubmit}>
         <div className="toms-modal-body">
           <p className="text-muted mb-3">
             You signed in with a one-time code. Choose a password of 12 to 72 characters to continue.
@@ -74,11 +76,11 @@ const ResetPasswordModal = ({ show, onComplete }) => {
           </div>
         </div>
         <div className="toms-modal-footer">
-          <button type="submit" className="btn btn-primary w-100" disabled={saving}>
+          <AsyncButton type="submit" className="btn btn-primary w-100" disabled={saving}>
             {saving ? 'Saving...' : 'Save password'}
-          </button>
+          </AsyncButton>
         </div>
-      </form>
+      </AsyncForm>
     </Modal>
   );
 };

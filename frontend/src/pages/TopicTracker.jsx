@@ -1,3 +1,4 @@
+import AsyncButton from '../components/AsyncButton.jsx';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import LoadingSpinner from '../components/LoadingSpinner.jsx';
@@ -166,50 +167,50 @@ const TopicTracker = () => {
       {showOverview && (
         <ul className="nav nav-tabs mb-3">
           <li className="nav-item">
-            <button
+            <AsyncButton
               type="button"
               className={`nav-link ${activeTab === 'day' ? 'active' : ''}`}
               aria-pressed={activeTab === 'day'}
               onClick={() => setActiveTab('day')}
             >
               Day overview
-            </button>
+            </AsyncButton>
           </li>
           <li className="nav-item">
-            <button
+            <AsyncButton
               type="button"
               className={`nav-link ${activeTab === 'pending' ? 'active' : ''}`}
               aria-pressed={activeTab === 'pending'}
               onClick={() => setActiveTab('pending')}
             >
               Pending backlog
-            </button>
+            </AsyncButton>
           </li>
           <li className="nav-item">
-            <button
+            <AsyncButton
               type="button"
               className={`nav-link ${activeTab === 'class' ? 'active' : ''}`}
               aria-pressed={activeTab === 'class'}
               onClick={() => setActiveTab('class')}
             >
               Class-wise summary
-            </button>
+            </AsyncButton>
           </li>
           {canManageSheets && (
             <li className="nav-item">
-              <button
+              <AsyncButton
                 type="button"
                 className={`nav-link ${activeTab === 'hours' ? 'active' : ''}`}
                 aria-pressed={activeTab === 'hours'}
                 onClick={() => setActiveTab('hours')}
               >
                 Hours
-              </button>
+              </AsyncButton>
             </li>
           )}
           {canManageSheets && (
             <li className="nav-item">
-              <button
+              <AsyncButton
                 type="button"
                 className={`nav-link ${activeTab === 'cancellations' ? 'active' : ''}`}
                 aria-pressed={activeTab === 'cancellations'}
@@ -217,7 +218,7 @@ const TopicTracker = () => {
               >
                 Cancelled sessions
                 <ActionCount count={counts.cancellations} />
-              </button>
+              </AsyncButton>
             </li>
           )}
         </ul>
@@ -238,9 +239,9 @@ const TopicTracker = () => {
 
           <div className="d-flex flex-wrap gap-2">
             {canOpenOwnTracker && (
-              <button type="button" className="btn btn-primary" onClick={handleTrainerOpen}>
+              <AsyncButton type="button" className="btn btn-primary" onClick={handleTrainerOpen}>
                 Open my tracker
-              </button>
+              </AsyncButton>
             )}
 
             {canManageSheets && (
@@ -256,14 +257,14 @@ const TopicTracker = () => {
                     Open linked sheet
                   </a>
                 )}
-                <button
+                <AsyncButton
                   type="button"
                   className="btn btn-outline-secondary d-inline-flex align-items-center gap-2"
                   onClick={() => setSheetModalOpen(true)}
                 >
                   <SheetIcon size={16} />
                   Link Google Sheet
-                </button>
+                </AsyncButton>
               </>
             )}
           </div>
@@ -319,7 +320,7 @@ const TopicTracker = () => {
           ) : overviewError ? (
             <div className="alert alert-danger" role="alert">
               Could not load the overview. {overviewError}{' '}
-              <button type="button" className="btn btn-sm btn-outline-danger" onClick={loadOverview}>Retry</button>
+              <AsyncButton type="button" className="btn btn-sm btn-outline-danger" onClick={loadOverview}>Retry</AsyncButton>
             </div>
           ) : !overview?.subjects?.length ? (
             <div className="alert alert-light border">No scheduled sessions for this date.</div>
@@ -335,7 +336,7 @@ const TopicTracker = () => {
                     <span className={`badge ${subject.pendingSlots || subject.totalPending ? 'bg-warning text-dark' : 'bg-success'}`}>
                       {subject.pendingSlots ?? subject.totalPending ?? 0} pending
                     </span>
-                    <button
+                    <AsyncButton
                       type="button"
                       className="btn btn-sm btn-primary"
                       onClick={() => openSpreadsheet({
@@ -344,7 +345,7 @@ const TopicTracker = () => {
                       })}
                     >
                       Open all slots
-                    </button>
+                    </AsyncButton>
                   </div>
                 </div>
                 <div className="table-responsive">
@@ -375,7 +376,7 @@ const TopicTracker = () => {
                               </span>
                             </td>
                             <td className="text-end">
-                              <button
+                              <AsyncButton
                                 type="button"
                                 className="btn btn-sm btn-outline-primary"
                                 onClick={() => openSpreadsheet({
@@ -385,7 +386,7 @@ const TopicTracker = () => {
                                 })}
                               >
                                 Open tracker
-                              </button>
+                              </AsyncButton>
                             </td>
                           </tr>
                         );
@@ -437,12 +438,12 @@ const TopicTracker = () => {
           highlightEntryId={spreadsheet.highlightEntryId || notificationTarget?.entryId}
           highlightScheduleId={spreadsheet.highlightScheduleId || notificationTarget?.scheduleId}
           onHighlightComplete={() => setNotificationTarget(null)}
-          onClose={() => {
+          onClose={async () => {
             setSpreadsheet(null);
             setNotificationTarget(null);
             setSummaryRefreshKey((key) => key + 1);
             setPendingRefreshKey((key) => key + 1);
-            if (showOverview && activeTab === 'day') loadOverview();
+            if (showOverview && activeTab === 'day') await loadOverview();
           }}
         />
       )}
@@ -452,9 +453,13 @@ const TopicTracker = () => {
           show
           initialUrl={sheetStatus?.spreadsheetUrl || ''}
           onClose={() => setSheetModalOpen(false)}
-          onLinked={() => {
+          onLinked={async () => {
             setSheetModalOpen(false);
-            getTopicTrackerSheetStatus().then(setSheetStatus).catch(() => {});
+            try {
+              setSheetStatus(await getTopicTrackerSheetStatus());
+            } catch (err) {
+              showError(getErrorMessage(err));
+            }
           }}
         />
       )}

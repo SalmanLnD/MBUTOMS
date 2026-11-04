@@ -1,3 +1,4 @@
+import AsyncButton from './AsyncButton.jsx';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import LoadingSpinner from './LoadingSpinner.jsx';
 import StyledSelect from './StyledSelect.jsx';
@@ -206,22 +207,22 @@ const VenueLiveTab = () => {
           <div className="col-md-3">
             <div className="d-flex flex-wrap align-items-center gap-2">
               {timeFilter ? (
-                <button
+                <AsyncButton
                   type="button"
                   className="btn btn-outline-primary btn-sm"
                   onClick={() => setTimeFilter('')}
                 >
                   Live now
-                </button>
+                </AsyncButton>
               ) : null}
-              <button
+              <AsyncButton
                 type="button"
                 className="btn btn-outline-secondary btn-sm"
                 onClick={() => fetchLive({ soft: true })}
                 disabled={refreshing}
               >
                 Refresh
-              </button>
+              </AsyncButton>
             </div>
           </div>
         </div>

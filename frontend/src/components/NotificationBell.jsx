@@ -1,3 +1,4 @@
+import AsyncButton from './AsyncButton.jsx';
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { getPopoverPosition, visibleViewport } from '../utils/popoverPosition.js';
@@ -156,7 +157,7 @@ const NotificationBell = () => {
 
   return (
     <div className="notification-bell" ref={rootRef}>
-      <button
+      <AsyncButton
         type="button"
         className="notification-bell-trigger"
         onClick={handleToggle}
@@ -169,7 +170,7 @@ const NotificationBell = () => {
             {unreadCount > 9 ? '9+' : unreadCount}
           </span>
         )}
-      </button>
+      </AsyncButton>
 
       {open && panelStyle && createPortal(
         <div
@@ -187,21 +188,21 @@ const NotificationBell = () => {
                 <p className="notification-panel-subtitle">{unreadCount ? `${unreadCount} unread update${unreadCount === 1 ? '' : 's'}` : 'You’re all caught up'}</p>
               </div>
             </div>
-            <button type="button" className="notification-close" aria-label="Close notifications" onClick={() => { setOpen(false); rootRef.current?.querySelector('button')?.focus(); }}>×</button>
+            <AsyncButton type="button" className="notification-close" aria-label="Close notifications" onClick={() => { setOpen(false); rootRef.current?.querySelector('button')?.focus(); }}>×</AsyncButton>
           </div>
           <div className="notification-toolbar">
             <div className="notification-filters" role="group" aria-label="Filter notifications">
-              <button type="button" aria-pressed={filter === 'all'} onClick={() => setFilter('all')}>All</button>
-              <button type="button" aria-pressed={filter === 'unread'} onClick={() => setFilter('unread')}>Unread{unreadCount > 0 && <span>{unreadCount}</span>}</button>
+              <AsyncButton type="button" aria-pressed={filter === 'all'} onClick={() => setFilter('all')}>All</AsyncButton>
+              <AsyncButton type="button" aria-pressed={filter === 'unread'} onClick={() => setFilter('unread')}>Unread{unreadCount > 0 && <span>{unreadCount}</span>}</AsyncButton>
             </div>
-            <button
+            <AsyncButton
               type="button"
               className="notification-mark-all"
               onClick={handleMarkAllRead}
               disabled={!unreadCount || markingAll}
             >
               <CheckReadIcon size={15} /> {markingAll ? 'Marking…' : 'Mark all read'}
-            </button>
+            </AsyncButton>
           </div>
 
           <div className="notification-panel-body">
@@ -224,7 +225,7 @@ const NotificationBell = () => {
                       className={`notification-item ${isUnread ? 'notification-item--unread' : ''}`}
                     >
                       <span className={`notification-item-icon ${isTracker ? 'notification-item-icon--tracker' : ''}`} aria-hidden="true">{isTracker ? <TopicTrackerIcon size={18} /> : <BellIcon size={18} />}</span>
-                      <button
+                      <AsyncButton
                         type="button"
                         className={`notification-item-content notification-item-link ${
                           notification.entityPath && !notification.entityPath.startsWith('/api/')
@@ -241,9 +242,9 @@ const NotificationBell = () => {
                         <p className="notification-item-meta text-muted small mb-0">
                           {formatDateTime(notification.createdAt)}
                         </p>
-                      </button>
+                      </AsyncButton>
                       {isUnread && (
-                        <button
+                        <AsyncButton
                           type="button"
                           className="notification-mark-read"
                           onClick={() => handleMarkRead(notification._id)}
@@ -251,7 +252,7 @@ const NotificationBell = () => {
                           title="Mark as read"
                         >
                           <CheckReadIcon size={16} />
-                        </button>
+                        </AsyncButton>
                       )}
                     </li>
                   );

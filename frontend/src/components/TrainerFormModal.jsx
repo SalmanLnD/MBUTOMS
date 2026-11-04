@@ -1,3 +1,5 @@
+import AsyncButton from './AsyncButton.jsx';
+import AsyncForm from './AsyncForm.jsx';
 import { useState, useEffect } from 'react';
 import {
   createTrainer,
@@ -103,7 +105,7 @@ const TrainerFormModal = ({ trainer, onClose }) => {
 
     try {
       const result = isEdit ? await updateTrainer(trainer._id, payload) : await createTrainer(payload);
-      onClose(result?.initialOtp ? { initialOtp: result.initialOtp, name: form.name } : true);
+      await onClose(result?.initialOtp ? { initialOtp: result.initialOtp, name: form.name } : true);
     } catch (err) {
       setError(getErrorMessage(err));
     } finally {
@@ -119,7 +121,7 @@ const TrainerFormModal = ({ trainer, onClose }) => {
       size="toms-modal-lg"
       scrollable
     >
-      <form onSubmit={handleSubmit}>
+      <AsyncForm onSubmit={handleSubmit}>
         <div className="toms-modal-body">
           {error && <div className="alert alert-danger">{error}</div>}
           <div className="row g-3">
@@ -207,12 +209,12 @@ const TrainerFormModal = ({ trainer, onClose }) => {
               </div>
         </div>
         <div className="toms-modal-footer">
-          <button type="button" className="btn btn-secondary" onClick={() => onClose(false)}>Cancel</button>
-          <button type="submit" className="btn btn-primary" disabled={loading}>
+          <AsyncButton type="button" className="btn btn-secondary" onClick={() => onClose(false)}>Cancel</AsyncButton>
+          <AsyncButton type="submit" className="btn btn-primary" disabled={loading}>
             {loading ? 'Saving...' : isEdit ? 'Update' : 'Create'}
-          </button>
+          </AsyncButton>
         </div>
-      </form>
+      </AsyncForm>
     </Modal>
   );
 };

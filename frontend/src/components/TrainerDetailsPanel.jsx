@@ -1,3 +1,4 @@
+import AsyncButton from './AsyncButton.jsx';
 import { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import LoadingSpinner from './LoadingSpinner.jsx';
@@ -53,18 +54,18 @@ const TrainerDetailsPanel = ({ trainerId, canEdit = false }) => {
     fetchTrainer();
   }, [fetchTrainer]);
 
-  const handleEditClose = (saved) => {
+  const handleEditClose = async (saved) => {
     setShowEditModal(false);
     if (saved) {
       showSuccess('Trainer updated successfully');
-      fetchTrainer();
+      await fetchTrainer();
     }
   };
 
-  const handleTransferComplete = (result) => {
+  const handleTransferComplete = async (result) => {
     setTransferMode(null);
     showSuccess(result?.message || 'Trainer updated successfully');
-    fetchTrainer();
+    await fetchTrainer();
   };
 
   if (loading) return <LoadingSpinner message="Loading trainer details..." />;
@@ -75,16 +76,16 @@ const TrainerDetailsPanel = ({ trainerId, canEdit = false }) => {
     <>
       {canEdit && !['resigned', 'relocated'].includes(trainer.employmentStatus) && (
         <div className="mb-3 d-flex flex-wrap justify-content-end gap-2">
-          <button type="button" className="btn btn-outline-secondary btn-sm" onClick={() => setShowEditModal(true)}>
+          <AsyncButton type="button" className="btn btn-outline-secondary btn-sm" onClick={() => setShowEditModal(true)}>
             Edit Profile
-          </button>
-          <button type="button" className="btn btn-outline-primary btn-sm" onClick={() => setTransferMode('replacement')}>
+          </AsyncButton>
+          <AsyncButton type="button" className="btn btn-outline-primary btn-sm" onClick={() => setTransferMode('replacement')}>
             Permanent Replacement
-          </button>
-          <button type="button" className="btn btn-outline-danger btn-sm" onClick={() => setTransferMode('resign')}>
+          </AsyncButton>
+          <AsyncButton type="button" className="btn btn-outline-danger btn-sm" onClick={() => setTransferMode('resign')}>
             Resignation / Exit
-          </button>
-          <button type="button" className="btn btn-outline-warning btn-sm" onClick={() => setTransferMode('relocate')}>Internal transfer</button>
+          </AsyncButton>
+          <AsyncButton type="button" className="btn btn-outline-warning btn-sm" onClick={() => setTransferMode('relocate')}>Internal transfer</AsyncButton>
         </div>
       )}
 
@@ -100,9 +101,9 @@ const TrainerDetailsPanel = ({ trainerId, canEdit = false }) => {
 
       {canEdit && ['resigned', 'relocated'].includes(trainer.employmentStatus) && (
         <div className="mb-3 d-flex justify-content-end">
-          <button type="button" className="btn btn-outline-secondary btn-sm" onClick={() => setShowEditModal(true)}>
+          <AsyncButton type="button" className="btn btn-outline-secondary btn-sm" onClick={() => setShowEditModal(true)}>
             Edit Profile
-          </button>
+          </AsyncButton>
         </div>
       )}
 

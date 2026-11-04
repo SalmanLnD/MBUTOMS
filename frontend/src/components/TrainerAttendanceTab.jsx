@@ -1,3 +1,7 @@
+import AsyncButton from './AsyncButton.jsx';
+import { createKeyedAsyncQueue } from '../utils/keyedAsyncQueue.js';
+import { attendanceCellFingerprint, attendanceCellPayload } from '../utils/attendanceDraft.js';
+import Pagination from './Pagination.jsx';
 import { useState, useEffect, useLayoutEffect, useCallback, Fragment, useMemo, useRef } from 'react';
 import LoadingSpinner from '../components/LoadingSpinner.jsx';
 import TrainerAttendanceRow from './TrainerAttendanceRow.jsx';
@@ -46,7 +50,13 @@ const TrainerAttendanceTab = () => {
   const [grid, setGrid] = useState(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [savingKey, setSavingKey] = useState('');
+  const [savingKeys, setSavingKeys] = useState(() => new Set());
+  const [trainerPage, setTrainerPage] = useState(1);
+  const [trainerPageSize, setTrainerPageSize] = useState(10);
+  const savedCells = useRef(new Map());
+  const requestedCells = useRef(new Map());
+  const gridRequestId = useRef(0);
+  const saveQueueRef = useRef(createKeyedAsyncQueue());
   const [trainerSearch, setTrainerSearch] = useState('');
   const [sheetStatus, setSheetStatus] = useState(null);
   const [showSheetSetup, setShowSheetSetup] = useState(false);
@@ -88,6 +98,10 @@ const TrainerAttendanceTab = () => {
   const scrollContainerRef = useRef(null);
   const gridDataRef = useRef(null);
   const monthCacheRef = useRef(new Map());
+  const cacheSession = useRef(null);
+  const sessionKey = JSON.stringify([user?._id, user?.sessionVersion, user?.role, user?.trainer, user?.impersonating]);
+  const currentSession = useRef(sessionKey);
+  currentSession.current = sessionKey;
 
   const monthKey = formatMonthKey(monthParts.year, monthParts.month);
   const monthOptions = useMemo(() => buildMonthOptions(), []);
@@ -110,7 +124,34 @@ const TrainerAttendanceTab = () => {
     });
   }, [grid?.rows, trainerSearch, canManageAll]);
 
+  const trainerPages = Math.max(1, Math.ceil(filteredRows.length / trainerPageSize));
+  const visibleTrainerPage = Math.min(trainerPage, trainerPages);
+  const visibleRows = useMemo(() => filteredRows.slice(
+    (visibleTrainerPage - 1) * trainerPageSize, visibleTrainerPage * trainerPageSize,
+  ), [filteredRows, visibleTrainerPage, trainerPageSize]);
+  const savingDatesByTrainer = useMemo(() => {
+    const byTrainer = new Map();
+    for (const key of savingKeys) {
+      const [trainerId, date] = key.split('|');
+      byTrainer.set(trainerId, [...(byTrainer.get(trainerId) || []), date]);
+    }
+    return new Map([...byTrainer].map(([trainerId, dates]) => [trainerId, dates.sort().join(',')]));
+  }, [savingKeys]);
+
+  useEffect(() => { setTrainerPage(1); }, [monthKey, trainerSearch]);
+
   const fetchGrid = useCallback(async ({ forceRefresh = false } = {}) => {
+    const requestId = ++gridRequestId.current;
+    if (cacheSession.current !== sessionKey) {
+      cacheSession.current = sessionKey;
+      monthCacheRef.current.clear();
+      savedCells.current.clear();
+      requestedCells.current.clear();
+      saveQueueRef.current = createKeyedAsyncQueue();
+      setSavingKeys(new Set());
+      gridDataRef.current = null;
+      setGrid(null);
+    }
     const requestParams = { month: monthKey };
     const todayKey = toAttendanceDateKey();
     const cacheRecord = monthCacheRef.current.get(monthKey);
@@ -137,19 +178,29 @@ const TrainerAttendanceTab = () => {
         preferCache: !forceRefresh,
         forceRefresh,
       });
+      if (requestId !== gridRequestId.current) return;
       monthCacheRef.current.set(monthKey, { todayKey, data });
+      while (monthCacheRef.current.size > 6) monthCacheRef.current.delete(monthCacheRef.current.keys().next().value);
+      for (const row of data.rows || []) {
+        for (const [date, cell] of Object.entries(row.days || {})) {
+          savedCells.current.set(`${row.trainer._id}|${date}`, attendanceCellFingerprint(cell));
+        }
+      }
       gridDataRef.current = data;
       setGrid(data);
     } catch (err) {
-      showError(getErrorMessage(err));
+      if (requestId === gridRequestId.current) showError(getErrorMessage(err));
     } finally {
-      setLoading(false);
-      setRefreshing(false);
+      if (requestId === gridRequestId.current) {
+        setLoading(false);
+        setRefreshing(false);
+      }
     }
-  }, [monthKey]);
+  }, [monthKey, sessionKey]);
 
   useEffect(() => {
     fetchGrid();
+    return () => { gridRequestId.current++; };
   }, [fetchGrid]);
 
   const loadSheetStatus = useCallback(async () => {
@@ -191,8 +242,8 @@ const TrainerAttendanceTab = () => {
   }, [hasVisibleGrid, monthKey, scrollToTodayColumn]);
 
   const canEditTrainer = useCallback(
-    () => canManageAll,
-    [canManageAll]
+    () => canManageAll && !refreshing,
+    [canManageAll, refreshing]
   );
 
   const updateCell = useCallback((trainerId, dateKey, field, value) => {
@@ -259,32 +310,42 @@ const TrainerAttendanceTab = () => {
 
   const handleSave = useCallback(async (trainerId, dateKey) => {
     const currentGrid = gridDataRef.current;
+    const saveSession = currentSession.current;
+    const saveMonth = currentGrid?.month;
     const row = currentGrid?.rows.find((entry) => entry.trainer._id === trainerId);
-    const cell = row?.days[dateKey];
-    if (!cell) return;
+    const currentCell = row?.days[dateKey];
+    if (!currentCell) return;
+    const cell = { ...currentCell };
     const isFuture = cell.isFuture || isFutureDateKey(dateKey);
     if (isFuture && !(cell.isOnLeave && canEditFutureLeave)) return;
 
     const saveKey = `${trainerId}|${dateKey}`;
-    setSavingKey(saveKey);
+    const fingerprint = attendanceCellFingerprint(cell);
+    const requested = requestedCells.current.get(saveKey);
+    if (requested?.fingerprint === fingerprint) return requested.promise;
+    if (!requested && savedCells.current.get(saveKey) === fingerprint) return;
+    setSavingKeys(current => new Set(current).add(saveKey));
 
+    const promise = saveQueueRef.current.run(saveKey, async () => {
+    if (saveSession !== currentSession.current) return;
     try {
       const saved = await upsertTrainerDailyAttendance({
         trainer: trainerId,
         date: dateKey,
-        attendanceType: cell.attendanceType,
-        oifNumber: cell.oifNumber,
-        mockPrepHours: cell.mockPrepHours,
-        classHandlingHours: cell.classHandlingHours,
-        foodAllowance: cell.foodAllowance,
+        ...attendanceCellPayload(cell),
       });
+      if (saveSession !== currentSession.current) return;
+      savedCells.current.set(saveKey, attendanceCellFingerprint({ ...cell, ...saved }));
 
       setGrid((prev) => {
-        if (!prev) return prev;
+        if (!prev || prev.month !== saveMonth || saveSession !== currentSession.current) return prev;
         const next = {
           ...prev,
           rows: prev.rows.map((entry) => {
             if (entry.trainer._id !== trainerId) return entry;
+            const latestCell = entry.days[dateKey] || {};
+            const hasNewerEdits = ['attendanceType', 'oifNumber', 'mockPrepHours', 'classHandlingHours', 'foodAllowance']
+              .some(field => latestCell[field] !== cell[field]);
             return {
               ...entry,
               days: {
@@ -304,6 +365,14 @@ const TrainerAttendanceTab = () => {
                   isOfficialHoliday: saved.isOfficialHoliday,
                   isHolidayOff: saved.isHolidayOff,
                   isDefaultWeekOff: saved.isDefaultWeekOff,
+                  // An older response must not overwrite a later queued edit.
+                  ...(hasNewerEdits ? {
+                    attendanceType: latestCell.attendanceType,
+                    oifNumber: latestCell.oifNumber,
+                    mockPrepHours: latestCell.mockPrepHours,
+                    classHandlingHours: latestCell.classHandlingHours,
+                    foodAllowance: latestCell.foodAllowance,
+                  } : {}),
                 },
               },
             };
@@ -314,11 +383,12 @@ const TrainerAttendanceTab = () => {
         return next;
       });
     } catch (err) {
+      if (saveSession !== currentSession.current) return;
       const payload = err?.response?.data;
       if (payload?.code === 'INSUFFICIENT_COMP_OFF') {
         showError(payload.message || 'Insufficient comp-off balance. Reverted to Leave.');
         setGrid((prev) => {
-          if (!prev) return prev;
+          if (!prev || prev.month !== saveMonth || saveSession !== currentSession.current) return prev;
           const revertTo = payload.revertTo || TRAINER_ATTENDANCE_TYPES.LEAVE;
           const next = {
             ...prev,
@@ -345,9 +415,20 @@ const TrainerAttendanceTab = () => {
       } else {
         showError(getErrorMessage(err));
       }
-    } finally {
-      setSavingKey('');
     }
+    }).finally(() => {
+      if (saveSession !== currentSession.current) return;
+      if (requestedCells.current.get(saveKey)?.promise === promise) requestedCells.current.delete(saveKey);
+      if (!saveQueueRef.current.has(saveKey)) {
+        setSavingKeys(current => {
+          const next = new Set(current);
+          next.delete(saveKey);
+          return next;
+        });
+      }
+    });
+    requestedCells.current.set(saveKey, { fingerprint, promise });
+    return promise;
   }, [canEditFutureLeave]);
 
   const pollWhatsappSyncJob = useCallback(async (jobId) => {
@@ -403,27 +484,28 @@ const TrainerAttendanceTab = () => {
     <section ref={panelRef} className={`trainer-attendance-panel${fullscreen ? ' trainer-attendance-panel--fullscreen' : ''}`} aria-label="Monthly trainer attendance">
       <div className="trainer-attendance-toolbar mb-2">
         <h5 className="mb-0">Monthly Trainer Attendance</h5>
-        <button ref={fullscreenButtonRef} type="button" className="btn btn-outline-primary btn-sm"
+        <AsyncButton ref={fullscreenButtonRef} type="button" className="btn btn-outline-primary btn-sm"
           aria-pressed={fullscreen} onClick={() => setFullscreen(value => !value)} title={fullscreen ? 'Exit full screen (Esc)' : 'Expand attendance to full screen'}>
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
             <path d={fullscreen ? 'M4 9h5V4M20 9h-5V4M4 15h5v5M20 15h-5v5' : 'M9 4H4v5M15 4h5v5M4 15v5h5M20 15v5h-5'} />
           </svg> {fullscreen ? 'Exit full screen' : 'Full screen'}
-        </button>
+        </AsyncButton>
 
         <div className="trainer-attendance-month-controls">
-          <button
+          <AsyncButton
             type="button"
             className="btn btn-outline-secondary btn-sm"
             aria-label="Previous month"
-            disabled={atEarliestMonth}
+            disabled={atEarliestMonth || savingKeys.size > 0}
             onClick={() => setMonthParts((current) => shiftMonth(current, -1))}
           >
             ‹
-          </button>
+          </AsyncButton>
           <StyledSelect
             size="sm"
             className="trainer-attendance-month-select"
             value={monthKey}
+            disabled={savingKeys.size > 0}
             onChange={(e) => setMonthParts(parseMonthKey(e.target.value))}
             aria-label="Select month"
             options={monthOptions.map((option) => ({
@@ -431,30 +513,31 @@ const TrainerAttendanceTab = () => {
               label: option.label,
             }))}
           />
-          <button
+          <AsyncButton
             type="button"
             className="btn btn-outline-secondary btn-sm"
             aria-label="Next month"
-            disabled={atLatestMonth}
+            disabled={atLatestMonth || savingKeys.size > 0}
             onClick={() => setMonthParts((current) => shiftMonth(current, 1))}
           >
             ›
-          </button>
-          <button
+          </AsyncButton>
+          <AsyncButton
             type="button"
             className="btn btn-outline-primary btn-sm"
             onClick={() => setMonthParts(clampMonthParts(getCurrentMonthParts()))}
+            disabled={savingKeys.size > 0}
           >
             This Month
-          </button>
-          <button
+          </AsyncButton>
+          <AsyncButton
             type="button"
             className="btn btn-outline-secondary btn-sm"
-            disabled={loading || refreshing}
+            disabled={loading || refreshing || savingKeys.size > 0}
             onClick={() => fetchGrid({ forceRefresh: true })}
           >
             Refresh
-          </button>
+          </AsyncButton>
         </div>
       </div>
 
@@ -465,14 +548,14 @@ const TrainerAttendanceTab = () => {
       {(canManageAll || canManageHolidays) && (
         <div className="trainer-attendance-tools d-flex flex-wrap align-items-center gap-2 mb-2">
           {canManageHolidays && (
-            <button
+            <AsyncButton
               type="button"
               className="btn btn-outline-primary btn-sm d-inline-flex align-items-center gap-2"
               onClick={() => setShowHolidays(true)}
             >
               <CalendarIcon size={16} aria-hidden="true" />
               Holidays
-            </button>
+            </AsyncButton>
           )}
           {canManageAll && (
             sheetStatus?.linked ? (
@@ -486,24 +569,24 @@ const TrainerAttendanceTab = () => {
                   <ExternalLinkIcon size={16} aria-hidden="true" />
                   Open attendance sheet
                 </a>
-                <button
+                <AsyncButton
                   type="button"
                   className="btn btn-outline-secondary btn-sm d-inline-flex align-items-center gap-2"
                   onClick={() => setShowSheetSetup(true)}
                 >
                   <SheetIcon size={16} aria-hidden="true" />
                   Sheet setup
-                </button>
+                </AsyncButton>
               </>
             ) : (
-              <button
+              <AsyncButton
                 type="button"
                 className="btn btn-outline-primary btn-sm d-inline-flex align-items-center gap-2"
                 onClick={() => setShowSheetSetup(true)}
               >
                 <SheetIcon size={16} aria-hidden="true" />
                 Link attendance sheet
-              </button>
+              </AsyncButton>
             )
           )}
         </div>
@@ -626,14 +709,14 @@ const TrainerAttendanceTab = () => {
               </tr>
             </thead>
             <tbody>
-              {filteredRows.map((row) => (
+              {visibleRows.map((row) => (
                 <TrainerAttendanceRow
                   key={row.trainer._id}
                   row={row}
                   dates={grid.dates}
                   canEditTrainer={canEditTrainer}
                   canEditFutureLeave={canEditFutureLeave}
-                  savingKey={savingKey}
+                  savingDateKeys={savingDatesByTrainer.get(row.trainer._id) || ''}
                   onUpdateCell={updateCell}
                   onSave={handleSave}
                 />
@@ -643,6 +726,19 @@ const TrainerAttendanceTab = () => {
         </div>
       )}
 
+      {!loading && grid && filteredRows.length > 0 && (
+        <Pagination
+          pagination={{ page: visibleTrainerPage, pages: trainerPages, total: filteredRows.length, limit: trainerPageSize }}
+          pageSize={trainerPageSize}
+          onPageChange={setTrainerPage}
+          onPageSizeChange={size => { setTrainerPageSize(size); setTrainerPage(1); }}
+          pageSizeOptions={[10, 20, 50]}
+          sizeLabel="Trainers per page"
+          showSummary
+          align="between"
+        />
+      )}
+
       {showSheetSetup && canManageAll && (
         <TrainerAttendanceSheetSetupModal
           show
@@ -650,8 +746,8 @@ const TrainerAttendanceTab = () => {
           onClose={() => setShowSheetSetup(false)}
           onLinked={() => {
             setShowSheetSetup(false);
-            loadSheetStatus();
             showSuccess('Trainer attendance Google Sheet linked.');
+            return loadSheetStatus();
           }}
         />
       )}

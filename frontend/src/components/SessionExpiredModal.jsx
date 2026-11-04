@@ -1,3 +1,4 @@
+import AsyncButton from './AsyncButton.jsx';
 import { useCallback, useLayoutEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Modal from './Modal.jsx';
@@ -42,9 +43,9 @@ const SessionExpiredModal = () => {
       title={isVersionUpdate ? 'Session Expired — Application Updated' : 'Session Expired'}
       onClose={handleSignInAgain}
       footer={(
-        <button type="button" className="btn btn-primary" onClick={handleSignInAgain}>
+        <AsyncButton type="button" className="btn btn-primary" onClick={handleSignInAgain}>
           Sign in again
-        </button>
+        </AsyncButton>
       )}
     >
       <div className="toms-modal-body">

@@ -71,10 +71,17 @@ const FeedbackFieldInput = ({
       label: cls.label || `${cls.department || ''} ${cls.section || ''}`.trim(),
     })).filter((option) => option.value);
 
+    // Normalize historical special class values (e.g. "B Pharmacy 1" -> "Pharmacy", "B Sc 1" -> "B Sc")
+    const normalizedValue = (value === 'B Pharmacy 1' || value === 'B Pharmacy')
+      ? (classOptions.some((o) => o.value === value) ? value : (classOptions.some((o) => o.value === 'Pharmacy') ? 'Pharmacy' : value))
+      : (value === 'B Sc 1')
+        ? (classOptions.some((o) => o.value === value) ? value : (classOptions.some((o) => o.value === 'B Sc') ? 'B Sc' : value))
+        : value;
+
     return (
       <StyledSelect
         name={field.id}
-        value={value || ''}
+        value={normalizedValue || ''}
         onChange={(e) => onChange(e.target.value)}
         disabled={disabled}
         required={field.required}

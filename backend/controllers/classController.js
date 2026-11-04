@@ -60,16 +60,22 @@ export const invalidateStudentCountCache = () => {
 const attachStudentCounts = async (classes) => {
   const countMap = await getActiveStudentCountMap();
 
-  return classes.map((cls) => ({
-    ...cls,
-    studentCount: getStudentCountForClass(
-      countMap,
-      cls.department,
-      cls.section,
-      cls.currentSemester
-    ),
-    label: `${cls.department} ${cls.section}`,
-  }));
+  return classes.map((cls) => {
+    const isSpecialDept = ['Pharmacy', 'B Pharmacy', 'B Sc'].includes(cls.department);
+    const label = isSpecialDept
+      ? (cls.department === 'B Pharmacy' ? 'Pharmacy' : cls.department)
+      : `${cls.department} ${cls.section}`;
+    return {
+      ...cls,
+      studentCount: getStudentCountForClass(
+        countMap,
+        cls.department,
+        cls.section,
+        cls.currentSemester
+      ),
+      label,
+    };
+  });
 };
 
 export const getClasses = async (req, res) => {

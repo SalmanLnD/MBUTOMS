@@ -11,6 +11,9 @@ const COMBINED_CLASS_DEPARTMENTS = [
 /** Class department labels that differ from canonical department codes in reference data. */
 const CLASS_DEPARTMENT_ALIASES = [
   { classDepartment: 'B.COM(CA)', subjectCodes: ['BCOM-CA'] },
+  { classDepartment: 'Pharmacy', subjectCodes: ['PHARMACY'] },
+  { classDepartment: 'B Pharmacy', subjectCodes: ['PHARMACY'] },
+  { classDepartment: 'B Sc', subjectCodes: ['BSC'] },
 ];
 
 export const expandAllowedClassDepartments = (departmentCodes) => {

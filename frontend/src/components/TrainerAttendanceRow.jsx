@@ -1,4 +1,4 @@
-import { memo, Fragment } from 'react';
+import { memo, Fragment, useMemo } from 'react';
 import {
   attendanceTypeUsesOifNumber,
   formatTrainerAttendanceOifDisplay,
@@ -15,10 +15,12 @@ const TrainerAttendanceRow = memo(({
   dates,
   canEditTrainer,
   canEditFutureLeave,
-  savingKey,
+  savingDateKeys = '',
   onUpdateCell,
   onSave,
-}) => (
+}) => {
+  const savingDates = useMemo(() => new Set(savingDateKeys.split(',')), [savingDateKeys]);
+  return (
   <tr>
     <th scope="row" className="trainer-attendance-sticky-col">
       <div className="fw-semibold">{row.trainer.name}</div>
@@ -93,8 +95,7 @@ const TrainerAttendanceRow = memo(({
         cell.attendanceType,
         cell.oifNumber
       );
-      const saveKey = `${row.trainer._id}|${date.key}`;
-      const isSaving = savingKey === saveKey;
+      const isSaving = savingDates.has(date.key);
       const futureClass = date.isFuture ? 'trainer-attendance-future' : '';
       const weekendClass = !isOfficialHoliday && date.isWeekend ? 'trainer-attendance-weekend' : '';
       const holidayClass = isOfficialHoliday ? 'trainer-attendance-holiday' : '';
@@ -135,6 +136,7 @@ const TrainerAttendanceRow = memo(({
       return (
         <Fragment key={`${row.trainer._id}-${date.key}`}>
           <td className={`trainer-attendance-oif-cell ${cellClass}`}>
+            {isSaving && <span className="small text-muted" role="status">Saving…</span>}
             {showTypeSelect && !canEditCell ? (
               <div
                 className="trainer-attendance-oif-sheet-value small fw-semibold"
@@ -311,7 +313,8 @@ const TrainerAttendanceRow = memo(({
       </div>
     </td>
   </tr>
-));
+  );
+});
 
 TrainerAttendanceRow.displayName = 'TrainerAttendanceRow';
 

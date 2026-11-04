@@ -1,4 +1,5 @@
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import AsyncButton from '../components/AsyncButton.jsx';
+import { useState, useEffect, useMemo, useCallback, lazy, Suspense } from 'react';
 import LoadingSpinner from '../components/LoadingSpinner.jsx';
 import Pagination from '../components/Pagination.jsx';
 import { showError, showSuccess } from '../utils/toast.js';
@@ -17,7 +18,6 @@ import {
 } from '../services/studentService.js';
 import { getSchools, getDepartments } from '../services/subjectService.js';
 import { formatStatus, getErrorMessage } from '../utils/helpers.js';
-import StudentMonthlyTestReportsTab from '../components/StudentMonthlyTestReportsTab.jsx';
 import CollapsibleFilters from '../components/CollapsibleFilters.jsx';
 import { EditIcon, EyeIcon, TrashIcon, UploadIcon } from '../components/icons.jsx';
 import ActionIconButton from '../components/ActionIconButton.jsx';
@@ -25,6 +25,7 @@ import StyledSelect from '../components/StyledSelect.jsx';
 
 const SEMESTER_ORDER = { I: 1, II: 2, III: 3, IV: 4, V: 5, VI: 6, VII: 7, VIII: 8 };
 const semesterSortKey = (sem) => SEMESTER_ORDER[String(sem || '').trim()] ?? 99;
+const StudentMonthlyTestReportsTab = lazy(() => import('../components/StudentMonthlyTestReportsTab.jsx'));
 const tabs = [
   { id: 'classes', label: 'Classes' },
   { id: 'students', label: 'Students' },
@@ -75,6 +76,13 @@ const ClassesStudents = () => {
       if (department.code === 'BCOM-CA') {
         map.get(key).add('B.COM(CA)');
       }
+      if (department.code === 'PHARMACY') {
+        map.get(key).add('Pharmacy');
+        map.get(key).add('B Pharmacy');
+      }
+      if (department.code === 'BSC') {
+        map.get(key).add('B Sc');
+      }
     });
     return map;
   }, [departments]);
@@ -93,6 +101,13 @@ const ClassesStudents = () => {
       }
       if (department.code === 'BCOM-CA') {
         map.set('B.COM(CA)', schoolName);
+      }
+      if (department.code === 'PHARMACY') {
+        map.set('Pharmacy', schoolName);
+        map.set('B Pharmacy', schoolName);
+      }
+      if (department.code === 'BSC') {
+        map.set('B Sc', schoolName);
       }
     });
     return map;
@@ -308,14 +323,13 @@ const ClassesStudents = () => {
     resetStudentPage();
   };
 
-  const handleClassSaved = () => {
+  const handleClassSaved = async () => {
     setShowClassForm(false);
     setEditingClass(null);
     showSuccess('Class saved successfully');
-    fetchClasses();
-    getDepartments()
+    await Promise.all([fetchClasses(), getDepartments()
       .then((list) => setDepartments(Array.isArray(list) ? list : []))
-      .catch(() => {});
+      .catch((err) => showError(getErrorMessage(err)))]);
   };
 
   const handleConfirmClassDelete = async () => {
@@ -324,25 +338,23 @@ const ClassesStudents = () => {
       await deleteClass(pendingClassDelete.id);
       showSuccess('Class removed');
       setPendingClassDelete(null);
-      fetchClasses();
+      await fetchClasses();
     } catch (err) {
       showError(getErrorMessage(err));
     }
   };
 
-  const handleStudentSaved = () => {
+  const handleStudentSaved = async () => {
     setShowStudentForm(false);
     setEditingStudent(null);
     showSuccess('Student saved successfully');
-    fetchStudents();
-    fetchClasses();
+    await Promise.all([fetchStudents(), fetchClasses()]);
   };
 
-  const handleStudentBulkImported = (result) => {
+  const handleStudentBulkImported = async (result) => {
     if ((result?.created || 0) + (result?.updated || 0) > 0) {
       showSuccess(result.message || 'Students imported');
-      fetchStudents();
-      fetchClasses();
+      await Promise.all([fetchStudents(), fetchClasses()]);
     }
   };
 
@@ -352,8 +364,7 @@ const ClassesStudents = () => {
       await deleteStudent(pendingDelete.id);
       showSuccess('Student removed');
       setPendingDelete(null);
-      fetchStudents();
-      fetchClasses();
+      await Promise.all([fetchStudents(), fetchClasses()]);
     } catch (err) {
       showError(getErrorMessage(err));
     }
@@ -364,13 +375,13 @@ const ClassesStudents = () => {
       <ul className="nav nav-tabs mb-3">
         {tabs.map((tab) => (
           <li className="nav-item" key={tab.id}>
-            <button
+            <AsyncButton
               type="button"
               className={`nav-link ${activeTab === tab.id ? 'active' : ''}`}
               onClick={() => setActiveTab(tab.id)}
             >
               {tab.label}
-            </button>
+            </AsyncButton>
           </li>
         ))}
       </ul>
@@ -463,14 +474,14 @@ const ClassesStudents = () => {
             </div>
             <div className="col-md-1">
               {hasClassFilters && (
-                <button type="button" className="btn btn-sm btn-outline-secondary" onClick={clearClassTableFilters}>
+                <AsyncButton type="button" className="btn btn-sm btn-outline-secondary" onClick={clearClassTableFilters}>
                   Clear
-                </button>
+                </AsyncButton>
               )}
             </div>
             <div className="col-md-2 text-md-end">
               {canManage && (
-                <button
+                <AsyncButton
                   type="button"
                   className="btn btn-primary"
                   onClick={() => {
@@ -479,7 +490,7 @@ const ClassesStudents = () => {
                   }}
                 >
                   Add Class
-                </button>
+                </AsyncButton>
               )}
             </div>
           </div>
@@ -637,24 +648,24 @@ const ClassesStudents = () => {
                   <span className="badge bg-primary">
                     {classLabel(classFilter)}
                   </span>
-                  <button type="button" className="btn btn-sm btn-link" onClick={clearClassFilter}>
+                  <AsyncButton type="button" className="btn btn-sm btn-link" onClick={clearClassFilter}>
                     Clear filter
-                  </button>
+                  </AsyncButton>
                 </div>
               )}
             </div>
             <div className="col-md-3 text-md-end">
               {canManage && (
                 <div className="d-inline-flex flex-wrap gap-2 justify-content-md-end">
-                  <button
+                  <AsyncButton
                     type="button"
                     className="btn btn-outline-primary d-inline-flex align-items-center gap-2"
                     onClick={() => setShowStudentBulkUpload(true)}
                   >
                     <UploadIcon size={16} />
                     Bulk Upload
-                  </button>
-                  <button
+                  </AsyncButton>
+                  <AsyncButton
                     type="button"
                     className="btn btn-primary"
                     onClick={() => {
@@ -663,7 +674,7 @@ const ClassesStudents = () => {
                     }}
                   >
                     Add Student
-                  </button>
+                  </AsyncButton>
                 </div>
               )}
             </div>
@@ -754,7 +765,7 @@ const ClassesStudents = () => {
       )}
 
       {activeTab === 'test-reports' && (
-        <StudentMonthlyTestReportsTab />
+        <Suspense fallback={<LoadingSpinner message="Loading test reports…" />}><StudentMonthlyTestReportsTab /></Suspense>
       )}
 
       {showClassForm && (

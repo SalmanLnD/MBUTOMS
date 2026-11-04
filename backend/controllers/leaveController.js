@@ -26,6 +26,8 @@ import {
 } from '../utils/trainerTimetableOwnership.js';
 import { splitLeaveRangeForPartialCancel } from '../utils/leaveRangeSplit.js';
 import { normalizeAttendanceDate } from '../utils/attendanceTracking.js';
+import { createLeaveWithoutOverlap } from '../utils/createLeaveWithoutOverlap.js';
+import { commitPartialLeaveSplit } from '../utils/commitPartialLeaveSplit.js';
 import {
   applyDefaultExcessRrdAttendance,
   clearELeaveAttendanceForDateKeys,
@@ -101,16 +103,18 @@ const getDaysInRange = (startDate, endDate) => {
   return [...new Set(days)];
 };
 
-const findAffectedSchedules = async (trainerId, startDate, endDate) => {
-  const trainer = await Trainer.findById(trainerId);
+const findAffectedSchedules = async (trainerId, startDate, endDate, session = null) => {
+  const trainerQuery = Trainer.findById(trainerId);
+  const trainer = await (session ? trainerQuery.session(session) : trainerQuery);
   if (!trainer) return [];
 
   const days = getDaysInRange(startDate, endDate);
 
-  const schedules = await Schedule.find({
+  const schedulesQuery = Schedule.find({
     trainerCode: { $in: resolveTrainerScheduleCodes(trainer) },
     day: { $in: days },
   }).sort({ day: 1, startTime: 1 });
+  const schedules = await (session ? schedulesQuery.session(session) : schedulesQuery);
   const floor = await inheritedOwnershipFloorKey(trainerId);
   applyOwnershipFloor(schedules, floor);
   const endKey = toLeaveDateKey(endDate);
@@ -182,6 +186,9 @@ export const createLeave = async (req, res) => {
 
   const startDate = normalizeDate(req.body.startDate);
   const endDate = normalizeDate(req.body.endDate);
+  if (Number.isNaN(startDate.getTime()) || Number.isNaN(endDate.getTime())) {
+    return res.status(400).json({ message: 'Select valid leave dates' });
+  }
   if (endDate < startDate) {
     return res.status(400).json({ message: 'End date must be on or after start date' });
   }
@@ -199,15 +206,22 @@ export const createLeave = async (req, res) => {
     holidayDateKeys
   );
 
-  const leave = await Leave.create({
-    trainer: trainerId,
-    startDate,
-    endDate,
-    reason: req.body.reason,
-    requestType,
-    scope: LEAVE_SCOPES.FULL_DAY,
-    affectedSchedules: affectedIds,
-    replacementNeeded: effectiveSchedules.length > 0,
+  const leave = await createLeaveWithoutOverlap({
+    Leave,
+    Trainer,
+    data: {
+      trainer: trainerId,
+      startDate,
+      endDate,
+      reason: req.body.reason,
+      requestType,
+      scope: LEAVE_SCOPES.FULL_DAY,
+      affectedSchedules: affectedIds,
+      replacementNeeded: effectiveSchedules.length > 0,
+    },
+    findLegacySchedules: (existing, session) => findAffectedSchedules(
+      trainerId, existing.startDate, existing.endDate, session,
+    ),
   });
 
   const populated = await Leave.findById(leave._id).populate(populateLeave);
@@ -468,7 +482,7 @@ export const partialCancelLeave = async (req, res) => {
     return;
   }
 
-  const createdRecords = [];
+  const retainedRecords = [];
   for (const range of remainingRanges) {
     const affectedSchedules = await findAffectedSchedules(leave.trainer._id, range.startDate, range.endDate);
     const affectedIds = affectedSchedules.map((schedule) => schedule._id);
@@ -483,7 +497,7 @@ export const partialCancelLeave = async (req, res) => {
       rangeHolidayKeys
     );
 
-    const created = await Leave.create({
+    retainedRecords.push({
       trainer: leave.trainer._id,
       startDate: normalizeDate(range.startDate),
       endDate: normalizeDate(range.endDate),
@@ -494,25 +508,12 @@ export const partialCancelLeave = async (req, res) => {
       affectedSchedules: affectedIds,
       replacementNeeded: effectiveSchedules.length > 0,
     });
-    createdRecords.push(created);
   }
 
-  leave.status = 'cancelled';
-  leave.replacements = [];
-  leave.affectedSchedules = [];
-  leave.replacementNeeded = false;
-  leave.bulkReplacement = {
-    groupId: '',
-    fromDate: null,
-    toDate: null,
-    replacementTrainer: null,
-    assignedAt: null,
-    assignedBy: null,
-  };
-  leave.markModified('replacements');
-  leave.markModified('affectedSchedules');
-  leave.markModified('bulkReplacement');
-  await leave.save();
+  const { createdRecords, cancellation } = await commitPartialLeaveSplit({
+    Leave, Trainer, source: leave, records: retainedRecords,
+  });
+  Object.assign(leave, cancellation);
   await clearELeaveAttendanceForDateKeys({
     trainerId: leave.trainer._id,
     dateKeys: getLeaveDateKeys({ startDate: cancelStart, endDate: cancelEnd }),

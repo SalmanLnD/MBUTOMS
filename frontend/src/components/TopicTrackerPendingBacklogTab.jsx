@@ -1,3 +1,4 @@
+import AsyncButton from './AsyncButton.jsx';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import LoadingSpinner from './LoadingSpinner.jsx';
 import { getTopicTrackerPendingBacklog } from '../services/topicTrackerService.js';
@@ -180,9 +181,9 @@ const TopicTrackerPendingBacklogTab = ({ refreshKey = 0, onOpenTracker }) => {
               Include today's slots
             </label>
           </div>
-          <button type="button" className="btn btn-sm btn-outline-secondary" onClick={() => loadBacklog(rangeFilter)}>
+          <AsyncButton type="button" className="btn btn-sm btn-outline-secondary" onClick={() => loadBacklog(rangeFilter)}>
             Refresh
-          </button>
+          </AsyncButton>
           <span className={`badge align-self-center ${filteredItems.length ? 'bg-warning text-dark' : 'bg-success'}`}>
             {filteredItems.length} pending
           </span>
@@ -196,9 +197,9 @@ const TopicTrackerPendingBacklogTab = ({ refreshKey = 0, onOpenTracker }) => {
               <>
                 Could not load pending trackers. {loadError}
                 {' '}
-                <button type="button" className="btn btn-sm btn-outline-danger ms-2" onClick={() => loadBacklog(rangeFilter)}>
+                <AsyncButton type="button" className="btn btn-sm btn-outline-danger ms-2" onClick={() => loadBacklog(rangeFilter)}>
                   Retry
-                </button>
+                </AsyncButton>
               </>
             )
             : items.length
@@ -245,7 +246,7 @@ const TopicTrackerPendingBacklogTab = ({ refreshKey = 0, onOpenTracker }) => {
                       </span>
                     </td>
                     <td className="text-end">
-                      <button
+                      <AsyncButton
                         type="button"
                         className="btn btn-sm btn-outline-primary"
                         onClick={() => onOpenTracker?.({
@@ -258,7 +259,7 @@ const TopicTrackerPendingBacklogTab = ({ refreshKey = 0, onOpenTracker }) => {
                         })}
                       >
                         Open tracker
-                      </button>
+                      </AsyncButton>
                     </td>
                   </tr>
                 ))}
@@ -286,25 +287,25 @@ const TopicTrackerPendingBacklogTab = ({ refreshKey = 0, onOpenTracker }) => {
                   <option value={100}>100 / page</option>
                 </select>
                 <div className="btn-group btn-group-sm">
-                  <button
+                  <AsyncButton
                     type="button"
                     className="btn btn-outline-secondary"
                     disabled={page <= 1}
                     onClick={() => setPage((p) => Math.max(1, p - 1))}
                   >
                     Previous
-                  </button>
+                  </AsyncButton>
                   <span className="btn btn-light disabled text-dark px-3">
                     Page {page} of {totalPages}
                   </span>
-                  <button
+                  <AsyncButton
                     type="button"
                     className="btn btn-outline-secondary"
                     disabled={page >= totalPages}
                     onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
                   >
                     Next
-                  </button>
+                  </AsyncButton>
                 </div>
               </div>
             </div>

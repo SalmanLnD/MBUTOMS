@@ -1,3 +1,5 @@
+import AsyncButton from './AsyncButton.jsx';
+import AsyncForm from './AsyncForm.jsx';
 import { useState, useEffect, useMemo } from 'react';
 import Modal from './Modal.jsx';
 import StyledSelect from './StyledSelect.jsx';
@@ -13,6 +15,8 @@ const CLASS_DEPARTMENT_BY_CODE = {
   ECE: 'ECE & EIE',
   EIE: 'ECE & EIE',
   'BCOM-CA': 'B.COM(CA)',
+  PHARMACY: 'Pharmacy',
+  BSC: 'B Sc',
 };
 
 const toClassDepartment = (code) => CLASS_DEPARTMENT_BY_CODE[code] || code;
@@ -104,7 +108,7 @@ const ClassFormModal = ({ show, classItem, schools = [], departments = [], onClo
       } else {
         await createClass(form);
       }
-      onSaved();
+      await onSaved();
     } catch (err) {
       setError(getErrorMessage(err));
     } finally {
@@ -114,7 +118,7 @@ const ClassFormModal = ({ show, classItem, schools = [], departments = [], onClo
 
   return (
     <Modal show={show} title={isEdit ? 'Edit Class' : 'Add Class'} onClose={onClose}>
-      <form onSubmit={handleSubmit}>
+      <AsyncForm onSubmit={handleSubmit}>
         <div className="toms-modal-body">
           {error && <div className="alert alert-danger">{error}</div>}
           <div className="row g-3">
@@ -210,14 +214,14 @@ const ClassFormModal = ({ show, classItem, schools = [], departments = [], onClo
           </div>
         </div>
         <div className="toms-modal-footer">
-          <button type="button" className="btn btn-secondary" onClick={onClose}>
+          <AsyncButton type="button" className="btn btn-secondary" onClick={onClose}>
             Cancel
-          </button>
-          <button type="submit" className="btn btn-primary" disabled={loading}>
+          </AsyncButton>
+          <AsyncButton type="submit" className="btn btn-primary" disabled={loading}>
             {loading ? 'Saving...' : isEdit ? 'Update' : 'Add Class'}
-          </button>
+          </AsyncButton>
         </div>
-      </form>
+      </AsyncForm>
     </Modal>
   );
 };

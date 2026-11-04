@@ -1,3 +1,4 @@
+import AsyncButton from '../components/AsyncButton.jsx';
 import { useState, useCallback, useEffect, useMemo, useRef, memo } from 'react';
 import { Virtuoso } from 'react-virtuoso';
 import TrainerTimetableGrid from '../components/TrainerTimetableGrid.jsx';
@@ -407,26 +408,26 @@ const Timetable = () => {
 
         {canEdit && (
           <div className="timetable-icon-actions" role="group" aria-label="Timetable actions">
-            <button type="button" className={`btn timetable-icon-btn ${editMode ? 'btn-success' : 'btn-outline-success'}`}
+            <AsyncButton type="button" className={`btn timetable-icon-btn ${editMode ? 'btn-success' : 'btn-outline-success'}`}
               title={editMode ? 'Exit Edit Mode' : 'Edit Mode'} aria-label={editMode ? 'Exit Edit Mode' : 'Edit Mode'}
               aria-pressed={editMode} onClick={() => setEditMode((current) => !current)}>
               <EditIcon size={18} aria-hidden="true" />
-            </button>
+            </AsyncButton>
             {canManageSpecialClasses && (
-              <button type="button" className="btn btn-outline-primary timetable-icon-btn" title="Special classes" aria-label="Special classes"
-                onClick={() => setShowSpecialClass(true)}><PlusIcon size={18} aria-hidden="true" /></button>
+              <AsyncButton type="button" className="btn btn-outline-primary timetable-icon-btn" title="Special classes" aria-label="Special classes"
+                onClick={() => setShowSpecialClass(true)}><PlusIcon size={18} aria-hidden="true" /></AsyncButton>
             )}
             {canCancelClasses && (
-              <button type="button" className="btn btn-outline-danger timetable-icon-btn" title="Cancel classes" aria-label="Cancel classes"
-                onClick={() => setShowCancellation(true)}><CalendarIcon size={18} aria-hidden="true" /></button>
+              <AsyncButton type="button" className="btn btn-outline-danger timetable-icon-btn" title="Cancel classes" aria-label="Cancel classes"
+                onClick={() => setShowCancellation(true)}><CalendarIcon size={18} aria-hidden="true" /></AsyncButton>
             )}
             {sheetStatus?.linked && (
               <a className="btn btn-outline-primary timetable-icon-btn" title="Open Sheet" aria-label="Open Sheet"
                 href={sheetStatus.spreadsheetUrl} target="_blank" rel="noreferrer"><ExternalLinkIcon size={18} aria-hidden="true" /></a>
             )}
-            <button type="button" className="btn btn-outline-secondary timetable-icon-btn"
+            <AsyncButton type="button" className="btn btn-outline-secondary timetable-icon-btn"
               title={sheetStatus?.linked ? 'Sheet setup' : 'Link to Sheets'} aria-label={sheetStatus?.linked ? 'Sheet setup' : 'Link to Sheets'}
-              onClick={() => setShowSheetSetup(true)}><SheetIcon size={18} aria-hidden="true" /></button>
+              onClick={() => setShowSheetSetup(true)}><SheetIcon size={18} aria-hidden="true" /></AsyncButton>
           </div>
         )}
         </div>

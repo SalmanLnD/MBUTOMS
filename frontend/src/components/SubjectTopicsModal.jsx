@@ -1,3 +1,5 @@
+import AsyncButton from './AsyncButton.jsx';
+import AsyncForm from './AsyncForm.jsx';
 import { useEffect, useState } from 'react';
 import Modal from './Modal.jsx';
 import { updateSubjectTopics } from '../services/subjectService.js';
@@ -54,7 +56,7 @@ const SubjectTopicsModal = ({ show, subject, onClose, onSaved }) => {
     setError('');
     try {
       const updated = await updateSubjectTopics(subject._id, cleaned);
-      onSaved(updated);
+      await onSaved(updated);
       onClose();
     } catch (err) {
       setError(getErrorMessage(err));
@@ -65,7 +67,7 @@ const SubjectTopicsModal = ({ show, subject, onClose, onSaved }) => {
 
   return (
     <Modal show={show} title={`Topics — ${subject?.name || ''}`} onClose={onClose} size="toms-modal-lg" scrollable>
-      <form onSubmit={handleSave}>
+      <AsyncForm onSubmit={handleSave}>
         <div className="toms-modal-body">
           {error && <div className="alert alert-danger">{error}</div>}
           <p className="text-muted small mb-3">
@@ -87,9 +89,9 @@ const SubjectTopicsModal = ({ show, subject, onClose, onSaved }) => {
                 }
               }}
             />
-            <button type="button" className="btn btn-outline-primary text-nowrap" onClick={addTopic}>
+            <AsyncButton type="button" className="btn btn-outline-primary text-nowrap" onClick={addTopic}>
               Add topic
-            </button>
+            </AsyncButton>
           </div>
 
           {topics.length === 0 ? (
@@ -108,7 +110,7 @@ const SubjectTopicsModal = ({ show, subject, onClose, onSaved }) => {
                       aria-label={`Topic ${index + 1}`}
                     />
                     <div className="btn-group-vertical btn-group-sm">
-                      <button
+                      <AsyncButton
                         type="button"
                         className="btn btn-outline-secondary"
                         onClick={() => moveTopic(index, -1)}
@@ -116,8 +118,8 @@ const SubjectTopicsModal = ({ show, subject, onClose, onSaved }) => {
                         aria-label={`Move topic ${index + 1} up`}
                       >
                         Up
-                      </button>
-                      <button
+                      </AsyncButton>
+                      <AsyncButton
                         type="button"
                         className="btn btn-outline-secondary"
                         onClick={() => moveTopic(index, 1)}
@@ -125,15 +127,15 @@ const SubjectTopicsModal = ({ show, subject, onClose, onSaved }) => {
                         aria-label={`Move topic ${index + 1} down`}
                       >
                         Down
-                      </button>
-                      <button
+                      </AsyncButton>
+                      <AsyncButton
                         type="button"
                         className="btn btn-outline-danger"
                         onClick={() => removeTopicAt(index)}
                         aria-label={`Remove topic ${index + 1}`}
                       >
                         Remove
-                      </button>
+                      </AsyncButton>
                     </div>
                   </div>
                 </div>
@@ -142,14 +144,14 @@ const SubjectTopicsModal = ({ show, subject, onClose, onSaved }) => {
           )}
         </div>
         <div className="toms-modal-footer">
-          <button type="button" className="btn btn-secondary" onClick={onClose} disabled={saving}>
+          <AsyncButton type="button" className="btn btn-secondary" onClick={onClose} disabled={saving}>
             Cancel
-          </button>
-          <button type="submit" className="btn btn-primary" disabled={saving}>
+          </AsyncButton>
+          <AsyncButton type="submit" className="btn btn-primary" disabled={saving}>
             {saving ? 'Saving...' : `Save ${topics.length} topic${topics.length === 1 ? '' : 's'}`}
-          </button>
+          </AsyncButton>
         </div>
-      </form>
+      </AsyncForm>
     </Modal>
   );
 };

@@ -1,3 +1,5 @@
+import AsyncButton from '../components/AsyncButton.jsx';
+import AsyncForm from '../components/AsyncForm.jsx';
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.jsx';
@@ -47,7 +49,7 @@ const Login = () => {
               <p className="text-muted">Training Operations Management System</p>
             </div>
 
-            <form onSubmit={handleSubmit}>
+            <AsyncForm onSubmit={handleSubmit}>
               <div className="mb-3">
                 <label htmlFor="email" className="form-label">Email</label>
                 <input
@@ -73,10 +75,10 @@ const Login = () => {
                   required
                 />
               </div>
-              <button type="submit" className="btn btn-primary w-100" disabled={loading}>
+              <AsyncButton type="submit" className="btn btn-primary w-100" disabled={loading}>
                 {loading ? 'Signing in...' : 'Sign In'}
-              </button>
-            </form>
+              </AsyncButton>
+            </AsyncForm>
           </div>
         </div>
       </div>

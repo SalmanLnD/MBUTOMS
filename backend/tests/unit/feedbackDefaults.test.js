@@ -57,4 +57,26 @@ describe('formatFeedbackClassLabel', () => {
       'AIML B1'
     );
   });
+
+  it('formats special class only departments Pharmacy and B Sc cleanly without dummy section numbers', () => {
+    const classes = [
+      { department: 'Pharmacy', section: '1', currentSemester: 'III' },
+      { department: 'B Sc', section: '1', currentSemester: 'V' },
+    ];
+    assert.equal(formatFeedbackClassLabel(classes[0], classes), 'Pharmacy');
+    assert.equal(formatFeedbackClassLabel(classes[1], classes), 'B Sc');
+    assert.equal(
+      formatFeedbackClassLabel({ department: 'B Pharmacy', section: '1', currentSemester: 'III' }, classes),
+      'Pharmacy'
+    );
+  });
+
+  it('disambiguates special class only departments by semester when multiple semesters exist', () => {
+    const classes = [
+      { department: 'Pharmacy', section: '1', currentSemester: 'III' },
+      { department: 'Pharmacy', section: '1', currentSemester: 'V' },
+    ];
+    assert.equal(formatFeedbackClassLabel(classes[0], classes), 'Pharmacy · Sem III');
+    assert.equal(formatFeedbackClassLabel(classes[1], classes), 'Pharmacy · Sem V');
+  });
 });

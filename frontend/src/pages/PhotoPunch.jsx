@@ -1,3 +1,4 @@
+import AsyncButton from '../components/AsyncButton.jsx';
 import { useEffect, useRef, useState } from 'react';
 import api from '../services/api.js';
 import { FingerprintIcon } from '../components/icons.jsx';
@@ -127,10 +128,10 @@ export default function PhotoPunch() {
       {result?.assignment && <p>OIF: {result.assignment.oifNumber || 'No scheduled OIF'} · Class hours: {result.assignment.classHandlingHours} · Mock / IT hours: {result.assignment.mockPrepHours}</p>}
       {result?.whatsappShare === 'queued' && <p>Your photo will also be posted to the training managers WhatsApp group.</p>}
       {result && <div className="photo-punch__success" role="status"><strong>You are checked in</strong><p>{result.message}</p><small>{result.folder}</small>{result.photoUrl && <a href={result.photoUrl} target="_blank" rel="noreferrer">View photo in Drive</a>}</div>}
-      <div className="photo-punch__actions">{!camera && !photo && <button className="btn btn-primary" disabled={busy || !config} onClick={start}>{busy ? 'Checking location…' : 'Enable camera & location'}</button>}
-        {camera && <><button className="btn btn-primary" disabled={busy} onClick={capture}>{busy ? 'Checking…' : 'Take photo'}</button><button className="btn btn-outline-secondary" disabled={busy} onClick={() => { stop(); setCamera(false); }}>Cancel</button></>}
-        {photo && !result && <><button className="btn btn-primary" disabled={busy} onClick={submit}>{busy ? 'Saving punch-in…' : 'Punch in'}</button><button className="btn btn-outline-secondary" disabled={busy} onClick={start}>Retake</button><a className="btn btn-outline-secondary" href={photo.url} download="toms-punch.jpg">Download photo</a></>}
-        {result && <button className="btn btn-outline-secondary" onClick={start}>Start again</button>}
+      <div className="photo-punch__actions">{!camera && !photo && <AsyncButton className="btn btn-primary" disabled={busy || !config} onClick={start}>{busy ? 'Checking location…' : 'Enable camera & location'}</AsyncButton>}
+        {camera && <><AsyncButton className="btn btn-primary" disabled={busy} onClick={capture}>{busy ? 'Checking…' : 'Take photo'}</AsyncButton><AsyncButton className="btn btn-outline-secondary" disabled={busy} onClick={() => { stop(); setCamera(false); }}>Cancel</AsyncButton></>}
+        {photo && !result && <><AsyncButton className="btn btn-primary" disabled={busy} onClick={submit}>{busy ? 'Saving punch-in…' : 'Punch in'}</AsyncButton><AsyncButton className="btn btn-outline-secondary" disabled={busy} onClick={start}>Retake</AsyncButton><a className="btn btn-outline-secondary" href={photo.url} download="toms-punch.jpg">Download photo</a></>}
+        {result && <AsyncButton className="btn btn-outline-secondary" onClick={start}>Start again</AsyncButton>}
       </div>
       {photo && !result && <p className="photo-punch__fine">Submit within 60 seconds of capture, or retake your photo for a fresh location check.</p>}
     </section><aside className="photo-punch__card photo-punch__details"><h2>Your check-in checks</h2>

@@ -1,3 +1,4 @@
+import AsyncButton from './AsyncButton.jsx';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation } from 'react-router-dom';
 import LoadingSpinner from './LoadingSpinner.jsx';
@@ -47,7 +48,7 @@ const ObservationsTab = () => {
   const [drafts, setDrafts] = useState({});
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState('');
-  const [savingId, setSavingId] = useState('');
+  const [savingIds, setSavingIds] = useState(() => new Set());
 
   const monthKey = formatMonthKey(monthParts.year, monthParts.month);
   const monthOptions = useMemo(() => buildMonthOptions(), []);
@@ -135,7 +136,7 @@ const ObservationsTab = () => {
       return;
     }
 
-    setSavingId(row.trainerId);
+    setSavingIds(current => new Set(current).add(row.trainerId));
     try {
       const saved = await upsertObservation(row.trainerId, {
         monthKey,
@@ -181,7 +182,11 @@ const ObservationsTab = () => {
     } catch (err) {
       showError(getErrorMessage(err));
     } finally {
-      setSavingId('');
+      setSavingIds(current => {
+        const next = new Set(current);
+        next.delete(row.trainerId);
+        return next;
+      });
     }
   };
 
@@ -190,32 +195,35 @@ const ObservationsTab = () => {
       <ul className="nav nav-tabs mb-3" role="tablist">
         {OBSERVATION_SUB_TABS.map((tab) => (
           <li className="nav-item" key={tab.id} role="presentation">
-            <button
+            <AsyncButton
               type="button"
               role="tab"
               className={`nav-link ${observationType === tab.id ? 'active' : ''}`}
               aria-selected={observationType === tab.id}
+              disabled={savingIds.size > 0}
               onClick={() => setObservationType(tab.id)}
             >
               {tab.label}
-            </button>
+            </AsyncButton>
           </li>
         ))}
       </ul>
 
       <div className="row g-2 mb-3 align-items-center">
         <div className="col-auto">
-          <button
+          <AsyncButton
             type="button"
             className="btn btn-outline-secondary btn-sm"
             onClick={() => setMonthParts((prev) => shiftMonth(prev, -1))}
+            disabled={savingIds.size > 0}
           >
             Previous
-          </button>
+          </AsyncButton>
         </div>
         <div className="col-md-3">
           <StyledSelect
             value={monthKey}
+            disabled={savingIds.size > 0}
             onChange={(e) => {
               const [year, month] = e.target.value.split('-').map(Number);
               setMonthParts(clampMonthParts({ year, month }));
@@ -228,13 +236,14 @@ const ObservationsTab = () => {
           />
         </div>
         <div className="col-auto">
-          <button
+          <AsyncButton
             type="button"
             className="btn btn-outline-secondary btn-sm"
             onClick={() => setMonthParts((prev) => shiftMonth(prev, 1))}
+            disabled={savingIds.size > 0}
           >
             Next
-          </button>
+          </AsyncButton>
         </div>
       </div>
 
@@ -296,6 +305,7 @@ const ObservationsTab = () => {
                               size="sm"
                               className="toms-styled-select--table-cell"
                               value={draft.scheduleId}
+                              disabled={savingIds.has(row.trainerId)}
                               onChange={(e) => updateDraft(row.trainerId, 'scheduleId', e.target.value)}
                               aria-label={`Class and slot for ${row.name}`}
                               placeholder="Select class / slot"
@@ -312,6 +322,7 @@ const ObservationsTab = () => {
                           type="date"
                           className="form-control form-control-sm"
                           value={draft.observationDate}
+                          disabled={savingIds.has(row.trainerId)}
                           onChange={(e) => updateDraft(row.trainerId, 'observationDate', e.target.value)}
                           aria-label={`Observation date for ${row.name}`}
                           required
@@ -323,6 +334,7 @@ const ObservationsTab = () => {
                             type="time"
                             className="form-control form-control-sm"
                             value={draft.observationTime}
+                            disabled={savingIds.has(row.trainerId)}
                             onChange={(e) => updateDraft(row.trainerId, 'observationTime', e.target.value)}
                             aria-label={`Observation time for ${row.name}`}
                           />
@@ -333,6 +345,7 @@ const ObservationsTab = () => {
                           size="sm"
                           className="toms-styled-select--table-cell"
                           value={draft.rating}
+                          disabled={savingIds.has(row.trainerId)}
                           onChange={(e) => updateDraft(row.trainerId, 'rating', e.target.value)}
                           aria-label={`Rating for ${row.name}`}
                           placeholder="—"
@@ -347,20 +360,21 @@ const ObservationsTab = () => {
                           type="text"
                           className="form-control form-control-sm"
                           value={draft.comments}
+                          disabled={savingIds.has(row.trainerId)}
                           onChange={(e) => updateDraft(row.trainerId, 'comments', e.target.value)}
                           placeholder="Observation comments"
                           aria-label={`Comments for ${row.name}`}
                         />
                       </td>
                       <td className="text-end">
-                        <button
+                        <AsyncButton
                           type="button"
                           className="btn btn-sm btn-primary"
-                          disabled={!dirty || savingId === row.trainerId}
+                          disabled={!dirty || savingIds.has(row.trainerId)}
                           onClick={() => handleSave(row)}
                         >
-                          {savingId === row.trainerId ? 'Saving…' : 'Save'}
-                        </button>
+                          {savingIds.has(row.trainerId) ? 'Saving…' : 'Save'}
+                        </AsyncButton>
                       </td>
                     </tr>
                   );

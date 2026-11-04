@@ -1,3 +1,5 @@
+import AsyncButton from './AsyncButton.jsx';
+import AsyncForm from './AsyncForm.jsx';
 import { useCallback, useEffect, useState } from 'react';
 import Modal from './Modal.jsx';
 import ConfirmModal from './ConfirmModal.jsx';
@@ -59,7 +61,7 @@ const OfficialHolidayModal = ({ show, onClose, onChanged }) => {
       setDate('');
       setName('Official leave');
       await loadHolidays();
-      onChanged?.();
+      await onChanged?.();
     } catch (err) {
       setError(getErrorMessage(err));
     } finally {
@@ -75,7 +77,7 @@ const OfficialHolidayModal = ({ show, onClose, onChanged }) => {
       await deleteOfficialHoliday(pendingDelete.id);
       setPendingDelete(null);
       await loadHolidays();
-      onChanged?.();
+      await onChanged?.();
     } catch (err) {
       setError(getErrorMessage(err));
     } finally {
@@ -98,7 +100,7 @@ const OfficialHolidayModal = ({ show, onClose, onChanged }) => {
             Adding a holiday marks every employee as Holiday for that date.
           </p>
 
-          <form className="row g-2 align-items-end mb-3" onSubmit={handleAdd}>
+          <AsyncForm className="row g-2 align-items-end mb-3" onSubmit={handleAdd}>
             <div className="col-md-4">
               <label className="form-label small text-muted mb-1" htmlFor="official-holiday-date">
                 Date
@@ -128,16 +130,16 @@ const OfficialHolidayModal = ({ show, onClose, onChanged }) => {
               />
             </div>
             <div className="col-md-3">
-              <button
+              <AsyncButton
                 type="submit"
                 className="btn btn-primary btn-sm d-inline-flex align-items-center gap-2"
                 disabled={saving}
               >
                 <PlusIcon size={16} aria-hidden="true" />
                 Add holiday
-              </button>
+              </AsyncButton>
             </div>
-          </form>
+          </AsyncForm>
 
           {loading ? (
             <div className="text-muted">Loading holidays...</div>

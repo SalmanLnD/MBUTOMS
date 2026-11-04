@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom';
+import AsyncButton from './AsyncButton.jsx';
 
 const ActionIconButton = ({
   variant = 'edit',
@@ -39,7 +40,7 @@ const ActionIconButton = ({
   }
 
   return (
-    <button
+    <AsyncButton
       type="button"
       className={classes}
       title={title}
@@ -48,7 +49,7 @@ const ActionIconButton = ({
       {...props}
     >
       {content}
-    </button>
+    </AsyncButton>
   );
 };
 

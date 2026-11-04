@@ -1,3 +1,4 @@
+import AsyncButton from '../components/AsyncButton.jsx';
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import TrainerTimetableGrid from '../components/TrainerTimetableGrid.jsx';
@@ -93,14 +94,14 @@ const TrainerSchedule = () => {
 
       <ul className="nav nav-tabs mb-3">
         <li className="nav-item">
-          <button className={`nav-link ${view === 'grid' ? 'active' : ''}`} onClick={() => setView('grid')}>
+          <AsyncButton className={`nav-link ${view === 'grid' ? 'active' : ''}`} onClick={() => setView('grid')}>
             Timetable
-          </button>
+          </AsyncButton>
         </li>
         <li className="nav-item">
-          <button className={`nav-link ${view === 'list' ? 'active' : ''}`} onClick={() => setView('list')}>
+          <AsyncButton className={`nav-link ${view === 'list' ? 'active' : ''}`} onClick={() => setView('list')}>
             List View
-          </button>
+          </AsyncButton>
         </li>
       </ul>
 

@@ -1,3 +1,4 @@
+import AsyncButton from './AsyncButton.jsx';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.jsx';
@@ -103,23 +104,23 @@ const Topbar = ({ title }) => {
     <>
       {user?.isDemo && <div className="demo-workspace-banner" role="status">
         <span><strong>Demo workspace</strong> · Edits stay in this browser. Sallu reads live data.</span>
-        <button type="button" className="btn btn-sm btn-outline-primary" onClick={() => {
+        <AsyncButton type="button" className="btn btn-sm btn-outline-primary" onClick={() => {
           demoWorkspace.reset(user.demoAccountId || user._id); window.location.reload();
-        }}>Reset demo changes</button>
+        }}>Reset demo changes</AsyncButton>
       </div>}
       {user?.impersonating && (
         <div className="impersonation-banner d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
           <span className="small">
             Viewing as <strong>{user.name}</strong> (trainer preview)
           </span>
-          <button
+          <AsyncButton
             type="button"
             className="btn btn-sm btn-outline-primary"
             onClick={handleExitTrainerView}
             disabled={switchingView}
           >
             Exit trainer view
-          </button>
+          </AsyncButton>
         </div>
       )}
 
@@ -154,7 +155,7 @@ const Topbar = ({ title }) => {
             <>
               <NotificationBell />
 
-              <button
+              <AsyncButton
                 type="button"
                 className="btn btn-outline-secondary btn-sm theme-toggle-btn d-inline-flex align-items-center justify-content-center"
                 onClick={toggleTheme}
@@ -162,19 +163,19 @@ const Topbar = ({ title }) => {
                 title={isDark ? 'Light mode' : 'Dark mode'}
               >
                 {isDark ? <SunIcon size={16} /> : <MoonIcon size={16} />}
-              </button>
+              </AsyncButton>
 
               <span className="topbar-user small" title={`${user.name} · ${formatRole(user.isDemo && !user.impersonating ? 'demo' : user.role)}`}>
                 {user.name} · {formatRole(user.isDemo && !user.impersonating ? 'demo' : user.role)}
               </span>
 
-              <button type="button" className="btn btn-outline-danger btn-sm" onClick={handleLogout}>
+              <AsyncButton type="button" className="btn btn-outline-danger btn-sm" onClick={handleLogout}>
                 Logout
-              </button>
+              </AsyncButton>
             </>
           ) : (
             <>
-              <button
+              <AsyncButton
                 type="button"
                 className="btn btn-outline-secondary btn-sm theme-toggle-btn d-inline-flex align-items-center justify-content-center"
                 onClick={toggleTheme}
@@ -182,10 +183,10 @@ const Topbar = ({ title }) => {
                 title={isDark ? 'Light mode' : 'Dark mode'}
               >
                 {isDark ? <SunIcon size={16} /> : <MoonIcon size={16} />}
-              </button>
-              <button type="button" className="btn btn-primary btn-sm" onClick={handleLogin}>
+              </AsyncButton>
+              <AsyncButton type="button" className="btn btn-primary btn-sm" onClick={handleLogin}>
                 Login
-              </button>
+              </AsyncButton>
             </>
           )}
         </div>

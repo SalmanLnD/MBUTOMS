@@ -1,5 +1,6 @@
 import { toAttendanceDateKey } from '../utils/monthDates.js';
 import api from './api.js';
+import { createRequestCache } from '../utils/requestCache.js';
 
 export const getAttendance = async (params = {}) => {
   const { data } = await api.get('/attendance', { params });
@@ -21,28 +22,26 @@ export const getAttendanceSummary = async (params = {}) => {
   return data;
 };
 
-const gridRequestCache = new Map();
-const GRID_CACHE_TTL_MS = 60_000;
+const gridRequestCache = createRequestCache();
+const gridCacheKey = params => {
+  let user;
+  try { user = JSON.parse(localStorage.getItem('toms_user') || 'null'); } catch { user = null; }
+  const session = [user?._id, user?.sessionVersion, user?.role, user?.impersonating, user?.impersonator?._id, user?.demoAccountId];
+  return `${JSON.stringify(session)}|${JSON.stringify(params)}|${toAttendanceDateKey()}`;
+};
 
 export const getTrainerAttendanceGrid = async (params = {}, options = {}) => {
   const { preferCache = true, forceRefresh = false } = options;
-  const cacheKey = `${JSON.stringify(params)}|${toAttendanceDateKey()}`;
-  const cached = gridRequestCache.get(cacheKey);
-  const cacheFresh = cached && Date.now() - cached.cachedAt < GRID_CACHE_TTL_MS;
-
-  if (preferCache && cacheFresh && !forceRefresh) {
-    return cached.data;
-  }
-
-  const { data } = await api.get('/attendance/trainer-grid', {
-    params: forceRefresh ? { ...params, refresh: '1' } : params,
-  });
-  gridRequestCache.set(cacheKey, { data, cachedAt: Date.now() });
-  return data;
+  return gridRequestCache.get(gridCacheKey(params), async () => {
+    const { data } = await api.get('/attendance/trainer-grid', {
+      params: forceRefresh ? { ...params, refresh: '1' } : params,
+    });
+    return data;
+  }, { force: forceRefresh || !preferCache });
 };
 
 export const primeTrainerAttendanceGrid = (params, data) => {
-  gridRequestCache.set(`${JSON.stringify(params)}|${toAttendanceDateKey()}`, { data, cachedAt: Date.now() });
+  gridRequestCache.set(gridCacheKey(params), data);
 };
 
 export const invalidateTrainerAttendanceGridCache = () => {

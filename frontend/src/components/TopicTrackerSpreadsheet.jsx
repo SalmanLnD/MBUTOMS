@@ -1,3 +1,4 @@
+import AsyncButton from './AsyncButton.jsx';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import Modal from './Modal.jsx';
 import ConfirmModal from './ConfirmModal.jsx';
@@ -82,7 +83,7 @@ const TopicTrackerSpreadsheet = ({
   const [sessions, setSessions] = useState([]);
   const [dayLabel, setDayLabel] = useState('');
   const [loading, setLoading] = useState(true);
-  const [savingKey, setSavingKey] = useState('');
+  const [savingKeys, setSavingKeys] = useState(() => new Set());
   const [dirtyRows, setDirtyRows] = useState(() => new Set());
   const [pendingDate, setPendingDate] = useState('');
   const requestRef = useRef(0);
@@ -209,7 +210,7 @@ const TopicTrackerSpreadsheet = ({
       return;
     }
 
-    setSavingKey(key);
+    setSavingKeys(current => new Set(current).add(key));
     try {
       const saved = await upsertTopicTrackerEntry(buildEntryPayload(row, 'closed'));
       const nextRow = {
@@ -236,19 +237,23 @@ const TopicTrackerSpreadsheet = ({
     } catch (err) {
       showError(getErrorMessage(err));
     } finally {
-      setSavingKey('');
+      setSavingKeys(current => {
+        const next = new Set(current);
+        next.delete(key);
+        return next;
+      });
     }
   };
 
   const renderCell = (row, column, index) => {
     const value = row[column.key] ?? '';
     const rowKey = getRowKey(row);
-    const isSaving = savingKey === rowKey;
+    const isSaving = savingKeys.has(rowKey);
     const isDirty = dirtyRows.has(rowKey);
 
     if (column.key === 'trackerStatus') {
       return (
-        <button
+        <AsyncButton
           type="button"
           className="btn btn-sm btn-primary"
           onClick={() => saveRow(row, index)}
@@ -256,7 +261,7 @@ const TopicTrackerSpreadsheet = ({
           title={canCloseEntries ? (isDirty ? 'Save changes' : 'No changes to save') : 'Status'}
         >
           {isSaving ? 'Saving...' : 'Save'}
-        </button>
+        </AsyncButton>
       );
     }
 
@@ -327,7 +332,7 @@ const TopicTrackerSpreadsheet = ({
                   />
                 )}
                 {topics.length > 1 && (
-                  <button
+                  <AsyncButton
                     type="button"
                     className="btn btn-sm btn-outline-danger topic-tracker-topic-action"
                     onClick={() => removeTopic(index, topicIndex)}
@@ -336,12 +341,12 @@ const TopicTrackerSpreadsheet = ({
                     title="Remove topic"
                   >
                     <TrashIcon size={14} />
-                  </button>
+                  </AsyncButton>
                 )}
               </div>
             );
           })}
-          <button
+          <AsyncButton
             type="button"
             className="btn btn-sm btn-outline-primary topic-tracker-add-topic"
             onClick={() => addTopic(index)}
@@ -351,7 +356,7 @@ const TopicTrackerSpreadsheet = ({
           >
             <PlusIcon size={14} />
             <span>Add topic</span>
-          </button>
+          </AsyncButton>
         </div>
       );
     }
@@ -394,7 +399,7 @@ const TopicTrackerSpreadsheet = ({
               className="form-control form-control-sm"
               style={{ width: 'auto' }}
               value={date}
-              disabled={Boolean(savingKey)}
+              disabled={savingKeys.size > 0}
               onChange={(event) => {
                 const nextDate = event.target.value;
                 if (!nextDate || nextDate === date) return;
@@ -448,9 +453,9 @@ const TopicTrackerSpreadsheet = ({
         )}
       </div>
       <div className="toms-modal-footer">
-        <button type="button" className="btn btn-secondary" onClick={onClose}>
+        <AsyncButton type="button" className="btn btn-secondary" onClick={onClose}>
           Close
-        </button>
+        </AsyncButton>
       </div>
     </Modal>
     <ConfirmModal

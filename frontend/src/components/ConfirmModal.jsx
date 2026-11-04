@@ -1,4 +1,5 @@
 import Modal from './Modal.jsx';
+import AsyncButton from './AsyncButton.jsx';
 
 const ConfirmModal = ({
   show,
@@ -20,12 +21,12 @@ const ConfirmModal = ({
       onClose={onClose}
       footer={(
         <>
-          <button type="button" className="btn btn-secondary" onClick={onClose}>
+          <AsyncButton type="button" className="btn btn-secondary" onClick={onClose}>
             {cancelLabel}
-          </button>
-          <button type="button" className={`btn btn-${confirmVariant}`} onClick={onConfirm}>
+          </AsyncButton>
+          <AsyncButton type="button" className={`btn btn-${confirmVariant}`} onClick={onConfirm}>
             {confirmLabel}
-          </button>
+          </AsyncButton>
         </>
       )}
     >

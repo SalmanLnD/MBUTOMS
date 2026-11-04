@@ -1,13 +1,10 @@
-import { useState, useEffect } from 'react';
+import AsyncButton from '../components/AsyncButton.jsx';
+import { useState, useEffect, lazy, Suspense } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import LoadingSpinner from '../components/LoadingSpinner.jsx';
 import Pagination from '../components/Pagination.jsx';
 import { showError, showSuccess } from '../utils/toast.js';
 import TrainerFormModal from '../components/TrainerFormModal.jsx';
-import TrainerAttendanceTab from '../components/TrainerAttendanceTab.jsx';
-import TrainerPunchInLogsTab from '../components/TrainerPunchInLogsTab.jsx';
-import LateMisconductTab from '../components/LateMisconductTab.jsx';
-import CompOffsTab from '../components/CompOffsTab.jsx';
 import ConfirmModal from '../components/ConfirmModal.jsx';
 import Modal from '../components/Modal.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
@@ -25,6 +22,11 @@ import { usePageTitle } from '../context/PageTitleContext.jsx';
 import { isAbortError } from '../services/api.js';
 import ActionCount from '../components/ActionCount.jsx';
 import { useActionCounts } from '../context/ActionCountsContext.jsx';
+
+const TrainerAttendanceTab = lazy(() => import('../components/TrainerAttendanceTab.jsx'));
+const TrainerPunchInLogsTab = lazy(() => import('../components/TrainerPunchInLogsTab.jsx'));
+const LateMisconductTab = lazy(() => import('../components/LateMisconductTab.jsx'));
+const CompOffsTab = lazy(() => import('../components/CompOffsTab.jsx'));
 
 const Trainers = () => {
   const { user, hasFullAccess } = useAuth();
@@ -128,7 +130,7 @@ const Trainers = () => {
       await deleteTrainer(pendingDelete.id);
       showSuccess('Trainer deleted successfully');
       setPendingDelete(null);
-      fetchTrainers();
+      await fetchTrainers();
     } catch (err) {
       showError(getErrorMessage(err));
     }
@@ -144,13 +146,13 @@ const Trainers = () => {
     setShowModal(true);
   };
 
-  const handleModalClose = (saved) => {
+  const handleModalClose = async (saved) => {
     setShowModal(false);
     setEditingTrainer(null);
     if (saved) {
       if (saved.initialOtp) setNewOtp(saved);
       else showSuccess(saved === true ? 'Trainer saved successfully' : saved);
-      fetchTrainers();
+      await fetchTrainers();
     }
   };
 
@@ -169,62 +171,62 @@ const Trainers = () => {
       <ul className="nav nav-tabs mb-3">
         {isTrainerUser ? (
           <li className="nav-item">
-            <button
+            <AsyncButton
               type="button"
               className={`nav-link ${activeTab === 'details' ? 'active' : ''}`}
               onClick={() => setTab('details')}
             >
               Trainer Details
-            </button>
+            </AsyncButton>
           </li>
         ) : (
           <li className="nav-item">
-            <button
+            <AsyncButton
               type="button"
               className={`nav-link ${activeTab === 'directory' ? 'active' : ''}`}
               onClick={() => setTab('directory')}
             >
               Directory
-            </button>
+            </AsyncButton>
           </li>
         )}
         <li className="nav-item">
-          <button
+          <AsyncButton
             type="button"
             className={`nav-link ${activeTab === 'comp-offs' ? 'active' : ''}`}
             onClick={() => setTab('comp-offs')}
           >
             Comp Offs
-          </button>
+          </AsyncButton>
         </li>
         <li className="nav-item">
-          <button
+          <AsyncButton
             type="button"
             className={`nav-link ${activeTab === 'attendance' ? 'active' : ''}`}
             onClick={() => setTab('attendance')}
           >
             Attendance
-          </button>
+          </AsyncButton>
         </li>
         <li className="nav-item">
-          <button
+          <AsyncButton
             type="button"
             className={`nav-link ${activeTab === 'logs' ? 'active' : ''}`}
             onClick={() => setTab('logs')}
           >
             Logs
-          </button>
+          </AsyncButton>
         </li>
         {canManage && (
           <li className="nav-item">
-            <button
+            <AsyncButton
               type="button"
               className={`nav-link ${activeTab === 'late' ? 'active' : ''}`}
               onClick={() => setTab('late')}
             >
               Late misconduct
               <ActionCount count={counts.latePunches} />
-            </button>
+            </AsyncButton>
           </li>
         )}
       </ul>
@@ -232,25 +234,25 @@ const Trainers = () => {
       {activeTab === 'attendance' ? (
         <div className="card table-card">
           <div className="card-body">
-            <TrainerAttendanceTab />
+            <Suspense fallback={<LoadingSpinner message="Loading attendance…" />}><TrainerAttendanceTab /></Suspense>
           </div>
         </div>
       ) : activeTab === 'comp-offs' ? (
         <div className="card table-card">
           <div className="card-body">
-            <CompOffsTab />
+            <Suspense fallback={<LoadingSpinner />}><CompOffsTab /></Suspense>
           </div>
         </div>
       ) : activeTab === 'logs' ? (
         <div className="card table-card">
           <div className="card-body">
-            <TrainerPunchInLogsTab />
+            <Suspense fallback={<LoadingSpinner />}><TrainerPunchInLogsTab /></Suspense>
           </div>
         </div>
       ) : activeTab === 'late' ? (
         <div className="card table-card">
           <div className="card-body">
-            <LateMisconductTab />
+            <Suspense fallback={<LoadingSpinner />}><LateMisconductTab /></Suspense>
           </div>
         </div>
       ) : activeTab === 'details' ? (
@@ -263,9 +265,9 @@ const Trainers = () => {
         <div className="card table-card">
           <div className="card-body">
             <CollapsibleFilters label="Trainer filters" actions={canManage && (
-              <button type="button" className="btn btn-primary" onClick={handleAdd}>
+              <AsyncButton type="button" className="btn btn-primary" onClick={handleAdd}>
                 + Add Trainer
-              </button>
+              </AsyncButton>
             )}>
             <div className="row g-2 mb-3 align-items-center">
               <div className="col-md-4">
@@ -313,10 +315,10 @@ const Trainers = () => {
                     <thead className="table-light">
                       <tr>
                         <th aria-sort={sortBy === 'employeeId' ? (sortOrder === 'asc' ? 'ascending' : 'descending') : 'none'}>
-                          <button type="button" className="table-sort" onClick={() => handleSort('employeeId')}>Employee ID{sortIcon('employeeId')}</button>
+                          <AsyncButton type="button" className="table-sort" onClick={() => handleSort('employeeId')}>Employee ID{sortIcon('employeeId')}</AsyncButton>
                         </th>
                         <th aria-sort={sortBy === 'name' ? (sortOrder === 'asc' ? 'ascending' : 'descending') : 'none'}>
-                          <button type="button" className="table-sort" onClick={() => handleSort('name')}>Name{sortIcon('name')}</button>
+                          <AsyncButton type="button" className="table-sort" onClick={() => handleSort('name')}>Name{sortIcon('name')}</AsyncButton>
                         </th>
                         <th className="d-none d-md-table-cell">Subjects</th>
                         <th className="d-none d-md-table-cell">Status</th>
@@ -431,7 +433,7 @@ const Trainers = () => {
             <p>Share this code privately with {newOtp.name}. It expires in 24 hours and can be used once.</p>
             <p><strong>{newOtp.initialOtp}</strong></p>
             <p>The trainer enters the code in the password field and then chooses a new password. If the code expires or is lost, generate a new one.</p>
-            <button type="button" className="btn btn-primary" onClick={() => setNewOtp(null)}>Done</button>
+            <AsyncButton type="button" className="btn btn-primary" onClick={() => setNewOtp(null)}>Done</AsyncButton>
           </div>
         </Modal>
       )}

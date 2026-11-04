@@ -1,3 +1,5 @@
+import AsyncButton from './AsyncButton.jsx';
+import AsyncForm from './AsyncForm.jsx';
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Modal from './Modal.jsx';
@@ -70,7 +72,7 @@ const LoginModal = () => {
         size="toms-modal-lg"
         dismissible={!loading}
       >
-        <form onSubmit={handleSubmit}>
+        <AsyncForm onSubmit={handleSubmit}>
           <div className="toms-modal-body">
             {loginModalMessage && (
               <div className="alert alert-info py-2 px-3 mb-3" role="status">
@@ -109,19 +111,19 @@ const LoginModal = () => {
             </div>
           </div>
           <div className="toms-modal-footer d-flex justify-content-end gap-2">
-            <button
+            <AsyncButton
               type="button"
               className="btn btn-secondary"
               onClick={handleClose}
               disabled={loading}
             >
               Cancel
-            </button>
-            <button type="submit" className="btn btn-primary" disabled={loading}>
+            </AsyncButton>
+            <AsyncButton type="submit" className="btn btn-primary" disabled={loading}>
               {loading ? 'Signing in...' : 'Sign In'}
-            </button>
+            </AsyncButton>
           </div>
-        </form>
+        </AsyncForm>
       </Modal>
 
       {showResetModal && (

@@ -1,3 +1,5 @@
+import AsyncButton from './AsyncButton.jsx';
+import AsyncForm from './AsyncForm.jsx';
 import { useEffect, useState } from 'react';
 import Modal from './Modal.jsx';
 import { getTopicTrackerAppsScriptSetup, linkTopicTrackerSheet } from '../services/topicTrackerService.js';
@@ -50,7 +52,7 @@ const TopicTrackerSheetSetupModal = ({ show, initialUrl = '', onClose, onLinked 
     setError('');
     try {
       await linkTopicTrackerSheet(spreadsheetUrl.trim());
-      onLinked();
+      await onLinked();
     } catch (err) {
       setError(getErrorMessage(err));
     } finally {
@@ -60,7 +62,7 @@ const TopicTrackerSheetSetupModal = ({ show, initialUrl = '', onClose, onLinked 
 
   return (
     <Modal show={show} title="Link Topic Tracker Google Sheet" onClose={onClose} size="toms-modal-lg" scrollable>
-      <form onSubmit={handleSaveLink}>
+      <AsyncForm onSubmit={handleSaveLink}>
         <div className="toms-modal-body">
           {error && <div className="alert alert-danger">{error}</div>}
           {copyHint && <div className="alert alert-success py-2">{copyHint}</div>}
@@ -89,13 +91,13 @@ const TopicTrackerSheetSetupModal = ({ show, initialUrl = '', onClose, onLinked 
               <div className="mb-3">
                 <div className="d-flex justify-content-between align-items-center mb-1">
                   <label className="form-label mb-0" htmlFor="tt-export-url">Export API URL</label>
-                  <button
+                  <AsyncButton
                     type="button"
                     className="btn btn-sm btn-outline-secondary"
                     onClick={() => handleCopy(setup.exportUrl, 'API URL')}
                   >
                     Copy URL
-                  </button>
+                  </AsyncButton>
                 </div>
                 <input id="tt-export-url" className="form-control form-control-sm" value={setup.exportUrl} readOnly />
               </div>
@@ -103,13 +105,13 @@ const TopicTrackerSheetSetupModal = ({ show, initialUrl = '', onClose, onLinked 
               <div className="mb-3">
                 <div className="d-flex justify-content-between align-items-center mb-1">
                   <label className="form-label mb-0" htmlFor="tt-api-key">API key</label>
-                  <button
+                  <AsyncButton
                     type="button"
                     className="btn btn-sm btn-outline-secondary"
                     onClick={() => handleCopy(setup.apiKey, 'API key')}
                   >
                     Copy key
-                  </button>
+                  </AsyncButton>
                 </div>
                 <input id="tt-api-key" className="form-control form-control-sm font-monospace" value={setup.apiKey} readOnly />
               </div>
@@ -117,13 +119,13 @@ const TopicTrackerSheetSetupModal = ({ show, initialUrl = '', onClose, onLinked 
               <div className="mb-3">
                 <div className="d-flex justify-content-between align-items-center mb-1">
                   <label className="form-label mb-0" htmlFor="tt-apps-script">Apps Script</label>
-                  <button
+                  <AsyncButton
                     type="button"
                     className="btn btn-sm btn-outline-secondary"
                     onClick={() => handleCopy(setup.script, 'Apps Script')}
                   >
                     Copy script
-                  </button>
+                  </AsyncButton>
                 </div>
                 <textarea
                   id="tt-apps-script"
@@ -150,14 +152,14 @@ const TopicTrackerSheetSetupModal = ({ show, initialUrl = '', onClose, onLinked 
           )}
         </div>
         <div className="toms-modal-footer">
-          <button type="button" className="btn btn-secondary" onClick={onClose}>
+          <AsyncButton type="button" className="btn btn-secondary" onClick={onClose}>
             Cancel
-          </button>
-          <button type="submit" className="btn btn-primary" disabled={loading || saving || !spreadsheetUrl.trim()}>
+          </AsyncButton>
+          <AsyncButton type="submit" className="btn btn-primary" disabled={loading || saving || !spreadsheetUrl.trim()}>
             {saving ? 'Saving...' : 'Save link'}
-          </button>
+          </AsyncButton>
         </div>
-      </form>
+      </AsyncForm>
     </Modal>
   );
 };

@@ -1,3 +1,4 @@
+import AsyncButton from './AsyncButton.jsx';
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import LoadingSpinner from './LoadingSpinner.jsx';
 import CollapsibleFilters from './CollapsibleFilters.jsx';
@@ -248,7 +249,7 @@ const CompOffsTab = () => {
         showSuccess('Comp-off added');
       }
       setShowFormModal(false);
-      fetchRows();
+      await fetchRows();
     } catch (err) {
       showError(getErrorMessage(err));
     } finally {
@@ -262,7 +263,7 @@ const CompOffsTab = () => {
       await deleteCompOff(pendingDelete._id);
       showSuccess('Comp-off deleted');
       setPendingDelete(null);
-      fetchRows();
+      await fetchRows();
     } catch (err) {
       showError(getErrorMessage(err));
     }
@@ -290,26 +291,26 @@ const CompOffsTab = () => {
         </div>
         <div className="d-flex flex-wrap gap-2">
           <div className="btn-group btn-group-sm" role="group" aria-label="Comp-off view mode">
-            <button
+            <AsyncButton
               type="button"
               className={`btn ${viewMode === 'table' ? 'btn-secondary' : 'btn-outline-secondary'}`}
               onClick={() => setViewMode('table')}
             >
               Table
-            </button>
-            <button
+            </AsyncButton>
+            <AsyncButton
               type="button"
               className={`btn ${viewMode === 'summary' ? 'btn-secondary' : 'btn-outline-secondary'}`}
               onClick={() => setViewMode('summary')}
             >
               Summary
-            </button>
+            </AsyncButton>
           </div>
           {canManage && (
-            <button type="button" className="btn btn-primary btn-sm" onClick={openCreateModal}>
+            <AsyncButton type="button" className="btn btn-primary btn-sm" onClick={openCreateModal}>
               <PlusIcon width={14} height={14} className="me-1" aria-hidden="true" />
               Add Comp Off
-            </button>
+            </AsyncButton>
           )}
         </div>
       </div>
@@ -441,14 +442,14 @@ const CompOffsTab = () => {
           <table className="table table-hover align-middle">
             <thead className="table-light">
               <tr>
-                <th><button type="button" className="btn btn-link btn-sm p-0 text-decoration-none" onClick={() => handleSort('employeeId')}>Emp ID{sortIcon('employeeId')}</button></th>
-                <th><button type="button" className="btn btn-link btn-sm p-0 text-decoration-none" onClick={() => handleSort('name')}>Name{sortIcon('name')}</button></th>
-                <th><button type="button" className="btn btn-link btn-sm p-0 text-decoration-none" onClick={() => handleSort('base')}>Base{sortIcon('base')}</button></th>
-                <th><button type="button" className="btn btn-link btn-sm p-0 text-decoration-none" onClick={() => handleSort('dateWorkedOn')}>Date Worked On{sortIcon('dateWorkedOn')}</button></th>
-                <th><button type="button" className="btn btn-link btn-sm p-0 text-decoration-none" onClick={() => handleSort('uniqueId')}>Unique ID{sortIcon('uniqueId')}</button></th>
-                <th><button type="button" className="btn btn-link btn-sm p-0 text-decoration-none" onClick={() => handleSort('count')}>Count{sortIcon('count')}</button></th>
-                <th><button type="button" className="btn btn-link btn-sm p-0 text-decoration-none" onClick={() => handleSort('status')}>Status{sortIcon('status')}</button></th>
-                <th><button type="button" className="btn btn-link btn-sm p-0 text-decoration-none" onClick={() => handleSort('availedOn')}>Availed On{sortIcon('availedOn')}</button></th>
+                <th><AsyncButton type="button" className="btn btn-link btn-sm p-0 text-decoration-none" onClick={() => handleSort('employeeId')}>Emp ID{sortIcon('employeeId')}</AsyncButton></th>
+                <th><AsyncButton type="button" className="btn btn-link btn-sm p-0 text-decoration-none" onClick={() => handleSort('name')}>Name{sortIcon('name')}</AsyncButton></th>
+                <th><AsyncButton type="button" className="btn btn-link btn-sm p-0 text-decoration-none" onClick={() => handleSort('base')}>Base{sortIcon('base')}</AsyncButton></th>
+                <th><AsyncButton type="button" className="btn btn-link btn-sm p-0 text-decoration-none" onClick={() => handleSort('dateWorkedOn')}>Date Worked On{sortIcon('dateWorkedOn')}</AsyncButton></th>
+                <th><AsyncButton type="button" className="btn btn-link btn-sm p-0 text-decoration-none" onClick={() => handleSort('uniqueId')}>Unique ID{sortIcon('uniqueId')}</AsyncButton></th>
+                <th><AsyncButton type="button" className="btn btn-link btn-sm p-0 text-decoration-none" onClick={() => handleSort('count')}>Count{sortIcon('count')}</AsyncButton></th>
+                <th><AsyncButton type="button" className="btn btn-link btn-sm p-0 text-decoration-none" onClick={() => handleSort('status')}>Status{sortIcon('status')}</AsyncButton></th>
+                <th><AsyncButton type="button" className="btn btn-link btn-sm p-0 text-decoration-none" onClick={() => handleSort('availedOn')}>Availed On{sortIcon('availedOn')}</AsyncButton></th>
                 <th>Flags</th>
                 {canManage && <th>Actions</th>}
               </tr>
@@ -616,12 +617,12 @@ const CompOffsTab = () => {
             </div>
           </div>
           <div className="d-flex justify-content-end gap-2 mt-4">
-            <button type="button" className="btn btn-outline-secondary" disabled={submitting} onClick={() => setShowFormModal(false)}>
+            <AsyncButton type="button" className="btn btn-outline-secondary" disabled={submitting} onClick={() => setShowFormModal(false)}>
               Cancel
-            </button>
-            <button type="button" className="btn btn-primary" disabled={submitting} onClick={handleSubmit}>
+            </AsyncButton>
+            <AsyncButton type="button" className="btn btn-primary" disabled={submitting} onClick={handleSubmit}>
               {submitting ? 'Saving...' : 'Save'}
-            </button>
+            </AsyncButton>
           </div>
         </Modal>
       )}

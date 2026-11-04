@@ -1,3 +1,4 @@
+import AsyncButton from './AsyncButton.jsx';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import LoadingSpinner from './LoadingSpinner.jsx';
 import StyledSelect from './StyledSelect.jsx';
@@ -36,7 +37,7 @@ const PlpTab = () => {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState('');
   const [savingWeights, setSavingWeights] = useState(false);
-  const [savingFinalId, setSavingFinalId] = useState('');
+  const [savingFinalIds, setSavingFinalIds] = useState(() => new Set());
   const [sheetStatus, setSheetStatus] = useState(null);
   const [showSheetSetup, setShowSheetSetup] = useState(false);
 
@@ -131,7 +132,7 @@ const PlpTab = () => {
 
   const handleSaveFinal = async (row) => {
     const raw = finalDrafts[row.trainerId];
-    setSavingFinalId(row.trainerId);
+    setSavingFinalIds(current => new Set(current).add(row.trainerId));
     try {
       if (raw === '' || raw == null) {
         const data = await upsertPlpFinalRating(row.trainerId, {
@@ -176,7 +177,11 @@ const PlpTab = () => {
     } catch (err) {
       showError(getErrorMessage(err));
     } finally {
-      setSavingFinalId('');
+      setSavingFinalIds(current => {
+        const next = new Set(current);
+        next.delete(row.trainerId);
+        return next;
+      });
     }
   };
 
@@ -186,15 +191,16 @@ const PlpTab = () => {
         <ul className="nav nav-tabs mb-0 flex-wrap" role="tablist">
           {cycles.map((option) => (
             <li className="nav-item" key={option.value} role="presentation">
-              <button
+              <AsyncButton
                 type="button"
                 role="tab"
                 className={`nav-link ${cycleKey === option.value ? 'active' : ''}`}
                 aria-selected={cycleKey === option.value}
+                disabled={loading || savingWeights || savingFinalIds.size > 0}
                 onClick={() => handleCycleChange(option.value)}
               >
                 {option.shortLabel || option.label}
-              </button>
+              </AsyncButton>
             </li>
           ))}
         </ul>
@@ -211,14 +217,14 @@ const PlpTab = () => {
               Open linked sheet
             </a>
           )}
-          <button
+          <AsyncButton
             type="button"
             className="btn btn-outline-secondary btn-sm d-inline-flex align-items-center gap-2"
             onClick={() => setShowSheetSetup(true)}
           >
             <SheetIcon size={16} />
             Link Google Sheet
-          </button>
+          </AsyncButton>
         </div>
       </div>
 
@@ -253,14 +259,14 @@ const PlpTab = () => {
               </div>
             ))}
             <div className="col-12 col-md-auto">
-              <button
+              <AsyncButton
                 type="button"
                 className="btn btn-primary btn-sm"
-                disabled={savingWeights || Math.abs(weightTotal - 100) > 0.01}
+                disabled={savingWeights || savingFinalIds.size > 0 || Math.abs(weightTotal - 100) > 0.01}
                 onClick={handleSaveWeightages}
               >
                 {savingWeights ? 'Saving...' : 'Save weightages'}
-              </button>
+              </AsyncButton>
             </div>
           </div>
         </div>
@@ -345,6 +351,7 @@ const PlpTab = () => {
                         size="sm"
                         className="toms-styled-select--table-cell"
                         value={finalDrafts[row.trainerId] ?? ''}
+                        disabled={savingWeights || savingFinalIds.has(row.trainerId)}
                         aria-label={`Final PLP for ${row.name}`}
                         onChange={(e) => setFinalDrafts((prev) => ({
                           ...prev,
@@ -356,14 +363,14 @@ const PlpTab = () => {
                           label: value === 0 ? '0 (break/leave)' : String(value),
                         }))}
                       />
-                      <button
+                      <AsyncButton
                         type="button"
                         className="btn btn-outline-secondary btn-sm"
-                        disabled={savingFinalId === row.trainerId}
+                        disabled={savingWeights || savingFinalIds.has(row.trainerId)}
                         onClick={() => handleSaveFinal(row)}
                       >
-                        {savingFinalId === row.trainerId ? '...' : 'Save'}
-                      </button>
+                        {savingFinalIds.has(row.trainerId) ? 'Saving…' : 'Save'}
+                      </AsyncButton>
                     </div>
                     {row.isManualFinal && (
                       <div className="text-muted small mt-1">
@@ -386,7 +393,7 @@ const PlpTab = () => {
           onClose={() => setShowSheetSetup(false)}
           onLinked={() => {
             setShowSheetSetup(false);
-            loadSheetStatus();
+            return loadSheetStatus();
           }}
         />
       )}

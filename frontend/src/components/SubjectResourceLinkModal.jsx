@@ -1,3 +1,5 @@
+import AsyncButton from './AsyncButton.jsx';
+import AsyncForm from './AsyncForm.jsx';
 import { useEffect, useState } from 'react';
 import Modal from './Modal.jsx';
 import { getErrorMessage } from '../utils/helpers.js';
@@ -44,7 +46,7 @@ const SubjectResourceLinkModal = ({
 
   return (
     <Modal show={show} onClose={onClose} title={title} size="toms-modal-md">
-      <form onSubmit={handleSubmit}>
+      <AsyncForm onSubmit={handleSubmit}>
         <div className="toms-modal-body">
           {error && <div className="alert alert-danger">{error}</div>}
           <label className="form-label" htmlFor="subject-resource-url">
@@ -61,14 +63,14 @@ const SubjectResourceLinkModal = ({
           />
         </div>
         <div className="toms-modal-footer">
-          <button type="button" className="btn btn-outline-secondary" onClick={onClose} disabled={saving}>
+          <AsyncButton type="button" className="btn btn-outline-secondary" onClick={onClose} disabled={saving}>
             Cancel
-          </button>
-          <button type="submit" className="btn btn-primary" disabled={saving}>
+          </AsyncButton>
+          <AsyncButton type="submit" className="btn btn-primary" disabled={saving}>
             {saving ? 'Saving...' : 'Save link'}
-          </button>
+          </AsyncButton>
         </div>
-      </form>
+      </AsyncForm>
     </Modal>
   );
 };

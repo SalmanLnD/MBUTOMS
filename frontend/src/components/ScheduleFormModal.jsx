@@ -1,3 +1,5 @@
+import AsyncButton from './AsyncButton.jsx';
+import AsyncForm from './AsyncForm.jsx';
 import { useState, useEffect } from 'react';
 import { createSchedule, updateSchedule } from '../services/scheduleService.js';
 import { getSubjects, getSemesters } from '../services/subjectService.js';
@@ -98,7 +100,7 @@ const ScheduleFormModal = ({ schedule, defaultDate, onClose }) => {
       } else {
         await createSchedule(form);
       }
-      onClose(true);
+      await onClose(true);
     } catch (err) {
       setError(getErrorMessage(err));
     } finally {
@@ -114,7 +116,7 @@ const ScheduleFormModal = ({ schedule, defaultDate, onClose }) => {
       size="toms-modal-lg"
       scrollable
     >
-      <form onSubmit={handleSubmit}>
+      <AsyncForm onSubmit={handleSubmit}>
         <div className="toms-modal-body">
           {error && <div className="alert alert-danger">{error}</div>}
           <div className="row g-3">
@@ -237,12 +239,12 @@ const ScheduleFormModal = ({ schedule, defaultDate, onClose }) => {
               </div>
         </div>
         <div className="toms-modal-footer">
-          <button type="button" className="btn btn-secondary" onClick={() => onClose(false)}>Cancel</button>
-          <button type="submit" className="btn btn-primary" disabled={loading}>
+          <AsyncButton type="button" className="btn btn-secondary" onClick={() => onClose(false)}>Cancel</AsyncButton>
+          <AsyncButton type="submit" className="btn btn-primary" disabled={loading}>
             {loading ? 'Saving...' : isEdit ? 'Update' : 'Schedule'}
-          </button>
+          </AsyncButton>
         </div>
-      </form>
+      </AsyncForm>
     </Modal>
   );
 };

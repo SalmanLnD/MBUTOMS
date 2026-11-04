@@ -19,12 +19,20 @@ const query = rows => ({ select() { return this; }, populate() { return this; },
 
 test('break is pending on submission and has a distinct request type', async t => {
   let created;
+  const session = {};
+  t.mock.method(Leave.db, 'transaction', async callback => callback(session));
+  t.mock.method(Trainer, 'updateOne', async () => ({ matchedCount: 1 }));
+  t.mock.method(Leave, 'find', () => ({ session: () => ({ lean: async () => [] }) }));
   t.mock.method(Trainer, 'findById', async () => ({ _id: 'trainer', employeeId: '100' }));
   t.mock.method(Schedule, 'find', () => query([]));
   t.mock.method(Subject, 'find', () => query([]));
   t.mock.method(ClassCancellation, 'find', () => query([]));
   t.mock.method(OfficialHoliday, 'find', () => query([]));
-  t.mock.method(Leave, 'create', async value => { created = new Leave(value); return created; });
+  t.mock.method(Leave, 'create', async (values, options) => {
+    assert.equal(options.session, session);
+    created = new Leave(values[0]);
+    return [created];
+  });
   t.mock.method(Leave, 'findById', () => query(created));
   clearSubjectStartDateCache();
   const res = { status() { return this; }, json() {} };

@@ -1,3 +1,5 @@
+import AsyncButton from '../components/AsyncButton.jsx';
+import AsyncForm from '../components/AsyncForm.jsx';
 import { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import LoadingSpinner from '../components/LoadingSpinner.jsx';
@@ -107,7 +109,7 @@ const PublicFeedbackForm = () => {
 
   return (
     <div className="feedback-public-page">
-      <form className="feedback-form-shell" onSubmit={handleSubmit}>
+      <AsyncForm className="feedback-form-shell" onSubmit={handleSubmit}>
         <div className="feedback-form-header">
           <h1>{form.title}</h1>
           {form.description && <p className="text-muted mb-0">{form.description}</p>}
@@ -126,11 +128,11 @@ const PublicFeedbackForm = () => {
         ))}
 
         <div className="d-flex justify-content-end">
-          <button type="submit" className="btn btn-primary px-4" disabled={submitting}>
+          <AsyncButton type="submit" className="btn btn-primary px-4" disabled={submitting}>
             {submitting ? 'Submitting...' : 'Submit'}
-          </button>
+          </AsyncButton>
         </div>
-      </form>
+      </AsyncForm>
     </div>
   );
 };

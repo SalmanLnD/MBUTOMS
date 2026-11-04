@@ -1,3 +1,5 @@
+import AsyncButton from './AsyncButton.jsx';
+import AsyncForm from './AsyncForm.jsx';
 import { useEffect, useState } from 'react';
 import Modal from './Modal.jsx';
 import { createCompliance } from '../services/plpService.js';
@@ -47,7 +49,7 @@ const ComplianceFormModal = ({
         date,
         remark: remark.trim(),
       });
-      onCreated(result);
+      await onCreated(result);
     } catch (err) {
       setError(getErrorMessage(err));
     } finally {
@@ -57,7 +59,7 @@ const ComplianceFormModal = ({
 
   return (
     <Modal show={show} title="Add Compliance" onClose={onClose}>
-      <form onSubmit={handleSubmit}>
+      <AsyncForm onSubmit={handleSubmit}>
         <div className="toms-modal-body">
           {error && <div className="alert alert-danger">{error}</div>}
 
@@ -110,14 +112,14 @@ const ComplianceFormModal = ({
           </div>
         </div>
         <div className="toms-modal-footer">
-          <button type="button" className="btn btn-secondary" onClick={onClose} disabled={saving}>
+          <AsyncButton type="button" className="btn btn-secondary" onClick={onClose} disabled={saving}>
             Cancel
-          </button>
-          <button type="submit" className="btn btn-primary" disabled={saving}>
+          </AsyncButton>
+          <AsyncButton type="submit" className="btn btn-primary" disabled={saving}>
             {saving ? 'Saving...' : 'Add compliance'}
-          </button>
+          </AsyncButton>
         </div>
-      </form>
+      </AsyncForm>
     </Modal>
   );
 };

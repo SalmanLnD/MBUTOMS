@@ -1,3 +1,4 @@
+import AsyncButton from './AsyncButton.jsx';
 import { Fragment, useCallback, useEffect, useMemo, useState } from 'react';
 import LoadingSpinner from './LoadingSpinner.jsx';
 import StyledSelect from './StyledSelect.jsx';
@@ -164,13 +165,13 @@ const TopicTrackerClassSummaryTab = ({
                               {cls.avgAttendance != null ? `${cls.avgAttendance}%` : '-'}
                             </td>
                             <td className="text-end">
-                              <button
+                              <AsyncButton
                                 type="button"
                                 className="btn btn-sm btn-outline-primary"
                                 onClick={() => setExpandedClass(isExpanded ? '' : expandKey)}
                               >
                                 {isExpanded ? 'Hide topics' : 'View topics'}
-                              </button>
+                              </AsyncButton>
                             </td>
                           </tr>
                           {isExpanded && (

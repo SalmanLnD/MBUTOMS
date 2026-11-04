@@ -1,11 +1,14 @@
-import { useEffect, useMemo, useState } from 'react';
+import AsyncButton from '../components/AsyncButton.jsx';
+import { useEffect, useMemo, useState, lazy, Suspense } from 'react';
 import { useLocation } from 'react-router-dom';
-import FeedbackSection from '../components/FeedbackSection.jsx';
-import ObservationsTab from '../components/ObservationsTab.jsx';
-import PlpTab from '../components/PlpTab.jsx';
-import ComplianceTab from '../components/ComplianceTab.jsx';
+import LoadingSpinner from '../components/LoadingSpinner.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
 import { FULL_ACCESS_ROLES, ROLES } from '../utils/roles.js';
+
+const FeedbackSection = lazy(() => import('../components/FeedbackSection.jsx'));
+const ObservationsTab = lazy(() => import('../components/ObservationsTab.jsx'));
+const PlpTab = lazy(() => import('../components/PlpTab.jsx'));
+const ComplianceTab = lazy(() => import('../components/ComplianceTab.jsx'));
 
 const Performance = () => {
   const { user } = useAuth();
@@ -25,7 +28,10 @@ const Performance = () => {
     return next;
   }, [canSeeFeedback, canManagePlp]);
 
-  const [activeTab, setActiveTab] = useState(tabs[0]?.id || 'observations');
+  const [activeTab, setActiveTab] = useState(() => {
+    const requested = new URLSearchParams(location.search).get('tab');
+    return tabs.some(tab => tab.id === requested) ? requested : (tabs[0]?.id || 'observations');
+  });
 
   useEffect(() => {
     const requested = new URLSearchParams(location.search).get('tab');
@@ -44,7 +50,7 @@ const Performance = () => {
         <ul className="nav nav-tabs mb-3" role="tablist">
           {tabs.map((tab) => (
             <li className="nav-item" key={tab.id} role="presentation">
-              <button
+              <AsyncButton
                 type="button"
                 role="tab"
                 className={`nav-link ${activeTab === tab.id ? 'active' : ''}`}
@@ -52,7 +58,7 @@ const Performance = () => {
                 onClick={() => setActiveTab(tab.id)}
               >
                 {tab.label}
-              </button>
+              </AsyncButton>
             </li>
           ))}
         </ul>
@@ -60,10 +66,12 @@ const Performance = () => {
 
       <div className="card table-card">
         <div className="card-body">
+          <Suspense fallback={<LoadingSpinner message="Loading performance data…" />}>
           {activeTab === 'feedback' && canSeeFeedback && <FeedbackSection />}
           {activeTab === 'observations' && <ObservationsTab />}
           {activeTab === 'compliance' && canManagePlp && <ComplianceTab />}
           {activeTab === 'plp' && canManagePlp && <PlpTab />}
+          </Suspense>
         </div>
       </div>
     </>

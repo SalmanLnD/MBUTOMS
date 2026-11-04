@@ -1,3 +1,4 @@
+import AsyncButton from './AsyncButton.jsx';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import LoadingSpinner from './LoadingSpinner.jsx';
 import Pagination from './Pagination.jsx';
@@ -71,9 +72,9 @@ const LatePunchPhoto = ({ item, onOpen }) => {
     return <div className="late-punch-photo late-punch-photo--empty">Loading photo</div>;
   }
   return (
-    <button type="button" className="late-punch-photo-button" aria-label="View punch photo" onClick={() => onOpen(src)}>
+    <AsyncButton type="button" className="late-punch-photo-button" aria-label="View punch photo" onClick={() => onOpen(src)}>
       <img src={src} alt="Punch-in photo" className="late-punch-photo" onError={() => setFailed(true)} />
-    </button>
+    </AsyncButton>
   );
 };
 
@@ -140,7 +141,7 @@ const LateMisconductTab = () => {
       showSuccess(result.message || 'Review saved');
       setPendingAction(null);
       refreshActionCounts();
-      loadItems();
+      await loadItems();
     } catch (err) {
       showError(getErrorMessage(err));
     } finally {
@@ -283,20 +284,20 @@ const LateMisconductTab = () => {
                       </span>
                     ) : (
                       <div className="d-flex flex-wrap gap-2">
-                        <button
+                        <AsyncButton
                           type="button"
                           className="btn btn-sm btn-primary"
                           onClick={() => setPendingAction({ item, action: 'mark' })}
                         >
                           {item.nextMarkOutcome === 'warning' ? 'Mark warning' : 'Mark misconduct'}
-                        </button>
-                        <button
+                        </AsyncButton>
+                        <AsyncButton
                           type="button"
                           className="btn btn-sm btn-outline-secondary"
                           onClick={() => setPendingAction({ item, action: 'dismiss' })}
                         >
                           Not late
-                        </button>
+                        </AsyncButton>
                       </div>
                     )}
                   </td>

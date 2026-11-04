@@ -1,3 +1,4 @@
+import AsyncButton from '../components/AsyncButton.jsx';
 import { useState, useEffect } from 'react';
 import LoadingSpinner from '../components/LoadingSpinner.jsx';
 import Pagination from '../components/Pagination.jsx';
@@ -101,7 +102,7 @@ const Venues = () => {
       await deleteVenue(pendingDelete.id);
       showSuccess('Venue deleted successfully');
       setPendingDelete(null);
-      fetchVenues();
+      await fetchVenues();
     } catch (err) {
       showError(getErrorMessage(err));
     }
@@ -112,7 +113,7 @@ const Venues = () => {
       <ul className="nav nav-tabs mb-3 venues-tabs" role="tablist">
         {VENUE_TABS.map((tab) => (
           <li key={tab.id} className="nav-item" role="presentation">
-            <button
+            <AsyncButton
               type="button"
               role="tab"
               className={`nav-link ${activeTab === tab.id ? 'active' : ''}`}
@@ -120,7 +121,7 @@ const Venues = () => {
               onClick={() => setActiveTab(tab.id)}
             >
               {tab.label}
-            </button>
+            </AsyncButton>
           </li>
         ))}
       </ul>
@@ -204,9 +205,9 @@ const Venues = () => {
             </CollapsibleFilters>
             {canManage && (
                 <div className="page-create-action">
-                  <button className="btn btn-primary" onClick={() => { setEditingVenue(null); setShowModal(true); }}>
+                  <AsyncButton className="btn btn-primary" onClick={() => { setEditingVenue(null); setShowModal(true); }}>
                     + Add Venue
-                  </button>
+                  </AsyncButton>
                 </div>
               )}
 
@@ -264,13 +265,13 @@ const Venues = () => {
                                   )}
                                 </div>
                               ) : (
-                                <button
+                                <AsyncButton
                                   type="button"
                                   className="btn btn-outline-primary btn-sm"
                                   onClick={() => setViewingVenue(venue)}
                                 >
                                   View
-                                </button>
+                                </AsyncButton>
                               )}
                             </td>
                           </tr>
@@ -296,10 +297,10 @@ const Venues = () => {
       {showModal && canManage && (
         <VenueFormModal
           venue={editingVenue}
-          onClose={(saved) => {
+          onClose={async (saved) => {
             setShowModal(false);
             setEditingVenue(null);
-            if (saved) { showSuccess('Venue saved successfully'); fetchVenues(); }
+            if (saved) { showSuccess('Venue saved successfully'); await fetchVenues(); }
           }}
         />
       )}

@@ -1,3 +1,4 @@
+import AsyncButton from './AsyncButton.jsx';
 import { useEffect, useRef, useState } from 'react';
 import { version } from '../../package.json';
 import { useAuth } from '../context/AuthContext.jsx';
@@ -117,43 +118,43 @@ const DeviceSettings = () => {
   };
 
   return <>
-    <button type="button" className="btn btn-outline-primary btn-sm device-settings-trigger"
+    <AsyncButton type="button" className="btn btn-outline-primary btn-sm device-settings-trigger"
       aria-label="Install TOMS and notifications" title="Install TOMS & notifications" onClick={() => { setOpen(true); setMessage(''); }}>
       <DownloadIcon size={18} />
-    </button>
+    </AsyncButton>
     <Modal show={open} onClose={() => { if (!busy && !setupRequired) setOpen(false); }}
       title={setupRequired ? `Set up TOMS v${version}` : 'TOMS on this device'} dismissible={!busy && !setupRequired} scrollable
       footer={setupRequired && <>
-        <button type="button" className="btn btn-outline-secondary" onClick={skipSetup} disabled={busy}>Skip for now</button>
-        <button type="button" className="btn btn-primary" onClick={finishSetup} disabled={busy || !canContinue}>
+        <AsyncButton type="button" className="btn btn-outline-secondary" onClick={skipSetup} disabled={busy}>Skip for now</AsyncButton>
+        <AsyncButton type="button" className="btn btn-primary" onClick={finishSetup} disabled={busy || !canContinue}>
         {pushUnavailable ? 'Continue without notifications' : 'Continue to TOMS'}
-      </button></>}>
+      </AsyncButton></>}>
       <div className="toms-modal-body device-settings" data-refresh={refresh}>
         {setupRequired && <p className="device-setup-intro">Install TOMS and enable notifications, or skip for now and continue in your browser. You can set these up later from the top bar.</p>}
         <section className="device-settings-card" aria-labelledby="device-install-title">
           <div className="device-settings-heading"><DownloadIcon size={22} /><h3 id="device-install-title">Keep TOMS a tap away</h3></div>
           <p>Open your dashboard from a TOMS icon on your Home Screen or desktop app launcher.</p>
-          <button type="button" className="btn btn-primary" onClick={handleInstall} disabled={installed || busy}>
+          <AsyncButton type="button" className="btn btn-primary" onClick={handleInstall} disabled={installed || busy}>
             {installed ? 'TOMS is installed' : 'Add to Home Screen'}
-          </button>
+          </AsyncButton>
           {!installed && (guide || ios) && <div className="device-install-guide">
             {ios ? <ol><li>Open TOMS in Safari and tap the Share button.</li><li>Choose <strong>Add to Home Screen</strong> (you may need to scroll).</li><li>Keep <strong>Open as Web App</strong> on if shown, then tap <strong>Add</strong>.</li></ol>
               : <p>Open your browser menu and choose <strong>Install TOMS</strong>, <strong>Install app</strong>, or <strong>Add to Home Screen</strong>. If no install option appears, open TOMS in Chrome or Edge, or create a browser shortcut to the dashboard.</p>}
             {ios && <p className="device-settings-hint">After adding it, open TOMS from your Home Screen to finish setup.</p>}
-            {!ios && !getInstallPrompt() && <button type="button" className="btn btn-outline-primary btn-sm" onClick={acknowledgeTomsInstallation}>
+            {!ios && !getInstallPrompt() && <AsyncButton type="button" className="btn btn-outline-primary btn-sm" onClick={acknowledgeTomsInstallation}>
               I've added the shortcut
-            </button>}
+            </AsyncButton>}
           </div>}
         </section>
         <section className="device-settings-card" aria-labelledby="device-push-title">
           <div className="device-settings-heading"><BellIcon size={22} /><h3 id="device-push-title">Stay up to date</h3></div>
           <p>Receive your replacements, ticket updates, observations and tracker alerts, even when TOMS is closed.</p>
           {notificationReason && <p className="device-settings-note">{notificationReason}</p>}
-          <button type="button" className={`btn ${enabled ? 'btn-outline-secondary' : 'btn-primary'}`}
+          <AsyncButton type="button" className={`btn ${enabled ? 'btn-outline-secondary' : 'btn-primary'}`}
             onClick={handleNotifications} disabled={busy || (!enabled && Boolean(notificationReason)) || user?.isDemo || user?.impersonating || (setupRequired && enabled)}>
             {busy ? 'Please wait…' : enabled ? setupRequired ? 'Notifications enabled' : 'Turn off device notifications' : 'Enable notifications'}
-          </button>
-          {loadError && <button type="button" className="btn btn-outline-primary ms-2" onClick={() => setRetry(value => value + 1)}>Retry setup</button>}
+          </AsyncButton>
+          {loadError && <AsyncButton type="button" className="btn btn-outline-primary ms-2" onClick={() => setRetry(value => value + 1)}>Retry setup</AsyncButton>}
           <p className="device-settings-hint">You choose whether to allow notifications. This setting applies to this device.</p>
         </section>
         {message && <p role="status" className="device-settings-status">{message}</p>}

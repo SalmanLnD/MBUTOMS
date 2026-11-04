@@ -1,3 +1,5 @@
+import AsyncButton from '../components/AsyncButton.jsx';
+import AsyncForm from '../components/AsyncForm.jsx';
 import { useRef, useState, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import LoadingSpinner from '../components/LoadingSpinner.jsx';
@@ -57,11 +59,11 @@ const Tickets = () => {
   const [highlightedTicketId, setHighlightedTicketId] = useState(ticketTarget);
   const highlightedRowRef = useRef(null);
 
-  const fetchTickets = async (signal) => {
+  const fetchTickets = async (signal, requestedPage = page) => {
     setLoading(true);
     try {
       const data = await getTickets({
-        page,
+        page: requestedPage,
         limit: pageSize,
         status: statusFilter,
         type: typeFilter,
@@ -129,7 +131,7 @@ const Tickets = () => {
       showSuccess('Ticket raised successfully');
       setShowCreateForm(false);
       setPage(1);
-      fetchTickets();
+      await fetchTickets(undefined, 1);
     } catch (err) {
       showError(getErrorMessage(err));
     }
@@ -149,7 +151,7 @@ const Tickets = () => {
       showSuccess('Ticket status updated');
       setPendingUpdate(null);
       refreshActionCounts();
-      fetchTickets();
+      await fetchTickets();
     } catch (err) {
       showError(getErrorMessage(err));
     }
@@ -192,9 +194,9 @@ const Tickets = () => {
             }))}
           />
         </div>
-        <button type="button" className="btn btn-primary" onClick={openCreateForm}>
+        <AsyncButton type="button" className="btn btn-primary" onClick={openCreateForm}>
           Raise Ticket
-        </button>
+        </AsyncButton>
       </div>
 
       {loading ? (
@@ -248,21 +250,21 @@ const Tickets = () => {
                     <td>{formatDateTime(ticket.createdAt)}</td>
                     <td>
                       <div className="d-flex gap-2">
-                        <button
+                        <AsyncButton
                           type="button"
                           className="btn btn-outline-secondary btn-sm"
                           onClick={() => setSelectedTicket(ticket)}
                         >
                           View
-                        </button>
+                        </AsyncButton>
                         {isAdmin && (
-                          <button
+                          <AsyncButton
                             type="button"
                             className="btn btn-outline-primary btn-sm"
                             onClick={() => openUpdateModal(ticket)}
                           >
                             Update
-                          </button>
+                          </AsyncButton>
                         )}
                       </div>
                     </td>
@@ -284,7 +286,7 @@ const Tickets = () => {
 
       {showCreateForm && (
         <Modal show title="Raise Ticket" onClose={() => setShowCreateForm(false)}>
-          <form onSubmit={handleCreateSubmit}>
+          <AsyncForm onSubmit={handleCreateSubmit}>
             <div className="toms-modal-body">
               {isAdmin && (
                 <div className="mb-3">
@@ -336,12 +338,12 @@ const Tickets = () => {
               </div>
             </div>
             <div className="toms-modal-footer">
-              <button type="button" className="btn btn-secondary" onClick={() => setShowCreateForm(false)}>
+              <AsyncButton type="button" className="btn btn-secondary" onClick={() => setShowCreateForm(false)}>
                 Cancel
-              </button>
-              <button type="submit" className="btn btn-primary">Submit Ticket</button>
+              </AsyncButton>
+              <AsyncButton type="submit" className="btn btn-primary">Submit Ticket</AsyncButton>
             </div>
-          </form>
+          </AsyncForm>
         </Modal>
       )}
 
@@ -409,7 +411,7 @@ const Tickets = () => {
           </div>
           <div className="toms-modal-footer">
             {isAdmin && (
-              <button
+              <AsyncButton
                 type="button"
                 className="btn btn-primary"
                 onClick={() => {
@@ -418,11 +420,11 @@ const Tickets = () => {
                 }}
               >
                 Update Status
-              </button>
+              </AsyncButton>
             )}
-            <button type="button" className="btn btn-secondary" onClick={() => setSelectedTicket(null)}>
+            <AsyncButton type="button" className="btn btn-secondary" onClick={() => setSelectedTicket(null)}>
               Close
-            </button>
+            </AsyncButton>
           </div>
         </Modal>
       )}
@@ -433,7 +435,7 @@ const Tickets = () => {
           title={`Update Ticket ${pendingUpdate.ticketId}`}
           onClose={() => setPendingUpdate(null)}
         >
-          <form onSubmit={handleUpdateSubmit}>
+          <AsyncForm onSubmit={handleUpdateSubmit}>
             <div className="toms-modal-body">
               <div className="mb-3">
                 <label className="form-label">Current Status</label>
@@ -490,12 +492,12 @@ const Tickets = () => {
               </div>
             </div>
             <div className="toms-modal-footer">
-              <button type="button" className="btn btn-secondary" onClick={() => setPendingUpdate(null)}>
+              <AsyncButton type="button" className="btn btn-secondary" onClick={() => setPendingUpdate(null)}>
                 Cancel
-              </button>
-              <button type="submit" className="btn btn-primary">Save Update</button>
+              </AsyncButton>
+              <AsyncButton type="submit" className="btn btn-primary">Save Update</AsyncButton>
             </div>
-          </form>
+          </AsyncForm>
         </Modal>
       )}
     </>

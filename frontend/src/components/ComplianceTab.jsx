@@ -1,3 +1,4 @@
+import AsyncButton from './AsyncButton.jsx';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import LoadingSpinner from './LoadingSpinner.jsx';
 import Pagination from './Pagination.jsx';
@@ -93,7 +94,7 @@ const ComplianceTab = () => {
       await deleteCompliance(pendingDelete._id);
       showSuccess('Compliance record deleted');
       setPendingDelete(null);
-      loadItems();
+      await loadItems();
     } catch (err) {
       showError(getErrorMessage(err));
     }
@@ -124,13 +125,13 @@ const ComplianceTab = () => {
           />
         </div>
         <div className="col-md-4 text-md-end">
-          <button
+          <AsyncButton
             type="button"
             className="btn btn-primary"
             onClick={() => setShowAddModal(true)}
           >
             Add compliance
-          </button>
+          </AsyncButton>
         </div>
       </div>
 
@@ -199,7 +200,7 @@ const ComplianceTab = () => {
           onCreated={() => {
             setShowAddModal(false);
             showSuccess('Compliance recorded');
-            loadItems();
+            return loadItems();
           }}
         />
       )}

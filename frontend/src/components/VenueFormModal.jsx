@@ -1,3 +1,5 @@
+import AsyncButton from './AsyncButton.jsx';
+import AsyncForm from './AsyncForm.jsx';
 import { useState, useEffect } from 'react';
 import { createVenue, updateVenue } from '../services/venueService.js';
 import { getErrorMessage } from '../utils/helpers.js';
@@ -53,7 +55,7 @@ const VenueFormModal = ({ venue, onClose }) => {
       } else {
         await createVenue(payload);
       }
-      onClose(true);
+      await onClose(true);
     } catch (err) {
       setError(getErrorMessage(err));
     } finally {
@@ -63,7 +65,7 @@ const VenueFormModal = ({ venue, onClose }) => {
 
   return (
     <Modal show title={isEdit ? 'Edit Venue' : 'Add Venue'} onClose={() => onClose(false)}>
-      <form onSubmit={handleSubmit}>
+      <AsyncForm onSubmit={handleSubmit}>
         <div className="toms-modal-body">
           {error && <div className="alert alert-danger">{error}</div>}
           <div className="row g-3">
@@ -107,12 +109,12 @@ const VenueFormModal = ({ venue, onClose }) => {
               </div>
         </div>
         <div className="toms-modal-footer">
-          <button type="button" className="btn btn-secondary" onClick={() => onClose(false)}>Cancel</button>
-          <button type="submit" className="btn btn-primary" disabled={loading}>
+          <AsyncButton type="button" className="btn btn-secondary" onClick={() => onClose(false)}>Cancel</AsyncButton>
+          <AsyncButton type="submit" className="btn btn-primary" disabled={loading}>
             {loading ? 'Saving...' : isEdit ? 'Update' : 'Create'}
-          </button>
+          </AsyncButton>
         </div>
-      </form>
+      </AsyncForm>
     </Modal>
   );
 };

@@ -1,3 +1,5 @@
+import AsyncButton from './AsyncButton.jsx';
+import AsyncForm from './AsyncForm.jsx';
 import { useEffect, useState } from 'react';
 import Modal from './Modal.jsx';
 import StyledSelect from './StyledSelect.jsx';
@@ -94,7 +96,7 @@ const AddSlotReplacementModal = ({ show, onClose, onCreated }) => {
         reason: form.reason.trim() || undefined,
       });
       showSuccess('Slot replacement request added');
-      onCreated?.();
+      await onCreated?.();
       onClose();
     } catch (err) {
       showError(getErrorMessage(err));
@@ -105,7 +107,7 @@ const AddSlotReplacementModal = ({ show, onClose, onCreated }) => {
 
   return (
     <Modal show={show} title="Add Slot Replacement" onClose={onClose} size="toms-modal-lg">
-      <form onSubmit={handleSubmit}>
+      <AsyncForm onSubmit={handleSubmit}>
         <div className="toms-modal-body">
           <p className="text-muted small">
             Use this when a trainer needs cover for a single class, without applying leave for the full day.
@@ -188,18 +190,18 @@ const AddSlotReplacementModal = ({ show, onClose, onCreated }) => {
           )}
         </div>
         <div className="toms-modal-footer">
-          <button type="button" className="btn btn-secondary" onClick={onClose} disabled={submitting}>
+          <AsyncButton type="button" className="btn btn-secondary" onClick={onClose} disabled={submitting}>
             Cancel
-          </button>
-          <button
+          </AsyncButton>
+          <AsyncButton
             type="submit"
             className="btn btn-primary"
             disabled={submitting || loadingTrainers || !form.scheduleId}
           >
             {submitting ? 'Adding...' : 'Add Replacement'}
-          </button>
+          </AsyncButton>
         </div>
-      </form>
+      </AsyncForm>
     </Modal>
   );
 };

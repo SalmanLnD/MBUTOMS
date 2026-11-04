@@ -2,6 +2,7 @@ import { useEffect, useId, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { lockBodyScroll, unlockBodyScroll } from '../utils/modalManager.js';
 import { cleanupBootstrapArtifacts } from '../utils/modalCleanup.js';
+import { AsyncActionScopeContext, useAsyncActionScope } from '../context/AsyncActionScope.jsx';
 
 const Modal = ({
   show,
@@ -19,7 +20,10 @@ const Modal = ({
   const dialogRef = useRef(null);
   const overlayRef = useRef(null);
   const onCloseRef = useRef(onClose);
-  onCloseRef.current = onClose;
+  const actionScope = useAsyncActionScope();
+  onCloseRef.current = () => {
+    if (!closeDisabled && !actionScope.hasPending()) onClose?.();
+  };
 
   useEffect(() => {
     if (!show) return undefined;
@@ -80,6 +84,7 @@ const Modal = ({
     .join(' ');
 
   return createPortal(
+    <AsyncActionScopeContext.Provider value={actionScope}>
     <div
       className="toms-modal-overlay"
       ref={overlayRef}
@@ -107,7 +112,7 @@ const Modal = ({
                   className="btn-close"
                   onClick={() => onCloseRef.current?.()}
                   aria-label="Close"
-                  disabled={closeDisabled}
+                  disabled={closeDisabled || actionScope.pending}
                 />
               )}
             </div>
@@ -116,7 +121,8 @@ const Modal = ({
           {footer && <div className="toms-modal-footer">{footer}</div>}
         </div>
       </div>
-    </div>,
+    </div>
+    </AsyncActionScopeContext.Provider>,
     document.body
   );
 };

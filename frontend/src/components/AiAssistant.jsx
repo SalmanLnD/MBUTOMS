@@ -1,3 +1,5 @@
+import AsyncButton from './AsyncButton.jsx';
+import AsyncForm from './AsyncForm.jsx';
 import { useEffect, useRef, useState } from 'react';
 import { sendAiMessage } from '../services/aiService.js';
 import { isAbortError } from '../services/api.js';
@@ -70,7 +72,7 @@ const AiAssistant = ({ open, onClose, usage, usageError, refreshUsage }) => {
           : failure.response?.status === 503 ? 'Sallu is temporarily unavailable. Please try again shortly.' : 'Could not get an answer. Please try again.');
     } finally {
       if (!controller.signal.aborted) { setBusy(false); request.current = null; }
-      refreshUsage();
+      await refreshUsage();
     }
   };
 
@@ -81,25 +83,25 @@ const AiAssistant = ({ open, onClose, usage, usageError, refreshUsage }) => {
       }}>
       <header className="ai-assistant__header">
         <div className="ai-assistant__identity"><SalluAvatar size={40} state={open && busy ? 'thinking' : open && speaking ? 'speaking' : 'idle'} /><div><h2 id="ai-assistant-title">Sallu</h2><p>Your TOMS assistant · Read-only</p></div></div>
-        <button type="button" className="ai-assistant__close" onClick={onClose} aria-label="Close Sallu">×</button>
+        <AsyncButton type="button" className="ai-assistant__close" onClick={onClose} aria-label="Close Sallu">×</AsyncButton>
       </header>
       <div className="ai-assistant__messages" role="log" aria-label="Assistant conversation" aria-live="polite" aria-relevant="additions text">
         {!messages.length && <div className="ai-assistant__welcome">
           <h3>Hi, I’m Sallu.</h3><p>Ask about schedules, replacements, hours or topic tracking.</p>
           <div className="ai-assistant__suggestions">
-            {AI_SUGGESTED_QUESTIONS.map((question) => <button key={question} type="button" disabled={busy || unavailable || voice.listening} onClick={() => send(question)}>{question}<span aria-hidden="true">↗</span></button>)}
+            {AI_SUGGESTED_QUESTIONS.map((question) => <AsyncButton key={question} type="button" disabled={busy || unavailable || voice.listening} onClick={() => send(question)}>{question}<span aria-hidden="true">↗</span></AsyncButton>)}
           </div>
         </div>}
         {messages.map((message, index) => <article key={index} className={`ai-assistant__message ai-assistant__message--${message.role}`}>
           <span>{message.role === 'user' ? 'You' : <><SalluAvatar size={22} state={open && speaking && index === messages.length - 1 ? 'speaking' : 'idle'} />Sallu</>}</span><p>{message.text}</p>
         </article>)}
         {busy && <p className="ai-assistant__status" role="status"><SalluAvatar size={32} state={open ? 'thinking' : 'idle'} /><span>{SALLU_LOADING_MESSAGES[loadingIndex]}</span></p>}
-        {error && <div className="ai-assistant__error" role="alert"><p>{error}</p><button type="button" disabled={busy || unavailable} onClick={() => send(lastQuestion.current, true)}>Retry</button></div>}
+        {error && <div className="ai-assistant__error" role="alert"><p>{error}</p><AsyncButton type="button" disabled={busy || unavailable} onClick={() => send(lastQuestion.current, true)}>Retry</AsyncButton></div>}
         <div ref={end} />
       </div>
-      <form className="ai-assistant__composer" onSubmit={(event) => { event.preventDefault(); send(draft); }}>
+      <AsyncForm className="ai-assistant__composer" onSubmit={(event) => { event.preventDefault(); return send(draft); }}>
         <div className="ai-assistant__quota" aria-live="polite">
-          {usageError ? <>Usage unavailable. <button type="button" onClick={() => refreshUsage()}>Refresh</button></>
+          {usageError ? <>Usage unavailable. <AsyncButton type="button" onClick={() => refreshUsage()}>Refresh</AsyncButton></>
             : !usage ? 'Loading your allowance…' : !usage.configured ? 'Sallu is paused until the free API quotas are configured.'
               : usage.sharedExhausted ? <>The shared free API budget is exhausted.<small>Resets {new Date(usage.resetAt).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', dateStyle: 'medium', timeStyle: 'short' })} IST</small></>
               : <>{usage.unlimitedPersonal ? null : `${usage.remaining} of ${usage.questionsPerDay} questions left today / ${usage.questionsPerMinute} per minute`}
@@ -113,16 +115,16 @@ const AiAssistant = ({ open, onClose, usage, usageError, refreshUsage }) => {
             onKeyDown={(event) => {
               if (event.key === 'Enter' && !event.shiftKey && !event.nativeEvent.isComposing) { event.preventDefault(); send(draft); }
             }} />
-          <button type="button" className="ai-assistant__mic" disabled={busy || unavailable || !voice.supported}
+          <AsyncButton type="button" className="ai-assistant__mic" disabled={busy || unavailable || !voice.supported}
             onClick={voice.toggle} aria-pressed={voice.listening} aria-label={voice.listening ? 'Stop voice input' : 'Start voice input'}
             title={voice.supported ? 'Dictate your question in English' : 'Voice input is unavailable in this browser'}>
             {voice.listening ? 'Stop' : <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><rect x="9" y="2" width="6" height="12" rx="3" /><path d="M5 10v2a7 7 0 0 0 14 0v-2M12 19v3M8 22h8" /></svg>}
-          </button>
-          <button type="submit" disabled={busy || unavailable || voice.listening || !draft.trim()} aria-label="Send question">Send</button>
+          </AsyncButton>
+          <AsyncButton type="submit" disabled={busy || unavailable || voice.listening || !draft.trim()} aria-label="Send question">Send</AsyncButton>
         </div>
         <p className="ai-assistant__voice-status" role="status">{voice.status || (voice.supported ? 'Use the mic to dictate. Review your text before sending.' : 'Voice input is unavailable in this browser. You can type your question.')}</p>
         <p>Each question is independent. Verify important details in TOMS.</p>
-      </form>
+      </AsyncForm>
     </section>
   );
 };

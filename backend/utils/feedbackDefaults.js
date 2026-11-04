@@ -69,12 +69,33 @@ const isSemesterField = (field) => {
 };
 
 export const formatFeedbackClassLabel = (cls, classes = []) => {
-  const base = `${cls.department || ''} ${cls.section || ''}`.trim();
+  const dept = String(cls?.department || '').trim();
+  const sec = String(cls?.section || '').trim();
+  if (!dept) return '';
+
+  // Special class only departments: show clean department label without trailing dummy section numbers
+  if (['Pharmacy', 'B Pharmacy', 'B Sc'].includes(dept)) {
+    const canonicalDept = dept === 'B Pharmacy' ? 'Pharmacy' : dept;
+    const sameDeptClasses = (classes || []).filter((item) => {
+      const itemDept = String(item?.department || '').trim();
+      return (
+        itemDept === dept ||
+        (canonicalDept === 'Pharmacy' && (itemDept === 'Pharmacy' || itemDept === 'B Pharmacy'))
+      );
+    });
+    const distinctSemesters = new Set(sameDeptClasses.map((item) => item?.currentSemester).filter(Boolean));
+    if (distinctSemesters.size > 1 && cls?.currentSemester) {
+      return `${canonicalDept} · Sem ${cls.currentSemester}`;
+    }
+    return canonicalDept;
+  }
+
+  const base = `${dept} ${sec}`.trim();
   if (!base) return '';
   const duplicates = classes.filter(
-    (item) => `${item.department || ''} ${item.section || ''}`.trim() === base
+    (item) => `${item?.department || ''} ${item?.section || ''}`.trim() === base
   );
-  if (duplicates.length > 1 && cls.currentSemester) {
+  if (duplicates.length > 1 && cls?.currentSemester) {
     return `${base} · Sem ${cls.currentSemester}`;
   }
   return base;

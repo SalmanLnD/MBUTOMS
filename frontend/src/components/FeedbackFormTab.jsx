@@ -1,3 +1,4 @@
+import AsyncButton from './AsyncButton.jsx';
 import { useState, useEffect, useCallback } from 'react';
 import LoadingSpinner from './LoadingSpinner.jsx';
 import StyledSelect from './StyledSelect.jsx';
@@ -177,9 +178,9 @@ const FeedbackFormTab = () => {
       <div className="text-center py-5">
         <h5 className="mb-2">No form for {monthLabel}</h5>
         <p className="text-muted mb-4">Create a feedback form for the current month with default questions.</p>
-        <button type="button" className="btn btn-primary" onClick={handleCreate} disabled={saving}>
+        <AsyncButton type="button" className="btn btn-primary" onClick={handleCreate} disabled={saving}>
           {saving ? 'Creating...' : 'Create form for current month'}
-        </button>
+        </AsyncButton>
       </div>
     );
   }
@@ -190,17 +191,17 @@ const FeedbackFormTab = () => {
   return (
     <div>
       <div className="d-flex flex-wrap gap-2 mb-3 align-items-center">
-        <button type="button" className="btn btn-outline-secondary btn-sm" onClick={() => setPreviewMode((v) => !v)}>
+        <AsyncButton type="button" className="btn btn-outline-secondary btn-sm" onClick={() => setPreviewMode((v) => !v)}>
           {previewMode ? 'Edit form' : 'Preview'}
-        </button>
+        </AsyncButton>
         {!isPublished && (
           <>
-            <button type="button" className="btn btn-outline-primary btn-sm" onClick={handleSave} disabled={saving}>
+            <AsyncButton type="button" className="btn btn-outline-primary btn-sm" onClick={handleSave} disabled={saving || publishing}>
               {saving ? 'Saving...' : 'Save draft'}
-            </button>
-            <button type="button" className="btn btn-primary btn-sm" onClick={handlePublish} disabled={publishing}>
+            </AsyncButton>
+            <AsyncButton type="button" className="btn btn-primary btn-sm" onClick={handlePublish} disabled={publishing || saving}>
               {publishing ? 'Publishing...' : 'Publish and share'}
-            </button>
+            </AsyncButton>
           </>
         )}
         {isPublished && (
@@ -215,15 +216,15 @@ const FeedbackFormTab = () => {
               <div className="fw-medium">Share link</div>
               <a href={shareUrl} target="_blank" rel="noreferrer">{shareUrl}</a>
             </div>
-            <button type="button" className="btn btn-outline-secondary btn-sm" onClick={handleCopyLink}>
+            <AsyncButton type="button" className="btn btn-outline-secondary btn-sm" onClick={handleCopyLink}>
               <CopyIcon size={16} className="me-1" aria-hidden="true" />
               Copy link
-            </button>
+            </AsyncButton>
           </div>
         </div>
       )}
 
-      <div className="feedback-form-shell">
+      <fieldset className="feedback-form-shell border-0 m-0 p-0" disabled={saving || publishing}>
         <div className="feedback-form-header">
           {!previewMode && !isPublished ? (
             <>
@@ -307,13 +308,13 @@ const FeedbackFormTab = () => {
                     />
                     <label className="form-check-label" htmlFor={`required-${field.id}`}>Required</label>
                   </div>
-                  <button
+                  <AsyncButton
                     type="button"
                     className="btn btn-outline-danger btn-sm ms-2"
                     onClick={() => removeField(index)}
                   >
                     Remove
-                  </button>
+                  </AsyncButton>
                 </div>
               </div>
             </div>
@@ -323,18 +324,18 @@ const FeedbackFormTab = () => {
         {!previewMode && !isPublished && (
           <div className="feedback-builder-toolbar">
             {FIELD_TYPES.map((type) => (
-              <button
+              <AsyncButton
                 key={type.value}
                 type="button"
                 className="btn btn-outline-secondary btn-sm"
                 onClick={() => addField(type.value)}
               >
                 + {type.label}
-              </button>
+              </AsyncButton>
             ))}
           </div>
         )}
-      </div>
+      </fieldset>
     </div>
   );
 };

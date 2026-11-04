@@ -1,10 +1,11 @@
 import WhatsappPunchShare from '../models/WhatsappPunchShare.js';
 import { downloadPunchPhoto } from '../services/punchPhotoDrive.js';
+import { isTimingSafeSecretMatch } from '../utils/webhookAuth.js';
 
 const assertWebhookSecret = (req) => {
   const secret = process.env.WHATSAPP_WEBHOOK_SECRET;
   if (!secret) return { ok: false, status: 503, message: 'WhatsApp webhook is not configured' };
-  if (req.headers['x-webhook-secret'] !== secret) {
+  if (!isTimingSafeSecretMatch(req.headers['x-webhook-secret'], secret)) {
     return { ok: false, status: 401, message: 'Invalid webhook secret' };
   }
   return { ok: true };

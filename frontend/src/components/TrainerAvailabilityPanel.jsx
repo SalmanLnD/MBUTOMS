@@ -1,3 +1,4 @@
+import AsyncButton from './AsyncButton.jsx';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import FullCalendar from '@fullcalendar/react';
 import timeGridPlugin from '@fullcalendar/timegrid';
@@ -211,7 +212,7 @@ const TrainerAvailabilityPanel = () => {
 
       <div className="availability-week-toolbar d-flex align-items-center justify-content-between mb-3">
         <div className="btn-group">
-          <button
+          <AsyncButton
             type="button"
             className="btn btn-outline-secondary btn-sm d-inline-flex align-items-center gap-1"
             onClick={() => shiftWeek(-1)}
@@ -220,16 +221,16 @@ const TrainerAvailabilityPanel = () => {
           >
             <ChevronLeftIcon size={16} />
             Previous
-          </button>
-          <button
+          </AsyncButton>
+          <AsyncButton
             type="button"
             className="btn btn-outline-secondary btn-sm"
             onClick={() => setWeekStart(getMonday())}
             disabled={loading}
           >
             Today
-          </button>
-          <button
+          </AsyncButton>
+          <AsyncButton
             type="button"
             className="btn btn-outline-secondary btn-sm d-inline-flex align-items-center gap-1"
             onClick={() => shiftWeek(1)}
@@ -238,7 +239,7 @@ const TrainerAvailabilityPanel = () => {
           >
             Next
             <ChevronRightIcon size={16} />
-          </button>
+          </AsyncButton>
         </div>
         <div className="fw-semibold">{formatWeekRangeLabel(weekStart, weekEnd)}</div>
       </div>
@@ -302,13 +303,13 @@ const TrainerAvailabilityPanel = () => {
                     return (
                       <tr key={trainer._id}>
                         <td className="availability-trainer-col">
-                          <button
+                          <AsyncButton
                             type="button"
                             className="btn btn-link btn-sm p-0 text-start"
                             onClick={() => setSelectedTrainerId(trainer._id)}
                           >
                             {trainer.name}
-                          </button>
+                          </AsyncButton>
                           <div className="small text-muted">{trainer.employeeId}</div>
                         </td>
                         {weekDays.map((day) => {

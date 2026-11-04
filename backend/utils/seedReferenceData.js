@@ -3,6 +3,7 @@ import Semester from '../models/Semester.js';
 import School from '../models/School.js';
 import Department from '../models/Department.js';
 import Subject from '../models/Subject.js';
+import ClassGroup from '../models/ClassGroup.js';
 
 const SEMESTER_DEFS = [
   { name: 'Semester I', number: 1 },
@@ -46,6 +47,10 @@ const DEPARTMENT_DEFS = [
   { code: 'BSC-CS', name: 'B.Sc Computer Science', school: 'SOLAS' },
   { code: 'BCOM-CA', name: 'B.Com Computer Applications', school: 'SOLAS' },
   { code: 'MCA', name: 'Master of Computer Applications', school: 'SOLAS' },
+
+  // Special class only departments
+  { code: 'PHARMACY', name: 'Pharmacy', school: 'SOLAS', description: 'Pharmacy special class department' },
+  { code: 'BSC', name: 'B Sc', school: 'SOLAS', description: 'B Sc special class department' },
 ];
 
 const RETIRED_DEPARTMENT_CODES = ['CE', 'ME'];
@@ -94,6 +99,34 @@ export const ensureReferenceData = async () => {
         code: deptDef.code,
         school: schoolsByCode[deptDef.school]._id,
         description: deptDef.description || '',
+      },
+      { upsert: true, new: true, setDefaultsOnInsert: true }
+    );
+  }
+
+  const solasSchool = schoolsByCode['SOLAS'];
+  if (solasSchool) {
+    await ClassGroup.findOneAndUpdate(
+      { department: 'Pharmacy', section: '1' },
+      {
+        department: 'Pharmacy',
+        section: '1',
+        currentSemester: 'III',
+        py: 2029,
+        school: solasSchool._id,
+        status: 'active',
+      },
+      { upsert: true, new: true, setDefaultsOnInsert: true }
+    );
+    await ClassGroup.findOneAndUpdate(
+      { department: 'B Sc', section: '1' },
+      {
+        department: 'B Sc',
+        section: '1',
+        currentSemester: 'V',
+        py: 2028,
+        school: solasSchool._id,
+        status: 'active',
       },
       { upsert: true, new: true, setDefaultsOnInsert: true }
     );

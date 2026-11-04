@@ -1,3 +1,4 @@
+import AsyncButton from '../components/AsyncButton.jsx';
 import { useState, useEffect } from 'react';
 import Modal from '../components/Modal.jsx';
 import LoadingSpinner from '../components/LoadingSpinner.jsx';
@@ -108,7 +109,7 @@ const Subjects = () => {
         setSelectedSubject(null);
       }
       setPendingDelete(null);
-      fetchSubjects();
+      await fetchSubjects();
     } catch (err) {
       showError(getErrorMessage(err));
     }
@@ -171,53 +172,53 @@ const Subjects = () => {
         <div>
           <h3 className="h6 fw-semibold mb-2">Resources</h3>
           <div className="d-flex flex-wrap gap-2">
-          <button
+          <AsyncButton
             type="button"
             className="btn btn-outline-primary btn-sm"
             onClick={() => setResourceModal({ type: 'syllabus' })}
           >
             {hasSyllabus ? 'Update Syllabus' : 'Add Syllabus'}
-          </button>
-          <button
+          </AsyncButton>
+          <AsyncButton
             type="button"
             className="btn btn-outline-primary btn-sm"
             onClick={() => setResourceModal({ type: 'cho' })}
           >
             {hasCho ? 'Update CHO' : 'Add CHO'}
-          </button>
-          <button
+          </AsyncButton>
+          <AsyncButton
             type="button"
             className="btn btn-outline-primary btn-sm"
             onClick={() => setResourceModal({ type: 'practicePortal' })}
           >
             {hasPracticePortal ? 'Update Practice Portal' : 'Add Practice Portal'}
-          </button>
+          </AsyncButton>
           {hasSyllabus && (
-            <button
+            <AsyncButton
               type="button"
               className="btn btn-primary btn-sm"
               onClick={() => openExternalLink(selectedSubject.syllabusUrl)}
             >
               Open Syllabus
-            </button>
+            </AsyncButton>
           )}
           {hasCho && (
-            <button
+            <AsyncButton
               type="button"
               className="btn btn-primary btn-sm"
               onClick={() => openExternalLink(selectedSubject.choUrl)}
             >
               Open CHO
-            </button>
+            </AsyncButton>
           )}
           {hasPracticePortal && (
-            <button
+            <AsyncButton
               type="button"
               className="btn btn-primary btn-sm"
               onClick={() => openExternalLink(selectedSubject.practicePortalUrl)}
             >
               Open Practice Portal
-            </button>
+            </AsyncButton>
           )}
           </div>
         </div>
@@ -228,30 +229,30 @@ const Subjects = () => {
       <div>
         <h3 className="h6 fw-semibold mb-2">Resources</h3>
         <div className="d-flex flex-wrap gap-2">
-        <button
+        <AsyncButton
           type="button"
           className="btn btn-primary btn-sm"
           disabled={!hasSyllabus}
           onClick={() => hasSyllabus && openExternalLink(selectedSubject.syllabusUrl)}
         >
           Syllabus
-        </button>
-        <button
+        </AsyncButton>
+        <AsyncButton
           type="button"
           className="btn btn-primary btn-sm"
           disabled={!hasCho}
           onClick={() => hasCho && openExternalLink(selectedSubject.choUrl)}
         >
           CHO
-        </button>
-        <button
+        </AsyncButton>
+        <AsyncButton
           type="button"
           className="btn btn-primary btn-sm"
           disabled={!hasPracticePortal}
           onClick={() => hasPracticePortal && openExternalLink(selectedSubject.practicePortalUrl)}
         >
           Practice Portal
-        </button>
+        </AsyncButton>
         </div>
       </div>
     );
@@ -269,13 +270,13 @@ const Subjects = () => {
             ? `${topicCount} topic${topicCount === 1 ? '' : 's'} configured for the tracker dropdown.`
             : 'No topics configured yet — trainers can enter free text.'}
         </p>
-        <button
+        <AsyncButton
           type="button"
           className="btn btn-outline-primary btn-sm"
           onClick={() => setTopicsModalOpen(true)}
         >
           {topicCount ? 'Manage topics' : 'Add topics'}
-        </button>
+        </AsyncButton>
       </div>
     );
   };
@@ -285,9 +286,9 @@ const Subjects = () => {
       <div className="card table-card mb-3">
         <div className="card-body">
           <CollapsibleFilters label="Subject filters" actions={canManage && (
-            <button className="btn btn-primary" onClick={() => { setEditingSubject(null); setShowModal(true); }}>
+            <AsyncButton className="btn btn-primary" onClick={() => { setEditingSubject(null); setShowModal(true); }}>
               + Add Subject
-            </button>
+            </AsyncButton>
           )}>
           <div className="row g-2 mb-3 align-items-center">
             <div className="col-md-6">
@@ -416,7 +417,7 @@ const Subjects = () => {
       {detailsOpen && selectedSubject && (
         <Modal show title={selectedSubject.name} size="toms-modal-lg" scrollable
           onClose={() => setDetailsOpen(false)}
-          footer={<button type="button" className="btn btn-outline-secondary" onClick={() => setDetailsOpen(false)}>Close</button>}>
+          footer={<AsyncButton type="button" className="btn btn-outline-secondary" onClick={() => setDetailsOpen(false)}>Close</AsyncButton>}>
           <div className="toms-modal-body">
             <div className="row g-3 mb-3">
               <div className="col-sm-4">
@@ -472,12 +473,12 @@ const Subjects = () => {
               setTopicsModalOpen(true);
             }
           }}
-          onClose={(saved) => {
+          onClose={async (saved) => {
             setShowModal(false);
             setEditingSubject(null);
             if (saved) {
               showSuccess('Subject saved successfully');
-              fetchSubjects();
+              await fetchSubjects();
             }
           }}
         />

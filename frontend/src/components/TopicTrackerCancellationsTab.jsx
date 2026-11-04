@@ -1,3 +1,4 @@
+import AsyncButton from './AsyncButton.jsx';
 import { useCallback, useEffect, useState } from 'react';
 import ConfirmModal from './ConfirmModal.jsx';
 import LoadingSpinner from './LoadingSpinner.jsx';
@@ -102,7 +103,7 @@ const TopicTrackerCancellationsTab = ({ highlightEntryId, onHighlightComplete })
         </div>
         <div className="d-flex flex-wrap align-items-end gap-2">
           {statusFilter === 'pending' && pendingCount > 0 && (
-            <button
+            <AsyncButton
               type="button"
               className="btn btn-success btn-sm d-inline-flex align-items-center gap-1"
               onClick={() => setPendingAction({ mode: 'all' })}
@@ -110,7 +111,7 @@ const TopicTrackerCancellationsTab = ({ highlightEntryId, onHighlightComplete })
             >
               <CheckReadIcon size={16} />
               Approve all
-            </button>
+            </AsyncButton>
           )}
           <div style={{ minWidth: '10rem' }}>
           <label className="form-label mb-1" htmlFor="cancel-approval-filter">Show</label>
@@ -192,20 +193,20 @@ const TopicTrackerCancellationsTab = ({ highlightEntryId, onHighlightComplete })
                       <td>
                         {canReview ? (
                           <div className="btn-group btn-group-sm">
-                            <button
+                            <AsyncButton
                               type="button"
                               className="btn btn-outline-success"
                               onClick={() => setPendingAction({ mode: 'one', entry, status: 'approved' })}
                             >
                               Approve
-                            </button>
-                            <button
+                            </AsyncButton>
+                            <AsyncButton
                               type="button"
                               className="btn btn-outline-danger"
                               onClick={() => setPendingAction({ mode: 'one', entry, status: 'rejected' })}
                             >
                               Reject
-                            </button>
+                            </AsyncButton>
                           </div>
                         ) : (
                           <span className="text-muted small text-capitalize">{approval}</span>

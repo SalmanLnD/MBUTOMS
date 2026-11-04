@@ -1,3 +1,5 @@
+import AsyncButton from './AsyncButton.jsx';
+import AsyncForm from './AsyncForm.jsx';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import Modal from './Modal.jsx';
 import StyledSelect from './StyledSelect.jsx';
@@ -221,12 +223,12 @@ const ClassCancellationModal = ({ show, initialDate, onClose, onChanged }) => {
 
   const footer = (
     <>
-      <button type="button" className="btn btn-secondary" onClick={onClose} disabled={saving}>
+      <AsyncButton type="button" className="btn btn-secondary" onClick={onClose} disabled={saving}>
         Close
-      </button>
-      <button type="submit" form="class-cancellation-form" className="btn btn-danger" disabled={saving || loading}>
+      </AsyncButton>
+      <AsyncButton type="submit" form="class-cancellation-form" className="btn btn-danger" disabled={saving || loading}>
         {saving ? 'Applying cancellation...' : 'Apply cancellation'}
-      </button>
+      </AsyncButton>
     </>
   );
 
@@ -241,7 +243,7 @@ const ClassCancellationModal = ({ show, initialDate, onClose, onChanged }) => {
         scrollable
         dismissible={!saving}
       >
-        <form id="class-cancellation-form" className="toms-modal-body" onSubmit={submit}>
+        <AsyncForm id="class-cancellation-form" className="toms-modal-body" onSubmit={submit}>
           <div className="alert alert-warning">
             Cancellations apply only to the selected calendar date. Canceled schedules are excluded
             from trainer class-handling hours, leave affected-class counts, and replacement
@@ -366,17 +368,17 @@ const ClassCancellationModal = ({ show, initialDate, onClose, onChanged }) => {
                       />
                     </div>
                     <div className="d-flex gap-2">
-                      <button type="button" className="btn btn-outline-secondary btn-sm" onClick={selectVisible}>
+                      <AsyncButton type="button" className="btn btn-outline-secondary btn-sm" onClick={selectVisible}>
                         Select visible
-                      </button>
+                      </AsyncButton>
                       {hasClassFilters && (
-                        <button type="button" className="btn btn-outline-secondary btn-sm" onClick={clearClassFilters}>
+                        <AsyncButton type="button" className="btn btn-outline-secondary btn-sm" onClick={clearClassFilters}>
                           Clear filters
-                        </button>
+                        </AsyncButton>
                       )}
-                      <button type="button" className="btn btn-outline-secondary btn-sm" onClick={() => setSelectedIds([])}>
+                      <AsyncButton type="button" className="btn btn-outline-secondary btn-sm" onClick={() => setSelectedIds([])}>
                         Clear
-                      </button>
+                      </AsyncButton>
                     </div>
                   </div>
                   <div className="class-cancellation-schedule-list border rounded p-2">
@@ -448,7 +450,7 @@ const ClassCancellationModal = ({ show, initialDate, onClose, onChanged }) => {
                             {entry.reason ? ` · ${entry.reason}` : ''}
                           </div>
                         </div>
-                        <button
+                        <AsyncButton
                           type="button"
                           className="btn btn-outline-danger btn-sm d-inline-flex align-items-center gap-1"
                           onClick={() => setPendingDelete(entry)}
@@ -456,7 +458,7 @@ const ClassCancellationModal = ({ show, initialDate, onClose, onChanged }) => {
                         >
                           <TrashIcon size={14} aria-hidden="true" />
                           Undo
-                        </button>
+                        </AsyncButton>
                       </div>
                     ))}
                   </div>
@@ -464,7 +466,7 @@ const ClassCancellationModal = ({ show, initialDate, onClose, onChanged }) => {
               )}
             </>
           )}
-        </form>
+        </AsyncForm>
       </Modal>
 
       {pendingDelete && (

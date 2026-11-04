@@ -12,6 +12,9 @@
     "test:interactions": "node scripts/check-interactions.mjs",
     "test:modals": "node scripts/check-modals.mjs",
     "test:page-dialogs": "node scripts/check-page-dialogs.mjs",
+    "test:pending-actions": "node scripts/check-pending-actions.mjs",
+    "test:attendance-actions": "node scripts/check-attendance-actions.mjs",
+    "test:performance": "node scripts/check-performance.mjs",
     "test:modal-stack": "node scripts/check-modal-stack.mjs",
     "test:pet": "node scripts/check-sallu-pet.mjs"
   },

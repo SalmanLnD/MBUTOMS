@@ -1,3 +1,5 @@
+import AsyncButton from './AsyncButton.jsx';
+import AsyncForm from './AsyncForm.jsx';
 import { useState, useEffect } from 'react';
 import { createStudent, updateStudent } from '../services/studentService.js';
 import { getClasses } from '../services/classService.js';
@@ -99,7 +101,7 @@ const StudentFormModal = ({ show, student, defaultClass, onClose, onSaved }) => 
       } else {
         await createStudent(form);
       }
-      onSaved();
+      await onSaved();
     } catch (err) {
       setError(getErrorMessage(err));
     } finally {
@@ -109,7 +111,7 @@ const StudentFormModal = ({ show, student, defaultClass, onClose, onSaved }) => 
 
   return (
     <Modal show={show} title={isEdit ? 'Edit Student' : 'Add Student'} onClose={onClose}>
-      <form onSubmit={handleSubmit}>
+      <AsyncForm onSubmit={handleSubmit}>
         <div className="toms-modal-body">
           {error && <div className="alert alert-danger">{error}</div>}
           <div className="mb-3">
@@ -178,14 +180,14 @@ const StudentFormModal = ({ show, student, defaultClass, onClose, onSaved }) => 
           </div>
         </div>
         <div className="toms-modal-footer">
-          <button type="button" className="btn btn-secondary" onClick={onClose} disabled={loading}>
+          <AsyncButton type="button" className="btn btn-secondary" onClick={onClose} disabled={loading}>
             Cancel
-          </button>
-          <button type="submit" className="btn btn-primary" disabled={loading}>
+          </AsyncButton>
+          <AsyncButton type="submit" className="btn btn-primary" disabled={loading}>
             {loading ? 'Saving...' : 'Save'}
-          </button>
+          </AsyncButton>
         </div>
-      </form>
+      </AsyncForm>
     </Modal>
   );
 };

@@ -1,3 +1,5 @@
+import AsyncButton from './AsyncButton.jsx';
+import AsyncForm from './AsyncForm.jsx';
 import { useState, useEffect, useMemo } from 'react';
 import Modal from './Modal.jsx';
 import ConfirmModal from './ConfirmModal.jsx';
@@ -218,7 +220,7 @@ const TimetableSlotModal = ({
       } else {
         await createSchedule(payload);
       }
-      onClose(true);
+      await onClose(true);
     } catch (err) {
       setError(getErrorMessage(err));
     } finally {
@@ -232,7 +234,7 @@ const TimetableSlotModal = ({
     try {
       await deleteSchedule(schedule._id);
       setPendingDelete(false);
-      onClose(true);
+      await onClose(true);
     } catch (err) {
       setError(getErrorMessage(err));
     } finally {
@@ -248,7 +250,7 @@ const TimetableSlotModal = ({
         onClose={() => onClose(false)}
         size="toms-modal-lg"
       >
-        <form onSubmit={handleSubmit}>
+        <AsyncForm onSubmit={handleSubmit}>
           <div className="toms-modal-body">
             {error && <div className="alert alert-danger">{error}</div>}
 
@@ -368,48 +370,48 @@ const TimetableSlotModal = ({
 
               <aside className="timetable-slot-modal-tags" aria-label="Session tags">
                 <span className="timetable-slot-modal-tags-label">Tags</span>
-                <button
+                <AsyncButton
                   type="button"
                   className={`timetable-tag-toggle timetable-tag-toggle--lab${form.isLab ? ' is-active' : ''}`}
                   aria-pressed={form.isLab}
                   onClick={() => toggleSessionTag('isLab')}
                 >
                   Lab
-                </button>
-                <button
+                </AsyncButton>
+                <AsyncButton
                   type="button"
                   className={`timetable-tag-toggle timetable-tag-toggle--project${form.isProject ? ' is-active' : ''}`}
                   aria-pressed={form.isProject}
                   onClick={() => toggleSessionTag('isProject')}
                 >
                   Project
-                </button>
+                </AsyncButton>
               </aside>
             </div>
           </div>
           <div className="toms-modal-footer d-flex justify-content-between">
             <div>
               {isEdit && (
-                <button
+                <AsyncButton
                   type="button"
                   className="btn btn-outline-danger"
                   onClick={() => setPendingDelete(true)}
                   disabled={loading}
                 >
                   Delete
-                </button>
+                </AsyncButton>
               )}
             </div>
             <div className="d-flex gap-2">
-              <button type="button" className="btn btn-secondary" onClick={() => onClose(false)}>
+              <AsyncButton type="button" className="btn btn-secondary" onClick={() => onClose(false)}>
                 Cancel
-              </button>
-              <button type="submit" className="btn btn-primary" disabled={loading}>
+              </AsyncButton>
+              <AsyncButton type="submit" className="btn btn-primary" disabled={loading}>
                 {loading ? 'Saving...' : isEdit ? 'Update' : 'Add Slot'}
-              </button>
+              </AsyncButton>
             </div>
           </div>
-        </form>
+        </AsyncForm>
       </Modal>
 
       {pendingDelete && (

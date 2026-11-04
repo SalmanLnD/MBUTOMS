@@ -1,3 +1,4 @@
+import AsyncButton from './AsyncButton.jsx';
 import { useState, useEffect, useCallback } from 'react';
 import LoadingSpinner from './LoadingSpinner.jsx';
 import Pagination from './Pagination.jsx';
@@ -121,14 +122,14 @@ const FeedbackResponsesTab = () => {
               Open linked sheet
             </a>
           )}
-          <button
+          <AsyncButton
             type="button"
             className="btn btn-outline-secondary btn-sm d-inline-flex align-items-center gap-2"
             onClick={() => setSheetModalOpen(true)}
           >
             <SheetIcon size={16} />
             Link Google Sheet
-          </button>
+          </AsyncButton>
         </div>
       </div>
 
@@ -186,7 +187,7 @@ const FeedbackResponsesTab = () => {
           onClose={() => setSheetModalOpen(false)}
           onLinked={() => {
             setSheetModalOpen(false);
-            loadSheetStatus();
+            return loadSheetStatus();
           }}
         />
       )}

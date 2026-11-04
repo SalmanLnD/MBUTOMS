@@ -1,3 +1,4 @@
+import AsyncButton from './AsyncButton.jsx';
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import LoadingSpinner from './LoadingSpinner.jsx';
 import CollapsibleFilters from './CollapsibleFilters.jsx';
@@ -67,7 +68,7 @@ const MonthPicker = ({
   onNext,
 }) => (
   <div className="d-flex align-items-center gap-1">
-    <button
+    <AsyncButton
       type="button"
       className="btn btn-sm btn-outline-secondary"
       disabled={atEarliestMonth}
@@ -75,7 +76,7 @@ const MonthPicker = ({
       aria-label="Previous month"
     >
       &lt;
-    </button>
+    </AsyncButton>
     <StyledSelect
       size="sm"
       className="trainer-attendance-month-select"
@@ -84,7 +85,7 @@ const MonthPicker = ({
       aria-label="Select month"
       options={monthOptions}
     />
-    <button
+    <AsyncButton
       type="button"
       className="btn btn-sm btn-outline-secondary"
       disabled={atLatestMonth}
@@ -92,7 +93,7 @@ const MonthPicker = ({
       aria-label="Next month"
     >
       &gt;
-    </button>
+    </AsyncButton>
   </div>
 );
 
@@ -531,7 +532,7 @@ const StudentMonthlyTestReportsTab = () => {
   return (
     <>
       <div className="d-flex flex-wrap align-items-center gap-2 mb-3">
-        <button
+        <AsyncButton
           type="button"
           className="btn btn-outline-secondary btn-sm d-inline-flex align-items-center gap-2"
           disabled={downloading}
@@ -539,7 +540,7 @@ const StudentMonthlyTestReportsTab = () => {
         >
           <DownloadIcon size={16} aria-hidden="true" />
           {downloading ? 'Downloading...' : 'Download Excel'}
-        </button>
+        </AsyncButton>
         {canManageSheets && (
           sheetStatus?.linked ? (
             <>
@@ -552,24 +553,24 @@ const StudentMonthlyTestReportsTab = () => {
                 <ExternalLinkIcon size={16} aria-hidden="true" />
                 Open test reports sheet
               </a>
-              <button
+              <AsyncButton
                 type="button"
                 className="btn btn-outline-secondary btn-sm d-inline-flex align-items-center gap-2"
                 onClick={() => setShowSheetSetup(true)}
               >
                 <SheetIcon size={16} aria-hidden="true" />
                 Sheet setup
-              </button>
+              </AsyncButton>
             </>
           ) : (
-            <button
+            <AsyncButton
               type="button"
               className="btn btn-outline-primary btn-sm d-inline-flex align-items-center gap-2"
               onClick={() => setShowSheetSetup(true)}
             >
               <SheetIcon size={16} aria-hidden="true" />
               Link test reports sheet
-            </button>
+            </AsyncButton>
           )
         )}
         <span className="text-muted small">
@@ -580,13 +581,13 @@ const StudentMonthlyTestReportsTab = () => {
       <ul className="nav nav-tabs mb-3">
         {SUB_TABS.map((tab) => (
           <li className="nav-item" key={tab.id}>
-            <button
+            <AsyncButton
               type="button"
               className={`nav-link ${activeSubTab === tab.id ? 'active' : ''}`}
               onClick={() => setActiveSubTab(tab.id)}
             >
               {tab.label}
-            </button>
+            </AsyncButton>
           </li>
         ))}
       </ul>
@@ -863,9 +864,9 @@ const StudentMonthlyTestReportsTab = () => {
             </div>
             <div className="mark-entry-filters__actions">
               {hasFilters && (
-                <button type="button" className="btn btn-sm btn-outline-secondary" onClick={clearFilters}>
+                <AsyncButton type="button" className="btn btn-sm btn-outline-secondary" onClick={clearFilters}>
                   Clear
-                </button>
+                </AsyncButton>
               )}
             </div>
           </div>
@@ -1098,20 +1099,20 @@ const StudentMonthlyTestReportsTab = () => {
               </div>
               <div className="card-footer d-flex flex-wrap justify-content-end gap-2 mark-entry-save-actions">
                 {clearedDrafts && (
-                  <button type="button" className="btn btn-outline-secondary"
+                  <AsyncButton type="button" className="btn btn-outline-secondary"
                     disabled={saving || loadingGrid} onClick={handleUndoClear}>
                     Undo Clear
-                  </button>
+                  </AsyncButton>
                 )}
-                <button type="button" className="btn btn-outline-danger"
+                <AsyncButton type="button" className="btn btn-outline-danger"
                   disabled={!grid.students.length || saving || loadingGrid || Boolean(clearedDrafts)}
                   onClick={handleClearAll} title="Clear mark entries for this class and subject to re-enter them">
                   Clear All
-                </button>
-                <button type="button" className="btn btn-primary"
+                </AsyncButton>
+                <AsyncButton type="button" className="btn btn-primary"
                   disabled={!grid.students.length || saving || loadingGrid} onClick={handleSave}>
                   {saving ? 'Saving...' : 'Save Marks'}
-                </button>
+                </AsyncButton>
               </div>
             </div>
           ) : null}

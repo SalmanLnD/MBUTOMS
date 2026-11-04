@@ -1,3 +1,5 @@
+import AsyncButton from './AsyncButton.jsx';
+import AsyncForm from './AsyncForm.jsx';
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   createSubject,
@@ -238,7 +240,7 @@ const SubjectFormModal = ({ subject, onClose, onManageResource, onManageTopics }
       } else {
         await createSubject(payload);
       }
-      onClose(true);
+      await onClose(true);
     } catch (err) {
       setError(getErrorMessage(err));
     } finally {
@@ -273,7 +275,7 @@ const SubjectFormModal = ({ subject, onClose, onManageResource, onManageTopics }
       size="toms-modal-lg"
       scrollable
     >
-      <form onSubmit={handleSubmit}>
+      <AsyncForm onSubmit={handleSubmit}>
         <div className="toms-modal-body">
           {error && <div className="alert alert-danger">{error}</div>}
           {optionsLoading ? (
@@ -494,37 +496,37 @@ const SubjectFormModal = ({ subject, onClose, onManageResource, onManageTopics }
                   <div className="d-flex flex-wrap gap-2">
                     {onManageResource && (
                       <>
-                        <button
+                        <AsyncButton
                           type="button"
                           className="btn btn-outline-primary btn-sm"
                           onClick={() => onManageResource('syllabus')}
                         >
                           {subject?.syllabusUrl ? 'Update Syllabus' : 'Add Syllabus'}
-                        </button>
-                        <button
+                        </AsyncButton>
+                        <AsyncButton
                           type="button"
                           className="btn btn-outline-primary btn-sm"
                           onClick={() => onManageResource('cho')}
                         >
                           {subject?.choUrl ? 'Update CHO' : 'Add CHO'}
-                        </button>
-                        <button
+                        </AsyncButton>
+                        <AsyncButton
                           type="button"
                           className="btn btn-outline-primary btn-sm"
                           onClick={() => onManageResource('practicePortal')}
                         >
                           {subject?.practicePortalUrl ? 'Update Practice Portal' : 'Add Practice Portal'}
-                        </button>
+                        </AsyncButton>
                       </>
                     )}
                     {onManageTopics && (
-                      <button
+                      <AsyncButton
                         type="button"
                         className="btn btn-outline-primary btn-sm"
                         onClick={onManageTopics}
                       >
                         {(subject?.topics?.length || 0) ? 'Manage topics' : 'Add topics'}
-                      </button>
+                      </AsyncButton>
                     )}
                   </div>
                 </div>
@@ -533,12 +535,12 @@ const SubjectFormModal = ({ subject, onClose, onManageResource, onManageTopics }
           )}
         </div>
         <div className="toms-modal-footer">
-          <button type="button" className="btn btn-secondary" onClick={() => onClose(false)}>Cancel</button>
-          <button type="submit" className="btn btn-primary" disabled={loading || optionsLoading}>
+          <AsyncButton type="button" className="btn btn-secondary" onClick={() => onClose(false)}>Cancel</AsyncButton>
+          <AsyncButton type="submit" className="btn btn-primary" disabled={loading || optionsLoading}>
             {loading ? 'Saving...' : isEdit ? 'Update' : 'Create'}
-          </button>
+          </AsyncButton>
         </div>
-      </form>
+      </AsyncForm>
     </Modal>
   );
 };

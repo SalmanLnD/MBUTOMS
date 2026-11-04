@@ -1,3 +1,4 @@
+import AsyncButton from './AsyncButton.jsx';
 import { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import LoadingSpinner from './LoadingSpinner.jsx';
@@ -84,7 +85,7 @@ const TrainerPunchInLogsTab = () => {
       await deleteTrainerPunchInLog(pendingDelete.id);
       showSuccess('Punch-in log and attendance removed');
       setPendingDelete(null);
-      fetchLogs();
+      await fetchLogs();
     } catch (err) {
       showError(getErrorMessage(err));
     } finally {
@@ -180,9 +181,9 @@ const TrainerPunchInLogsTab = () => {
           />
         </div>
         <div className="mark-entry-filters__actions">
-          <button type="button" className="btn btn-outline-secondary" onClick={handleClearFilters}>
+          <AsyncButton type="button" className="btn btn-outline-secondary" onClick={handleClearFilters}>
             Clear filters
-          </button>
+          </AsyncButton>
         </div>
       </div>
 

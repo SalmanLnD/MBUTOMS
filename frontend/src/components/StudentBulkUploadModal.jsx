@@ -1,3 +1,5 @@
+import AsyncButton from './AsyncButton.jsx';
+import AsyncForm from './AsyncForm.jsx';
 import { useState } from 'react';
 import Modal from './Modal.jsx';
 import { DownloadIcon, UploadIcon } from './icons.jsx';
@@ -69,7 +71,7 @@ const StudentBulkUploadModal = ({ show, onClose, onImported }) => {
       });
       setProgress({ phase: 'done', percent: 100, label: 'Import complete' });
       setResult(data);
-      onImported?.(data);
+      await onImported?.(data);
     } catch (err) {
       setProgress(null);
       if (err.code === 'ERR_NETWORK' || !err.response) {
@@ -94,7 +96,7 @@ const StudentBulkUploadModal = ({ show, onClose, onImported }) => {
       size="toms-modal-lg"
       scrollable
     >
-      <form onSubmit={handleSubmit}>
+      <AsyncForm onSubmit={handleSubmit}>
         <div className="toms-modal-body">
           {error && <div className="alert alert-danger">{error}</div>}
 
@@ -128,7 +130,7 @@ const StudentBulkUploadModal = ({ show, onClose, onImported }) => {
           </p>
 
           <div className="d-flex flex-wrap gap-2 mb-3">
-            <button
+            <AsyncButton
               type="button"
               className="btn btn-outline-secondary btn-sm d-inline-flex align-items-center gap-2"
               onClick={handleDownloadTemplate}
@@ -136,7 +138,7 @@ const StudentBulkUploadModal = ({ show, onClose, onImported }) => {
             >
               <DownloadIcon size={16} />
               {downloading ? 'Downloading...' : 'Download template'}
-            </button>
+            </AsyncButton>
           </div>
 
           <div className="mb-3">
@@ -253,15 +255,15 @@ const StudentBulkUploadModal = ({ show, onClose, onImported }) => {
         </div>
 
         <div className="toms-modal-footer">
-          <button type="button" className="btn btn-outline-secondary" onClick={handleClose} disabled={loading}>
+          <AsyncButton type="button" className="btn btn-outline-secondary" onClick={handleClose} disabled={loading}>
             Close
-          </button>
-          <button type="submit" className="btn btn-primary d-inline-flex align-items-center gap-2" disabled={loading || !file}>
+          </AsyncButton>
+          <AsyncButton type="submit" className="btn btn-primary d-inline-flex align-items-center gap-2" disabled={loading || !file}>
             <UploadIcon size={16} />
             {loading ? 'Uploading…' : 'Upload'}
-          </button>
+          </AsyncButton>
         </div>
-      </form>
+      </AsyncForm>
     </Modal>
   );
 };

@@ -1,3 +1,5 @@
+import AsyncButton from './AsyncButton.jsx';
+import AsyncForm from './AsyncForm.jsx';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Modal from './Modal.jsx';
 import ConfirmModal from './ConfirmModal.jsx';
@@ -398,7 +400,7 @@ const SpecialClassModal = ({ trainers = [], initialDate, initialTab = 'add', onC
               { id: 'completed', label: 'Completed classes' },
             ].map((tab) => (
               <li className="nav-item" key={tab.id} role="presentation">
-                <button
+                <AsyncButton
                   type="button"
                   role="tab"
                   className={`nav-link ${activeTab === tab.id ? 'active' : ''}`}
@@ -409,7 +411,7 @@ const SpecialClassModal = ({ trainers = [], initialDate, initialTab = 'add', onC
                   }}
                 >
                   {tab.label}
-                </button>
+                </AsyncButton>
               </li>
             ))}
           </ul>
@@ -417,7 +419,7 @@ const SpecialClassModal = ({ trainers = [], initialDate, initialTab = 'add', onC
           {error && <div className="alert alert-danger">{error}</div>}
 
           {activeTab === 'add' && (
-            <form id="special-class-form" onSubmit={handleSubmit}>
+            <AsyncForm id="special-class-form" onSubmit={handleSubmit}>
               <fieldset className="mb-3">
                 <legend className="form-label fw-semibold fs-6">Is this a one-time or recurring class?</legend>
                 <div className="btn-group" role="radiogroup" aria-label="Special class type">
@@ -425,7 +427,7 @@ const SpecialClassModal = ({ trainers = [], initialDate, initialTab = 'add', onC
                     { value: 'one_time', label: 'One-time' },
                     { value: 'recurring', label: 'Recurring' },
                   ].map((option) => (
-                    <button
+                    <AsyncButton
                       key={option.value}
                       type="button"
                       role="radio"
@@ -434,7 +436,7 @@ const SpecialClassModal = ({ trainers = [], initialDate, initialTab = 'add', onC
                       onClick={() => handleTypeChange(option.value)}
                     >
                       {option.label}
-                    </button>
+                    </AsyncButton>
                   ))}
                 </div>
               </fieldset>
@@ -472,7 +474,7 @@ const SpecialClassModal = ({ trainers = [], initialDate, initialTab = 'add', onC
                           const available = availableRecurringDays.has(day);
                           const active = form.days.includes(day);
                           return (
-                            <button
+                            <AsyncButton
                               key={day}
                               type="button"
                               className={`btn btn-sm ${active ? 'btn-primary' : 'btn-outline-secondary'}`}
@@ -481,7 +483,7 @@ const SpecialClassModal = ({ trainers = [], initialDate, initialTab = 'add', onC
                               onClick={() => toggleDay(day)}
                             >
                               {day.slice(0, 3)}
-                            </button>
+                            </AsyncButton>
                           );
                         })}
                       </div>
@@ -619,7 +621,7 @@ const SpecialClassModal = ({ trainers = [], initialDate, initialTab = 'add', onC
                         { value: true, label: 'Include in RTET' },
                         { value: false, label: 'Exclude from RTET' },
                       ].map((option) => (
-                        <button
+                        <AsyncButton
                           key={String(option.value)}
                           type="button"
                           role="radio"
@@ -628,7 +630,7 @@ const SpecialClassModal = ({ trainers = [], initialDate, initialTab = 'add', onC
                           onClick={() => updateForm({ includeInRtet: option.value })}
                         >
                           {option.label}
-                        </button>
+                        </AsyncButton>
                       ))}
                     </div>
                     <small className="text-muted d-block mt-1">
@@ -642,7 +644,7 @@ const SpecialClassModal = ({ trainers = [], initialDate, initialTab = 'add', onC
                 Special classes count toward trainer class hours, attendance and the topic
                 tracker only on the dates they run. RTET includes them only when that option is on.
               </p>
-            </form>
+            </AsyncForm>
           )}
 
           {activeTab !== 'add' && <p className="text-muted small">{activeTab === 'completed'
@@ -708,19 +710,19 @@ const SpecialClassModal = ({ trainers = [], initialDate, initialTab = 'add', onC
         </div>
 
         <div className="toms-modal-footer d-flex justify-content-end gap-2">
-          <button type="button" className="btn btn-secondary" onClick={onClose}>
+          <AsyncButton type="button" className="btn btn-secondary" onClick={onClose}>
             Close
-          </button>
+          </AsyncButton>
           {activeTab === 'add' && (
             <>
               {editingGroupId && (
-                <button type="button" className="btn btn-outline-secondary" onClick={cancelEdit}>
+                <AsyncButton type="button" className="btn btn-outline-secondary" onClick={cancelEdit}>
                   Cancel edit
-                </button>
+                </AsyncButton>
               )}
-              <button type="submit" form="special-class-form" className="btn btn-primary" disabled={saving}>
+              <AsyncButton type="submit" form="special-class-form" className="btn btn-primary" disabled={saving}>
                 {saving ? 'Saving...' : editingGroupId ? 'Save changes' : 'Add special class'}
-              </button>
+              </AsyncButton>
             </>
           )}
         </div>

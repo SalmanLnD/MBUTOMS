@@ -301,6 +301,39 @@ export const getPublicFeedbackForm = async (req, res) => {
     label: formatFeedbackClassLabel(cls, classGroups),
   }));
 
+  // Ensure special class only departments Pharmacy and B Sc are visible in current cycle
+  if (!classes.some((c) => c.label === 'Pharmacy' || c.department === 'Pharmacy')) {
+    classes.push({
+      _id: 'spcl_pharmacy',
+      department: 'Pharmacy',
+      section: '1',
+      currentSemester: 'III',
+      label: 'Pharmacy',
+    });
+  }
+
+  if (!classes.some((c) => c.label === 'B Sc' || c.department === 'B Sc')) {
+    classes.push({
+      _id: 'spcl_bsc',
+      department: 'B Sc',
+      section: '1',
+      currentSemester: 'V',
+      label: 'B Sc',
+    });
+  }
+
+  const uniqueClassesMap = new Map();
+  for (const cls of classes) {
+    if (!cls.label) continue;
+    if (!uniqueClassesMap.has(cls.label)) {
+      uniqueClassesMap.set(cls.label, cls);
+    }
+  }
+
+  const sortedClasses = Array.from(uniqueClassesMap.values()).sort((a, b) =>
+    a.label.localeCompare(b.label, undefined, { sensitivity: 'base' })
+  );
+
   res.json({
     title: form.title,
     description: form.description,
@@ -308,7 +341,7 @@ export const getPublicFeedbackForm = async (req, res) => {
     monthLabel: formatMonthLabel(form.monthKey),
     fields: form.fields.sort((a, b) => a.order - b.order),
     trainers,
-    classes,
+    classes: sortedClasses,
     semesters: FEEDBACK_SEMESTER_OPTIONS,
   });
 };

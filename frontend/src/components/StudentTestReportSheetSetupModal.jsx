@@ -1,3 +1,5 @@
+import AsyncButton from './AsyncButton.jsx';
+import AsyncForm from './AsyncForm.jsx';
 import { useEffect, useState } from 'react';
 import Modal from './Modal.jsx';
 import {
@@ -55,7 +57,7 @@ const StudentTestReportSheetSetupModal = ({
     setError('');
     try {
       await linkTestReportSheet(spreadsheetUrl.trim());
-      onLinked();
+      await onLinked();
     } catch (err) {
       setError(getErrorMessage(err));
     } finally {
@@ -71,7 +73,7 @@ const StudentTestReportSheetSetupModal = ({
       size="toms-modal-lg"
       scrollable
     >
-      <form onSubmit={handleSave}>
+      <AsyncForm onSubmit={handleSave}>
         <div className="toms-modal-body">
           {error && <div className="alert alert-danger">{error}</div>}
           {copyHint && <div className="alert alert-success py-2">{copyHint}</div>}
@@ -97,13 +99,13 @@ const StudentTestReportSheetSetupModal = ({
                 <div className="mb-3" key={id}>
                   <div className="d-flex justify-content-between align-items-center mb-1">
                     <label className="form-label mb-0" htmlFor={id}>{label}</label>
-                    <button
+                    <AsyncButton
                       type="button"
                       className="btn btn-sm btn-outline-secondary"
                       onClick={() => handleCopy(value, copyLabel)}
                     >
                       Copy
-                    </button>
+                    </AsyncButton>
                   </div>
                   <input
                     id={id}
@@ -119,13 +121,13 @@ const StudentTestReportSheetSetupModal = ({
                   <label className="form-label mb-0" htmlFor="test-report-apps-script">
                     Apps Script
                   </label>
-                  <button
+                  <AsyncButton
                     type="button"
                     className="btn btn-sm btn-outline-secondary"
                     onClick={() => handleCopy(setup.script, 'Apps Script')}
                   >
                     Copy
-                  </button>
+                  </AsyncButton>
                 </div>
                 <textarea
                   id="test-report-apps-script"
@@ -154,18 +156,18 @@ const StudentTestReportSheetSetupModal = ({
           )}
         </div>
         <div className="toms-modal-footer">
-          <button type="button" className="btn btn-secondary" onClick={onClose}>
+          <AsyncButton type="button" className="btn btn-secondary" onClick={onClose}>
             Cancel
-          </button>
-          <button
+          </AsyncButton>
+          <AsyncButton
             type="submit"
             className="btn btn-primary"
             disabled={loading || saving || !spreadsheetUrl.trim()}
           >
             {saving ? 'Saving...' : 'Save link'}
-          </button>
+          </AsyncButton>
         </div>
-      </form>
+      </AsyncForm>
     </Modal>
   );
 };

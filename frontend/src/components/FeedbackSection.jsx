@@ -1,3 +1,4 @@
+import AsyncButton from './AsyncButton.jsx';
 import { useCallback, useEffect, useState } from 'react';
 import LoadingSpinner from './LoadingSpinner.jsx';
 import FeedbackSummaryTab from './FeedbackSummaryTab.jsx';
@@ -41,7 +42,7 @@ const FeedbackSection = () => {
       <ul className="nav nav-tabs mb-3" role="tablist">
         {FEEDBACK_SUB_TABS.map((tab) => (
           <li className="nav-item" key={tab.id} role="presentation">
-            <button
+            <AsyncButton
               type="button"
               role="tab"
               className={`nav-link ${activeSubTab === tab.id ? 'active' : ''}`}
@@ -49,7 +50,7 @@ const FeedbackSection = () => {
               onClick={() => setActiveSubTab(tab.id)}
             >
               {tab.label}
-            </button>
+            </AsyncButton>
           </li>
         ))}
       </ul>

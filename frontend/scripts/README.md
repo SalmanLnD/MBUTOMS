@@ -35,3 +35,19 @@ into view, and verifies that unmounting releases the body scroll lock. The page
 dialog suite opens dialogs through the real page buttons and closes them through
 their normal controls. Neither suite submits a form. The harness is excluded
 from the production build, which has only the main application entry.
+
+## Pending actions and attendance performance
+
+`npm run test:pending-actions` holds real form/button promises and API responses.
+It verifies click/Enter deduplication, locked dialog close routes, external submit
+buttons, independent actions, draft preservation after failure, and the real
+leave form with a synthetic conflict/retry. `npm run test:attendance-actions`
+checks pagination/search, unchanged-cell saves, independent writes, failure retry,
+rapid month changes, and direct PLP links. All API data is synthetic and all base
+URLs must be localhost.
+
+`npm run test:performance` measures three fresh-browser attendance trials using
+60 trainers and 30 days. Set `PERFORMANCE_OUTPUT` to save a comparison report.
+This is a local UI fixture benchmark, not a production API/database benchmark.
+The development-only async-actions fixture and UI-audit entry are excluded from
+the production build.

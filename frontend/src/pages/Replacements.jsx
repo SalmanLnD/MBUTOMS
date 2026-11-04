@@ -1,4 +1,5 @@
-import { useState, useEffect } from 'react';
+import AsyncButton from '../components/AsyncButton.jsx';
+import { useState, useEffect, useRef } from 'react';
 import LoadingSpinner from '../components/LoadingSpinner.jsx';
 import { showError, showSuccess } from '../utils/toast.js';
 import { formatDate, getErrorMessage } from '../utils/helpers.js';
@@ -55,6 +56,9 @@ const Replacements = () => {
   const [showAddSlotModal, setShowAddSlotModal] = useState(false);
   const [externalTrainerName, setExternalTrainerName] = useState('');
   const [assigningExternal, setAssigningExternal] = useState(false);
+  const [assigning, setAssigning] = useState(false);
+  const assignmentInFlight = useRef(false);
+  const suggestionsRequest = useRef(0);
   const [pendingCancel, setPendingCancel] = useState(null);
   const [newTrainerOtp, setNewTrainerOtp] = useState(null);
   const [registerFilter, setRegisterFilter] = useState('all');
@@ -186,7 +190,7 @@ const Replacements = () => {
       }
       refreshActionCounts();
       setShowBulkModal(false);
-      fetchReplacements();
+      await fetchReplacements();
     } catch (err) {
       showError(getErrorMessage(err));
     } finally {
@@ -194,7 +198,8 @@ const Replacements = () => {
     }
   };
 
-  const closeSuggestionsModal = () => {
+  const resetSuggestionsModal = () => {
+    suggestionsRequest.current += 1;
     setSelectedSchedule(null);
     setSelectedLeaveId('');
     setSelectedDate('');
@@ -207,7 +212,14 @@ const Replacements = () => {
     setAssigningExternal(false);
   };
 
+  const closeSuggestionsModal = () => {
+    if (assignmentInFlight.current) return;
+    resetSuggestionsModal();
+  };
+
   const handleViewSuggestions = async (leaveId, schedule, replacement = null, date) => {
+    if (assignmentInFlight.current) return;
+    const request = ++suggestionsRequest.current;
     setSelectedSchedule(schedule);
     setSelectedLeaveId(leaveId);
     setSelectedDate(date || '');
@@ -220,17 +232,22 @@ const Replacements = () => {
     setSuggestionFilter('');
     try {
       const data = await getReplacementSuggestions(schedule._id, leaveId, date);
+      if (request !== suggestionsRequest.current) return;
       setSuggestions(data.suggestions || []);
       setOtherSuggestions(data.otherSuggestions || []);
       setSuggestionSubject(data.subject || null);
     } catch (err) {
+      if (request !== suggestionsRequest.current) return;
       showError(getErrorMessage(err));
     } finally {
-      setLoadingSuggestions(false);
+      if (request === suggestionsRequest.current) setLoadingSuggestions(false);
     }
   };
 
   const handleAssign = async (trainerId) => {
+    if (assignmentInFlight.current || !selectedSchedule || !selectedLeaveId) return;
+    assignmentInFlight.current = true;
+    setAssigning(true);
     try {
       await assignReplacement(selectedLeaveId, selectedSchedule._id, {
         date: selectedDate,
@@ -238,19 +255,25 @@ const Replacements = () => {
       });
       showSuccess(changingReplacement ? 'Replacement trainer updated' : 'Replacement trainer assigned');
       refreshActionCounts();
-      closeSuggestionsModal();
-      fetchReplacements();
+      resetSuggestionsModal();
+      await fetchReplacements();
     } catch (err) {
       showError(getErrorMessage(err));
+    } finally {
+      assignmentInFlight.current = false;
+      setAssigning(false);
     }
   };
 
   const handleAssignExternal = async () => {
+    if (assignmentInFlight.current || !selectedSchedule || !selectedLeaveId) return;
     const name = externalTrainerName.trim();
     if (!name) {
       showError('Enter the external trainer name');
       return;
     }
+    assignmentInFlight.current = true;
+    setAssigning(true);
     setAssigningExternal(true);
     try {
       await assignReplacement(selectedLeaveId, selectedSchedule._id, {
@@ -260,11 +283,13 @@ const Replacements = () => {
       });
       showSuccess(changingReplacement ? 'Replacement updated to external trainer' : 'External trainer assigned');
       refreshActionCounts();
-      closeSuggestionsModal();
-      fetchReplacements();
+      resetSuggestionsModal();
+      await fetchReplacements();
     } catch (err) {
       showError(getErrorMessage(err));
     } finally {
+      assignmentInFlight.current = false;
+      setAssigning(false);
       setAssigningExternal(false);
     }
   };
@@ -276,7 +301,7 @@ const Replacements = () => {
       showSuccess('Replacement cancelled. Original trainer will handle this class.');
       refreshActionCounts();
       setPendingCancel(null);
-      fetchReplacements();
+      await fetchReplacements();
     } catch (err) {
       showError(getErrorMessage(err));
     }
@@ -297,9 +322,9 @@ const Replacements = () => {
         <td>{s.weeklyHours.toFixed(1)} hrs</td>
         <td>{s.performanceScore}%</td>
         <td>
-          <button type="button" className="btn btn-sm btn-success" onClick={() => handleAssign(s.trainer._id)}>
+          <AsyncButton type="button" className="btn btn-sm btn-success" disabled={assigning} onClick={() => handleAssign(s.trainer._id)}>
             {changingReplacement ? 'Update' : 'Assign'}
-          </button>
+          </AsyncButton>
         </td>
       </tr>
     ));
@@ -337,22 +362,22 @@ const Replacements = () => {
     <>
       <ul className="nav nav-tabs mb-3">
         <li className="nav-item">
-          <button
+          <AsyncButton
             type="button"
             className={`nav-link ${activeTab === 'all' ? 'active' : ''}`}
             onClick={() => setActiveTab('all')}
           >
             All Replacements
-          </button>
+          </AsyncButton>
         </li>
         <li className="nav-item">
-          <button
+          <AsyncButton
             type="button"
             className={`nav-link ${activeTab === 'availability' ? 'active' : ''}`}
             onClick={() => setActiveTab('availability')}
           >
             Trainer Availability
-          </button>
+          </AsyncButton>
         </li>
       </ul>
 
@@ -365,7 +390,7 @@ const Replacements = () => {
               <h5 className="card-title mb-0">Replacement Register</h5>
               <div className="d-flex flex-wrap align-items-center gap-2">
                 <div className="btn-group btn-group-sm" role="group" aria-label="Replacement register filter">
-                  <button
+                  <AsyncButton
                     type="button"
                     className={`btn ${registerFilter === 'all' ? 'btn-secondary' : 'btn-outline-secondary'}`}
                     onClick={() => {
@@ -374,8 +399,8 @@ const Replacements = () => {
                     }}
                   >
                     All
-                  </button>
-                  <button
+                  </AsyncButton>
+                  <AsyncButton
                     type="button"
                     className={`btn ${registerFilter === 'pending' ? 'btn-secondary' : 'btn-outline-secondary'}`}
                     onClick={() => {
@@ -384,8 +409,8 @@ const Replacements = () => {
                     }}
                   >
                     Pending
-                  </button>
-                  <button
+                  </AsyncButton>
+                  <AsyncButton
                     type="button"
                     className={`btn ${registerFilter === 'closed' ? 'btn-secondary' : 'btn-outline-secondary'}`}
                     onClick={() => {
@@ -394,22 +419,22 @@ const Replacements = () => {
                     }}
                   >
                     Closed
-                  </button>
+                  </AsyncButton>
                 </div>
-                <button
+                <AsyncButton
                   type="button"
                   className="btn btn-outline-primary btn-sm"
                   onClick={openBulkModal}
                 >
                   Bulk Replacement
-                </button>
-                <button
+                </AsyncButton>
+                <AsyncButton
                   type="button"
                   className="btn btn-primary btn-sm"
                   onClick={() => setShowAddSlotModal(true)}
                 >
                   Add Replacement
-                </button>
+                </AsyncButton>
               </div>
             </div>
             <div className="table-responsive">
@@ -418,7 +443,7 @@ const Replacements = () => {
                   <tr>
                     <th>Trainer on Leave</th>
                     <th aria-sort={dateSortOrder === 'asc' ? 'ascending' : dateSortOrder === 'desc' ? 'descending' : 'none'}>
-                      <button
+                      <AsyncButton
                         type="button"
                         className="btn btn-link p-0 text-reset fw-bold text-decoration-none"
                         onClick={() => {
@@ -427,7 +452,7 @@ const Replacements = () => {
                         }}
                       >
                         Date{dateSortOrder === 'asc' ? ' ↑' : dateSortOrder === 'desc' ? ' ↓' : ' ↕'}
-                      </button>
+                      </AsyncButton>
                     </th>
                     <th>Time</th>
                     <th>Class</th>
@@ -508,13 +533,13 @@ const Replacements = () => {
                           </div>
                         ) : canAssign ? (
                           <div className="d-flex align-items-center gap-2">
-                            <button
+                            <AsyncButton
                               type="button"
                               className="btn btn-sm btn-primary"
                               onClick={() => handleViewSuggestions(leave._id, schedule, null, replacementDate)}
                             >
                               Find Replacements
-                            </button>
+                            </AsyncButton>
                             <ActionIconButton
                               variant="delete"
                               icon={TrashIcon}
@@ -560,7 +585,7 @@ const Replacements = () => {
       />
 
       {activeTab === 'all' && showBulkModal && (
-        <Modal show title="Bulk Replacement" onClose={() => setShowBulkModal(false)} size="toms-modal-lg">
+        <Modal show title="Bulk Replacement" onClose={() => { if (!bulkSubmitting) setShowBulkModal(false); }} size="toms-modal-lg">
           <div className="toms-modal-body">
             <div className="row g-3">
               <div className="col-md-4">
@@ -599,14 +624,14 @@ const Replacements = () => {
             </div>
 
             <div className="d-flex align-items-center gap-2 mt-3">
-              <button
+              <AsyncButton
                 type="button"
                 className="btn btn-outline-secondary btn-sm"
                 onClick={loadBulkSuggestions}
                 disabled={loadingBulkSuggestions}
               >
                 {loadingBulkSuggestions ? 'Loading...' : 'Load suggestions'}
-              </button>
+              </AsyncButton>
               {bulkTargetCount > 0 && (
                 <span className="small text-muted">
                   {bulkTargetCount} class slots need replacement in this range
@@ -698,22 +723,22 @@ const Replacements = () => {
             )}
 
             <div className="d-flex justify-content-end gap-2 mt-4">
-              <button
+              <AsyncButton
                 type="button"
                 className="btn btn-outline-secondary"
                 onClick={() => setShowBulkModal(false)}
                 disabled={bulkSubmitting}
               >
                 Close
-              </button>
-              <button
+              </AsyncButton>
+              <AsyncButton
                 type="button"
                 className="btn btn-primary"
                 onClick={handleBulkAssign}
                 disabled={bulkSubmitting}
               >
                 {bulkSubmitting ? 'Saving...' : 'Apply Bulk Replacement'}
-              </button>
+              </AsyncButton>
             </div>
           </div>
         </Modal>
@@ -818,22 +843,22 @@ const Replacements = () => {
                         placeholder="Enter external trainer name"
                         value={externalTrainerName}
                         onChange={(e) => setExternalTrainerName(e.target.value)}
-                        disabled={assigningExternal}
+                        disabled={assigning}
                       />
                     </div>
                     <div className="col-sm-auto">
-                      <button
+                      <AsyncButton
                         type="button"
                         className="btn btn-sm btn-outline-primary"
                         onClick={handleAssignExternal}
-                        disabled={assigningExternal || !externalTrainerName.trim()}
+                        disabled={assigning || !externalTrainerName.trim()}
                       >
                         {assigningExternal
                           ? 'Assigning...'
                           : changingReplacement
                             ? 'Update to External'
                             : 'Assign External'}
-                      </button>
+                      </AsyncButton>
                     </div>
                   </div>
                 </div>
@@ -848,7 +873,7 @@ const Replacements = () => {
             <p>Share this code privately with {newTrainerOtp.name}. It expires in 24 hours and can be used once.</p>
             <p><strong>{newTrainerOtp.code}</strong></p>
             <p>The trainer enters it in the password field and then chooses a password.</p>
-            <button type="button" className="btn btn-primary" onClick={() => setNewTrainerOtp(null)}>Done</button>
+            <AsyncButton type="button" className="btn btn-primary" onClick={() => setNewTrainerOtp(null)}>Done</AsyncButton>
           </div>
         </Modal>
       )}

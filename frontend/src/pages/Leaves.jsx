@@ -1,4 +1,6 @@
-import { useState, useEffect } from 'react';
+import AsyncButton from '../components/AsyncButton.jsx';
+import AsyncForm from '../components/AsyncForm.jsx';
+import { useState, useEffect, useRef } from 'react';
 import LoadingSpinner from '../components/LoadingSpinner.jsx';
 import Pagination from '../components/Pagination.jsx';
 import { showError, showSuccess } from '../utils/toast.js';
@@ -53,6 +55,18 @@ const Leaves = () => {
   const [preview, setPreview] = useState(null);
   const [pendingCancel, setPendingCancel] = useState(null);
   const [pendingPartialCancel, setPendingPartialCancel] = useState(null);
+  const actionLocks = useRef(new Set());
+  const [pendingLeaveIds, setPendingLeaveIds] = useState(new Set());
+  const beginLeaveAction = (id) => {
+    if (actionLocks.current.has(id)) return false;
+    actionLocks.current.add(id);
+    setPendingLeaveIds(new Set(actionLocks.current));
+    return true;
+  };
+  const finishLeaveAction = (id) => {
+    actionLocks.current.delete(id);
+    setPendingLeaveIds(new Set(actionLocks.current));
+  };
 
   const fetchLeaves = async (signal) => {
     setLoading(true);
@@ -136,20 +150,23 @@ const Leaves = () => {
       await createLeave(payload);
       showSuccess(requestType === 'break' ? 'Break application submitted' : 'Leave application submitted');
       closeLeaveForm();
-      fetchLeaves();
+      await fetchLeaves();
     } catch (err) {
       showError(getErrorMessage(err));
     }
   };
 
   const handleApprove = async (id, status) => {
+    if (!beginLeaveAction(id)) return;
     try {
       await updateLeave(id, { status });
       showSuccess(`Leave ${status}`);
       refreshActionCounts();
-      fetchLeaves();
+      await fetchLeaves();
     } catch (err) {
       showError(getErrorMessage(err));
+    } finally {
+      finishLeaveAction(id);
     }
   };
 
@@ -158,15 +175,18 @@ const Leaves = () => {
   };
 
   const handleConfirmDelete = async () => {
-    if (!pendingCancel) return;
+    if (!pendingCancel || !beginLeaveAction(pendingCancel._id)) return;
+    const id = pendingCancel._id;
     try {
       await deleteLeave(pendingCancel._id);
       showSuccess('Leave cancelled');
       refreshActionCounts();
       setPendingCancel(null);
-      fetchLeaves();
+      await fetchLeaves();
     } catch (err) {
       showError(getErrorMessage(err));
+    } finally {
+      finishLeaveAction(id);
     }
   };
 
@@ -179,15 +199,18 @@ const Leaves = () => {
   };
 
   const handleConfirmPartialCancel = async () => {
-    if (!pendingPartialCancel) return;
+    if (!pendingPartialCancel || !beginLeaveAction(pendingPartialCancel.leave._id)) return;
+    const id = pendingPartialCancel.leave._id;
     try {
       const { leave, startDate, endDate } = pendingPartialCancel;
       await partialCancelLeave(leave._id, { startDate, endDate });
       showSuccess('Leave range updated');
       setPendingPartialCancel(null);
-      fetchLeaves();
+      await fetchLeaves();
     } catch (err) {
       showError(getErrorMessage(err));
+    } finally {
+      finishLeaveAction(id);
     }
   };
 
@@ -219,8 +242,8 @@ const Leaves = () => {
             { value: 'cancelled', label: 'Cancelled' },
           ]}
         />
-        <button type="button" className="btn btn-primary" onClick={() => openLeaveForm('leave')}>Apply Leave</button>
-        <button type="button" className="btn btn-outline-primary" onClick={() => openLeaveForm('break')}>Apply break</button>
+        <AsyncButton type="button" className="btn btn-primary" onClick={() => openLeaveForm('leave')}>Apply Leave</AsyncButton>
+        <AsyncButton type="button" className="btn btn-outline-primary" onClick={() => openLeaveForm('break')}>Apply break</AsyncButton>
       </div>
 
       {loading ? <LoadingSpinner /> : (
@@ -253,21 +276,23 @@ const Leaves = () => {
                       <div className="d-flex align-items-center gap-2">
                         {canApprove && leave.status === 'pending' && (
                           <div className="btn-group btn-group-sm">
-                            <button type="button" className="btn btn-outline-success" onClick={() => handleApprove(leave._id, 'approved')}>Approve</button>
-                            <button type="button" className="btn btn-outline-danger" onClick={() => handleApprove(leave._id, 'rejected')}>Reject</button>
+                            <AsyncButton type="button" className="btn btn-outline-success" disabled={pendingLeaveIds.has(leave._id)} onClick={() => handleApprove(leave._id, 'approved')}>Approve</AsyncButton>
+                            <AsyncButton type="button" className="btn btn-outline-danger" disabled={pendingLeaveIds.has(leave._id)} onClick={() => handleApprove(leave._id, 'rejected')}>Reject</AsyncButton>
                           </div>
                         )}
                         {canCancelLeave(leave) && (
                           <>
-                            <button
+                            <AsyncButton
                               type="button"
                               className="btn btn-outline-warning btn-sm"
+                              disabled={pendingLeaveIds.has(leave._id)}
                               onClick={() => handlePartialCancel(leave)}
                             >
                               Partial Cancel
-                            </button>
+                            </AsyncButton>
                             <ActionIconButton
                               variant="delete"
+                              disabled={pendingLeaveIds.has(leave._id)}
                               icon={TrashIcon}
                               title="Cancel leave"
                               aria-label={`Cancel leave for ${leave.trainer?.name}`}
@@ -295,7 +320,7 @@ const Leaves = () => {
 
       {showForm && (
         <Modal show title={requestType === 'break' ? 'Apply for Break' : 'Apply for Leave'} onClose={closeLeaveForm}>
-          <form onSubmit={handleSubmit}>
+          <AsyncForm onSubmit={handleSubmit}>
             <div className="toms-modal-body">
               {requestType === 'break' && <p className="text-muted small">Once approved, these dates will be marked as Break in trainer attendance.</p>}
               {canApplyForOthers && (
@@ -346,10 +371,10 @@ const Leaves = () => {
               )}
             </div>
             <div className="toms-modal-footer">
-              <button type="button" className="btn btn-secondary" onClick={closeLeaveForm}>Cancel</button>
-              <button type="submit" className="btn btn-primary">Submit</button>
+              <AsyncButton type="button" className="btn btn-secondary" onClick={closeLeaveForm}>Cancel</AsyncButton>
+              <AsyncButton type="submit" className="btn btn-primary">Submit</AsyncButton>
             </div>
-          </form>
+          </AsyncForm>
         </Modal>
       )}
 
