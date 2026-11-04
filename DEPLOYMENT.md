@@ -90,7 +90,7 @@ You can also connect the Vercel frontend project to `SalmanLnD/MBUTOMS` in the V
 
 | Variable | Value |
 |----------|-------|
-| `VITE_API_URL` | `https://mbutoms-api.onrender.com/api` |
+| `VITE_API_URL` | `/api` |
 
 6. Deploy. Live URL: `https://mbutoms.onrender.com`
 
@@ -113,6 +113,19 @@ npm run dev
 ## 5. CORS
 
 Set `CLIENT_URL` on the backend to your frontend origin(s), comma-separated (Render, Vercel, and local Vite).
+
+Production builds send API requests to the frontend's `/api` reverse proxy so the
+HttpOnly session cookie stays first-party, including when third-party cookies
+are blocked. Deploy the frontend proxy rules together with the application:
+`frontend/vercel.json` puts `/api/:path*` before the SPA fallback; `render.yaml`
+puts `/api/*` → `https://mbutoms-api.onrender.com/api/*` before `/*` → `/index.html`.
+For an existing Render static site managed manually, add that API rewrite in
+the dashboard before deploying the frontend. Do not use a redirect for API calls.
+Production builds use `/api` even if an older hosting environment still sets an
+absolute `VITE_API_URL`. Local Vite requests use its existing API proxy by default.
+After deployment, verify login, `/api/auth/me`, refresh, and logout with browser
+third-party cookies disabled. Existing API-domain cookies will require one fresh
+sign-in on the frontend domain; tokens are never moved into browser storage.
 
 ## Notes
 

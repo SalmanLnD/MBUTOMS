@@ -46,6 +46,11 @@ app.use(
 );
 app.use(express.json({ limit: '2mb' }));
 app.use(express.urlencoded({ extended: true }));
+// API responses can contain private session data and pass through frontend CDNs.
+app.use('/api', (req, res, next) => {
+  res.set('Cache-Control', 'private, no-store');
+  next();
+});
 app.use(protectCookieRequest);
 app.use(invalidateAfterWrite);
 app.use(guardDemoToken);

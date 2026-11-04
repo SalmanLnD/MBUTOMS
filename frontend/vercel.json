@@ -6,6 +6,10 @@
   "installCommand": "npm install",
   "rewrites": [
     {
+      "source": "/api/:path*",
+      "destination": "https://mbutoms-api.onrender.com/api/:path*"
+    },
+    {
       "source": "/((?!assets/|icons/|sw\\.js$|theme-init\\.js$|manifest\\.webmanifest$|toms\\.svg$).*)",
       "destination": "/index.html"
     }

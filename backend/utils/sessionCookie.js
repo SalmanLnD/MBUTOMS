@@ -19,7 +19,10 @@ export const protectCookieRequest = (req, res, next) => {
   const needsCheck = Boolean(getCookieToken(req)) || req.path === '/api/auth/login';
   if (!needsCheck) return next();
   const origin = req.headers.origin;
-  if (!origin || !isOriginAllowed(origin) || req.headers['x-toms-request'] !== '1') {
+  // Same-origin requests may omit Origin. Fetch Metadata is browser-controlled;
+  // never infer trust from a forwarded host supplied by a client.
+  const trustedSource = origin ? isOriginAllowed(origin) : req.headers['sec-fetch-site'] === 'same-origin';
+  if (!trustedSource || req.headers['x-toms-request'] !== '1') {
     return res.status(403).json({ message: 'Request origin or security header is invalid.' });
   }
   return next();

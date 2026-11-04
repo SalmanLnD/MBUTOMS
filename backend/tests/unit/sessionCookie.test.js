@@ -19,3 +19,23 @@ test('cookie-authenticated writes require a trusted origin and custom header', (
   const good = response(); protectCookieRequest({ ...base, headers: { ...base.headers, origin: 'https://mbutoms.onrender.com', 'x-toms-request': '1' } }, good, () => { called = true; });
   assert.equal(called, true);
 });
+
+test('login and cookie writes accept browser same-origin metadata, but reject untrusted sources', () => {
+  for (const path of ['/api/auth/login', '/api/test']) {
+    for (const [headers, expected] of [
+      [{ 'sec-fetch-site': 'same-origin', 'x-toms-request': '1' }, true],
+      [{ 'sec-fetch-site': 'cross-site', 'x-toms-request': '1' }, false],
+      [{ 'sec-fetch-site': 'same-origin' }, false],
+      [{ origin: 'https://evil.example', 'sec-fetch-site': 'same-origin', 'x-toms-request': '1' }, false],
+      [{ 'x-toms-request': '1' }, false],
+      [{ origin: 'https://mbutoms.vercel.app', 'x-toms-request': '1' }, true],
+    ]) {
+      let called = false;
+      const res = { status() { return this; }, json() { return this; } };
+      protectCookieRequest({ method: 'POST', path, headers: {
+        ...(path === '/api/test' ? { cookie: 'toms_session=test-token' } : {}), ...headers,
+      } }, res, () => { called = true; });
+      assert.equal(called, expected, JSON.stringify({ path, headers }));
+    }
+  }
+});

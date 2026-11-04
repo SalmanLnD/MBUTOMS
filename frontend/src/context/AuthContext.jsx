@@ -52,7 +52,9 @@ export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(() => {
     const stored = localStorage.getItem('toms_user');
     if (!stored) return null;
-    const parsed = JSON.parse(stored);
+    let parsed;
+    try { parsed = JSON.parse(stored); } catch { return null; }
+    if (!parsed || typeof parsed !== 'object') return null;
     return {
       ...parsed,
       trainer: resolveLinkedTrainerId(parsed.trainer),
@@ -72,7 +74,7 @@ export const AuthProvider = ({ children }) => {
     localStorage.removeItem('toms_token');
     localStorage.removeItem('toms_admin_token');
     try {
-      const userData = await getMe();
+      const userData = await getMe({ skipSessionExpired: true });
       applySession(userData);
     } catch {
       localStorage.removeItem('toms_token');
@@ -93,7 +95,7 @@ export const AuthProvider = ({ children }) => {
   }, [loading, user]);
 
   useEffect(() => {
-    if (!user) return undefined;
+    if (loading || !user) return undefined;
 
     const validateSession = async () => {
       try {
@@ -122,7 +124,7 @@ export const AuthProvider = ({ children }) => {
       window.removeEventListener('focus', onFocus);
       window.clearInterval(intervalId);
     };
-  }, [user]);
+  }, [loading, user]);
 
   const login = useCallback(async (email, password) => {
     const data = await loginApi({ email, password });

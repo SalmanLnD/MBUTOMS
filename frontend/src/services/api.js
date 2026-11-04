@@ -37,7 +37,8 @@ const isAuthLoginRequest = (config) => {
 };
 
 const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || '/api',
+  // Production uses the frontend reverse proxy so HttpOnly sessions are first-party.
+  baseURL: import.meta.env.PROD ? '/api' : (import.meta.env.VITE_API_URL || '/api'),
   timeout: REQUEST_TIMEOUT_MS,
   withCredentials: true,
   headers: { 'Content-Type': 'application/json', 'X-TOMS-Request': '1' },

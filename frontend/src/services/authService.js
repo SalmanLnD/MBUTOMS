@@ -2,11 +2,19 @@ import api from './api.js';
 
 export const login = async (credentials) => {
   const { data } = await api.post('/auth/login', credentials);
-  return data;
+  // Do not enter the app until the browser has returned the session cookie.
+  const session = await getMe({ skipSessionExpired: true, skipRetry: true });
+  if (!data?._id || session._id !== data._id) {
+    throw new Error('Unable to verify your sign-in session. Please try again.');
+  }
+  return session;
 };
 
-export const getMe = async () => {
-  const { data } = await api.get('/auth/me');
+export const getMe = async (config) => {
+  const { data } = await api.get('/auth/me', config);
+  if (!data?._id || !data.role) {
+    throw new Error('The sign-in service is unavailable. Please try again shortly.');
+  }
   return data;
 };
 

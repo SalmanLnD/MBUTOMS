@@ -10,8 +10,11 @@ services:
     autoDeploy: true
     envVars:
       - key: VITE_API_URL
-        value: https://mbutoms-api.onrender.com/api
+        value: /api
     routes:
+      - type: rewrite
+        source: /api/*
+        destination: https://mbutoms-api.onrender.com/api/*
       - type: rewrite
         source: /*
         destination: /index.html
