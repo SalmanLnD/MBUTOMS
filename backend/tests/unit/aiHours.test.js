@@ -92,6 +92,49 @@ test('explanation fields preserve attendance slot deduplication and zero-hour ho
   assert.equal(holiday.excludedSchedules[0].exclusion, 'official_holiday');
 });
 
+test('class-hours reads overlap without skipping historical handover lookups', async (t) => {
+  const date = new Date('2026-10-01T00:00:00Z');
+  const trainer = { _id: 'owner', employeeId: '100' };
+  const reads = new Set();
+  let releaseSchedules;
+  let releaseSuccessor;
+  const schedules = new Promise(resolve => { releaseSchedules = resolve; });
+  const successor = new Promise(resolve => { releaseSuccessor = resolve; });
+  t.mock.method(Schedule, 'find', () => ({ select: () => ({ lean: () => schedules }) }));
+  t.mock.method(Trainer, 'find', filter => {
+    if (filter.successorTrainer) {
+      reads.add('outgoing');
+      return query([{ ...trainer, successorTrainer: 'next', roleTransferEffectiveDate: '2026-10-02' }]);
+    }
+    reads.add('successor');
+    return { select: () => ({ lean: () => successor }) };
+  });
+  t.mock.method(Leave, 'find', filter => {
+    if (filter['affectedSchedules.0']) reads.add('historical leave');
+    return query([]);
+  });
+  t.mock.method(Subject, 'find', () => query([]));
+  t.mock.method(ClassCancellation, 'find', () => query([]));
+  t.mock.method(OfficialHoliday, 'find', () => query([]));
+  clearSubjectStartDateCache();
+  t.after(clearSubjectStartDateCache);
+
+  const result = computeClassHandlingHoursBatch(['owner'], [date], null, [trainer]);
+  try {
+    await new Promise(resolve => setImmediate(resolve));
+    assert.ok(reads.has('outgoing'), 'handover lookup starts while schedules are pending');
+    releaseSchedules([]);
+    await new Promise(resolve => setImmediate(resolve));
+    assert.ok(reads.has('successor'));
+    assert.ok(reads.has('historical leave'), 'historical leave lookup starts while successors are pending');
+  } finally {
+    releaseSchedules([]);
+    releaseSuccessor([]);
+    await result;
+  }
+  assert.equal((await result).get('owner|2026-10-01'), 0);
+});
+
 test('real class controllers enforce trainer access before exposing counts', async (t) => {
   const own = { _id: 'own-class', department: 'CSE', section: 'A1', currentSemester: 'III', status: 'active' };
   const other = { _id: 'other-class', department: 'CSE', section: 'A2', currentSemester: 'III', status: 'active' };

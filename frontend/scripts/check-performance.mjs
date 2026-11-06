@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { pathToFileURL } from 'node:url';
 import { fixture, user } from './responsive-fixtures.mjs';
+import { attendancePerformanceFixture } from './performance-fixtures.mjs';
 
 const { chromium } = await import(process.env.PLAYWRIGHT_MODULE_PATH ? pathToFileURL(process.env.PLAYWRIGHT_MODULE_PATH).href : 'playwright');
 const base = process.env.RESPONSIVE_BASE_URL || 'http://127.0.0.1:5176';
@@ -11,7 +12,8 @@ const trainerCount = 60;
 const browser = await chromium.launch({ headless: true, ...(process.env.CHROME_PATH ? { executablePath: process.env.CHROME_PATH } : {}) });
 const trials = [];
 try {
-  for (let trial = 0; trial < 3; trial++) {
+  // Warm the Vite transforms once; measure fresh contexts with the same compiled assets.
+  for (let trial = -1; trial < 3; trial++) {
     const context = await browser.newContext({ viewport: { width: 1366, height: 900 }, reducedMotion: 'reduce' });
     await context.addInitScript(u => localStorage.setItem('toms_user', JSON.stringify(u)), user);
     const requests = [];
@@ -21,13 +23,7 @@ try {
       requests.push({ path, method: route.request().method() });
       if (path === '/attendance/trainer-grid') {
         const month = url.searchParams.get('month') || '2026-11';
-        const dates = Array.from({ length: 30 }, (_, i) => ({ key: `${month}-${String(i + 1).padStart(2, '0')}`, day: i + 1, label: String(i + 1), dayName: 'Mon', isFuture: false }));
-        const rows = Array.from({ length: trainerCount }, (_, i) => ({
-          trainer: { _id: `perf-trainer-${i}`, name: `Performance trainer ${i + 1}`, employeeId: String(150000 + i) },
-          days: Object.fromEntries(dates.map(date => [date.key, { attendanceType: 'oif', oifNumber: '12345', mockPrepHours: 0, classHandlingHours: 2, foodAllowance: '', classHoursEditable: true }])),
-          totals: { mockPrepHours: 0, classHandlingHours: 60, oifDays: 30, leaveDays: 0, replacementRequiredDays: 0 },
-        }));
-        return route.fulfill({ json: { month, workingDays: 30, dates, rows } });
+        return route.fulfill({ json: attendancePerformanceFixture(month, trainerCount) });
       }
       if (path === '/attendance/trainer-daily') return route.fulfill({ json: route.request().postDataJSON() });
       return route.fulfill({ json: fixture(path, url.searchParams) });
@@ -58,7 +54,7 @@ try {
     }
     assert.deepEqual(errors, []);
     assert.ok(mountedRows > 0 && mountedRows <= trainerCount);
-    trials.push({ trial, readyMs, mountedRows, inputs, editMs, gridRequests: requests.filter(request => request.path === '/attendance/trainer-grid').length });
+    if (trial >= 0) trials.push({ trial, readyMs, mountedRows, inputs, editMs, gridRequests: requests.filter(request => request.path === '/attendance/trainer-grid').length });
     await context.close();
   }
 } finally { await browser.close(); }

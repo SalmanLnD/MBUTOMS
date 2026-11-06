@@ -51,3 +51,9 @@ URLs must be localhost.
 This is a local UI fixture benchmark, not a production API/database benchmark.
 The development-only async-actions fixture and UI-audit entry are excluded from
 the production build.
+
+For manual review without a database, run `node scripts/review-preview.mjs`, then
+start Vite on port 5178 with `VITE_API_URL=http://127.0.0.1:5001/api`. The preview
+API binds only to localhost and stores sample leave/attendance edits in memory.
+It deliberately delays saves so loading/double-click behavior is easy to inspect;
+all other writes are disabled. Restarting it discards the sample edits.

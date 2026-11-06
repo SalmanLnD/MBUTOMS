@@ -181,6 +181,7 @@ export const computeClassHandlingHoursBatch = async (
     leaves,
     canceledIdsByDate,
     holidayMap,
+    outgoing,
   ] = await Promise.all([
     Schedule.find(ownedFilter).select(`${SCHEDULE_FIELDS} ${includeDetails ? EXPLANATION_FIELDS : ''}`).lean(),
     buildSubjectStartDateMap(),
@@ -196,6 +197,11 @@ export const computeClassHandlingHoursBatch = async (
       .lean(),
     getCancellationMapForRange(rangeStart, rangeEnd),
     loadOfficialHolidayMap(rangeStart, rangeEnd),
+    Trainer.find({
+      _id: { $in: trainerIds },
+      successorTrainer: { $ne: null },
+      roleTransferEffectiveDate: { $gt: rangeStart },
+    }).select('successorTrainer roleTransferEffectiveDate').lean(),
   ]);
 
   const ownershipFloors = await inheritedOwnershipFloorsByTrainer(trainerIds);
@@ -209,14 +215,17 @@ export const computeClassHandlingHoursBatch = async (
   // Older handovers rewrote timetable ownership without retaining its history.
   // An approved leave's affected schedule IDs provide per-slot evidence of the
   // outgoing trainer's former timetable; only recover those before handover.
-  const outgoing = await Trainer.find({ _id: { $in: trainerIds }, successorTrainer: { $ne: null }, roleTransferEffectiveDate: { $gt: rangeStart } })
-    .select('successorTrainer roleTransferEffectiveDate').lean();
   if (outgoing.length) {
-    const successors = await Trainer.find({ _id: { $in: outgoing.map((trainer) => trainer.successorTrainer) } })
-      .select('employeeId scheduleTrainerCodes').lean();
+    const [successors, historicalLeaves] = await Promise.all([
+      Trainer.find({ _id: { $in: outgoing.map((trainer) => trainer.successorTrainer) } })
+        .select('employeeId scheduleTrainerCodes').lean(),
+      Leave.find({
+        trainer: { $in: outgoing.map((trainer) => trainer._id) },
+        status: 'approved',
+        'affectedSchedules.0': { $exists: true },
+      }).select('trainer affectedSchedules').lean(),
+    ]);
     const successorCodes = new Map(successors.map((trainer) => [String(trainer._id), new Set(resolveTrainerScheduleCodes(trainer))]));
-    const historicalLeaves = await Leave.find({ trainer: { $in: outgoing.map((trainer) => trainer._id) }, status: 'approved', 'affectedSchedules.0': { $exists: true } })
-      .select('trainer affectedSchedules').lean();
     const historicalIds = [...new Set(historicalLeaves.flatMap((leave) => (leave.affectedSchedules || []).map(String)))];
     const historicalSlots = historicalIds.length
       ? await Schedule.find({ _id: { $in: historicalIds }, ...(semester ? { semester } : {}) })

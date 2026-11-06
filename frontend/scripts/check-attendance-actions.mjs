@@ -32,6 +32,7 @@ try {
   const context = await browser.newContext({ viewport: { width: 1366, height: 900 }, reducedMotion: 'reduce' });
   await context.addInitScript(u => localStorage.setItem('toms_user', JSON.stringify(u)), user);
   const requests = [], writes = [], heldMonths = new Map();
+  const savedCells = new Map();
   const writeWaiters = new Map();
   let holdNewMonths = false;
   const waitForWrites = count => {
@@ -55,7 +56,12 @@ try {
           heldMonths.set(month, pending);
           await pending.promise;
         }
-        return await route.fulfill({ json: grid(month) });
+        const data = grid(month);
+        for (const row of data.rows) for (const date of data.dates) {
+          const saved = savedCells.get(`${row.trainer._id}|${date.key}`);
+          if (saved) row.days[date.key] = { ...row.days[date.key], ...saved };
+        }
+        return await route.fulfill({ json: data });
       }
       if (path === '/attendance/trainer-daily') {
         const pending = gate();
@@ -63,7 +69,10 @@ try {
         writes.push(write);
         for (const [count, resolve] of writeWaiters) if (writes.length >= count) { writeWaiters.delete(count); resolve(); }
         await pending.promise;
-        return await route.fulfill(write.fail ? { status: 409, json: { message: 'Synthetic attendance save conflict' } } : { json: { ...write.payload, id: `saved-${writes.indexOf(write)}`, classHoursEditable: true, isOnLeave: false, isSundayWeekOff: false, isOfficialHoliday: false, isHolidayOff: false, isDefaultWeekOff: false } });
+        if (write.fail) return await route.fulfill({ status: 409, json: { message: 'Synthetic attendance save conflict' } });
+        const saved = { ...write.payload, id: `saved-${writes.indexOf(write)}`, classHoursEditable: true, isOnLeave: false, isSundayWeekOff: false, isOfficialHoliday: false, isHolidayOff: false, isDefaultWeekOff: false };
+        savedCells.set(`${saved.trainer}|${saved.date}`, saved);
+        return await route.fulfill({ json: saved });
       }
       return await route.fulfill({ json: fixture(path, url.searchParams) });
     } catch (error) {
@@ -109,6 +118,8 @@ try {
   await page.waitForFunction(() => document.querySelector('.trainer-attendance-grid tbody input')?.disabled);
   assert.equal(await first.isDisabled(), true);
   assert.equal(await second.isEnabled(), true);
+  assert.equal(await panel.getByRole('button', { name: 'Refresh', exact: true }).isDisabled(), true);
+  assert.equal(await panel.getByRole('button', { name: 'Previous month', exact: true }).isDisabled(), true);
   // Repeated blur bypasses the UI's disabled control; the same payload is coalesced.
   await first.evaluate(input => { input.dispatchEvent(new FocusEvent('focusout', { bubbles: true })); input.dispatchEvent(new FocusEvent('focusout', { bubbles: true })); });
   await tick(page);
@@ -116,6 +127,7 @@ try {
   await second.fill('54321');
   await second.press('Tab');
   await waitForWrites(2);
+  assert.match(await panel.locator('.trainer-attendance-summary [role="status"]').innerText(), /Saving 2 attendance entries/);
   assert.equal(writes[0].payload.trainer, 'attendance-trainer-0');
   assert.equal(writes[1].payload.trainer, 'attendance-trainer-1');
   await mkdir('.tmp', { recursive: true });
@@ -127,6 +139,12 @@ try {
   writes[0].release();
   await page.waitForFunction(() => !document.querySelector('.trainer-attendance-grid tbody input')?.disabled);
   assert.equal(await first.inputValue(), '43210');
+  const refreshed = page.waitForResponse(response => response.url().includes('/attendance/trainer-grid'));
+  await panel.getByRole('button', { name: 'Refresh', exact: true }).click();
+  await refreshed;
+  await page.waitForFunction(() => !document.querySelector('.trainer-attendance-grid tbody input')?.disabled);
+  assert.equal(await first.inputValue(), '43210', 'refresh must retain the failed edit for retry');
+  assert.equal(await second.inputValue(), '54321', 'refresh still loads saved server values');
   await first.focus();
   await first.press('Tab');
   await waitForWrites(3);

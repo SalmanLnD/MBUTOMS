@@ -24,7 +24,7 @@ for (const [width,height] of sizes) {
   const errors = []; page.on('pageerror', e => errors.push(e.message));
   for (const path of routes) {
     errors.length = 0;
-    await page.goto(baseURL + path); await page.waitForSelector('main'); await page.waitForTimeout(1200);
+    await page.goto(baseURL + path, { waitUntil: 'domcontentloaded' }); await page.waitForSelector('main'); await page.waitForTimeout(1200);
     const layout = await page.evaluate(() => ({ width: innerWidth, scrollWidth: document.documentElement.scrollWidth, height: document.documentElement.scrollHeight, content: document.querySelector('main')?.innerText?.length || 0, overflow: [...document.querySelectorAll('main *')].filter(e => { const r=e.getBoundingClientRect(); return r.width>0 && r.right>innerWidth+2 && !e.closest('.table-responsive,.timetable-grid-wrap,.trainer-attendance-grid,.nav-tabs'); }).slice(0,8).map(e=>`${e.tagName}.${e.className}`) }));
     if (layout.scrollWidth > width + 2 || errors.length || layout.content < 10) failures.push({ width,height,path,layout,errors: [...errors] });
     results.push({ width,height,path,...layout });

@@ -18,7 +18,7 @@ const cases=[
   ['/tickets',['Raise Ticket']], ['/tickets',['View']], ['/tickets',['Update']],
   ['/replacements',['Bulk Replacement']], ['/replacements',['Bulk Replacement','radio:External trainer (create account)']],
   ['/replacements',['Add Replacement']], ['/replacements',['Change replacement for CSE A3']], ['/replacements',['Cancel replacement for CSE A3']],
-  ['/timetable',['Special class']], ['/timetable',['Cancel classes']], ['/timetable',['Link to Sheets']],
+  ['/timetable',['Special classes']], ['/timetable',['Cancel classes']], ['/timetable',['Link to Sheets']],
   ['/venues',['tab:Room details','+ Add Venue']],
   ['/classes-students',['filter:Class filters','Add Class']],
   ['/classes-students',['tab:Students','filter:Student filters','Add Student']],
@@ -31,18 +31,24 @@ const cases=[
 ];
 const browser=await chromium.launch({headless:true,...(process.env.CHROME_PATH ? {executablePath:process.env.CHROME_PATH}: {})});
 const results=[],failures=[];
-for(const viewport of [{width:390,height:844},{width:1366,height:768},{width:568,height:320}]){
+const selectedCases = process.env.PAGE_DIALOG_CASES ? new Set(process.env.PAGE_DIALOG_CASES.split(',').map(Number)) : null;
+if (selectedCases) assert.ok([...selectedCases].every(index => Number.isInteger(index) && index >= 0 && index < cases.length));
+const selectedWidths = process.env.PAGE_DIALOG_WIDTHS?.split(',').map(Number);
+const viewports = [{width:390,height:844},{width:1366,height:768},{width:568,height:320}].filter(viewport => !selectedWidths || selectedWidths.includes(viewport.width));
+assert.ok(viewports.length > 0);
+for(const viewport of viewports){
   const context=await browser.newContext({viewport,reducedMotion:'reduce'});
   await context.addInitScript(u=>{localStorage.setItem('toms_token','responsive-test');localStorage.setItem('toms_user',JSON.stringify(u));},user);
   await context.route('**/api/**',async r=>{assert.equal(r.request().method(),'GET');const url=new URL(r.request().url());await r.fulfill({json:fixture(url.pathname.replace(/^\/api/,''),url.searchParams)});});
   const page=await context.newPage();page.setDefaultTimeout(5000);const errors=[];page.on('pageerror',e=>errors.push(e.message));
   for(let index=0;index<cases.length;index++){
+    if (selectedCases && !selectedCases.has(index)) continue;
     const [path,steps]=cases[index];errors.length=0;
     try{
-      await page.goto(base+path);await page.waitForSelector('main');await page.waitForTimeout(500);
+      await page.goto(base+path, { waitUntil: 'domcontentloaded', timeout: 15000 });await page.waitForSelector('main');await page.waitForTimeout(500);
       for(const step of steps){
         if(step.startsWith('tab:'))await page.locator('.nav-tabs button').filter({hasText:new RegExp(`^${step.slice(4)}$`,'i')}).click();
-        else if(step.startsWith('filter:')){if(viewport.width<768)await page.getByRole('button',{name:step.slice(7),exact:true}).click();}
+        else if(step.startsWith('filter:')){const toggle=page.getByRole('button',{name:step.slice(7),exact:true});if(await toggle.getAttribute('aria-expanded')!=='true')await toggle.click();}
         else if(step.startsWith('radio:'))await page.getByRole('radio',{name:step.slice(6),exact:true}).check();
         else await page.getByRole('button',{name:step,exact:true}).first().click();
         await page.waitForTimeout(150);
@@ -67,7 +73,7 @@ for(const viewport of [{width:390,height:844},{width:1366,height:768},{width:568
       results.push({path,steps,viewport,title});
     }catch(e){failures.push({path,steps,viewport,error:e.message,errors:[...errors]});console.log(`FAIL ${viewport.width} ${path} ${steps.at(-1)}: ${e.message}`);await page.screenshot({path:`${output}/FAILED-page-${viewport.width}-${index}.png`});}
   }
-  console.log(`Page dialogs ${viewport.width}x${viewport.height}: ${results.filter(r=>r.viewport.width===viewport.width).length}/${cases.length} passed`);await context.close();
+  console.log(`Page dialogs ${viewport.width}x${viewport.height}: ${results.filter(r=>r.viewport.width===viewport.width).length}/${selectedCases?.size || cases.length} passed`);await context.close();
 }
 await browser.close();await writeFile(`${output}/page-dialog-report.json`,JSON.stringify({results,failures},null,2));
 console.log(`${results.length} page dialog checks passed; ${failures.length} failed`);if(failures.length)process.exitCode=1;

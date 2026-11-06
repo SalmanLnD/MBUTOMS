@@ -1,7 +1,10 @@
 # Page responsiveness and request safety
 
-Status: implementation and local verification in progress. Nothing in this batch
-will be pushed until the user verifies the result.
+Status: implementation and automated local verification complete; user review
+is pending. Results are in `PERFORMANCE_VERIFICATION.md`. A separate workspace
+process included most of this batch in commit
+`02bfd3a` on `origin/main` while verification was running. This chat did not push
+that commit. Remaining changes will wait for the user's review before any push.
 
 ## Baseline and acceptance gates
 
@@ -9,8 +12,10 @@ will be pushed until the user verifies the result.
   Playwright fixture: 60 trainers × 30 attendance days, 1366 × 900 viewport, three
   fresh-browser trials. Measure time to rendered grid, mounted inputs/rows, edit
   to two animation frames, and number of grid requests.
-- Budget: three focused performance changes, local synthetic data only; no
-  production writes, new hosted resources, or data cleanup.
+- Budget: three focused performance change groups, at most two after-comparison
+  runs with three measured trials each, up to 20 minutes of benchmark runtime,
+  local synthetic data only, and no external spend, production writes, new hosted
+  resources, or data cleanup.
 - Gates: no duplicate writes on double-click/Enter; preserve form drafts on
   failure; release loading states on error; keep independent attendance saves
   independent and serialize writes to the same cell; reject overlapping active

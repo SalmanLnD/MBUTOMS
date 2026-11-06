@@ -1,6 +1,6 @@
 import AsyncButton from './AsyncButton.jsx';
 import { createKeyedAsyncQueue } from '../utils/keyedAsyncQueue.js';
-import { attendanceCellFingerprint, attendanceCellPayload } from '../utils/attendanceDraft.js';
+import { attendanceCellFingerprint, attendanceCellPayload, mergeFailedAttendanceDrafts } from '../utils/attendanceDraft.js';
 import Pagination from './Pagination.jsx';
 import { useState, useEffect, useLayoutEffect, useCallback, Fragment, useMemo, useRef } from 'react';
 import LoadingSpinner from '../components/LoadingSpinner.jsx';
@@ -54,8 +54,14 @@ const TrainerAttendanceTab = () => {
   const [trainerPage, setTrainerPage] = useState(1);
   const [trainerPageSize, setTrainerPageSize] = useState(10);
   const savedCells = useRef(new Map());
+  const failedDrafts = useRef(new Map());
   const requestedCells = useRef(new Map());
   const gridRequestId = useRef(0);
+  const mounted = useRef(true);
+  useEffect(() => {
+    mounted.current = true;
+    return () => { mounted.current = false; };
+  }, []);
   const saveQueueRef = useRef(createKeyedAsyncQueue());
   const [trainerSearch, setTrainerSearch] = useState('');
   const [sheetStatus, setSheetStatus] = useState(null);
@@ -146,11 +152,19 @@ const TrainerAttendanceTab = () => {
       cacheSession.current = sessionKey;
       monthCacheRef.current.clear();
       savedCells.current.clear();
+      failedDrafts.current.clear();
       requestedCells.current.clear();
       saveQueueRef.current = createKeyedAsyncQueue();
       setSavingKeys(new Set());
       gridDataRef.current = null;
       setGrid(null);
+    }
+    // Refreshes from other dialogs must not replace a cell while its write is pending.
+    const pendingSaves = [...requestedCells.current.values()].map(request => request.promise);
+    if (pendingSaves.length) {
+      setRefreshing(true);
+      await Promise.allSettled(pendingSaves);
+      if (requestId !== gridRequestId.current || !mounted.current) return;
     }
     const requestParams = { month: monthKey };
     const todayKey = toAttendanceDateKey();
@@ -174,18 +188,20 @@ const TrainerAttendanceTab = () => {
     }
 
     try {
-      const data = await getTrainerAttendanceGrid(requestParams, {
+      const persistedData = await getTrainerAttendanceGrid(requestParams, {
         preferCache: !forceRefresh,
         forceRefresh,
       });
       if (requestId !== gridRequestId.current) return;
-      monthCacheRef.current.set(monthKey, { todayKey, data });
-      while (monthCacheRef.current.size > 6) monthCacheRef.current.delete(monthCacheRef.current.keys().next().value);
-      for (const row of data.rows || []) {
+      savedCells.current.clear();
+      for (const row of persistedData.rows || []) {
         for (const [date, cell] of Object.entries(row.days || {})) {
           savedCells.current.set(`${row.trainer._id}|${date}`, attendanceCellFingerprint(cell));
         }
       }
+      const data = mergeFailedAttendanceDrafts(persistedData, failedDrafts.current);
+      monthCacheRef.current.set(monthKey, { todayKey, data });
+      while (monthCacheRef.current.size > 6) monthCacheRef.current.delete(monthCacheRef.current.keys().next().value);
       gridDataRef.current = data;
       setGrid(data);
     } catch (err) {
@@ -274,6 +290,11 @@ const TrainerAttendanceTab = () => {
             ...row.days,
             [dateKey]: nextCell,
           };
+          const draftKey = `${trainerId}|${dateKey}`;
+          if (failedDrafts.current.has(draftKey)) {
+            if (attendanceCellFingerprint(nextCell) === savedCells.current.get(draftKey)) failedDrafts.current.delete(draftKey);
+            else failedDrafts.current.set(draftKey, attendanceCellPayload(nextCell));
+          }
           const dateKeys = prev.dates.map((date) => date.key);
           const totals = dateKeys.reduce(
             (acc, key) => {
@@ -327,82 +348,53 @@ const TrainerAttendanceTab = () => {
     setSavingKeys(current => new Set(current).add(saveKey));
 
     const promise = saveQueueRef.current.run(saveKey, async () => {
-    if (saveSession !== currentSession.current) return;
-    try {
-      const saved = await upsertTrainerDailyAttendance({
-        trainer: trainerId,
-        date: dateKey,
-        ...attendanceCellPayload(cell),
-      });
-      if (saveSession !== currentSession.current) return;
-      savedCells.current.set(saveKey, attendanceCellFingerprint({ ...cell, ...saved }));
+      if (!mounted.current || saveSession !== currentSession.current) return;
+      try {
+        const saved = await upsertTrainerDailyAttendance({
+          trainer: trainerId,
+          date: dateKey,
+          ...attendanceCellPayload(cell),
+        });
+        if (!mounted.current || saveSession !== currentSession.current) return;
+        failedDrafts.current.delete(saveKey);
+        savedCells.current.set(saveKey, attendanceCellFingerprint({ ...cell, ...saved }));
 
-      setGrid((prev) => {
-        if (!prev || prev.month !== saveMonth || saveSession !== currentSession.current) return prev;
-        const next = {
-          ...prev,
-          rows: prev.rows.map((entry) => {
-            if (entry.trainer._id !== trainerId) return entry;
-            const latestCell = entry.days[dateKey] || {};
-            const hasNewerEdits = ['attendanceType', 'oifNumber', 'mockPrepHours', 'classHandlingHours', 'foodAllowance']
-              .some(field => latestCell[field] !== cell[field]);
-            return {
-              ...entry,
-              days: {
-                ...entry.days,
-                [dateKey]: {
-                  ...entry.days[dateKey],
-                  id: saved.id,
-                  attendanceType: saved.attendanceType,
-                  oifNumber: saved.oifNumber,
-                  oifDisplay: saved.oifDisplay,
-                  foodAllowance: saved.foodAllowance,
-                  mockPrepHours: saved.mockPrepHours,
-                  classHandlingHours: saved.classHandlingHours,
-                  classHoursEditable: saved.classHoursEditable,
-                  isOnLeave: saved.isOnLeave,
-                  isSundayWeekOff: saved.isSundayWeekOff,
-                  isOfficialHoliday: saved.isOfficialHoliday,
-                  isHolidayOff: saved.isHolidayOff,
-                  isDefaultWeekOff: saved.isDefaultWeekOff,
-                  // An older response must not overwrite a later queued edit.
-                  ...(hasNewerEdits ? {
-                    attendanceType: latestCell.attendanceType,
-                    oifNumber: latestCell.oifNumber,
-                    mockPrepHours: latestCell.mockPrepHours,
-                    classHandlingHours: latestCell.classHandlingHours,
-                    foodAllowance: latestCell.foodAllowance,
-                  } : {}),
-                },
-              },
-            };
-          }),
-        };
-        gridDataRef.current = next;
-        monthCacheRef.current.set(next.month, { todayKey: toAttendanceDateKey(), data: next });
-        return next;
-      });
-    } catch (err) {
-      if (saveSession !== currentSession.current) return;
-      const payload = err?.response?.data;
-      if (payload?.code === 'INSUFFICIENT_COMP_OFF') {
-        showError(payload.message || 'Insufficient comp-off balance. Reverted to Leave.');
         setGrid((prev) => {
           if (!prev || prev.month !== saveMonth || saveSession !== currentSession.current) return prev;
-          const revertTo = payload.revertTo || TRAINER_ATTENDANCE_TYPES.LEAVE;
           const next = {
             ...prev,
             rows: prev.rows.map((entry) => {
               if (entry.trainer._id !== trainerId) return entry;
+              const latestCell = entry.days[dateKey] || {};
+              const hasNewerEdits = ['attendanceType', 'oifNumber', 'mockPrepHours', 'classHandlingHours', 'foodAllowance']
+                .some(field => latestCell[field] !== cell[field]);
               return {
                 ...entry,
                 days: {
                   ...entry.days,
                   [dateKey]: {
                     ...entry.days[dateKey],
-                    attendanceType: revertTo,
-                    oifNumber: '',
-                    mockPrepHours: 0,
+                    id: saved.id,
+                    attendanceType: saved.attendanceType,
+                    oifNumber: saved.oifNumber,
+                    oifDisplay: saved.oifDisplay,
+                    foodAllowance: saved.foodAllowance,
+                    mockPrepHours: saved.mockPrepHours,
+                    classHandlingHours: saved.classHandlingHours,
+                    classHoursEditable: saved.classHoursEditable,
+                    isOnLeave: saved.isOnLeave,
+                    isSundayWeekOff: saved.isSundayWeekOff,
+                    isOfficialHoliday: saved.isOfficialHoliday,
+                    isHolidayOff: saved.isHolidayOff,
+                    isDefaultWeekOff: saved.isDefaultWeekOff,
+                    // An older response must not overwrite a later queued edit.
+                    ...(hasNewerEdits ? {
+                      attendanceType: latestCell.attendanceType,
+                      oifNumber: latestCell.oifNumber,
+                      mockPrepHours: latestCell.mockPrepHours,
+                      classHandlingHours: latestCell.classHandlingHours,
+                      foodAllowance: latestCell.foodAllowance,
+                    } : {}),
                   },
                 },
               };
@@ -412,12 +404,45 @@ const TrainerAttendanceTab = () => {
           monthCacheRef.current.set(next.month, { todayKey: toAttendanceDateKey(), data: next });
           return next;
         });
-      } else {
-        showError(getErrorMessage(err));
+      } catch (err) {
+        if (!mounted.current || saveSession !== currentSession.current) return;
+        const payload = err?.response?.data;
+        if (payload?.code === 'INSUFFICIENT_COMP_OFF') {
+          failedDrafts.current.delete(saveKey);
+          showError(payload.message || 'Insufficient comp-off balance. Reverted to Leave.');
+          setGrid((prev) => {
+            if (!prev || prev.month !== saveMonth || saveSession !== currentSession.current) return prev;
+            const revertTo = payload.revertTo || TRAINER_ATTENDANCE_TYPES.LEAVE;
+            const next = {
+              ...prev,
+              rows: prev.rows.map((entry) => {
+                if (entry.trainer._id !== trainerId) return entry;
+                return {
+                  ...entry,
+                  days: {
+                    ...entry.days,
+                    [dateKey]: {
+                      ...entry.days[dateKey],
+                      attendanceType: revertTo,
+                      oifNumber: '',
+                      mockPrepHours: 0,
+                    },
+                  },
+                };
+              }),
+            };
+            gridDataRef.current = next;
+            monthCacheRef.current.set(next.month, { todayKey: toAttendanceDateKey(), data: next });
+            return next;
+          });
+        } else {
+          const latest = gridDataRef.current?.rows.find(row => row.trainer._id === trainerId)?.days[dateKey];
+          failedDrafts.current.set(saveKey, attendanceCellPayload(latest || cell));
+          showError(getErrorMessage(err));
+        }
       }
-    }
     }).finally(() => {
-      if (saveSession !== currentSession.current) return;
+      if (!mounted.current || saveSession !== currentSession.current) return;
       if (requestedCells.current.get(saveKey)?.promise === promise) requestedCells.current.delete(saveKey);
       if (!saveQueueRef.current.has(saveKey)) {
         setSavingKeys(current => {
@@ -597,6 +622,11 @@ const TrainerAttendanceTab = () => {
           <span className="trainer-attendance-pill">{monthLabel}</span>
           {refreshing && (
             <span className="trainer-attendance-pill text-muted">Refreshing...</span>
+          )}
+          {savingKeys.size > 0 && (
+            <span className="trainer-attendance-pill text-primary" role="status">
+              Saving {savingKeys.size} attendance {savingKeys.size === 1 ? 'entry' : 'entries'}…
+            </span>
           )}
           <span className="trainer-attendance-pill">
             {grid.workingDays} day{grid.workingDays === 1 ? '' : 's'} in month
