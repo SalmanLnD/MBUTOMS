@@ -16,3 +16,19 @@ test('deduplicates timetable slots and keeps subjects distinct', () => {
  assert.equal(rows.length,3);
  assert.deepEqual(rows.slice(1).map(r=>r[6]),['X','Y']);
 });
+
+test('department transfers retain old-subject marks in student summary', () => {
+ const moved=[{...students[0],branch:'ECE',sectionLabel:'B'}];
+ const reports=[{...report('2026-08',0),subject:{_id:'x',name:'Original Subject',code:'X'},subjectName:'Original Subject',subjectCode:'X'}];
+ const rows=buildStudentSummaryRows(moved,[],reports);
+ assert.equal(rows.length,2);
+ assert.equal(rows[1][2],'ECE');
+ assert.equal(rows[1][6],'X');
+ assert.equal(rows[1][7],0);
+});
+
+test('summary supports term-specific month columns', () => {
+ const rows=buildStudentSummaryRows(students,subjects,[report('2027-01',8)],['2027-01','2027-02']);
+ assert.deepEqual(rows[0].slice(7),['January 2027','February 2027','Average']);
+ assert.deepEqual(rows[1].slice(7),[8,'NA','Not finalized']);
+});

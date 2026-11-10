@@ -3,6 +3,7 @@ import Trainer from '../models/Trainer.js';
 import Subject from '../models/Subject.js';
 import { ROLES } from './roles.js';
 import { EVALUATOR_ASSIGNMENTS } from './evaluatorConfig.js';
+import { setAcademicUserSubjects, usesTermAssignments } from './academicAssignments.js';
 
 const sameIdSet = (a = [], b = []) => {
   const left = [...new Set(a.map(String))].sort();
@@ -61,6 +62,12 @@ export const syncEvaluators = async () => {
     }
 
     const subjectIds = subjects.map((subject) => subject._id);
+    if (usesTermAssignments()) {
+      await setAcademicUserSubjects(user, 'evaluatorSubjects', subjectIds);
+      updated += 1;
+      results.push({ employeeId: assignment.employeeId, userId: String(user._id), subjectCodes: assignment.subjectCodes, status: 'updated' });
+      continue;
+    }
     const currentSubjectIds = (user.evaluatorSubjects || []).map((id) => id.toString());
     const nextSubjectIds = subjectIds.map((id) => id.toString());
     const trainerLinked = user.trainer?.toString() === trainer._id.toString();

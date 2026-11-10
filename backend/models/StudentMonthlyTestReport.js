@@ -1,4 +1,5 @@
 import mongoose from 'mongoose';
+import { termModel } from '../utils/academicTermContext.js';
 
 const studentMonthlyTestReportSchema = new mongoose.Schema(
   {
@@ -41,7 +42,7 @@ studentMonthlyTestReportSchema.index({ month: 1, student: 1, subject: 1 }, { uni
 studentMonthlyTestReportSchema.index({ month: 1, department: 1, section: 1, semester: 1, subject: 1 });
 studentMonthlyTestReportSchema.index({ month: 1, subject: 1 });
 
-const StudentMonthlyTestReport = mongoose.model(
+const StudentMonthlyTestReport = termModel(
   'StudentMonthlyTestReport',
   studentMonthlyTestReportSchema
 );

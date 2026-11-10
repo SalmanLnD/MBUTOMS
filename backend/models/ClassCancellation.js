@@ -1,4 +1,5 @@
 import mongoose from 'mongoose';
+import { termModel } from '../utils/academicTermContext.js';
 
 const classCancellationSchema = new mongoose.Schema(
   {
@@ -31,5 +32,5 @@ const classCancellationSchema = new mongoose.Schema(
 classCancellationSchema.index({ date: 1, schedules: 1 });
 classCancellationSchema.index({ createdAt: -1 });
 
-const ClassCancellation = mongoose.model('ClassCancellation', classCancellationSchema);
+const ClassCancellation = termModel('ClassCancellation', classCancellationSchema);
 export default ClassCancellation;

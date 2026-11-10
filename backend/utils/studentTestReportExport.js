@@ -39,7 +39,7 @@ const MONTH_MARKS_HEADERS = MARKS_HEADERS.filter((header) => header !== 'Month')
 const STUDENT_SUMMARY_MONTHS = ['2026-08', '2026-09', '2026-10'];
 
 // One row per student and subject; zero is a mark, missing/ungraded is NA.
-export const buildStudentSummaryRows = (students, schedules, reports) => {
+export const buildStudentSummaryRows = (students, schedules, reports, monthKeys = STUDENT_SUMMARY_MONTHS) => {
   const classKey = (department, section, semester) => [department, section, semester].join('|');
   const subjectsByClass = new Map();
   for (const schedule of schedules) {
@@ -50,26 +50,35 @@ export const buildStudentSummaryRows = (students, schedules, reports) => {
     subjectsByClass.get(key).set(String(subject._id), subject);
   }
   const reportsByStudentSubject = new Map();
+  const historicalSubjectsByStudent = new Map();
   for (const report of reports) {
     const studentId = String(report.student?._id || report.student || '');
     const subjectId = String(report.subject?._id || report.subject || '');
     const key = `${studentId}|${subjectId}`;
     if (!reportsByStudentSubject.has(key)) reportsByStudentSubject.set(key, new Map());
     reportsByStudentSubject.get(key).set(report.month, report);
+    if (!historicalSubjectsByStudent.has(studentId)) historicalSubjectsByStudent.set(studentId, new Map());
+    historicalSubjectsByStudent.get(studentId).set(subjectId, {
+      _id: subjectId,
+      name: report.subjectName || report.subject?.name || '',
+      code: report.subjectCode || report.subject?.code || '',
+    });
   }
   const rows = [];
   for (const student of students) {
-    const subjects = subjectsByClass.get(classKey(student.branch, student.sectionLabel, student.semesterLabel));
-    if (!subjects) continue;
+    const subjects = new Map(subjectsByClass.get(classKey(student.branch, student.sectionLabel, student.semesterLabel)) || []);
+    for (const [id, subject] of historicalSubjectsByStudent.get(String(student._id)) || []) {
+      if (!subjects.has(id)) subjects.set(id, subject);
+    }
     for (const [subjectId, subject] of subjects) {
       const monthly = reportsByStudentSubject.get(`${student._id}|${subjectId}`) || new Map();
-      const values = STUDENT_SUMMARY_MONTHS.map((month) => {
+      const values = monthKeys.map((month) => {
         const report = monthly.get(month);
         if (!report) return 'NA';
         if (resolveAttendance(report) === 'A') return 'Absent';
         return Number.isFinite(report.marksObtained) ? report.marksObtained : 'NA';
       });
-      const average = values.every((value) => typeof value === 'number')
+      const average = values.length && values.every((value) => typeof value === 'number')
         ? Math.round((values.reduce((sum, value) => sum + value, 0) / values.length) * 100) / 100
         : 'Not finalized';
       rows.push([student.rollNumber || '', student.name || '', student.branch || '', student.sectionLabel || '',
@@ -79,7 +88,7 @@ export const buildStudentSummaryRows = (students, schedules, reports) => {
   rows.sort((a, b) => String(a[2]).localeCompare(String(b[2])) || String(a[3]).localeCompare(String(b[3]), undefined, { numeric: true })
     || String(a[0]).localeCompare(String(b[0]), undefined, { numeric: true }) || String(a[6]).localeCompare(String(b[6])));
   return [['Roll No.', 'Student Name', 'Department', 'Section', 'Semester', 'Subject', 'Subject Code',
-    'August 2026', 'September 2026', 'October 2026', 'Average'], ...rows];
+    ...monthKeys.map(getMonthLabelFromKey), 'Average'], ...rows];
 };
 
 const SUBJECT_SUMMARY_HEADERS = [
@@ -303,7 +312,7 @@ export const buildTestReportSheetsExportPayload = async () => {
     summarySheetName: 'Summary',
     summaryRows: buildSummarySheetRows(monthSummaries),
     studentSummarySheetName: 'Student Summary',
-    studentSummaryRows: buildStudentSummaryRows(students, schedules, allReports),
+    studentSummaryRows: buildStudentSummaryRows(students, schedules, allReports, monthKeys),
     monthSheets,
     managedSheetNames: ['Summary', 'Student Summary', ...monthSheets.map((sheet) => sheet.sheetName)],
   };

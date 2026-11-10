@@ -18,6 +18,7 @@ import {
   isSubjectCoordinator,
 } from '../utils/subjectCoordinatorAccess.js';
 import { escapeRegex } from '../utils/regex.js';
+import { getTrainerAcademicSubjects, usesTermAssignments } from '../utils/academicAssignments.js';
 
 const populateSubject = (query) =>
   query
@@ -43,7 +44,7 @@ const trimOptionalUrl = (value) => {
 const trainerCanAccessSubject = async (trainerId, subject) => {
   if (!trainerId || !subject) return false;
 
-  const trainer = await Trainer.findById(trainerId).select('subjects');
+  const trainer = usesTermAssignments() ? null : await Trainer.findById(trainerId).select('subjects');
   const subjectId = subject._id.toString();
   const assignedIds = trainer?.subjects?.map((id) => id.toString()) || [];
   if (assignedIds.includes(subjectId)) return true;
@@ -187,7 +188,7 @@ const buildSubjectQuery = async (query) => {
   }
   if (query.trainer) {
     const trainer = await Trainer.findById(query.trainer).select('subjects');
-    const subjectIds = trainer?.subjects?.map((id) => id.toString()) || [];
+    const subjectIds = (await getTrainerAcademicSubjects(trainer, '_id')).map((id) => (id._id || id).toString());
     const trainerClauses = [{ trainerEligible: query.trainer }];
     if (subjectIds.length) {
       trainerClauses.push({ _id: { $in: subjectIds } });

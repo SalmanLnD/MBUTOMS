@@ -2,6 +2,7 @@ import axios from 'axios';
 import { notifySessionExpired } from '../utils/sessionManager.js';
 import { createDemoWorkspace, isDemoUser, demoNetworkActions } from '../utils/demoWorkspace.js';
 import { isSafeRetryMethod } from '../utils/retryPolicy.js';
+import { getAcademicTransport, isAcademicPath } from '../utils/academicTerm.js';
 
 export const demoWorkspace = createDemoWorkspace(window.localStorage, () => window.dispatchEvent(new Event('toms-demo-change')));
 const cachedUser = () => { try { return JSON.parse(localStorage.getItem('toms_user') || 'null'); } catch { return null; } };
@@ -46,6 +47,16 @@ const api = axios.create({
 
 api.interceptors.request.use((config) => {
   const user = cachedUser(), path = requestPath(config), method = config.method?.toLowerCase() || 'get';
+  const academic = getAcademicTransport();
+  if (isAcademicPath(path) && academic.enabled) {
+    if (academic.stale && !isSafeRetryMethod(method)) {
+      return Promise.reject(new Error('The published semester changed. Preserve your edits, then load the current semester before saving.'));
+    }
+    config.headers['X-Academic-Term'] = academic.termId;
+    config.headers['X-Academic-Revision'] = String(academic.revision);
+    config.academicGeneration = academic.generation;
+    config.signal = config.signal && AbortSignal.any ? AbortSignal.any([config.signal, academic.signal]) : academic.signal;
+  }
   if (isDemoUser(user)) {
     config.demoOwner = user.demoAccountId || user._id;
     const localDetail = method === 'get' && demoWorkspace.localDetail(config.demoOwner, path);
@@ -60,6 +71,9 @@ api.interceptors.request.use((config) => {
 api.interceptors.response.use(
   (response) => {
     const { config } = response, user = cachedUser();
+    if (config.academicGeneration != null && config.academicGeneration !== getAcademicTransport().generation) {
+      return Promise.reject(new axios.CanceledError('Semester context changed'));
+    }
     if (config.demoOwner && isDemoUser(user) && config.demoOwner === (user.demoAccountId || user._id)
       && config.method === 'get' && !requestPath(config).startsWith('/auth/')) {
       const path = requestPath(config);
@@ -73,6 +87,9 @@ api.interceptors.response.use(
     const status = error.response?.status;
     const hadToken = Boolean(cachedUser());
     const isLoginRequest = isAuthLoginRequest(config);
+    if (status === 409 && error.response?.data?.code === 'ACADEMIC_TERM_STALE') {
+      window.dispatchEvent(new Event('toms-academic-stale'));
+    }
 
     if (status === 401 && hadToken && !isLoginRequest && !config?.skipSessionExpired) {
       const data = error.response?.data;

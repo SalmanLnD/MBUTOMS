@@ -3,6 +3,7 @@ import School from '../models/School.js';
 import Semester from '../models/Semester.js';
 import Subject from '../models/Subject.js';
 import Trainer from '../models/Trainer.js';
+import { usesTermAssignments } from './academicAssignments.js';
 import User from '../models/User.js';
 import Schedule from '../models/Schedule.js';
 import {
@@ -86,14 +87,14 @@ export const syncIdsaTrainersAndSubject = async () => {
 
   if (subject) {
     if (legacySubject) {
-      await Trainer.updateMany(
+      if (!usesTermAssignments()) await Trainer.updateMany(
         { subjects: legacySubject._id },
         { $pull: { subjects: legacySubject._id } }
       );
       await legacySubject.deleteOne();
     }
 
-    await Trainer.updateMany(
+    if (!usesTermAssignments()) await Trainer.updateMany(
       { employeeId: { $in: idsaTrainerCodes } },
       { $addToSet: { subjects: subject._id } }
     );

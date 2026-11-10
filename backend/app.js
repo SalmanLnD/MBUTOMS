@@ -31,6 +31,8 @@ import { guardDemoToken } from './utils/demoAccess.js';
 import { protectCookieRequest } from './utils/sessionCookie.js';
 import { invalidateAfterWrite } from './utils/dataRevision.js';
 import announcementRoutes from './routes/announcementRoutes.js';
+import academicTermRoutes from './routes/academicTermRoutes.js';
+import { academicTermMiddleware } from './middleware/academicTerm.js';
 
 dotenv.config();
 const app = express();
@@ -68,6 +70,8 @@ app.use(async (req, res, next) => {
   }
 });
 
+app.use(academicTermMiddleware);
+app.use('/api/academic-terms', academicTermRoutes);
 app.use('/api/auth', authRoutes);
 app.use('/api/trainers', trainerRoutes);
 app.use('/api/venues', venueRoutes);

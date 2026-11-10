@@ -13,6 +13,9 @@ import {
   isSubjectCoordinator,
 } from '../utils/subjectCoordinatorAccess.js';
 import { escapeRegex } from '../utils/regex.js';
+import { getTrainerAcademicSubjects, projectTrainerAcademicSubjects, projectTrainerAcademicList, usesTermAssignments } from '../utils/academicAssignments.js';
+
+const populateTrainerSubjects = (query, fields) => usesTermAssignments() ? query : query.populate('subjects', fields);
 
 const buildTrainerQuery = async (query) => {
   const clauses = [];
@@ -56,7 +59,7 @@ const buildTrainerQuery = async (query) => {
         ),
       ];
 
-      const subjectClauses = [{ subjects: { $in: subjectIds } }];
+      const subjectClauses = usesTermAssignments() ? [{ _id: { $in: eligibleTrainerIds } }] : [{ subjects: { $in: subjectIds } }];
       if (eligibleTrainerIds.length) {
         subjectClauses.push({ _id: { $in: eligibleTrainerIds } });
       }
@@ -115,9 +118,8 @@ export const getTrainers = async (req, res) => {
     ? Trainer.find(finalFilter).select(
       'name employeeId scheduleTrainerCodes status employmentStatus resignationDate includeInAttendanceUntilMonth'
     )
-    : Trainer.find(finalFilter)
-      .populate('department', 'name code')
-      .populate('subjects', 'name code slotCount slotTimings');
+    : populateTrainerSubjects(Trainer.find(finalFilter)
+      .populate('department', 'name code'), 'name code slotCount slotTimings');
 
   const [trainers, total] = await Promise.all([
     trainerQuery.sort(sort).skip(skip).limit(limit).lean(),
@@ -125,7 +127,7 @@ export const getTrainers = async (req, res) => {
   ]);
 
   res.json({
-    trainers,
+    trainers: liteFields ? trainers : await projectTrainerAcademicList(trainers),
     pagination: {
       page,
       limit,
@@ -136,6 +138,7 @@ export const getTrainers = async (req, res) => {
 };
 
 const mergeTrainerSubjects = async (trainer) => {
+  if (usesTermAssignments()) return projectTrainerAcademicSubjects(trainer);
   const eligibleSubjects = await Subject.find({ trainerEligible: trainer._id }).select('name code hours');
   const subjectMap = new Map();
 
@@ -152,10 +155,9 @@ const mergeTrainerSubjects = async (trainer) => {
 };
 
 export const getTrainerById = async (req, res) => {
-  const trainer = await Trainer.findById(req.params.id)
+  const trainer = await populateTrainerSubjects(Trainer.findById(req.params.id)
     .populate('department', 'name code')
-    .populate('subjects', 'name code hours')
-    .populate('successorTrainer', 'name employeeId');
+    .populate('successorTrainer', 'name employeeId'), 'name code hours');
 
   if (!trainer) {
     return res.status(404).json({ message: 'Trainer not found' });
@@ -206,6 +208,7 @@ export const createTrainer = async (req, res) => {
   }
 
   const { email, ...trainerData } = payload;
+  if (usesTermAssignments()) delete trainerData.subjects;
   const trainer = await Trainer.create(trainerData);
 
   if (email) {
@@ -213,17 +216,17 @@ export const createTrainer = async (req, res) => {
     await trainer.save();
   }
 
-  if (trainer.subjects?.length) {
-    await applyTrainerSubjectsChange(trainer._id, [], trainer.subjects);
+  if (payload.subjects?.length) {
+    await applyTrainerSubjectsChange(trainer._id, [], payload.subjects);
   }
 
-  const populated = await Trainer.findById(trainer._id)
-    .populate('department', 'name code')
-    .populate('subjects', 'name code');
+  const populated = await populateTrainerSubjects(Trainer.findById(trainer._id)
+    .populate('department', 'name code'), 'name code');
 
   const loginUser = email ? await syncTrainerUser(populated, { resetPassword: true }) : null;
   res.set('Cache-Control', 'no-store');
-  res.status(201).json({ ...populated.toObject(), initialOtp: loginUser?.$locals?.initialOtp || null });
+  const projected = await projectTrainerAcademicSubjects(populated);
+  res.status(201).json({ ...(projected.toObject ? projected.toObject() : projected), initialOtp: loginUser?.$locals?.initialOtp || null });
 };
 
 export const updateTrainer = async (req, res) => {
@@ -247,7 +250,7 @@ export const updateTrainer = async (req, res) => {
     }
   }
 
-  const previousSubjects = [...(trainer.subjects || [])];
+  const previousSubjects = await getTrainerAcademicSubjects(trainer);
   if (payload.status === 'active' && (trainer.status !== 'active' || ['resigned', 'relocated'].includes(trainer.employmentStatus))) {
     payload.directoryReactivatedAt = new Date();
     payload.showInRoster = true;
@@ -258,17 +261,16 @@ export const updateTrainer = async (req, res) => {
   const previousEmployeeId = trainer.employeeId;
 
   const updateDoc = { $set: { ...payload } };
+  if (usesTermAssignments()) delete updateDoc.$set.subjects;
   if (!req.body.email?.trim()) {
     delete updateDoc.$set.email;
     updateDoc.$unset = { email: '' };
   }
 
-  const updated = await Trainer.findByIdAndUpdate(req.params.id, updateDoc, {
+  await Trainer.findByIdAndUpdate(req.params.id, updateDoc, {
     new: true,
     runValidators: true,
-  })
-    .populate('department', 'name code')
-    .populate('subjects', 'name code');
+  });
 
   if (payload.subjects !== undefined) {
     await applyTrainerSubjectsChange(req.params.id, previousSubjects, payload.subjects);
@@ -287,9 +289,8 @@ export const updateTrainer = async (req, res) => {
     }
   }
 
-  const refreshed = await Trainer.findById(req.params.id)
-    .populate('department', 'name code')
-    .populate('subjects', 'name code');
+  const refreshed = await populateTrainerSubjects(Trainer.findById(req.params.id)
+    .populate('department', 'name code'), 'name code');
 
   let loginUser;
   if (payload.email) {
@@ -299,7 +300,8 @@ export const updateTrainer = async (req, res) => {
   }
 
   res.set('Cache-Control', 'no-store');
-  res.json({ ...refreshed.toObject(), initialOtp: loginUser?.$locals?.initialOtp || null });
+  const projected = await projectTrainerAcademicSubjects(refreshed);
+  res.json({ ...(projected.toObject ? projected.toObject() : projected), initialOtp: loginUser?.$locals?.initialOtp || null });
 };
 
 export const deleteTrainer = async (req, res) => {

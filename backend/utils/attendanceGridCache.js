@@ -1,6 +1,7 @@
 import { isTrainerLikeRole } from './roles.js';
 import { getDataRevision, invalidateDerivedData } from './dataRevision.js';
 import { clearAttendanceExportCache } from '../services/attendanceSheetsService.js';
+import { academicCacheKey } from './academicCacheKey.js';
 
 const cache = new Map();
 // Leave/punch/replacement writes invalidate explicitly, so a longer TTL is safe.
@@ -11,7 +12,7 @@ export const buildAttendanceGridCacheKey = (month, semester, user, todayKey = ''
   const scope = isTrainerLikeRole(user?.role)
     ? `trainer:${trainerIdentity ? trainerIdentity.toString() : 'unlinked'}`
     : 'all';
-  return `${month}|${semester}|${scope}|${todayKey}`;
+  return academicCacheKey(`${month}|${semester}|${scope}|${todayKey}`);
 };
 
 export const getCachedAttendanceGrid = (key) => {

@@ -12,6 +12,8 @@ import {
 import { attachManagerEditNotifier } from '../utils/managerEditNotifications.js';
 import { DEMO_ROLE, isDemoRequestAllowed, rejectDemoWrite, maskDemoCredentials } from '../utils/demoAccess.js';
 import { getSessionToken } from '../utils/sessionCookie.js';
+import { hydrateAcademicUser } from '../utils/academicAssignments.js';
+import { getAcademicTermContext } from '../utils/academicTermContext.js';
 
 export const allowPasswordResetSession = (req, res, next) => {
   req.allowPasswordResetSession = true;
@@ -87,6 +89,7 @@ export const protect = async (req, res, next) => {
         req.user = { ...(req.user.toObject?.() || req.user), role: 'admin', isDemo: true };
       }
     } else attachManagerEditNotifier(req, res);
+    if (getAcademicTermContext()?.repositories) await hydrateAcademicUser(req.user);
     next();
   } catch {
     return res.status(401).json({

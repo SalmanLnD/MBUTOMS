@@ -3,6 +3,7 @@ import School from '../models/School.js';
 import Semester from '../models/Semester.js';
 import Subject from '../models/Subject.js';
 import Trainer from '../models/Trainer.js';
+import { usesTermAssignments } from './academicAssignments.js';
 import User from '../models/User.js';
 import Schedule from '../models/Schedule.js';
 import {
@@ -73,7 +74,7 @@ export const syncPstpTrainersAndSubject = async () => {
   }
 
   if (subject) {
-    await Trainer.updateMany(
+    if (!usesTermAssignments()) await Trainer.updateMany(
       {
         $or: [
           { employeeId: { $in: pstpTrainerCodes } },

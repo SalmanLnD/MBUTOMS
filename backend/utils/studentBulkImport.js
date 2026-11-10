@@ -251,7 +251,7 @@ const validateParsedRow = (row) => {
   const branch = String(row.branch || '').trim();
   const sectionLabel = String(row.sectionLabel || '').trim();
   const email = normalizeEmail(row.email);
-  const status = normalizeStatus(row.status);
+  const status = String(row.status || '').trim() ? normalizeStatus(row.status) : undefined;
   const pyResult = normalizePy(row.py);
   const semesterResult = normalizeSemesterLabel(row.semesterLabel);
 
@@ -276,12 +276,12 @@ const validateParsedRow = (row) => {
     payload: {
       rollNumber,
       name,
-      email: email || undefined,
-      branch: branch || undefined,
-      sectionLabel: sectionLabel || undefined,
-      py: pyResult.value,
-      semesterLabel: semesterResult.value,
-      status: status || 'active',
+      ...(email ? { email } : {}),
+      ...(branch ? { branch } : {}),
+      ...(sectionLabel ? { sectionLabel } : {}),
+      ...(pyResult.value !== undefined ? { py: pyResult.value } : {}),
+      ...(semesterResult.value !== undefined ? { semesterLabel: semesterResult.value } : {}),
+      ...(status ? { status } : {}),
     },
   };
 };
@@ -292,6 +292,18 @@ const UPDATE_CHUNK_SIZE = 200;
 
 export const validateStudentBulkRows = (rows) => {
   const validated = rows.map(validateParsedRow);
+  const counts = new Map();
+  rows.forEach((row) => {
+    const roll = String(row.rollNumber || '').trim();
+    if (roll) counts.set(roll, (counts.get(roll) || 0) + 1);
+  });
+  validated.forEach((row, index) => {
+    const roll = String(rows[index].rollNumber || '').trim();
+    if ((counts.get(roll) || 0) > 1) {
+      row.ok = false;
+      row.errors = [...(row.errors || []), `Duplicate roll number ${roll} in upload`];
+    }
+  });
   return {
     validRows: validated.filter((row) => row.ok),
     errors: validated
@@ -367,11 +379,12 @@ const updateStudentPayloads = async (rows) => {
     }));
 
     try {
-      await Student.bulkWrite(ops, { ordered: false });
-      updated += chunk.length;
+      const result = await Student.bulkWrite(ops, { ordered: false });
+      updated += result.matchedCount ?? result.modifiedCount ?? chunk.length;
     } catch (error) {
       const writeErrors = error?.writeErrors || [];
       if (writeErrors.length) {
+        updated += Math.max(0, chunk.length - writeErrors.length);
         writeErrors.forEach((writeError, writeIndex) => {
           const row = chunk[writeError.index ?? writeIndex];
           errors.push({
@@ -389,13 +402,20 @@ const updateStudentPayloads = async (rows) => {
 };
 
 export const importValidatedStudentRows = async (validRows, { updateExisting = false } = {}) => {
+  // Browser batches are untrusted: validate again and discard unexpected fields.
+  const revalidated = validateStudentBulkRows(validRows.map((row) => ({
+    ...row.payload,
+    __rowNumber: row.rowNumber,
+  })));
+  const validationErrors = revalidated.errors;
+  validRows = revalidated.validRows;
   if (!validRows.length) {
     return {
       created: 0,
       updated: 0,
       skipped: 0,
-      failed: 0,
-      errors: [],
+      failed: validationErrors.length,
+      errors: validationErrors.slice(0, 100),
     };
   }
 
@@ -409,7 +429,7 @@ export const importValidatedStudentRows = async (validRows, { updateExisting = f
   const toCreate = [];
   const toUpdate = [];
   let skipped = 0;
-  const errors = [];
+  const errors = [...validationErrors];
 
   for (const row of withSemesterRefs) {
     if (existingSet.has(row.payload.rollNumber)) {

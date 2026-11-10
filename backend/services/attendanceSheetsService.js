@@ -6,6 +6,7 @@ import AppSetting from '../models/AppSetting.js';
 import { getPublicApiBaseUrl } from './appsScriptSheetsService.js';
 import * as trainerAttendanceExport from '../utils/trainerAttendanceExport.js';
 import * as rtetExport from '../utils/rtetExport.js';
+import { academicCacheKey } from '../utils/academicCacheKey.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const SPREADSHEET_SETTING_KEY = 'trainer_attendance_spreadsheet';
@@ -17,6 +18,15 @@ let exportGeneration = 0;
 let rtetCache = { payload: null, cachedAt: 0 };
 let rtetInFlight = null;
 let rtetGeneration = 0;
+let exportScope = '';
+
+const ensureAcademicExportScope = () => {
+  const scope = academicCacheKey('attendance-export');
+  if (scope !== exportScope) {
+    clearAttendanceExportCache();
+    exportScope = scope;
+  }
+};
 
 export const clearAttendanceExportCache = () => {
   exportGeneration += 1;
@@ -122,6 +132,7 @@ export const unlinkAttendanceSpreadsheet = async () => {
 };
 
 export const exportTrainerAttendance = async () => {
+  ensureAcademicExportScope();
   const now = Date.now();
   if (exportCache.payload && now - exportCache.cachedAt < EXPORT_CACHE_MS) {
     return exportCache.payload;
@@ -151,6 +162,7 @@ export const exportTrainerAttendance = async () => {
 };
 
 export const exportRtet = async () => {
+  ensureAcademicExportScope();
   const now = Date.now();
   if (rtetCache.payload && now - rtetCache.cachedAt < EXPORT_CACHE_MS) {
     return rtetCache.payload;

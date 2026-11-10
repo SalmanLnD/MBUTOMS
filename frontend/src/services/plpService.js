@@ -9,6 +9,15 @@ export const getPlpSheet = async (cycle, config = {}) => {
   return data;
 };
 
+export const getSemesterPerformanceSummary = async (termId, config = {}) => {
+  const { data } = await api.get('/plp/semester-summary', {
+    ...config,
+    skipRetry: true,
+    params: { termId, ...(config.params || {}) },
+  });
+  return data;
+};
+
 export const updatePlpWeightages = async (weightages) => {
   const { data } = await api.put('/plp/weightages', weightages);
   return data;

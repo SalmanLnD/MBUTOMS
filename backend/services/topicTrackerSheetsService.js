@@ -1,3 +1,4 @@
+import { academicSettingKey, academicExportUrl } from '../utils/academicCacheKey.js';
 import crypto from 'crypto';
 import fs from 'fs';
 import path from 'path';
@@ -11,7 +12,7 @@ const SPREADSHEET_SETTING_KEY = 'topic_tracker_spreadsheet';
 const EXPORT_KEY_SETTING = 'topic_tracker_export_api_key';
 
 const getExportKey = async () => {
-  const setting = await AppSetting.findOne({ key: EXPORT_KEY_SETTING }).lean();
+  const setting = await AppSetting.findOne({ key: academicSettingKey(EXPORT_KEY_SETTING) }).lean();
   return setting?.value || null;
 };
 
@@ -21,8 +22,8 @@ export const getOrCreateTopicTrackerExportKey = async () => {
 
   const key = crypto.randomBytes(24).toString('hex');
   await AppSetting.findOneAndUpdate(
-    { key: EXPORT_KEY_SETTING },
-    { key: EXPORT_KEY_SETTING, value: key },
+    { key: academicSettingKey(EXPORT_KEY_SETTING) },
+    { key: academicSettingKey(EXPORT_KEY_SETTING), value: key },
     { upsert: true, new: true }
   );
   return key;
@@ -34,14 +35,14 @@ export const validateTopicTrackerExportKey = async (key) => {
 };
 
 export const getLinkedTopicTrackerSheet = async () => {
-  const setting = await AppSetting.findOne({ key: SPREADSHEET_SETTING_KEY }).lean();
+  const setting = await AppSetting.findOne({ key: academicSettingKey(SPREADSHEET_SETTING_KEY) }).lean();
   return setting?.value || null;
 };
 
 const saveLinkedSheet = async (value) => {
   await AppSetting.findOneAndUpdate(
-    { key: SPREADSHEET_SETTING_KEY },
-    { key: SPREADSHEET_SETTING_KEY, value },
+    { key: academicSettingKey(SPREADSHEET_SETTING_KEY) },
+    { key: academicSettingKey(SPREADSHEET_SETTING_KEY), value },
     { upsert: true, new: true }
   );
   return value;
@@ -72,7 +73,7 @@ export const getTopicTrackerAppsScriptStatus = async () => {
 export const getTopicTrackerAppsScriptSetup = async (req) => {
   const apiKey = req.isDemo ? 'DEMO_LOCAL_ONLY' : await getOrCreateTopicTrackerExportKey();
   const baseUrl = getPublicApiBaseUrl(req);
-  const exportUrl = `${baseUrl}/api/topic-tracker/export`;
+  const exportUrl = academicExportUrl(`${baseUrl}/api/topic-tracker/export`);
 
   const templatePath = path.join(__dirname, '../templates/topic-tracker-sync.gs');
   const template = fs.readFileSync(templatePath, 'utf8');
@@ -108,7 +109,7 @@ export const linkTopicTrackerSpreadsheetUrl = async (spreadsheetUrl) => {
 };
 
 export const unlinkTopicTrackerSpreadsheet = async () => {
-  await AppSetting.deleteOne({ key: SPREADSHEET_SETTING_KEY });
+  await AppSetting.deleteOne({ key: academicSettingKey(SPREADSHEET_SETTING_KEY) });
   return { unlinked: true };
 };
 

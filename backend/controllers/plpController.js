@@ -7,6 +7,9 @@ import AppSetting from '../models/AppSetting.js';
 import { mergeRosterFilter } from '../utils/rosterFilter.js';
 import { PERFORMANCE_EXCLUDED_EMPLOYEE_IDS } from '../utils/trainerMappings.js';
 import { getReplacementRequiredDaysByTrainer } from '../utils/replacementRequiredDays.js';
+import mongoose from 'mongoose';
+import AcademicTerm from '../models/AcademicTerm.js';
+import { academicTermsEnabled, getTermRepositories, runWithAcademicTerm } from '../utils/academicTermContext.js';
 import {
   buildPlpCycleOptions,
   getPlpCycleRange,
@@ -216,6 +219,74 @@ const buildPlpRowsForCycle = async (cycleKey, weightages = PLP_WEIGHTAGES) => {
   });
 
   return { rows, updatedRules };
+};
+
+const monthKeyFromDate = (value) => new Date(value).toISOString().slice(0, 7);
+
+export const getSemesterPerformanceSummary = async (req, res) => {
+  const termId = req.query.termId;
+  if (!termId) return res.status(400).json({ message: 'termId is required' });
+  if (!mongoose.isValidObjectId(termId)) return res.status(400).json({ message: 'Invalid termId' });
+  const term = await AcademicTerm.findById(termId).lean();
+  if (!term?.startDate || !term?.endDate) {
+    return res.status(400).json({ message: 'The selected semester has no date range configured.' });
+  }
+  const run = async () => {
+    const startKey = new Date(term.startDate).toISOString().slice(0, 10);
+    const endKey = new Date(term.endDate).toISOString().slice(0, 10);
+    const startMonth = monthKeyFromDate(term.startDate);
+    const endMonth = monthKeyFromDate(term.endDate);
+    const rosterFilter = await mergeRosterFilter({
+      status: 'active',
+      employeeId: { $nin: PERFORMANCE_EXCLUDED_EMPLOYEE_IDS },
+    }, { rosterOnly: true });
+    const trainers = await Trainer.find(rosterFilter).select('name employeeId').sort({ employeeId: 1 }).lean();
+    const ids = trainers.map((trainer) => trainer._id);
+    const [observations, feedback, compliance, rrdByTrainer] = await Promise.all([
+      ids.length ? TrainerObservation.aggregate([
+        { $match: { trainer: { $in: ids }, type: 'class', rating: { $gte: 0.5, $lte: 5 }, $or: [
+          { observationDate: { $gte: startKey, $lte: endKey } },
+          { observationDate: { $in: ['', null] }, monthKey: { $gte: startMonth, $lte: endMonth } },
+        ] } },
+        { $group: { _id: '$trainer', average: { $avg: '$rating' }, count: { $sum: 1 } } },
+      ]) : [],
+      ids.length ? FeedbackResponse.aggregate([
+        { $match: { trainer: { $in: ids }, rating: { $gte: 1, $lte: 5 }, monthKey: { $gte: startMonth, $lte: endMonth } } },
+        { $group: { _id: '$trainer', average: { $avg: '$rating' }, count: { $sum: 1 } } },
+      ]) : [],
+      ids.length ? TrainerCompliance.aggregate([
+        { $match: { trainer: { $in: ids }, dateKey: { $gte: startKey, $lte: endKey } } },
+        { $group: { _id: '$trainer', count: { $sum: 1 } } },
+      ]) : [],
+      getReplacementRequiredDaysByTrainer({ startDate: new Date(term.startDate), endDate: new Date(term.endDate), trainers }),
+    ]);
+    const byTrainer = (rows) => new Map(rows.map((row) => [String(row._id), row]));
+    const observationMap = byTrainer(observations);
+    const feedbackMap = byTrainer(feedback);
+    const complianceMap = byTrainer(compliance);
+    return {
+      term: { _id: term._id, key: term.key, academicYear: term.academicYear, parity: term.parity, startDate: term.startDate, endDate: term.endDate },
+      rows: trainers.map((trainer) => {
+        const id = String(trainer._id);
+        const observation = observationMap.get(id);
+        const feedbackRow = feedbackMap.get(id);
+        return {
+          trainerId: trainer._id,
+          employeeId: trainer.employeeId,
+          name: trainer.name,
+          rrd: rrdByTrainer.get(id) || 0,
+          classObservationAverage: observation ? Math.round(observation.average * 100) / 100 : null,
+          classObservationCount: observation?.count || 0,
+          feedbackAverage: feedbackRow ? Math.round(feedbackRow.average * 100) / 100 : null,
+          feedbackCount: feedbackRow?.count || 0,
+          complianceCount: complianceMap.get(id)?.count || 0,
+        };
+      }),
+    };
+  };
+  if (!academicTermsEnabled()) return res.json(await run());
+  const repositories = await getTermRepositories(term);
+  return runWithAcademicTerm({ term, repositories, readOnly: true }, async () => res.json(await run()));
 };
 
 export const getPlpSheet = async (req, res) => {

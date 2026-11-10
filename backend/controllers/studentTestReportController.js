@@ -32,9 +32,32 @@ import {
   getTrainerClassKeys,
   getTrainerSubjectIdsForClass,
   buildClassKey,
+  canAccessStudentRecord,
 } from '../utils/trainerClassAccess.js';
 
 const canViewAll = canViewAllClasses;
+
+// History follows the student, including subjects no longer taught by their
+// current class. Access is still checked against their present enrolment.
+export const getStudentTestHistory = async (req, res) => {
+  const student = await Student.findById(req.params.studentId)
+    .select('rollNumber name branch sectionLabel semesterLabel').lean();
+  if (!student) return res.status(404).json({ message: 'Student not found' });
+  if (!await canAccessStudentRecord(req.user, student, req)) {
+    return res.status(403).json({ message: 'Not authorized to view this student' });
+  }
+  const filter = { student: student._id };
+  if (!canViewAll(req.user)) {
+    const subjects = await getTrainerSubjectIdsForClass(
+      req.user.trainer, student.branch, student.sectionLabel, student.semesterLabel, req
+    );
+    filter.subject = { $in: [...subjects] };
+  }
+  const reports = await StudentMonthlyTestReport.find(filter)
+    .select('month subject subjectName subjectCode department section semester py marksObtained maxMarks attendance remarks updatedAt')
+    .sort({ month: -1, subjectName: 1 }).lean();
+  res.json({ student: { _id: student._id, rollNumber: student.rollNumber, name: student.name }, reports });
+};
 
 export const getTestReportFilterOptions = async (req, res) => {
   const classes = await ClassGroup.find({ status: 'active' })
@@ -115,7 +138,7 @@ export const getTestReportSummary = async (req, res) => {
     return res.status(400).json({ message: 'month is required' });
   }
   if (!isValidReportMonth(month)) {
-    return res.status(400).json({ message: 'Invalid month. Reports start from August 2026.' });
+    return res.status(400).json({ message: 'Invalid month. Select a month within this semester and no later than the current month.' });
   }
 
   const reportFilter = await getAccessibleReportFilter(req.user, classAccessHelpers);
@@ -151,7 +174,7 @@ export const getTestReportGrid = async (req, res) => {
     });
   }
   if (!isValidReportMonth(month)) {
-    return res.status(400).json({ message: 'Invalid month. Reports start from August 2026.' });
+    return res.status(400).json({ message: 'Invalid month. Select a month within this semester and no later than the current month.' });
   }
 
   const hasAccess = await canAccessClass(req.user, department, section, semester, req);
@@ -184,15 +207,17 @@ export const getTestReportGrid = async (req, res) => {
   };
   if (py) studentFilter.py = Number(py);
 
-  const [students, reports] = await Promise.all([
-    Student.find(studentFilter)
+  const students = await Student.find(studentFilter)
       .select('rollNumber name branch sectionLabel py semesterLabel')
       .sort({ rollNumber: 1 })
-      .lean(),
-    StudentMonthlyTestReport.find({ month, department, section, semester, subject })
+      .lean();
+  // Placement is mutable. Marks belong to stable student/subject identities,
+  // including reports entered before a department or section transfer.
+  const reports = await StudentMonthlyTestReport.find({
+      month, subject, student: { $in: students.map((student) => student._id) },
+    })
       .populate('enteredBy', 'name')
-      .lean(),
-  ]);
+      .lean();
 
   const reportByStudent = new Map(
     reports.map((r) => [String(r.student), r])
@@ -261,7 +286,7 @@ export const bulkUpsertTestReports = async (req, res) => {
     });
   }
   if (!isValidReportMonth(month)) {
-    return res.status(400).json({ message: 'Invalid month. Reports start from August 2026.' });
+    return res.status(400).json({ message: 'Invalid month. Select a month within this semester and no later than the current month.' });
   }
 
   const hasAccess = await canAccessClass(req.user, department, section, semester, req);
@@ -324,10 +349,6 @@ export const bulkUpsertTestReports = async (req, res) => {
         filter: { month, student: studentId, subject },
         update: {
           $set: {
-            department,
-            section,
-            semester,
-            py: py ? Number(py) : undefined,
             subjectCode: subjectDoc.code,
             subjectName: subjectDoc.name,
             attendance,
@@ -335,7 +356,8 @@ export const bulkUpsertTestReports = async (req, res) => {
             maxMarks,
             enteredBy: req.user._id,
           },
-          $unset: { remarks: '' },
+          // A transfer must not rewrite assessment-time class attribution.
+          $setOnInsert: { department, section, semester, ...(py ? { py: Number(py) } : {}) },
         },
         upsert: true,
       },
@@ -356,7 +378,7 @@ export const downloadTestReportExcel = async (req, res) => {
     return res.status(400).json({ message: 'month is required' });
   }
   if (!isValidReportMonth(month)) {
-    return res.status(400).json({ message: 'Invalid month. Reports start from August 2026.' });
+    return res.status(400).json({ message: 'Invalid month. Select a month within this semester and no later than the current month.' });
   }
 
   const reportFilter = await getAccessibleReportFilter(req.user, classAccessHelpers);
@@ -389,7 +411,7 @@ export const exportTestReportsForSheets = async (req, res) => {
   const month = req.query.month;
   if (month) {
     if (!isValidReportMonth(month)) {
-      return res.status(400).json({ message: 'Invalid month. Reports start from August 2026.' });
+      return res.status(400).json({ message: 'Invalid month. Select a month within this semester and no later than the current month.' });
     }
     return res.json(await buildTestReportExportPayload(month));
   }

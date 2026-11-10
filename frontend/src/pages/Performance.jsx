@@ -8,6 +8,7 @@ import { FULL_ACCESS_ROLES, ROLES } from '../utils/roles.js';
 const FeedbackSection = lazy(() => import('../components/FeedbackSection.jsx'));
 const ObservationsTab = lazy(() => import('../components/ObservationsTab.jsx'));
 const PlpTab = lazy(() => import('../components/PlpTab.jsx'));
+const SemesterPerformanceTab = lazy(() => import('../components/SemesterPerformanceTab.jsx'));
 const ComplianceTab = lazy(() => import('../components/ComplianceTab.jsx'));
 
 const Performance = () => {
@@ -24,6 +25,7 @@ const Performance = () => {
     if (canManagePlp) {
       next.push({ id: 'compliance', label: 'Compliance' });
       next.push({ id: 'plp', label: 'PLP' });
+      next.push({ id: 'semester-analysis', label: 'Semester analysis' });
     }
     return next;
   }, [canSeeFeedback, canManagePlp]);
@@ -71,6 +73,7 @@ const Performance = () => {
           {activeTab === 'observations' && <ObservationsTab />}
           {activeTab === 'compliance' && canManagePlp && <ComplianceTab />}
           {activeTab === 'plp' && canManagePlp && <PlpTab />}
+          {activeTab === 'semester-analysis' && canManagePlp && <SemesterPerformanceTab />}
           </Suspense>
         </div>
       </div>

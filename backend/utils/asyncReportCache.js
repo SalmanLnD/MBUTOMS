@@ -1,9 +1,11 @@
 import { getDataRevision } from './dataRevision.js';
+import { academicCacheKey } from './academicCacheKey.js';
 
 // Deduplicate simultaneous reads; bound retained reports and never cache failures.
 export const createAsyncReportCache = ({ ttlMs = 30_000, maxEntries = 8 } = {}) => {
   const entries = new Map();
   return async (key, load) => {
+    key = academicCacheKey(key);
     const revision = getDataRevision();
     const existing = entries.get(key);
     if (existing?.revision === revision && (existing.pending || existing.expires > Date.now())) {

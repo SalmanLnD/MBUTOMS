@@ -14,6 +14,7 @@ export const errorHandler = (err, req, res, next) => {
   if (res.headersSent) return next(err);
   res.status(statusCode).json({
     message: err.message || 'Internal server error',
+    code: typeof err.code === 'string' && err.code.startsWith('ACADEMIC_') ? err.code : undefined,
     stack: process.env.NODE_ENV === 'production' ? undefined : err.stack,
   });
 };

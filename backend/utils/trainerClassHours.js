@@ -1,5 +1,6 @@
 import { buildTrainerSchedulesForDate } from './trainerScheduleView.js';
 import { isScheduleActiveOnDate } from './subjectStartDate.js';
+import { runForOperationalDate, needsOperationalTermResolution } from './academicOperationalHistory.js';
 
 const WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
@@ -14,6 +15,7 @@ export const computeHours = (startTime, endTime) => {
 };
 
 export const computeClassHandlingHours = async (trainerId, referenceDate, semester = null) => {
+  if (needsOperationalTermResolution()) return runForOperationalDate(referenceDate, () => computeClassHandlingHours(trainerId, referenceDate, semester));
   const schedules = await buildTrainerSchedulesForDate({
     trainerId,
     referenceDate,

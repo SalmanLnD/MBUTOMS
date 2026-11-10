@@ -1,4 +1,5 @@
 import mongoose from 'mongoose';
+import { sharedAcademicReferences } from '../utils/sharedAcademicReferences.js';
 
 export const OBSERVATION_TYPES = ['demo', 'class'];
 
@@ -63,5 +64,6 @@ trainerObservationSchema.index(
 );
 trainerObservationSchema.index({ monthKey: 1, type: 1 });
 
+sharedAcademicReferences(trainerObservationSchema, { schedule: 'Schedule' });
 const TrainerObservation = mongoose.model('TrainerObservation', trainerObservationSchema);
 export default TrainerObservation;

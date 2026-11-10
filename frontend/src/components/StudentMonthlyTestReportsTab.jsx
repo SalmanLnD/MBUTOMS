@@ -6,6 +6,7 @@ import StyledSelect from './StyledSelect.jsx';
 import { showError, showSuccess } from '../utils/toast.js';
 import { getErrorMessage } from '../utils/helpers.js';
 import { useAuth } from '../context/AuthContext.jsx';
+import { useAcademicTerm } from '../context/AcademicTermContext.jsx';
 import { getSchools, getDepartments } from '../services/subjectService.js';
 import {
   getTestReportFilterOptions,
@@ -23,9 +24,9 @@ import {
   formatMonthLabel,
   getCurrentMonthParts,
   getTrackingStartParts,
+  getLatestReportMonthParts,
   parseMonthKey,
   shiftMonth,
-  STUDENT_TEST_REPORT_TRACKING_START,
 } from '../utils/studentTestReportDates.js';
 import {
   DEFAULT_MAX_MARKS,
@@ -98,12 +99,14 @@ const MonthPicker = ({
 );
 
 const StudentMonthlyTestReportsTab = () => {
+  const { enabled, viewedTerm } = useAcademicTerm() || {};
+  const reportTerm = enabled ? viewedTerm : null;
   const { hasManagementRole } = useAuth();
   const canManageSheets = hasManagementRole();
 
   const [activeSubTab, setActiveSubTab] = useState('summary');
   const [monthParts, setMonthParts] = useState(() =>
-    clampMonthParts(getCurrentMonthParts())
+    clampMonthParts(getCurrentMonthParts(), reportTerm)
   );
   const [classes, setClasses] = useState([]);
   const [schools, setSchools] = useState([]);
@@ -136,9 +139,9 @@ const StudentMonthlyTestReportsTab = () => {
   const markEntryTableRef = useRef(null);
 
   const monthKey = formatMonthKey(monthParts.year, monthParts.month);
-  const monthOptions = useMemo(() => buildMonthOptions(), []);
-  const trackingMonth = parseMonthKey(STUDENT_TEST_REPORT_TRACKING_START.slice(0, 7));
-  const latestMonth = getCurrentMonthParts();
+  const monthOptions = useMemo(() => buildMonthOptions(reportTerm), [reportTerm]);
+  const trackingMonth = getTrackingStartParts(reportTerm);
+  const latestMonth = getLatestReportMonthParts(reportTerm);
   const monthLabel = formatMonthLabel(monthParts.year, monthParts.month);
 
   const atEarliestMonth =
@@ -225,6 +228,7 @@ const StudentMonthlyTestReportsTab = () => {
   }, [canManageSheets]);
 
   const loadSummary = useCallback(async () => {
+    if (!monthOptions.length) return;
     setLoadingSummary(true);
     try {
       const data = await getTestReportSummary({ month: monthKey });
@@ -235,7 +239,7 @@ const StudentMonthlyTestReportsTab = () => {
     } finally {
       setLoadingSummary(false);
     }
-  }, [monthKey]);
+  }, [monthKey, monthOptions.length]);
 
   useEffect(() => {
     if (activeSubTab !== 'summary') return;
@@ -523,11 +527,13 @@ const StudentMonthlyTestReportsTab = () => {
     || marksFilterValue
   );
 
-  const shiftMonthParts = (delta) => setMonthParts((prev) => shiftMonth(prev, delta));
+  const shiftMonthParts = (delta) => setMonthParts((prev) => shiftMonth(prev, delta, reportTerm));
 
   if (loadingOptions) {
     return <LoadingSpinner />;
   }
+
+  if (!monthOptions.length) return <div className="alert alert-info">Monthly test reports become available when this semester starts.</div>;
 
   return (
     <>

@@ -5,6 +5,7 @@ import { resolveTrainerScheduleCodes } from './trainerMappings.js';
 import { resignationMonthKeyFromDate } from './trainerEmployment.js';
 import { normalizeAttendanceDate } from './attendanceDates.js';
 import { clearAttendanceGridCache } from './attendanceGridCache.js';
+import { getTrainerAcademicSubjects, usesTermAssignments } from './academicAssignments.js';
 
 const collectSourceScheduleCodes = (trainer) => {
   const codes = new Set(resolveTrainerScheduleCodes(trainer));
@@ -37,8 +38,8 @@ export async function transferTrainerRole({
 
   const ownedSchedules = await Schedule.find(scheduleFilter).select('_id trainerCode').lean();
 
-  const sourceSubjectIds = toIdStrings(sourceTrainer.subjects || []);
-  const successorSubjectIds = toIdStrings(successorTrainer.subjects || []);
+  const sourceSubjectIds = toIdStrings(await getTrainerAcademicSubjects(sourceTrainer, '_id'));
+  const successorSubjectIds = toIdStrings(await getTrainerAcademicSubjects(successorTrainer, '_id'));
   const mergedSubjectIds = [...new Set([...successorSubjectIds, ...sourceSubjectIds])];
 
   const camuPayload = {};
@@ -82,7 +83,7 @@ export async function transferTrainerRole({
     {
       $set: {
         ...camuPayload,
-        subjects: mergedSubjectIds,
+        ...(!usesTermAssignments() ? { subjects: mergedSubjectIds } : {}),
         joiningDate: successorJoiningDate,
       },
       ...(legacyCodesForSuccessor.length
@@ -98,7 +99,7 @@ export async function transferTrainerRole({
   );
 
   const sourceSet = {
-    subjects: [],
+    ...(!usesTermAssignments() ? { subjects: [] } : {}),
     camuErpId: '',
     camuPassword: '',
     successorTrainer: successorTrainer._id,

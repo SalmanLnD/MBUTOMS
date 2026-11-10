@@ -1,6 +1,7 @@
 import Schedule from '../models/Schedule.js';
 import Subject from '../models/Subject.js';
 import Trainer from '../models/Trainer.js';
+import { projectTrainerAcademicList, usesTermAssignments } from '../utils/academicAssignments.js';
 import Venue from '../models/Venue.js';
 import { timesOverlap } from '../utils/timetableSlots.js';
 import { buildTrainerSchedulesForDate } from '../utils/trainerScheduleView.js';
@@ -186,9 +187,8 @@ export const getPublicTimetable = async (req, res) => {
 
   const [{ schedulesByTrainer }, trainers, subjects] = await Promise.all([
     buildTimetableBoardForDate({ referenceDate, semester }),
-    Trainer.find(rosterFilter)
+    (usesTermAssignments() ? Trainer.find(rosterFilter) : Trainer.find(rosterFilter).populate('subjects', 'name code slotCount slotTimings'))
       .select('name employeeId scheduleTrainerCodes')
-      .populate('subjects', 'name code slotCount slotTimings')
       .sort({ employeeId: 1 })
       .limit(200)
       .lean(),
@@ -203,7 +203,7 @@ export const getPublicTimetable = async (req, res) => {
   res.json({
     referenceDate,
     schedulesByTrainer: sanitizeSchedulesByTrainerForPublic(schedulesByTrainer),
-    trainers: trainers.map(sanitizeTrainerForPublic),
+    trainers: (await projectTrainerAcademicList(trainers)).map(sanitizeTrainerForPublic),
     subjects: subjects.map(sanitizeSubjectForPublic),
   });
 };

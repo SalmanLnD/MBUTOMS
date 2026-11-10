@@ -1,6 +1,7 @@
 import Subject from '../models/Subject.js';
 import Trainer from '../models/Trainer.js';
 import { ROLES } from './roles.js';
+import { usesTermAssignments } from './academicAssignments.js';
 
 export const isSubjectCoordinator = (user) => user?.role === ROLES.SUBJECT_COORDINATOR;
 
@@ -28,7 +29,7 @@ export const buildTrainerFilterForCoordinatorSubjects = async (subjectIds) => {
     });
   });
 
-  const assignedTrainers = await Trainer.find({ subjects: { $in: subjectIds } }).select('_id');
+  const assignedTrainers = usesTermAssignments() ? [] : await Trainer.find({ subjects: { $in: subjectIds } }).select('_id');
   assignedTrainers.forEach((trainer) => {
     trainerIds.add(trainer._id.toString());
   });

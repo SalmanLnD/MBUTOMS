@@ -1,4 +1,5 @@
 import { getDataRevision } from '../utils/dataRevision.js';
+import { academicCacheKey } from '../utils/academicCacheKey.js';
 
 const cache = new Map();
 let active = false;
@@ -10,7 +11,7 @@ let retainedBytes = 0;
 // across endpoints so simultaneous triggers cannot multiply peak DB/CPU load.
 export const exportGuard = (req, res, next) => {
   const query = Object.fromEntries(Object.entries(req.query || {}).filter(([key]) => key !== 'key').sort());
-  const key = `${req.baseUrl}${req.path}|${JSON.stringify(query)}`;
+  const key = academicCacheKey(`${req.baseUrl}${req.path}|${JSON.stringify(query)}`);
   const revision = getDataRevision();
   for (const [storedKey, entry] of cache) {
     if (entry.expires <= Date.now() || entry.revision !== revision) {

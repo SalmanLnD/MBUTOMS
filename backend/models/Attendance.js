@@ -1,4 +1,5 @@
 import mongoose from 'mongoose';
+import { sharedAcademicReferences } from '../utils/sharedAcademicReferences.js';
 
 const attendanceSchema = new mongoose.Schema(
   {
@@ -27,5 +28,6 @@ attendanceSchema.index({ type: 1, date: 1, student: 1 });
 // Dashboard and summary aggregate by date without a type prefix.
 attendanceSchema.index({ date: 1, status: 1 });
 
+sharedAcademicReferences(attendanceSchema, { schedule: 'Schedule', student: 'Student' });
 const Attendance = mongoose.model('Attendance', attendanceSchema);
 export default Attendance;

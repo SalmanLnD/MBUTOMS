@@ -1,5 +1,6 @@
 import Trainer from '../models/Trainer.js';
 import Subject from '../models/Subject.js';
+import { usesTermAssignments } from './academicAssignments.js';
 
 const OBJECT_ID_PATTERN = /^[a-f\d]{24}$/i;
 
@@ -41,6 +42,10 @@ export const applySubjectTrainerEligibleChange = async (subjectId, previousIds, 
   const added = [...next].filter((id) => !previous.has(id));
   const removed = [...previous].filter((id) => !next.has(id));
 
+  // Subject.trainerEligible is the canonical term-owned association. Never
+  // mirror it into the shared trainer document after semester isolation.
+  if (usesTermAssignments()) return { added: added.length, removed: removed.length };
+
   if (added.length) {
     await Trainer.updateMany(
       { _id: { $in: added } },
@@ -65,6 +70,11 @@ export const applyTrainerSubjectsChange = async (trainerId, previousIds, nextIds
   const added = [...next].filter((id) => !previous.has(id));
   const removed = [...previous].filter((id) => !next.has(id));
 
+  if (usesTermAssignments() && next.size) {
+    const found = await Subject.countDocuments({ _id: { $in: [...next] } });
+    if (found !== next.size) throw Object.assign(new Error('Assigned subjects must belong to this semester.'), { statusCode: 400 });
+  }
+
   if (added.length) {
     await Subject.updateMany(
       { _id: { $in: added } },
@@ -83,6 +93,7 @@ export const applyTrainerSubjectsChange = async (trainerId, previousIds, nextIds
 };
 
 export const syncAllTrainerSubjectLinks = async () => {
+  if (usesTermAssignments()) return { trainersUpdated: 0, subjectsUpdated: 0 };
   const subjects = await Subject.find().select('trainerEligible');
   let trainersUpdated = 0;
 

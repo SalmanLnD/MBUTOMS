@@ -119,6 +119,9 @@ export const connectDB = async ({ runStartup = false, readOnly = false } = {}) =
     throw error;
   }
 
+  // Legacy seed/sync jobs must never touch archived term partitions.
+  if (process.env.ACADEMIC_TERMS_ENABLED === 'true') return cache.conn;
+
   const shouldRunStartup = runStartup && !cache.startupDone;
 
   if (shouldRunStartup) {

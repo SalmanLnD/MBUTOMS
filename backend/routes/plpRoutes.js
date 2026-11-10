@@ -1,6 +1,7 @@
 import express from 'express';
 import {
   getPlpSheet,
+  getSemesterPerformanceSummary,
   updatePlpWeightages,
   upsertPlpFinalRating,
 } from '../controllers/plpController.js';
@@ -30,6 +31,7 @@ router.use(protect);
 router.use(authorizeExact(...FULL_ACCESS_ROLES));
 
 router.get('/', asyncHandler(getPlpSheet));
+router.get('/semester-summary', asyncHandler(getSemesterPerformanceSummary));
 router.put('/weightages', asyncHandler(updatePlpWeightages));
 
 router.get('/sheets/status', asyncHandler(getPlpGoogleSheetStatus));

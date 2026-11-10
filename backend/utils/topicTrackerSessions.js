@@ -4,6 +4,7 @@ import Subject from '../models/Subject.js';
 import Student from '../models/Student.js';
 import ClassGroup from '../models/ClassGroup.js';
 import TopicTrackerEntry from '../models/TopicTrackerEntry.js';
+import { getTrainerAcademicSubjects } from './academicAssignments.js';
 import Leave from '../models/Leave.js';
 import ClassCancellation from '../models/ClassCancellation.js';
 import { filterSchedulesActiveOnDate } from './activeSchedulesForDate.js';
@@ -1079,7 +1080,7 @@ export const buildTopicTrackerExportRows = async () => {
 
 export const collectTaughtSubjectIds = async (trainer) => {
   const ids = new Set(
-    (trainer?.subjects || []).map((id) => id?.toString?.()).filter(Boolean)
+    (await getTrainerAcademicSubjects(trainer, '_id')).map((subject) => (subject?._id || subject)?.toString?.()).filter(Boolean)
   );
   if (!trainer) return [...ids];
 

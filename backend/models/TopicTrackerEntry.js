@@ -1,4 +1,5 @@
 import mongoose from 'mongoose';
+import { termModel } from '../utils/academicTermContext.js';
 import {
   TOPIC_TRACKER_STATUSES,
   CANCELLATION_APPROVAL_STATUSES,
@@ -72,5 +73,5 @@ topicTrackerEntrySchema.index({
   date: -1,
 });
 
-const TopicTrackerEntry = mongoose.model('TopicTrackerEntry', topicTrackerEntrySchema);
+const TopicTrackerEntry = termModel('TopicTrackerEntry', topicTrackerEntrySchema);
 export default TopicTrackerEntry;

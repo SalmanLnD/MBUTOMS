@@ -5,6 +5,7 @@ import { isUsableTrainerOtp } from '../utils/trainerOtp.js';
 import { setSessionCookie, clearSessionCookie } from '../utils/sessionCookie.js';
 import { canImpersonate, IMPERSONATION_TARGET_ROLES, ROLES } from '../utils/roles.js';
 import { APP_VERSION, SESSION_APP_VERSION } from '../utils/sessionVersion.js';
+import { hydrateAcademicUser } from '../utils/academicAssignments.js';
 
 const generateToken = (user, impersonator = null, demoOwner = null) => {
   const payload = {
@@ -45,7 +46,8 @@ const userResponse = (user, { impersonator = null, demoOwner = null } = {}) => (
     : null,
 });
 
-const sendSession = (res, user, options = {}) => {
+const sendSession = async (res, user, options = {}) => {
+  await hydrateAcademicUser(user);
   setSessionCookie(res, generateToken(user, options.impersonator, options.demoOwner));
   res.set('Cache-Control', 'no-store');
   return res.json(userResponse(user, options));
@@ -85,6 +87,7 @@ export const getMe = async (req, res) => {
     .populate('trainer', 'name employeeId department')
     .populate('coordinatorSubjects', 'name code')
     .populate('evaluatorSubjects', 'name code');
+  await hydrateAcademicUser(user);
   res.json({
     ...user.toObject(),
     appVersion: APP_VERSION,

@@ -7,6 +7,7 @@ import {
   bulkUpsertTestReports,
   downloadTestReportExcel,
   exportTestReportsForSheets,
+  getStudentTestHistory,
 } from '../controllers/studentTestReportController.js';
 import {
   getStudentTestReportSheetStatus,
@@ -35,6 +36,7 @@ router.get('/filter-options', asyncHandler(getTestReportFilterOptions));
 router.get('/subjects', asyncHandler(getTestReportSubjects));
 router.get('/summary', asyncHandler(getTestReportSummary));
 router.get('/grid', asyncHandler(getTestReportGrid));
+router.get('/student/:studentId/history', asyncHandler(getStudentTestHistory));
 router.get('/export/excel', asyncHandler(downloadTestReportExcel));
 router.put('/bulk', authorize(...EDIT_ROLES), asyncHandler(bulkUpsertTestReports));
 

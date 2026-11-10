@@ -1,4 +1,5 @@
 import mongoose from 'mongoose';
+import { termModel } from '../utils/academicTermContext.js';
 import { DEFAULT_SLOT_TIMINGS } from '../utils/timetableSlots.js';
 import { defaultSubjectEndDate } from '../utils/subjectTrainingDates.js';
 
@@ -61,5 +62,5 @@ const subjectSchema = new mongoose.Schema(
 
 subjectSchema.index({ trainerEligible: 1 });
 
-const Subject = mongoose.model('Subject', subjectSchema);
+const Subject = termModel('Subject', subjectSchema);
 export default Subject;

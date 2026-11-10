@@ -1,3 +1,4 @@
+import { academicSettingKey, academicExportUrl } from '../utils/academicCacheKey.js';
 import crypto from 'crypto';
 import fs from 'fs';
 import path from 'path';
@@ -10,7 +11,7 @@ const SPREADSHEET_SETTING_KEY = 'student_test_reports_spreadsheet';
 const EXPORT_KEY_SETTING = 'student_test_reports_export_api_key';
 
 const getExportKey = async () => {
-  const setting = await AppSetting.findOne({ key: EXPORT_KEY_SETTING }).lean();
+  const setting = await AppSetting.findOne({ key: academicSettingKey(EXPORT_KEY_SETTING) }).lean();
   return setting?.value || null;
 };
 
@@ -20,8 +21,8 @@ export const getOrCreateTestReportExportKey = async () => {
 
   const key = crypto.randomBytes(24).toString('hex');
   await AppSetting.findOneAndUpdate(
-    { key: EXPORT_KEY_SETTING },
-    { key: EXPORT_KEY_SETTING, value: key },
+    { key: academicSettingKey(EXPORT_KEY_SETTING) },
+    { key: academicSettingKey(EXPORT_KEY_SETTING), value: key },
     { upsert: true, new: true }
   );
   return key;
@@ -33,7 +34,7 @@ export const validateTestReportExportKey = async (key) => {
 };
 
 const getLinkedSheet = async () => {
-  const setting = await AppSetting.findOne({ key: SPREADSHEET_SETTING_KEY }).lean();
+  const setting = await AppSetting.findOne({ key: academicSettingKey(SPREADSHEET_SETTING_KEY) }).lean();
   return setting?.value || null;
 };
 
@@ -60,7 +61,7 @@ export const getTestReportSheetStatus = async () => {
 
 export const getTestReportAppsScriptSetup = async (req) => {
   const apiKey = req.isDemo ? 'DEMO_LOCAL_ONLY' : await getOrCreateTestReportExportKey();
-  const exportUrl = `${getPublicApiBaseUrl(req)}/api/student-test-reports/export`;
+  const exportUrl = academicExportUrl(`${getPublicApiBaseUrl(req)}/api/student-test-reports/export`);
   const templatePath = path.join(__dirname, '../templates/student-test-reports-sync.gs');
   const template = fs.readFileSync(templatePath, 'utf8');
   const script = template
@@ -79,7 +80,7 @@ export const getTestReportAppsScriptSetup = async (req) => {
       'Paste the Google Sheet URL below and click Save link.',
     ],
     note:
-      'The sheet refreshes every 5 minutes. Student Summary shows August to October marks and their average when finalized; Summary aggregates all months; each month tab '
+      'The sheet refreshes every 5 minutes. Student Summary shows semester marks and their average when finalized; Summary aggregates all months; each month tab '
       + 'lists student marks with P/A (Present/Absent). Re-paste the Apps Script after '
       + 'deployments if the sync format changed. Google Apps Script cannot call localhost; '
       + 'use the deployed API URL or a tunnel for local testing.',
@@ -93,14 +94,14 @@ export const linkTestReportSpreadsheet = async (spreadsheetUrl) => {
     linkedAt: new Date().toISOString(),
   };
   await AppSetting.findOneAndUpdate(
-    { key: SPREADSHEET_SETTING_KEY },
-    { key: SPREADSHEET_SETTING_KEY, value },
+    { key: academicSettingKey(SPREADSHEET_SETTING_KEY) },
+    { key: academicSettingKey(SPREADSHEET_SETTING_KEY), value },
     { upsert: true, new: true }
   );
   return value;
 };
 
 export const unlinkTestReportSpreadsheet = async () => {
-  await AppSetting.deleteOne({ key: SPREADSHEET_SETTING_KEY });
+  await AppSetting.deleteOne({ key: academicSettingKey(SPREADSHEET_SETTING_KEY) });
   return { unlinked: true };
 };

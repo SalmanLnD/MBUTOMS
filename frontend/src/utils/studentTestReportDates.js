@@ -8,18 +8,25 @@ export const parseMonthKey = (monthKey) => {
   return { year, month };
 };
 
-export const getTrackingStartParts = () =>
-  parseMonthKey(STUDENT_TEST_REPORT_TRACKING_START.slice(0, 7));
+export const getTrackingStartParts = (term) =>
+  parseMonthKey(String(term?.startDate || STUDENT_TEST_REPORT_TRACKING_START).slice(0, 7));
 
 export const getCurrentMonthParts = (referenceDate = new Date()) => {
   const ref = new Date(referenceDate);
   return { year: ref.getFullYear(), month: ref.getMonth() + 1 };
 };
 
-export const clampMonthParts = ({ year, month }) => {
-  const tracking = getTrackingStartParts();
+export const getLatestReportMonthParts = (term, referenceDate = new Date()) => {
+  const current = getCurrentMonthParts(referenceDate);
+  if (!term?.endDate) return current;
+  const end = parseMonthKey(String(term.endDate).slice(0, 7));
+  return end.year * 12 + end.month < current.year * 12 + current.month ? end : current;
+};
+
+export const clampMonthParts = ({ year, month }, term) => {
+  const tracking = getTrackingStartParts(term);
   const trackingIndex = tracking.year * 12 + tracking.month - 1;
-  const latest = getCurrentMonthParts();
+  const latest = getLatestReportMonthParts(term);
   const latestIndex = latest.year * 12 + latest.month - 1;
   let index = year * 12 + month - 1;
   if (index < trackingIndex) index = trackingIndex;
@@ -27,17 +34,17 @@ export const clampMonthParts = ({ year, month }) => {
   return { year: Math.floor(index / 12), month: (index % 12) + 1 };
 };
 
-export const shiftMonth = ({ year, month }, delta) => {
+export const shiftMonth = ({ year, month }, delta, term) => {
   const date = new Date(year, month - 1 + delta, 1);
-  return clampMonthParts({ year: date.getFullYear(), month: date.getMonth() + 1 });
+  return clampMonthParts({ year: date.getFullYear(), month: date.getMonth() + 1 }, term);
 };
 
 export const formatMonthLabel = (year, month) =>
   new Date(year, month - 1, 1).toLocaleDateString('en-IN', { month: 'long', year: 'numeric' });
 
-export const buildMonthOptions = () => {
-  const tracking = getTrackingStartParts();
-  const latest = getCurrentMonthParts();
+export const buildMonthOptions = (term, referenceDate) => {
+  const tracking = getTrackingStartParts(term);
+  const latest = getLatestReportMonthParts(term, referenceDate);
   const options = [];
   let { year, month } = tracking;
 

@@ -1,4 +1,5 @@
 import mongoose from 'mongoose';
+import { termModel } from '../utils/academicTermContext.js';
 
 const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 
@@ -42,5 +43,5 @@ scheduleSchema.index({ department: 1, section: 1, semester: 1 });
 scheduleSchema.index({ semester: 1, trainerCode: 1 });
 scheduleSchema.index({ isSpecial: 1, specialStartDate: 1, specialEndDate: 1 });
 
-const Schedule = mongoose.model('Schedule', scheduleSchema);
+const Schedule = termModel('Schedule', scheduleSchema);
 export default Schedule;

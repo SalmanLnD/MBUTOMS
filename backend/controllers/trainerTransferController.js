@@ -1,4 +1,6 @@
 import Trainer from '../models/Trainer.js';
+import { usesTermAssignments, projectTrainerAcademicSubjects } from '../utils/academicAssignments.js';
+const loadTrainerSubjects = (id) => usesTermAssignments() ? Trainer.findById(id) : Trainer.findById(id).populate('subjects');
 import { transferTrainerRole } from '../utils/trainerPermanentTransfer.js';
 import { normalizeAttendanceDate } from '../utils/attendanceDates.js';
 import {
@@ -9,8 +11,8 @@ import { shouldRequirePermanentReplacement } from '../utils/trainerTransferRules
 
 const loadTrainerPair = async (sourceId, successorId) => {
   const [sourceTrainer, successorTrainer] = await Promise.all([
-    Trainer.findById(sourceId).populate('subjects'),
-    Trainer.findById(successorId).populate('subjects'),
+    loadTrainerSubjects(sourceId),
+    loadTrainerSubjects(successorId),
   ]);
 
   if (!sourceTrainer) {
@@ -63,7 +65,7 @@ const finalizeExitTransfer = async ({
     return res.status(400).json({ message: 'Resignation date is required' });
   }
 
-  const sourceTrainer = await Trainer.findById(req.params.id).populate('subjects');
+  const sourceTrainer = await loadTrainerSubjects(req.params.id);
   if (!sourceTrainer) {
     return res.status(404).json({ message: 'Trainer not found' });
   }
@@ -110,7 +112,7 @@ const finalizeExitTransfer = async ({
     return res.json({
       message: `${sourceTrainer.name} marked as ${mode === 'relocate' ? 'relocated' : 'resigned'} without a permanent replacement because no timetable classes remain.`,
       transfer: { mode, schedulesTransferred: 0, subjectsTransferred: 0 },
-      trainer: updatedSource,
+      trainer: await projectTrainerAcademicSubjects(updatedSource),
       successor: null,
     });
   }
@@ -134,7 +136,7 @@ const finalizeExitTransfer = async ({
   res.json({
     message: `${messagePrefix}${successorTrainer.name}.`,
     transfer: result,
-    trainer: updatedSource,
+    trainer: await projectTrainerAcademicSubjects(updatedSource),
     successor: updatedSuccessor,
   });
 };
@@ -194,7 +196,7 @@ export const permanentReplaceTrainer = async (req, res) => {
   res.json({
     message: `Role transferred from ${sourceTrainer.name} to ${successorTrainer.name} effective ${effectiveDate}. ${sourceTrainer.name} remains active with no timetable slots.`,
     transfer: result,
-    trainer: updatedSource,
+    trainer: await projectTrainerAcademicSubjects(updatedSource),
     successor: updatedSuccessor,
   });
 };

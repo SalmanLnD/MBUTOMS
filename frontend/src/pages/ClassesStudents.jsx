@@ -6,6 +6,7 @@ import { showError, showSuccess } from '../utils/toast.js';
 import ConfirmModal from '../components/ConfirmModal.jsx';
 import StudentFormModal from '../components/StudentFormModal.jsx';
 import StudentBulkUploadModal from '../components/StudentBulkUploadModal.jsx';
+import StudentMarksHistoryModal from '../components/StudentMarksHistoryModal.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
 import { ROLES } from '../utils/roles.js';
 import { useDebounce } from '../hooks/useDebounce.js';
@@ -39,6 +40,7 @@ const ClassesStudents = () => {
   const trainerEmptyMessage = 'No classes assigned to your timetable. Contact an administrator if this looks wrong.';
 
   const [activeTab, setActiveTab] = useState('classes');
+  const [historyStudent, setHistoryStudent] = useState(null);
 
   const [classes, setClasses] = useState([]);
   const [classesLoading, setClassesLoading] = useState(true);
@@ -697,13 +699,13 @@ const ClassesStudents = () => {
                       <th>Semester</th>
                       <th>Email</th>
                       <th>Status</th>
-                      {canManage && <th />}
+                      <th scope="col">Actions</th>
                     </tr>
                   </thead>
                   <tbody>
                     {students.length === 0 ? (
                       <tr>
-                        <td colSpan={canManage ? 9 : 8} className="text-center text-muted py-4">
+                        <td colSpan={9} className="text-center text-muted py-4">
                           {isTrainerScopedView && !classFilter
                             ? trainerEmptyMessage
                             : 'No students found'}
@@ -722,9 +724,10 @@ const ClassesStudents = () => {
                           <td>
                             <span className="badge bg-secondary">{formatStatus(s.status)}</span>
                           </td>
-                          {canManage && (
                             <td className="text-end">
                               <div className="btn-group btn-group-sm action-btn-group d-inline-flex">
+                                <ActionIconButton variant="view" icon={EyeIcon} title="View marks history" aria-label={`View marks history for ${s.name}`} onClick={() => setHistoryStudent(s)} />
+                                {canManage && <>
                                 <ActionIconButton
                                   variant="edit"
                                   icon={EditIcon}
@@ -742,9 +745,9 @@ const ClassesStudents = () => {
                                   aria-label={`Delete ${s.name}`}
                                   onClick={() => setPendingDelete({ id: s._id, name: s.name })}
                                 />
+                                </>}
                               </div>
                             </td>
-                          )}
                         </tr>
                       ))
                     )}
@@ -793,6 +796,8 @@ const ClassesStudents = () => {
           onClose={() => setPendingClassDelete(null)}
         />
       )}
+
+      {historyStudent && <StudentMarksHistoryModal student={historyStudent} onClose={() => setHistoryStudent(null)} />}
 
       {showStudentForm && (
         <StudentFormModal

@@ -1,5 +1,6 @@
 import mongoose from 'mongoose';
 import { LEAVE_SCOPES } from '../utils/leaveScope.js';
+import { sharedAcademicReferences } from '../utils/sharedAcademicReferences.js';
 
 const leaveSchema = new mongoose.Schema(
   {
@@ -56,5 +57,6 @@ leaveSchema.index({ affectedSchedules: 1 });
 leaveSchema.index({ 'replacements.replacementTrainer': 1, status: 1, startDate: 1, endDate: 1 });
 leaveSchema.index({ 'replacements.schedule': 1, status: 1, startDate: 1, endDate: 1 });
 
+sharedAcademicReferences(leaveSchema, { affectedSchedules: 'Schedule', 'replacements.schedule': 'Schedule' });
 const Leave = mongoose.model('Leave', leaveSchema);
 export default Leave;

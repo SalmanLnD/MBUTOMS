@@ -1,4 +1,5 @@
 import mongoose from 'mongoose';
+import { termModel } from '../utils/academicTermContext.js';
 
 const classGroupSchema = new mongoose.Schema(
   {
@@ -16,7 +17,7 @@ const classGroupSchema = new mongoose.Schema(
   { timestamps: true, collection: 'classes' }
 );
 
-classGroupSchema.index({ department: 1, section: 1, currentSemester: 1 }, { unique: true });
+classGroupSchema.index({ department: 1, section: 1, py: 1, currentSemester: 1 }, { unique: true });
 classGroupSchema.index({ status: 1, department: 1, section: 1, currentSemester: 1 });
 
 classGroupSchema.virtual('label').get(function label() {
@@ -26,5 +27,5 @@ classGroupSchema.virtual('label').get(function label() {
 classGroupSchema.set('toJSON', { virtuals: true });
 classGroupSchema.set('toObject', { virtuals: true });
 
-const ClassGroup = mongoose.model('ClassGroup', classGroupSchema);
+const ClassGroup = termModel('ClassGroup', classGroupSchema);
 export default ClassGroup;

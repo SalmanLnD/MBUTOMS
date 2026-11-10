@@ -8,6 +8,7 @@ import LoginModal from './components/LoginModal.jsx';
 import SessionExpiredModal from './components/SessionExpiredModal.jsx';
 import MainLayout from './layouts/MainLayout.jsx';
 import { AiAssistantProvider } from './context/AiAssistantContext.jsx';
+import { AcademicTermProvider } from './context/AcademicTermContext.jsx';
 import OptionalAuthLayout from './layouts/OptionalAuthLayout.jsx';
 import { needsPasswordReset, MANAGEMENT_ROLES, PERFORMANCE_ACCESS_ROLES } from './utils/roles.js';
 import { PHOTO_PUNCH_ROLES } from './utils/photoPunchAccess.js';
@@ -59,6 +60,7 @@ const HomeRedirect = () => {
 };
 
 const App = () => (
+  <AcademicTermProvider>
   <AiAssistantProvider>
     <Suspense fallback={<LoadingSpinner fullPage message="Loading page..." />}>
     <Routes>
@@ -113,6 +115,7 @@ const App = () => (
     <LoginModal />
     <SessionExpiredModal />
   </AiAssistantProvider>
+  </AcademicTermProvider>
 );
 
 export default App;

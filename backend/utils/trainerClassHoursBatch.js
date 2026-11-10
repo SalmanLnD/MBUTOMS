@@ -25,6 +25,7 @@ import {
 } from './trainerTimetableOwnership.js';
 import { loadOfficialHolidayMap } from './officialHolidays.js';
 import { resolveSubjectEndDate } from './subjectTrainingDates.js';
+import { needsOperationalTermResolution, getOperationalTerms, groupOperationalDatesByTerm, runOperationalTerm } from './academicOperationalHistory.js';
 
 const SCHEDULE_FIELDS = `day startTime endTime trainerCode ownershipStartDate semester subject subjectCode ${SPECIAL_CLASS_FIELDS}`;
 const EXPLANATION_FIELDS = 'department section slot venue specialReason includeInRtet';
@@ -159,6 +160,17 @@ export const computeClassHandlingHoursBatch = async (
 ) => {
   const result = new Map();
   if (!trainerIds.length || !dates.length) return result;
+
+  if (needsOperationalTermResolution()) {
+    const groups = groupOperationalDatesByTerm(dates, await getOperationalTerms());
+    for (const group of groups) {
+      const rows = await runOperationalTerm(group.term, () => computeClassHandlingHoursBatch(
+        trainerIds, group.dates, semester, trainersInput, { includeDetails }
+      ));
+      for (const [key, value] of rows) result.set(key, value);
+    }
+    return result;
+  }
 
   const trainers = trainersInput?.length
     ? trainersInput

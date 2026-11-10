@@ -12,10 +12,15 @@ import { formatRole, getErrorMessage } from '../utils/helpers.js';
 import { ROLES } from '../utils/roles.js';
 import { showError } from '../utils/toast.js';
 import { demoWorkspace } from '../services/api.js';
+import { useAcademicTerm } from '../context/AcademicTermContext.jsx';
+import { safeCalendarUrl } from '../utils/academicTerm.js';
+import AcademicTermControls from './AcademicTermControls.jsx';
 
 const ACADEMIC_CALENDARS_URL = 'https://drive.google.com/drive/u/1/folders/1GvF_2ieWFGKaFfVvPTSaVG1bl87WQD3J';
 
 const Topbar = ({ title }) => {
+  const academic = useAcademicTerm();
+  const calendarUrl = safeCalendarUrl(academic?.enabled ? academic.viewedTerm?.calendarUrl : ACADEMIC_CALENDARS_URL);
   const {
     user,
     logout,
@@ -136,8 +141,9 @@ const Topbar = ({ title }) => {
               </div>
             )}
             {showAcademicCalendars && (
+            calendarUrl ? (
             <a
-              href={ACADEMIC_CALENDARS_URL}
+              href={calendarUrl}
               target="_blank"
               rel="noopener noreferrer"
               className="btn btn-outline-primary btn-sm topbar-calendars-btn d-inline-flex align-items-center gap-2"
@@ -146,6 +152,7 @@ const Topbar = ({ title }) => {
               <span className="d-none d-sm-inline">Academic Calendars</span>
               <span className="d-inline d-sm-none">Calendars</span>
             </a>
+            ) : <span className="small text-muted">Academic calendar not configured for this semester</span>
             )}
           </div>
         )}
@@ -191,6 +198,7 @@ const Topbar = ({ title }) => {
           )}
         </div>
       </header>
+      <AcademicTermControls />
     </>
   );
 };

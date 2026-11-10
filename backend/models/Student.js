@@ -1,4 +1,7 @@
 import mongoose from 'mongoose';
+import { termModel } from '../utils/academicTermContext.js';
+import { academicTermsEnabled } from '../utils/academicTermContext.js';
+import StudentIdentity from './StudentIdentity.js';
 
 const studentSchema = new mongoose.Schema(
   {
@@ -21,6 +24,17 @@ const studentSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
+// A student keeps one identity even when independently enrolled in many terms.
+const reserveIdentity = async student => {
+  if (!academicTermsEnabled() || !student.rollNumber) return;
+  const identity = await StudentIdentity.findOneAndUpdate({ rollNumber: student.rollNumber },
+    { $setOnInsert: { _id: student._id || new mongoose.Types.ObjectId(), name: student.name, email: student.email } },
+    { upsert: true, new: true }).lean();
+  student._id = identity._id;
+};
+studentSchema.pre('validate', async function () { if (this.isNew) await reserveIdentity(this); });
+studentSchema.pre('insertMany', async function (_next, docs) { for (const doc of docs) await reserveIdentity(doc); });
+
 studentSchema.index({ status: 1, branch: 1, sectionLabel: 1 });
 studentSchema.index({ status: 1, py: 1, semesterLabel: 1 });
 studentSchema.index({
@@ -31,5 +45,5 @@ studentSchema.index({
   rollNumber: 1,
 });
 
-const Student = mongoose.model('Student', studentSchema);
+const Student = termModel('Student', studentSchema);
 export default Student;

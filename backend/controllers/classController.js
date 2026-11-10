@@ -4,6 +4,7 @@ import Schedule from '../models/Schedule.js';
 import Subject from '../models/Subject.js';
 import School from '../models/School.js';
 import Department from '../models/Department.js';
+import { academicCacheKey } from '../utils/academicCacheKey.js';
 import {
   getAllowedClassDepartmentsForSubject,
   getDepartmentCodesForClassDepartment,
@@ -18,9 +19,11 @@ import {
 } from '../utils/trainerClassAccess.js';
 
 const STUDENT_COUNT_CACHE_TTL_MS = 60_000;
-let studentCountCache = { map: null, expiresAt: 0 };
+const studentCountCaches = new Map();
 
 const getActiveStudentCountMap = async () => {
+  const key = academicCacheKey('student-counts');
+  const studentCountCache = studentCountCaches.get(key) || { map: null, expiresAt: 0 };
   if (studentCountCache.map && Date.now() < studentCountCache.expiresAt) {
     return studentCountCache.map;
   }
@@ -46,15 +49,16 @@ const getActiveStudentCountMap = async () => {
     ])
   );
 
-  studentCountCache = {
+  if (studentCountCaches.size >= 32) studentCountCaches.delete(studentCountCaches.keys().next().value);
+  studentCountCaches.set(key, {
     map,
     expiresAt: Date.now() + STUDENT_COUNT_CACHE_TTL_MS,
-  };
+  });
   return map;
 };
 
 export const invalidateStudentCountCache = () => {
-  studentCountCache = { map: null, expiresAt: 0 };
+  studentCountCaches.clear();
 };
 
 const attachStudentCounts = async (classes) => {

@@ -1,5 +1,6 @@
 import Subject from '../models/Subject.js';
 import Trainer from '../models/Trainer.js';
+import { usesTermAssignments } from './academicAssignments.js';
 import { QAVA_SUBJECT_CODE, QAVA_TRAINER_EMPLOYEE_IDS } from './qavaTimetable.js';
 
 /** Keep Suryadeo and Bhargavi linked to QAVA so coordinator/observation scope includes them. */
@@ -27,7 +28,7 @@ export const syncQavaTrainerLinks = async () => {
     updated += 1;
   }
 
-  const trainerResult = await Trainer.updateMany(
+  const trainerResult = usesTermAssignments() ? { modifiedCount: 0 } : await Trainer.updateMany(
     {
       _id: { $in: trainerIds },
       subjects: { $ne: subject._id },
