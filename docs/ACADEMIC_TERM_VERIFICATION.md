@@ -15,7 +15,17 @@ Initial semester dates confirmed by the administrator: 2026-07-12 through 2026-1
 
 ## Remaining target acceptance
 
-Production migration has not been applied and the feature has not been enabled. A production-sized backup/restore rehearsal completed on November 10, 2026: 38 collections and 40,271 documents were backed up as canonical EJSON, reread from source for consistency, restored to a fresh local MongoDB, and checksum verified. The initial migration completed on that restored database. Verification confirmed all original records unchanged, eight partition collections, migrated teaching-role assignments and only the expected term-specific sheet settings additions. The durable cutover backup should be taken again during the production academic-write freeze; this rehearsal snapshot was captured while the application remained online.
+### Production cutover — November 10, 2026
+
+The administrator authorized proceeding. Both Render services were confirmed on reviewed commit `0436ebf`. The API was suspended for a fresh backup and migration. The cutover backup contains 43 collections and 40,271 documents (including empty registry collections created by deployment), was restored locally, and passed migration verification. Retained backup: `C:/Users/ms266/AppData/Local/TOMSBackups/academic-cutover-20261110`.
+
+Production migration completed and published `2026-2027-odd`, revision 1, July 12 through December 6, 2026. The source URI was verified to match the deployed backend configuration without exposing credentials. Student identity upserts were batched in groups of 500; the resumable migration was restarted before publication to apply that optimization. The migration verified partition counts/checksums before publishing. `ACADEMIC_TERMS_ENABLED=true` was deployed and the API resumed. Render deploy `dep-dbplaputlv9c73dlbfqg` became live.
+
+Live acceptance: direct API and frontend-proxied academic context both returned enabled/current Odd semester. Authenticated read checks returned HTTP 200 for subjects, students (5,013), classes, schedules and semester performance (20 rows). Resuming initially brought back the previous environment until the explicit deployment became live; post-restart comparison found only two refreshed legacy class `updatedAt` timestamps, with no class field differences. No next semester was created or student promotion performed.
+
+The following paragraphs describe the earlier pre-cutover verification history.
+
+At the earlier checkpoint, production migration had not been applied and the feature was disabled. A production-sized backup/restore rehearsal completed on November 10, 2026: 38 collections and 40,271 documents were backed up as canonical EJSON, reread from source for consistency, restored to a fresh local MongoDB, and checksum verified. The initial migration completed on that restored database. Verification confirmed all original records unchanged, eight partition collections, migrated teaching-role assignments and only the expected term-specific sheet settings additions. This first rehearsal snapshot was captured while the application remained online; the later cutover used the fresh frozen backup described above.
 
 The rehearsal backup and manifest are outside the repository at `C:/Users/ms266/AppData/Local/Temp/toms-academic-backup-4D4jw2`. This folder contains private application data and must not be committed. The local rehearsal database is `academic_rehearsal_20261110_a` on port 27119. The initial validator reported expected settings additions as differences; the corrected standalone verifier subsequently passed all checks.
 

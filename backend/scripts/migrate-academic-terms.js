@@ -64,9 +64,12 @@ try {
       for await (const doc of destination.find().sort({ _id: 1 })) { delete doc.termId; checksum.update(JSON.stringify(doc)); }
       if (count !== row.count || checksum.digest('hex') !== row.sourceChecksum) throw new Error(`Verification failed: ${row.model}`);
     }
+    const identityBatch = [];
     for await (const student of db.collection('students').find()) {
-      await StudentIdentity.updateOne({ _id: student._id }, { $setOnInsert: { rollNumber: student.rollNumber, name: student.name, email: student.email } }, { upsert: true });
+      identityBatch.push({ updateOne: { filter: { _id: student._id }, update: { $setOnInsert: { rollNumber: student.rollNumber, name: student.name, email: student.email } }, upsert: true } });
+      if (identityBatch.length === 500) { await StudentIdentity.bulkWrite(identityBatch); identityBatch.length = 0; }
     }
+    if (identityBatch.length) await StudentIdentity.bulkWrite(identityBatch);
     if (repositories.models.AcademicUserAssignment) {
       for await (const user of db.collection('users').find({ $or: [{ 'coordinatorSubjects.0': { $exists: true } }, { 'evaluatorSubjects.0': { $exists: true } }] })) {
         await repositories.models.AcademicUserAssignment.collection.updateOne({ user: user._id }, { $setOnInsert: { user: user._id, coordinatorSubjects: user.coordinatorSubjects || [], evaluatorSubjects: user.evaluatorSubjects || [], termId: term._id } }, { upsert: true });

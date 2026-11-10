@@ -55,6 +55,13 @@ try {
     const added = await collection.find({ _id: { $nin: documents.map(doc => doc._id) } }).toArray();
     const allowed = ['timetable_spreadsheet', 'timetable_export_api_key', 'topic_tracker_spreadsheet', 'topic_tracker_export_api_key', 'student_test_reports_spreadsheet', 'student_test_reports_export_api_key'];
     for (const doc of added) {
+      if (row.name === 'academicterms' && String(doc._id) === String(publication.currentTermId) && doc.key === '2026-2027-odd') continue;
+      if (row.name === 'academicpublications' && doc._id === 'current' && doc.revision === 1) continue;
+      if (row.name === 'academictermjobs' && doc.key === 'migration:initial' && doc.status === 'completed') continue;
+      if (row.name === 'student_identities') {
+        const student = await destination.db.collection('students').findOne({ _id: doc._id });
+        if (student && student.rollNumber === doc.rollNumber && student.name === doc.name) continue;
+      }
       const original = documents.find(item => allowed.includes(item.key) && doc.key === `term:${publication.currentTermId}:${item.key}`);
       if (row.name !== 'app_settings' || !original || checksum(original.value) !== checksum(doc.value)) throw new Error(`Unexpected migrated addition: ${row.name}`);
     }

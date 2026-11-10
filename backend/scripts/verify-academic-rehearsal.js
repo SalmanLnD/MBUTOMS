@@ -20,6 +20,13 @@ try {
     const originalIds = new Set(documents.map(doc => String(doc._id)));
     if (checksum(restored.filter(doc => originalIds.has(String(doc._id)))) !== row.checksum) throw new Error(`Original records changed: ${row.name}`);
     for (const doc of restored.filter(doc => !originalIds.has(String(doc._id)))) {
+      if (row.name === 'academicterms' && String(doc._id) === String(publication.currentTermId) && doc.key === '2026-2027-odd') continue;
+      if (row.name === 'academicpublications' && doc._id === 'current' && doc.revision === 1) continue;
+      if (row.name === 'academictermjobs' && doc.key === 'migration:initial' && doc.status === 'completed') continue;
+      if (row.name === 'student_identities') {
+        const student = await connection.db.collection('students').findOne({ _id: doc._id });
+        if (student && student.rollNumber === doc.rollNumber && student.name === doc.name) continue;
+      }
       const original = documents.find(item => allowed.includes(item.key) && doc.key === `term:${publication.currentTermId}:${item.key}`);
       if (row.name !== 'app_settings' || !original || checksum(original.value) !== checksum(doc.value)) throw new Error(`Unexpected addition: ${row.name}`);
     }
