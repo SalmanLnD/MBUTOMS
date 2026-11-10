@@ -427,20 +427,8 @@ export const getCancellationApprovals = async (req, res) => {
     return res.status(400).json({ message: 'Invalid status filter' });
   }
 
-  // Demo reads never backfill production records.
-  if (statusFilter === 'pending' && !req.isDemo) {
-    await TopicTrackerEntry.updateMany(
-      {
-        sessionStatus: { $in: ALERT_SESSION_STATUSES },
-        $or: [
-          { cancellationApprovalStatus: 'none' },
-          { cancellationApprovalStatus: { $exists: false } },
-        ],
-      },
-      { $set: { cancellationApprovalStatus: 'pending' } }
-    );
-  }
-
+  // Legacy none/missing statuses are already included above. Loading the queue
+  // must stay read-only, including in archived academic semesters.
   const entries = await TopicTrackerEntry.find(filter)
     .populate('trainer', 'name employeeId')
     .populate('subject', 'name code')
