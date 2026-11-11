@@ -5,11 +5,30 @@ import { FingerprintIcon } from '../components/icons.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
 import '../styles/photo-punch.css';
 
-const gps = () => new Promise((resolve, reject) => {
+const gps = (signal) => new Promise((resolve, reject) => {
   if (!navigator.geolocation) return reject(new Error('This browser does not support location.'));
-  navigator.geolocation.getCurrentPosition(position => resolve({ latitude: position.coords.latitude, longitude: position.coords.longitude,
-    accuracy: position.coords.accuracy, timestamp: position.timestamp }), error => reject(new Error(error.code === 1 ? 'Allow location access to continue.' : 'Could not get an accurate location. Move outdoors and retry.')),
-  { enableHighAccuracy: true, maximumAge: 0, timeout: 20000 });
+  if (signal.aborted) return reject(signal.reason);
+  let bestAccuracy = Infinity;
+  const finish = (error, location) => {
+    clearTimeout(timer);
+    navigator.geolocation.clearWatch(watch);
+    signal.removeEventListener('abort', abort);
+    if (error) reject(error);
+    else resolve(location);
+  };
+  const abort = () => finish(signal.reason);
+  const timer = setTimeout(() => {
+    const best = Number.isFinite(bestAccuracy) ? ` Best reading: ${Math.round(bestAccuracy)} m.` : '';
+    finish(new Error(`Could not get GPS accuracy within 100 m.${best} Enable precise location and retry near a window or outdoors.`));
+  }, 25000);
+  const watch = navigator.geolocation.watchPosition(({ coords, timestamp }) => {
+    const { latitude, longitude, accuracy } = coords;
+    bestAccuracy = Math.min(bestAccuracy, accuracy);
+    if (accuracy >= 0 && accuracy <= 100) finish(null, { latitude, longitude, accuracy, timestamp });
+  }, error => {
+    if (error.code === 1) finish(new Error('Allow precise location access to continue.'));
+  }, { enableHighAccuracy: true, maximumAge: 0, timeout: 25000 });
+  signal.addEventListener('abort', abort, { once: true });
 });
 const formatTime = value => new Date(value).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', dateStyle: 'medium', timeStyle: 'medium' });
 const radiusLabel = (mode) => (mode === 'scheduled' ? '300 m campus radius' : mode === 'other' ? 'Location range not restricted' : '1.5 km campus radius');
@@ -20,6 +39,11 @@ export default function PhotoPunch() {
   const [assignment, setAssignment] = useState({ mode: 'scheduled', oifNumber: '', classHandlingHours: '', mockPrepHours: '' });
   const [scheduled, setScheduled] = useState(null), [scheduleError, setScheduleError] = useState('');
   const video = useRef(null), stream = useRef(null), active = useRef(true), pending = useRef(null);
+  const latestLocation = useRef(null);
+  const getLocation = (signal) => {
+    const location = latestLocation.current;
+    return location && Date.now() - location.timestamp <= 30000 ? Promise.resolve(location) : gps(signal);
+  };
   const stop = () => { stream.current?.getTracks().forEach(track => track.stop()); stream.current = null; };
   useEffect(() => {
     active.current = true;
@@ -31,11 +55,28 @@ export default function PhotoPunch() {
       }).catch(() => { if (!controller.signal.aborted) setScheduleError('Could not load your scheduled OIF. Retry by refreshing this screen.'); });
     };
     refreshSchedule();
-    const onHidden = () => { if (document.hidden) { stop(); setCamera(false); } else refreshSchedule(); };
+    let locationWatch;
+    const stopLocation = () => {
+      if (locationWatch !== undefined) navigator.geolocation.clearWatch(locationWatch);
+      locationWatch = undefined;
+      latestLocation.current = null;
+    };
+    const warmLocation = () => {
+      if (document.hidden || !navigator.geolocation || locationWatch !== undefined) return;
+      locationWatch = navigator.geolocation.watchPosition(({ coords, timestamp }) => {
+        const { latitude, longitude, accuracy } = coords;
+        latestLocation.current = accuracy >= 0 && accuracy <= 100 ? { latitude, longitude, accuracy, timestamp } : null;
+      }, () => { latestLocation.current = null; }, { enableHighAccuracy: true, maximumAge: 0, timeout: 25000 });
+    };
+    warmLocation();
+    const onHidden = () => {
+      if (document.hidden) { stopLocation(); stop(); setCamera(false); }
+      else { warmLocation(); refreshSchedule(); }
+    };
     document.addEventListener('visibilitychange', onHidden);
     window.addEventListener('focus', refreshSchedule);
     const refreshTimer = window.setInterval(() => { if (!document.hidden) refreshSchedule(); }, 60000);
-    return () => { active.current = false; controller.abort(); pending.current?.abort(); stop(); document.removeEventListener('visibilitychange', onHidden); window.removeEventListener('focus', refreshSchedule); window.clearInterval(refreshTimer); };
+    return () => { active.current = false; controller.abort(); pending.current?.abort(); stopLocation(); stop(); document.removeEventListener('visibilitychange', onHidden); window.removeEventListener('focus', refreshSchedule); window.clearInterval(refreshTimer); };
   }, []);
   useEffect(() => { if (photo) return () => URL.revokeObjectURL(photo.url); }, [photo]);
   useEffect(() => { if (camera && video.current) { video.current.srcObject = stream.current; video.current.play().catch(() => setError('Camera could not start. Retry camera access.')); } }, [camera]);
@@ -44,26 +85,19 @@ export default function PhotoPunch() {
     const controller = new AbortController(); pending.current = controller;
     try {
       if (!window.isSecureContext || !navigator.mediaDevices?.getUserMedia) throw new Error('Camera access needs HTTPS or localhost and a supported browser.');
-      const location = await gps();
-      if (!active.current) return;
-      const { data } = await api.post('/photo-punch/capture-session', { location, mode: assignment.mode }, { signal: controller.signal });
-      if (!active.current) return;
       const media = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: 'environment' }, width: { ideal: 1280 }, height: { ideal: 960 } }, audio: false });
-      if (!active.current) { media.getTracks().forEach(track => track.stop()); return; }
-      stream.current = media; setSession(data); setCamera(true);
+      if (!active.current || controller.signal.aborted || document.hidden) { media.getTracks().forEach(track => track.stop()); return; }
+      stream.current = media; setCamera(true);
     } catch (e) { if (active.current) setError(e.response?.data?.message || (e.name === 'NotAllowedError' ? 'Allow camera access to take your punch-in photo.' : e.message)); }
     finally { if (active.current) setBusy(false); }
   };
   const capture = async () => {
-    if (!video.current?.videoWidth || !session) return;
+    if (!video.current?.videoWidth) return;
     setBusy(true); setError('');
+    const controller = new AbortController(); pending.current = controller;
     try {
-      // Recheck location immediately before exposure. Server signs fresh coordinates and time.
-      const location = await gps();
-      const controller = new AbortController(); pending.current = controller;
-      const { data } = await api.post('/photo-punch/capture-session', { location, mode: assignment.mode }, { signal: controller.signal });
-      if (!active.current || !video.current || !stream.current) return;
-      setSession(data);
+      const location = await getLocation(controller.signal);
+      if (!active.current || controller.signal.aborted || !video.current?.videoWidth || !stream.current) return;
       const canvas = document.createElement('canvas');
       const scale = Math.min(1, 1280 / video.current.videoWidth);
       canvas.width = Math.round(video.current.videoWidth * scale); canvas.height = Math.round(video.current.videoHeight * scale);
@@ -72,6 +106,9 @@ export default function PhotoPunch() {
       let total = 0, squares = 0, count = 0;
       for (let i = 0; i < sample.length; i += 160) { const v = (sample[i] + sample[i + 1] + sample[i + 2]) / 3; total += v; squares += v * v; count++; }
       if (count && (total / count < 12 || squares / count - (total / count) ** 2 < 12)) throw new Error('Photo is too dark or blank. Improve lighting and retake.');
+      const { data } = await api.post('/photo-punch/capture-session', { location, mode: assignment.mode }, { signal: controller.signal });
+      if (!active.current || controller.signal.aborted) return;
+      setSession(data);
       const font = Math.max(13, Math.round(canvas.width * .022));
       const height = font * 7; ctx.fillStyle = 'rgba(8,20,32,.82)'; ctx.fillRect(0, canvas.height - height, canvas.width, height);
       ctx.fillStyle = '#fff'; ctx.font = `600 ${font * 1.25}px sans-serif`;
@@ -82,8 +119,8 @@ export default function PhotoPunch() {
       lines.forEach((line, index) => ctx.fillText(line, font, canvas.height - height + font * (3.1 + index * 1.05)));
       const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg', .85));
       if (!blob || blob.size > 5 * 1024 * 1024) throw new Error('Photo could not be prepared. Retake it.');
-      if (active.current) { setPhoto({ blob, url: URL.createObjectURL(blob) }); stop(); setCamera(false); }
-    } catch (e) { if (active.current) setError(e.response?.data?.message || e.message); }
+      if (active.current && !controller.signal.aborted) { setPhoto({ blob, url: URL.createObjectURL(blob) }); stop(); setCamera(false); }
+    } catch (e) { if (active.current && !controller.signal.aborted) setError(e.response?.data?.message || e.message); }
     finally { if (active.current) setBusy(false); }
   };
   const submit = async () => {
@@ -128,7 +165,7 @@ export default function PhotoPunch() {
       {result?.assignment && <p>OIF: {result.assignment.oifNumber || 'No scheduled OIF'} · Class hours: {result.assignment.classHandlingHours} · Mock / IT hours: {result.assignment.mockPrepHours}</p>}
       {result?.whatsappShare === 'queued' && <p>Your photo will also be posted to the training managers WhatsApp group.</p>}
       {result && <div className="photo-punch__success" role="status"><strong>You are checked in</strong><p>{result.message}</p><small>{result.folder}</small>{result.photoUrl && <a href={result.photoUrl} target="_blank" rel="noreferrer">View photo in Drive</a>}</div>}
-      <div className="photo-punch__actions">{!camera && !photo && <AsyncButton className="btn btn-primary" disabled={busy || !config} onClick={start}>{busy ? 'Checking location…' : 'Enable camera & location'}</AsyncButton>}
+      <div className="photo-punch__actions">{!camera && !photo && <AsyncButton className="btn btn-primary" disabled={busy || !config} onClick={start}>{busy ? 'Opening camera…' : 'Open camera'}</AsyncButton>}
         {camera && <><AsyncButton className="btn btn-primary" disabled={busy} onClick={capture}>{busy ? 'Checking…' : 'Take photo'}</AsyncButton><AsyncButton className="btn btn-outline-secondary" disabled={busy} onClick={() => { stop(); setCamera(false); }}>Cancel</AsyncButton></>}
         {photo && !result && <><AsyncButton className="btn btn-primary" disabled={busy} onClick={submit}>{busy ? 'Saving punch-in…' : 'Punch in'}</AsyncButton><AsyncButton className="btn btn-outline-secondary" disabled={busy} onClick={start}>Retake</AsyncButton><a className="btn btn-outline-secondary" href={photo.url} download="toms-punch.jpg">Download photo</a></>}
         {result && <AsyncButton className="btn btn-outline-secondary" onClick={start}>Start again</AsyncButton>}
