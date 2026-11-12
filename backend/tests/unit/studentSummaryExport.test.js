@@ -1,6 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { buildStudentSummaryRows } from '../../utils/studentTestReportExport.js';
+import { buildStudentSummaryRows, buildTestReportSheetsExportPayload } from '../../utils/studentTestReportExport.js';
+import { getMonthLabelFromKey, getReportMonthKeys } from '../../utils/studentTestReportDates.js';
+import StudentMonthlyTestReport from '../../models/StudentMonthlyTestReport.js';
+import Student from '../../models/Student.js';
+import Schedule from '../../models/Schedule.js';
 const students = [{_id:'s', rollNumber:'001',name:'Student',branch:'CSE',sectionLabel:'A',semesterLabel:'III'}];
 const subjects = [{department:'CSE',section:'A',semester:'III',subject:{_id:'x',name:'Test',code:'X'}}];
 const report = (month, marksObtained, attendance='P') => ({student:'s',subject:'x',month,marksObtained,attendance});
@@ -31,4 +35,26 @@ test('summary supports term-specific month columns', () => {
  const rows=buildStudentSummaryRows(students,subjects,[report('2027-01',8)],['2027-01','2027-02']);
  assert.deepEqual(rows[0].slice(7),['January 2027','February 2027','Average']);
  assert.deepEqual(rows[1].slice(7),[8,'NA','Not finalized']);
+});
+
+test('report export skips months without marks or recorded absences', async (t) => {
+ const [markedMonth, placeholderMonth, absentMonth] = getReportMonthKeys();
+ const query = (rows) => ({
+  populate() { return this; },
+  select() { return this; },
+  sort() { return this; },
+  async lean() { return rows; },
+ });
+ t.mock.method(StudentMonthlyTestReport, 'find', () => query([
+  report(markedMonth, 0), report(placeholderMonth, null), report(absentMonth, null, 'A'),
+ ]));
+ t.mock.method(Student, 'find', () => query(students));
+ t.mock.method(Schedule, 'find', () => query(subjects));
+
+ const result = await buildTestReportSheetsExportPayload();
+ assert.deepEqual(result.monthSheets.map(({ month }) => month), [markedMonth, absentMonth]);
+ assert.deepEqual(result.studentSummaryRows[0].slice(7), [
+  getMonthLabelFromKey(markedMonth), getMonthLabelFromKey(absentMonth), 'Average',
+ ]);
+ assert.deepEqual(result.studentSummaryRows[1].slice(7), [0, 'Absent', 'Not finalized']);
 });

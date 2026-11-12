@@ -37,6 +37,9 @@ const MARKS_HEADERS = [
 const MONTH_MARKS_HEADERS = MARKS_HEADERS.filter((header) => header !== 'Month');
 
 const STUDENT_SUMMARY_MONTHS = ['2026-08', '2026-09', '2026-10'];
+const hasAssessmentResults = (reports) => reports.some(
+  (report) => Number.isFinite(report.marksObtained) || resolveAttendance(report) === 'A'
+);
 
 // One row per student and subject; zero is a mark, missing/ungraded is NA.
 export const buildStudentSummaryRows = (students, schedules, reports, monthKeys = STUDENT_SUMMARY_MONTHS) => {
@@ -250,7 +253,8 @@ const loadReports = (filter = {}) =>
     .lean();
 
 export const buildTestReportExportPayload = async (month, { reportFilter = {} } = {}) => {
-  const reports = await loadReports({ month, ...reportFilter });
+  const savedReports = await loadReports({ month, ...reportFilter });
+  const reports = hasAssessmentResults(savedReports) ? savedReports : [];
   const monthLabel = getMonthLabelFromKey(month);
   const subjectSummary = buildSubjectSummaryRows(reports);
   const classSummary = buildClassSubjectSummaryRows(reports);
@@ -288,8 +292,9 @@ export const buildTestReportSheetsExportPayload = async () => {
     if (bucket) bucket.push(report);
   });
 
-  const monthSummaries = monthKeys.map((monthKey) => {
-    const reports = reportsByMonth.get(monthKey) || [];
+  const assessedMonthKeys = monthKeys.filter((monthKey) => hasAssessmentResults(reportsByMonth.get(monthKey)));
+  const monthSummaries = assessedMonthKeys.map((monthKey) => {
+    const reports = reportsByMonth.get(monthKey);
     const monthLabel = getMonthLabelFromKey(monthKey);
     return {
       month: monthKey,
@@ -312,7 +317,7 @@ export const buildTestReportSheetsExportPayload = async () => {
     summarySheetName: 'Summary',
     summaryRows: buildSummarySheetRows(monthSummaries),
     studentSummarySheetName: 'Student Summary',
-    studentSummaryRows: buildStudentSummaryRows(students, schedules, allReports, monthKeys),
+    studentSummaryRows: buildStudentSummaryRows(students, schedules, monthSummaries.flatMap(({ reports }) => reports), assessedMonthKeys),
     monthSheets,
     managedSheetNames: ['Summary', 'Student Summary', ...monthSheets.map((sheet) => sheet.sheetName)],
   };
