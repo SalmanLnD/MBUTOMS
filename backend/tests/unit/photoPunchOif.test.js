@@ -17,3 +17,13 @@ test('manual OIF requires explicit valid hours; IT and capsule use attendance co
   assert.throws(() => resolvePhotoPunchOif({mode:'other',oifNumber:'XX123',classHandlingHours:20,mockPrepHours:8}));
   assert.throws(() => resolvePhotoPunchOif({mode:'unknown'}));
 });
+
+test('Other OIF accepts standalone capsule and IT codes with manually entered hours', () => {
+  for (const oifNumber of ['ca26421', 'it']) {
+    assert.deepEqual(resolvePhotoPunchOif({
+      mode: 'other', oifNumber, classHandlingHours: 2, mockPrepHours: 3,
+    }), {
+      oifEntryMode: 'other', oifNumber: oifNumber.toUpperCase(), classHandlingHours: 2, mockPrepHours: 3,
+    });
+  }
+});
