@@ -136,15 +136,41 @@ const LateMisconductTab = () => {
     if (!pendingAction || savingRef.current) return;
     savingRef.current = true;
     setSaving(true);
+    let completed = 0;
     try {
-      const result = await reviewLatePunch(pendingAction.item._id, pendingAction.action);
-      showSuccess(result.message || 'Review saved');
+      if (pendingAction.bulk) {
+        const pending = [];
+        let nextPage = 1;
+        let pages = 1;
+        do {
+          const data = await getLatePunches({
+            month: monthKey, status: 'pending', search: debouncedSearch, page: nextPage, limit: 50,
+          });
+          pending.push(...(data.items || []));
+          pages = data.pagination.pages;
+          nextPage += 1;
+        } while (nextPage <= pages);
+        // Review oldest punches first so monthly warnings precede later misconduct.
+        pending.sort((a, b) => new Date(a.punchInAt) - new Date(b.punchInAt));
+        for (const item of pending) {
+          try {
+            await reviewLatePunch(item._id, pendingAction.action);
+            completed += 1;
+          } catch (error) {
+            if (error.response?.status !== 409) throw error;
+          }
+        }
+        showSuccess(`${completed} punches reviewed.`);
+      } else {
+        const result = await reviewLatePunch(pendingAction.item._id, pendingAction.action);
+        showSuccess(result.message || 'Review saved');
+      }
       setPendingAction(null);
+    } catch (err) {
+      showError(`${pendingAction.bulk ? `${completed} punches reviewed before stopping. ` : ''}${getErrorMessage(err)}`);
+    } finally {
       refreshActionCounts();
       await loadItems();
-    } catch (err) {
-      showError(getErrorMessage(err));
-    } finally {
       savingRef.current = false;
       setSaving(false);
     }
@@ -152,6 +178,16 @@ const LateMisconductTab = () => {
 
   const confirmCopy = () => {
     if (!pendingAction) return { title: '', message: '', label: 'Confirm', variant: 'primary' };
+    if (pendingAction.bulk) {
+      return {
+        title: 'Approve all pending punches',
+        message: pendingAction.action === 'dismiss'
+          ? `Approve every pending punch matching the month ${monthKey} and trainer filter as on time, across all pages?`
+          : `Mark every pending punch matching the month ${monthKey} and trainer filter as late, across all pages? The first monthly mark is a warning. Later marks add compliance points and send trainer notifications.`,
+        label: 'Approve all',
+        variant: pendingAction.action === 'dismiss' ? 'primary' : 'danger',
+      };
+    }
     const name = pendingAction.item.trainer?.name || 'this trainer';
     if (pendingAction.action === 'dismiss') {
       return {
@@ -186,6 +222,7 @@ const LateMisconductTab = () => {
           {counts.latePunches} {counts.latePunches === 1 ? 'punch needs' : 'punches need'} review across all months. Use the Month filter to check earlier pending reviews.
         </p>
       )}
+      <fieldset disabled={saving}>
       <div className="row g-2 mb-3 align-items-end">
         <div className="col-md-3">
           <label className="form-label" htmlFor="late-month">Month</label>
@@ -232,6 +269,17 @@ const LateMisconductTab = () => {
           />
         </div>
       </div>
+
+      {status !== 'reviewed' && (
+        <AsyncButton
+          type="button"
+          className="btn btn-primary mb-3"
+          disabled={loading || saving || !items.some((item) => !item.review)}
+          onClick={() => setPendingAction({ bulk: true, action: 'choose' })}
+        >
+          Approve all
+        </AsyncButton>
+      )}
 
       {loading ? <LoadingSpinner /> : items.length === 0 ? (
         <p className="text-muted mb-0">No punches after 8:40 AM in this view.</p>
@@ -313,8 +361,19 @@ const LateMisconductTab = () => {
         onPageChange={setPage}
         onPageSizeChange={changePageSize}
       />
+      </fieldset>
 
-      {pendingAction && (
+      {pendingAction?.action === 'choose' && (
+        <Modal show title="Approve all pending punches" onClose={closeReview}>
+          <p>Choose how to review all pending punches matching the selected month and trainer filter, across all pages.</p>
+          <div className="d-flex flex-wrap gap-2">
+            <button type="button" className="btn btn-primary" onClick={() => setPendingAction({ bulk: true, action: 'dismiss' })}>Approve as on time</button>
+            <button type="button" className="btn btn-outline-danger" onClick={() => setPendingAction({ bulk: true, action: 'mark' })}>Mark warning / misconduct</button>
+          </div>
+        </Modal>
+      )}
+
+      {pendingAction && pendingAction.action !== 'choose' && (
         <ConfirmModal
           show
           title={copy.title}
