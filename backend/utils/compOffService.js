@@ -7,30 +7,49 @@ const COMP_OFF_DAY_UNITS = 1;
 
 const roundCount = (value) => Math.round(Number(value || 0) * 10) / 10;
 
+export const getCompOffTrainerFilter = async (trainer) => {
+  const trainers = await Trainer.find().select('name employeeId').lean();
+  const sameName = trainers.filter((entry) => entry.name === trainer.name).length;
+  return { $or: [
+    { trainer: trainer._id },
+    { trainer: null, employeeId: trainer.employeeId },
+    ...(sameName === 1 ? [{ trainer: null, name: trainer.name,
+      employeeId: { $nin: trainers.map((entry) => entry.employeeId) } }] : []),
+  ] };
+};
+
+export const resolveCompOffRows = async (rows) => {
+  if (!rows.length) return [];
+  const trainers = await Trainer.find().select('_id employeeId name').lean();
+  const byId = new Map(trainers.map((trainer) => [String(trainer._id), trainer]));
+  const byEmployee = new Map(trainers.map((trainer) => [trainer.employeeId, trainer]));
+  const byName = new Map();
+  for (const trainer of trainers) {
+    byName.set(trainer.name, byName.has(trainer.name) ? null : trainer);
+  }
+  return rows.map((row) => {
+    const linkedId = row.trainer?._id || row.trainer;
+    const trainer = linkedId ? byId.get(String(linkedId))
+      : byEmployee.get(row.employeeId) || byName.get(row.name);
+    return trainer ? { ...row, trainer, employeeId: trainer.employeeId, name: trainer.name } : row;
+  });
+};
+
 export const buildCompOffRowKey = (row) =>
   `${row.employeeId}|${normalizeDate(row.dateWorkedOn).toISOString().slice(0, 10)}|${row.uniqueId}|${row.count}`;
 
 export const annotateCompOffRows = (rows) => {
   const duplicateCounts = new Map();
-  const nameToEmployeeIds = new Map();
 
   rows.forEach((row) => {
     const key = buildCompOffRowKey(row);
     duplicateCounts.set(key, (duplicateCounts.get(key) || 0) + 1);
-    if (!nameToEmployeeIds.has(row.name)) nameToEmployeeIds.set(row.name, new Set());
-    nameToEmployeeIds.get(row.name).add(row.employeeId);
   });
-
-  const multiEmployeeIdNames = new Set(
-    [...nameToEmployeeIds.entries()]
-      .filter(([, employeeIds]) => employeeIds.size > 1)
-      .map(([name]) => name)
-  );
 
   return rows.map((row) => ({
     ...row,
     isDuplicate: (duplicateCounts.get(buildCompOffRowKey(row)) || 0) > 1,
-    hasMultipleEmployeeIds: multiEmployeeIdNames.has(row.name),
+    hasMultipleEmployeeIds: false,
   }));
 };
 
@@ -87,19 +106,17 @@ export const buildTrainerCompOffSummary = (rows) => {
   };
 };
 
-const resolveTrainerEmployeeId = async (trainerId) => {
-  const trainer = await Trainer.findById(trainerId).select('employeeId').lean();
-  return trainer?.employeeId || null;
-};
-
 const pendingSort = { dateWorkedOn: 1, uniqueId: 1, createdAt: 1 };
 
 export const getPendingCompOffBalance = async ({ trainerId, employeeId }) => {
-  const resolvedEmployeeId = employeeId || await resolveTrainerEmployeeId(trainerId);
-  if (!resolvedEmployeeId) return 0;
+  if (!trainerId && !employeeId) return 0;
+  const trainer = trainerId
+    ? await Trainer.findById(trainerId).select('_id employeeId name').lean()
+    : await Trainer.findOne({ employeeId }).select('_id employeeId name').lean();
+  if (!trainer && !employeeId) return 0;
 
   const rows = await CompOff.find({
-    employeeId: resolvedEmployeeId,
+    ...(trainer ? await getCompOffTrainerFilter(trainer) : { employeeId }),
     status: COMP_OFF_STATUSES.PENDING,
   })
     .select('count')
@@ -109,15 +126,15 @@ export const getPendingCompOffBalance = async ({ trainerId, employeeId }) => {
 };
 
 export const consumeCompOffForAttendance = async ({ trainerId, attendanceDate, units = COMP_OFF_DAY_UNITS }) => {
-  const employeeId = await resolveTrainerEmployeeId(trainerId);
-  if (!employeeId) {
+  const trainer = await Trainer.findById(trainerId).select('_id employeeId name').lean();
+  if (!trainer?.employeeId) {
     const error = new Error('Trainer profile is not linked to an employee ID.');
     error.statusCode = 400;
     throw error;
   }
 
   const pendingRows = await CompOff.find({
-    employeeId,
+    ...await getCompOffTrainerFilter(trainer),
     status: COMP_OFF_STATUSES.PENDING,
   }).sort(pendingSort);
 
@@ -162,12 +179,12 @@ export const consumeCompOffForAttendance = async ({ trainerId, attendanceDate, u
 };
 
 export const releaseCompOffForAttendance = async ({ trainerId, attendanceDate }) => {
-  const employeeId = await resolveTrainerEmployeeId(trainerId);
-  if (!employeeId) return [];
+  const trainer = await Trainer.findById(trainerId).select('_id employeeId name').lean();
+  if (!trainer?.employeeId) return [];
 
   const day = normalizeDate(attendanceDate);
   const rows = await CompOff.find({
-    employeeId,
+    ...await getCompOffTrainerFilter(trainer),
     status: COMP_OFF_STATUSES.CLOSED,
     availedOn: day,
   }).sort({ dateWorkedOn: 1, uniqueId: 1, createdAt: 1 });

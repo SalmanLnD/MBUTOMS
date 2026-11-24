@@ -95,6 +95,7 @@ test('demo page reads do not seed comp-offs or persist feedback field backfills'
   t.mock.method(CompOff, 'estimatedDocumentCount', () => { throw Error('Demo reads must not seed'); });
   t.mock.method(CompOff, 'insertMany', () => { throw Error('Demo reads must not insert'); });
   t.mock.method(CompOff, 'find', () => query);
+  t.mock.method(Trainer, 'findOne', () => ({ select() { return this; }, lean: async () => null }));
   let response;
   const res = { json: data => { response = data; } };
   const req = { isDemo: true, user: { role: 'admin' }, query: {}, params: {} };

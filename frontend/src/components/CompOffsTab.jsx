@@ -148,7 +148,6 @@ const CompOffsTab = () => {
     pendingBalance: summaryByEmployee.reduce((sum, row) => sum + Number(row.pendingCount || 0), 0),
     pendingRecords: summaryByEmployee.reduce((sum, row) => sum + Number(row.pendingRecords || 0), 0),
     duplicateRecords: rows.filter((row) => row.isDuplicate).length,
-    flaggedEmployees: summaryByEmployee.filter((row) => row.hasMultipleEmployeeIds).length,
   }), [summaryByEmployee, rows]);
 
   const handleSort = (field) => {
@@ -231,6 +230,7 @@ const CompOffsTab = () => {
     setSubmitting(true);
     try {
       const payload = {
+        trainerId: form.trainerId || undefined,
         employeeId: form.employeeId.trim(),
         name: form.name.trim(),
         base: form.base.trim(),
@@ -384,13 +384,10 @@ const CompOffsTab = () => {
         </div>
       </CollapsibleFilters>
 
-      {(totals.duplicateRecords > 0 || totals.flaggedEmployees > 0) && (
+      {totals.duplicateRecords > 0 && (
         <div className="alert alert-warning py-2 small mb-3">
           {totals.duplicateRecords > 0 && (
             <span>{totals.duplicateRecords} duplicate row(s) flagged. </span>
-          )}
-          {totals.flaggedEmployees > 0 && (
-            <span>{totals.flaggedEmployees} employee name(s) appear under multiple Emp IDs.</span>
           )}
         </div>
       )}
@@ -425,9 +422,6 @@ const CompOffsTab = () => {
                   <td>{row.totalCount}</td>
                   <td>{row.pendingRecords} pending / {row.closedRecords} closed</td>
                   <td>
-                    {row.hasMultipleEmployeeIds && (
-                      <span className="badge bg-warning text-dark me-1">Multiple Emp IDs</span>
-                    )}
                     {row.duplicateRecords > 0 && (
                       <span className="badge bg-secondary">{row.duplicateRecords} duplicate(s)</span>
                     )}
@@ -473,7 +467,6 @@ const CompOffsTab = () => {
                   <td>{row.availedOn ? formatDate(row.availedOn) : '—'}</td>
                   <td>
                     {row.isDuplicate && <span className="badge bg-warning text-dark me-1">Duplicate</span>}
-                    {row.hasMultipleEmployeeIds && <span className="badge bg-info text-dark">Multi Emp ID</span>}
                   </td>
                   {canManage && (
                     <td>

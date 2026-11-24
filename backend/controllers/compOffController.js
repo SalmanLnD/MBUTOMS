@@ -7,6 +7,8 @@ import {
   buildCompOffSummaryByEmployee,
   buildTrainerCompOffSummary,
   ensureCompOffSeedData,
+  getCompOffTrainerFilter,
+  resolveCompOffRows,
 } from '../utils/compOffService.js';
 import { escapeRegex } from '../utils/regex.js';
 
@@ -17,8 +19,8 @@ const toPlainRow = (doc) => {
   return {
     _id: row._id,
     trainer: row.trainer,
-    employeeId: row.employeeId,
-    name: row.name,
+    employeeId: row.trainer?.employeeId || row.employeeId,
+    name: row.trainer?.name || row.name,
     base: row.base,
     dateWorkedOn: row.dateWorkedOn,
     uniqueId: row.uniqueId,
@@ -34,17 +36,21 @@ const buildListFilter = async (req) => {
   const filter = {};
 
   if (isTrainerLikeRole(req.user.role)) {
-    const trainer = await Trainer.findById(req.user.trainer).select('employeeId').lean();
+    const trainer = await Trainer.findById(req.user.trainer).select('_id employeeId name').lean();
     if (!trainer?.employeeId) {
       return { impossible: true };
     }
-    filter.employeeId = trainer.employeeId;
+    filter.$and = [await getCompOffTrainerFilter(trainer)];
   } else if (req.query.employeeId?.trim()) {
-    filter.employeeId = String(req.query.employeeId).trim();
+    const employeeId = String(req.query.employeeId).trim();
+    const trainer = await Trainer.findOne({ employeeId }).select('_id employeeId name').lean();
+    filter.$and = [trainer ? await getCompOffTrainerFilter(trainer) : { employeeId }];
   }
 
   if (req.query.trainer) {
-    filter.trainer = req.query.trainer;
+    const trainer = await Trainer.findById(req.query.trainer).select('_id employeeId name').lean();
+    if (!trainer) return { impossible: true };
+    (filter.$and ||= []).push(await getCompOffTrainerFilter(trainer));
   }
 
   if (req.query.name?.trim()) {
@@ -87,10 +93,7 @@ export const listCompOffs = async (req, res) => {
     .sort({ employeeId: 1, dateWorkedOn: 1, uniqueId: 1, createdAt: 1 })
     .lean();
 
-  const rows = annotateCompOffRows(docs.map((doc) => ({
-    ...doc,
-    dateWorkedOn: doc.dateWorkedOn,
-  })));
+  const rows = annotateCompOffRows(await resolveCompOffRows(docs));
 
   const view = String(req.query.view || 'table').trim().toLowerCase();
   if (view === 'summary') {
@@ -111,13 +114,16 @@ export const getCompOffSummary = async (req, res) => {
   if (!req.isDemo) await ensureCompOffSeedData();
 
   let employeeId = req.query.employeeId?.trim() || '';
+  let trainer;
   if (isTrainerLikeRole(req.user.role)) {
-    const trainer = await Trainer.findById(req.user.trainer).select('employeeId').lean();
+    trainer = await Trainer.findById(req.user.trainer).select('_id employeeId name').lean();
     employeeId = trainer?.employeeId || '';
   } else if (req.params.trainerId) {
-    const trainer = await Trainer.findById(req.params.trainerId).select('employeeId').lean();
+    trainer = await Trainer.findById(req.params.trainerId).select('_id employeeId name').lean();
     if (!trainer) return res.status(404).json({ message: 'Trainer not found' });
     employeeId = trainer.employeeId;
+  } else if (employeeId) {
+    trainer = await Trainer.findOne({ employeeId }).select('_id employeeId name').lean();
   }
 
   if (!employeeId) {
@@ -133,13 +139,13 @@ export const getCompOffSummary = async (req, res) => {
     });
   }
 
-  const docs = await CompOff.find({ employeeId })
+  const docs = await CompOff.find(trainer ? await getCompOffTrainerFilter(trainer) : { employeeId })
     .sort({ dateWorkedOn: 1, uniqueId: 1, createdAt: 1 })
     .lean();
 
   res.json({
     employeeId,
-    summary: buildTrainerCompOffSummary(docs),
+    summary: buildTrainerCompOffSummary(await resolveCompOffRows(docs)),
   });
 };
 
@@ -171,12 +177,15 @@ export const createCompOff = async (req, res) => {
     return res.status(400).json({ message: 'Invalid status.' });
   }
 
-  const trainer = await Trainer.findOne({ employeeId: String(employeeId).trim() }).select('_id').lean();
+  const trainer = req.body.trainerId
+    ? await Trainer.findById(req.body.trainerId).select('_id employeeId name').lean()
+    : await Trainer.findOne({ employeeId: String(employeeId).trim() }).select('_id employeeId name').lean();
+  if (req.body.trainerId && !trainer) return res.status(400).json({ message: 'Trainer not found' });
 
   const doc = await CompOff.create({
     trainer: trainer?._id || null,
-    employeeId: String(employeeId).trim(),
-    name: String(name).trim(),
+    employeeId: trainer?.employeeId || String(employeeId).trim(),
+    name: trainer?.name || String(name).trim(),
     base: String(base).trim(),
     dateWorkedOn: normalizeDate(dateWorkedOn),
     uniqueId: String(uniqueId).trim(),
@@ -233,6 +242,12 @@ export const updateCompOff = async (req, res) => {
     }
   }
 
+  const [resolved] = await resolveCompOffRows([doc.toObject()]);
+  if (resolved.trainer?._id) {
+    doc.trainer = resolved.trainer._id;
+    doc.employeeId = resolved.employeeId;
+    doc.name = resolved.name;
+  }
   await doc.save();
   const populated = await CompOff.findById(doc._id).populate('trainer', 'name employeeId');
   res.json(annotateCompOffRows([toPlainRow(populated)])[0]);
