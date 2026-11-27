@@ -10,9 +10,6 @@ export const PLP_WEIGHTAGES = {
 };
 
 export const PLP_ATTENDANCE_DEFAULT = 4;
-/** Attendance starts at 5 from 21 October–20 November 2026 onward. */
-export const PLP_ATTENDANCE_DEFAULT_UPDATED = 5;
-export const PLP_ATTENDANCE_UPDATED_FROM_CYCLE = '2026-11';
 /** Historical compliance start, used before the September–October 2026 cycle. */
 export const PLP_COMPLIANCE_DEFAULT = 5;
 /** Compliance start from September–October 2026 onward. Still out of 5. */
@@ -48,9 +45,7 @@ export const clampPlpFinal = (value) => {
 export const attendanceScoreFromRrd = (rrdDays = 0, cycleKey) => {
   const days = Math.max(0, Number(rrdDays) || 0);
   const deduction = plpCycleUsesUpdatedRules(cycleKey) ? Math.max(0, days - 1) : days;
-  const base = String(cycleKey || '') >= PLP_ATTENDANCE_UPDATED_FROM_CYCLE
-    ? PLP_ATTENDANCE_DEFAULT_UPDATED : PLP_ATTENDANCE_DEFAULT;
-  return Math.max(0, base - deduction);
+  return Math.max(0, PLP_ATTENDANCE_DEFAULT - deduction);
 };
 
 export const complianceDefaultForCycle = (cycleKey) =>
